@@ -5,18 +5,23 @@ description:         Please see README.md
 homepage:            https://github.com/githubuser/corelang#readme
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2017 Author name here
-category:            Web
+author:              Martin Huschenbett
+maintainer:          martin.huschenbett@posteo.me
+copyright:           2017 Martin Huschenbett
+category:            Compilers/Interpreters
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files:
 cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
   exposed-modules:     Lib
+                     , CoreLang.Optimizer
+                     , CoreLang.Parser
+                     , CoreLang.Syntax
   build-depends:       base >= 4.7 && < 5
+                     , parsec
+                     , pretty
   default-language:    Haskell2010
 
 executable corelang-exe
