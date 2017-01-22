@@ -1,6 +1,6 @@
-module CoreLang.Optimizer where
+module CoreLang.Language.Optimizer where
 
-import CoreLang.Syntax
+import CoreLang.Language.Syntax
 
 neutral :: GenExpr a -> GenExpr a
 neutral = bottomUp $ \e ->
@@ -9,8 +9,8 @@ neutral = bottomUp $ \e ->
     (Ap (Ap (Var "+") (Num 0)) e2) -> e2
     (Ap (Ap (Var "*") e1) (Num 1)) -> e1
     (Ap (Ap (Var "*") (Num 1)) e2) -> e2
-    (Ap (Ap (Var "*") e1) (Num 0)) -> Num 0
-    (Ap (Ap (Var "*") (Num 0)) e2) -> Num 0
+    (Ap (Ap (Var "*") _) (Num 0))  -> Num 0
+    (Ap (Ap (Var "*") (Num 0)) _)  -> Num 0
     _                              -> e
 
 bottomUp :: (GenExpr a -> GenExpr a) -> GenExpr a -> GenExpr a

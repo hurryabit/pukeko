@@ -1,5 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
-module CoreLang.Parser where
+module CoreLang.Language.Parser where
 
 import Control.Monad (msum)
 import Text.Parsec as Parsec
@@ -7,7 +7,7 @@ import Text.Parsec.Expr
 import qualified Text.Parsec.Language as Language
 import qualified Text.Parsec.Token as Token
 
-import CoreLang.Syntax
+import CoreLang.Language.Syntax
 
 parse = Parsec.parse program
 

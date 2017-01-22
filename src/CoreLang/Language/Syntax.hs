@@ -1,4 +1,4 @@
-module CoreLang.Syntax where
+module CoreLang.Language.Syntax where
 
 type Identifier = String
 
