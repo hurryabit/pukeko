@@ -38,6 +38,17 @@ type GenProgram a = [GenDefinition a]
 
 type Program = GenProgram Identifier
 
+prelude :: Program
+prelude =
+  [ ("I", ["x"], Var "x")
+  , ("K", ["x", "y"], Var "x")
+  , ("K1", ["x", "y"], Var "y")
+  , ("S", ["f", "g", "x"], Ap (Ap (Var "f") (Var "x"))
+                              (Ap (Var "g") (Var "x")))
+  , ("compose", ["f", "g", "x"], Ap (Var "f") (Ap (Var "g") (Var "x")))
+  , ("twice", ["f"], Ap (Ap (Var "compose") (Var "f")) (Var "f"))
+  ]
+
 lhss :: [(a, b)] -> [a]
 lhss = map fst
 
