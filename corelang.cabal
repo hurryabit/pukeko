@@ -17,6 +17,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lib
                      , CoreLang.Language.Mark1
+                     , CoreLang.Language.Mark2
+                     , CoreLang.Language.Mark3
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Syntax

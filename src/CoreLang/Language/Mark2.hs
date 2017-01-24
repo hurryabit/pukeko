@@ -1,4 +1,4 @@
-module CoreLang.Language.Mark1 where
+module CoreLang.Language.Mark2 where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -73,8 +73,8 @@ instance Show State where
       showHeapItem (n, Just node) = Just $
         "  " ++ show (Addr n) ++ ": " ++ showNode node
 
-newtype Mark1 a =
-  Mark1 { getMark1 :: ExceptT String (RWS Environment String State) a }
+newtype Mark2 a =
+  Mark2 { getMark2 :: ExceptT String (RWS Environment String State) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader Environment
@@ -82,23 +82,23 @@ newtype Mark1 a =
            , MonadState State
            )
 
-runMark1 :: Mark1 a -> (Either String a, String)
-runMark1 mark1 = evalRWS (runExceptT (getMark1 mark1)) [] emptyState
+runMark2 :: Mark2 a -> (Either String a, String)
+runMark2 mark1 = evalRWS (runExceptT (getMark2 mark1)) [] emptyState
 
-stackSize :: Mark1 Int
+stackSize :: Mark2 Int
 stackSize = gets (length . _stack)
 
-isEmpty :: Mark1 Bool
+isEmpty :: Mark2 Bool
 isEmpty = gets (null . _stack)
 
-top :: Mark1 Addr
+top :: Mark2 Addr
 top = do
   stack <- gets _stack
   case stack of
     []  -> throwError "top: empty stack"
     x:_ -> return x
 
-pop :: Mark1 Addr
+pop :: Mark2 Addr
 pop = do
   stack <- gets _stack
   case stack of
@@ -107,13 +107,13 @@ pop = do
       modify $ \state -> state { _stack = xs }
       return x
 
-push :: Addr -> Mark1 ()
+push :: Addr -> Mark2 ()
 push addr = modify $ \state -> state { _stack = addr : _stack state }
 
-heapSize :: Mark1 Int
+heapSize :: Mark2 Int
 heapSize = gets (Array.rangeSize . Array.bounds . _heap)
 
-doubleHeap :: Mark1 ()
+doubleHeap :: Mark2 ()
 doubleHeap =
   modify $ \state@(State { _heap, _free }) ->
     let (l,h) = Array.bounds _heap
@@ -121,7 +121,7 @@ doubleHeap =
         newFree = _free ++ [h+1 .. 2*h]
     in  state { _heap = newHeap, _free = newFree }
 
-alloc :: Node -> Mark1 Addr
+alloc :: Node -> Mark2 Addr
 alloc node = do
   free <- gets _free
   case free of
@@ -134,28 +134,28 @@ alloc node = do
           }
       return (Addr addr)
 
-isValid :: Addr -> Mark1 Bool
+isValid :: Addr -> Mark2 Bool
 isValid (Addr n) = do
   heap <- gets _heap
   return $ Array.inRange (Array.bounds heap) n && isJust (heap ! n)
 
-check :: String -> Addr -> Mark1 ()
+check :: String -> Addr -> Mark2 ()
 check fun addr = do
   valid <- isValid addr
   unless valid $ throwError (fun ++ ": unknown address " ++ show addr)
 
-deref :: Addr -> Mark1 Node
+deref :: Addr -> Mark2 Node
 deref addr@(Addr n) = do
   check "deref" addr
   gets (fromJust . (! n) . _heap)
 
-update :: Addr -> Node -> Mark1 ()
+update :: Addr -> Node -> Mark2 ()
 update addr@(Addr n) node = do
   check "update" addr
   modify $ \state@(State { _heap }) ->
     state { _heap = _heap // [(n, Just node)] }
 
-free :: Addr -> Mark1 ()
+free :: Addr -> Mark2 ()
 free addr@(Addr n) = do
   valid <- isValid addr
   when valid $ modify $ \state@(State { _heap, _free }) ->
@@ -164,7 +164,7 @@ free addr@(Addr n) = do
       , _free = n : _free
       }
 
-tick :: Mark1 ()
+tick :: Mark2 ()
 tick = modify $ \state@(State { _ticks }) -> state { _ticks = _ticks + 1 }
 
 executeFile :: String -> IO ()
@@ -179,7 +179,7 @@ executeIO code = do
     Right n    -> "main = " ++ show n
 
 execute :: String -> (Either String Integer, String)
-execute code = runMark1 $
+execute code = runMark2 $
   case parse "<interactive>" code of
     Left error -> throwError (show error)
     Right program -> do
@@ -188,7 +188,7 @@ execute code = runMark1 $
       Number n <- top >>= deref
       return n
 
-compile :: Program -> Mark1 Environment
+compile :: Program -> Mark2 Environment
 compile program = do
   let definitions = program ++ prelude
   globals <-
@@ -199,7 +199,7 @@ compile program = do
     Just addr -> push addr
   return globals
 
-isFinal :: Mark1 Bool
+isFinal :: Mark2 Bool
 isFinal = do
   addr <- pop
   empty <- isEmpty
@@ -212,15 +212,15 @@ isFinal = do
   else
     return False
 
-dump :: Mark1 ()
+dump :: Mark2 ()
 dump = get >>= tell . show
 
-run :: Mark1 ()
+run :: Mark2 ()
 run = do
   over <- isFinal
   if over then dump else step >> run
 
-step :: Mark1 ()
+step :: Mark2 ()
 step = do
   dump
   tick
@@ -229,7 +229,7 @@ step = do
     Number _ -> throwError "step: number applied as function"
     Application addr _ -> push addr
     Function fun args body -> do
-      let rethrowEmptyStack :: String -> Mark1 a
+      let rethrowEmptyStack :: String -> Mark2 a
           rethrowEmptyStack _ =
             throwError $
               "step: function " ++ fun ++ " applied to too few arguments"
@@ -241,14 +241,15 @@ step = do
           case param of
             Application _ addr2 -> return (arg, addr2)
             _ -> throwError "step: expected application node"
-      _ <- pop `catchError` rethrowEmptyStack
+      root <- pop `catchError` rethrowEmptyStack
       addr <- local (bindings ++) (instantiate body)
+      update root (Indirection addr)
       push addr
     Indirection addr -> do
       _ <- pop
       push addr
 
-instantiate :: Expr -> Mark1 Addr
+instantiate :: Expr -> Mark2 Addr
 instantiate body =
   case body of
     Num n -> alloc (Number n)
