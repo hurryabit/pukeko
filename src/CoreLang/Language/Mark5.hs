@@ -22,7 +22,7 @@ instance Show Addr where
 
 data Primitive 
   = Neg | Add | Sub | Mul | Div 
-  | Lss | Leq | Equ | Neq | Geq | Gtr
+  | Lss | Leq | Eq  | Neq | Geq | Gtr
   | If
   deriving (Eq, Ord, Show)
 
@@ -35,7 +35,7 @@ builtins =
   , (Div, ("/"  , stepArith2 div))
   , (Lss, ("<"  , stepRel2 (<) ))
   , (Leq, ("<=" , stepRel2 (<=)))
-  , (Equ, ("==" , stepRel2 (==)))
+  , (Eq , ("==" , stepRel2 (==)))
   , (Neq, ("!=" , stepRel2 (/=)))
   , (Geq, (">=" , stepRel2 (>=)))
   , (Leq, (">"  , stepRel2 (>) ))
@@ -93,9 +93,8 @@ step = do
         update root (Data t addrs)
 
 stepArith1 :: (Integer -> Integer) -> Mark5 ()
-stepArith1 op = stepPrim1 $ \node -> do
-  Number n <- return node
-  return $ Number (op n)
+stepArith1 op = stepPrim1 $ \node ->
+  Number <$> op <$> getNumber node
 
 stepPrim1 :: (Node -> Mark5 Node) -> Mark5 ()
 stepPrim1 impl = do
@@ -111,17 +110,12 @@ stepPrim1 impl = do
     push argAddr
 
 stepArith2 :: (Integer -> Integer -> Integer) -> Mark5 ()
-stepArith2 op = stepPrim2 $ \node1 node2 -> do
-  Number n1 <- return node1
-  Number n2 <- return node2
-  return $ Number (n1 `op` n2)
+stepArith2 op = stepPrim2 $ \node1 node2 ->
+  Number <$> (op <$> getNumber node1 <*> getNumber node2)
 
 stepRel2 :: (Integer -> Integer -> Bool) -> Mark5 ()
-stepRel2 rel = stepPrim2 $ \node1 node2 -> do
-  Number n1 <- return node1
-  Number n2 <- return node2
-  let t = fromEnum (n1 `rel` n2)
-  return $ Data t []
+stepRel2 rel = stepPrim2 $ \node1 node2 ->
+  mkBool <$> (rel <$> getNumber node1 <*> getNumber node2)
 
 stepPrim2 :: (Node -> Node -> Mark5 Node) -> Mark5 ()
 stepPrim2 impl = do
@@ -155,8 +149,8 @@ stepIf = do
     thenAppAddr <- pop
     elseAppAddr <- top
     let rootAddr = elseAppAddr
-    Data t [] <- return condNode
-    if t /= 0 then do
+    cond <- getBool condNode
+    if cond then do
       Application _ thenAddr <- deref thenAppAddr
       update rootAddr (Indirection thenAddr)
     else do
@@ -436,3 +430,16 @@ run = do
   over <- isFinal
   get >>= tell . show
   unless over (step >> run)
+
+getNumber :: Node -> Mark5 Integer
+getNumber node = do
+  Number num <- return node
+  return num
+
+mkBool :: Bool -> Node
+mkBool bool = Data (fromEnum bool) []
+  
+getBool :: Node -> Mark5 Bool
+getBool node = do
+  Data t [] <- return node
+  return $ toEnum t

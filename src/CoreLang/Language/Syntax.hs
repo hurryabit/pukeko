@@ -50,8 +50,8 @@ prelude =
   , ("false", [], Pack (fromEnum False) 0)
   , ("true" , [], Pack (fromEnum True ) 0)
   , ("not", ["x"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "false")) (Var "true"))
-  , ("and", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "y"))    (Var "false"))
-  , ("or" , ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "true")) (Var "y"))
+  , ("&", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "y"))    (Var "false"))
+  , ("|" , ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "true")) (Var "y"))
   , ("xor", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Ap (Var "not") (Var "y"))) (Var "y"))
   ]
 
