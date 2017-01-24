@@ -6,6 +6,8 @@ import Control.Monad.RWS
 import Data.Array (Array, (!), (//))
 import qualified Data.Array as Array
 import Data.Maybe (mapMaybe)
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 
 import CoreLang.Language.Parser (parse)
 import CoreLang.Language.Syntax
@@ -280,7 +282,7 @@ data State = State
   { _stack :: Stack
   , _dump  :: [Stack]
   , _heap  :: Array Int (Maybe Node)
-  , _free  :: [Int] -- free addresses
+  , _free  :: IntSet -- free addresses
   , _ticks :: Int
   }
 
@@ -291,7 +293,7 @@ emptyState =
         { _stack = []
         , _dump  = []
         , _heap
-        , _free  = Array.indices _heap
+        , _free  = IntSet.fromAscList (Array.indices _heap)
         , _ticks = 0
         }
 
@@ -404,22 +406,22 @@ doubleHeap :: Mark5 ()
 doubleHeap =
   modify $ \state@(State { _heap, _free }) ->
     let (l,h) = Array.bounds _heap
-        newHeap = Array.listArray (l,2*h) (Array.elems _heap ++ repeat Nothing)
-        newFree = _free ++ [h+1 .. 2*h]
-    in  state { _heap = newHeap, _free = newFree }
+    in  state
+          { _heap = Array.listArray (l,2*h) (Array.elems _heap ++ repeat Nothing)
+          , _free = IntSet.union _free (IntSet.fromAscList [h+1 .. 2*h])
+          }
 
 alloc :: Node -> Mark5 Addr
 alloc node = do
-  free <- gets _free
-  case free of
-    [] -> doubleHeap >> alloc node
-    addr:_free -> do
-      modify $ \state@(State { _heap }) ->
-        state
-          { _heap = _heap // [(addr, Just node)]
-          , _free
-          }
-      return (Addr addr)
+  heapFull <- gets (IntSet.null . _free)
+  when heapFull doubleHeap
+  Just (addr, _free) <- gets (IntSet.minView . _free)
+  modify $ \state@(State { _heap }) ->
+    state
+      { _heap = _heap // [(addr, Just node)]
+      , _free
+      }
+  return (Addr addr)
 
 deref :: Addr -> Mark5 Node
 deref (Addr addr) = do
@@ -436,7 +438,7 @@ free (Addr addr) = do
   modify $ \state@(State { _heap, _free }) ->
     state
       { _heap = _heap // [(addr, Nothing)]
-      , _free = addr : _free
+      , _free = IntSet.insert addr _free
       }
 
 tick :: Mark5 ()

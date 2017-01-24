@@ -26,6 +26,7 @@ library
                      , CoreLang.Language.Syntax
   build-depends:       base >= 4.7 && < 5
                      , array
+                     , containers
                      , mtl
                      , parsec
                      , pretty
