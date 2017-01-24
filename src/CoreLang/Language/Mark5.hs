@@ -53,7 +53,6 @@ data Node
 
 step :: Mark5 ()
 step = do
-  tick
   dataStack <- isDataStack
   if dataStack then
     undump
@@ -283,7 +282,6 @@ data State = State
   , _dump  :: [Stack]
   , _heap  :: Array Int (Maybe Node)
   , _free  :: IntSet -- free addresses
-  , _ticks :: Int
   }
 
 initState :: Int -> State
@@ -294,14 +292,12 @@ initState heapSize =
         , _dump  = []
         , _heap
         , _free  = IntSet.fromAscList (Array.indices _heap)
-        , _ticks = 0
         }
 
 instance Show State where
-  show (State { _stack, _dump, _heap, _ticks }) =
+  show (State { _stack, _dump, _heap }) =
     unlines $ concat $
-      [ [ "Ticks = " ++ show _ticks
-        , "Stack = ["
+      [ [ "Stack = ["
         ]
       , map showStackItem _stack
       , [ "]"
@@ -313,7 +309,6 @@ instance Show State where
         ]
       , mapMaybe showHeapItem (Array.assocs _heap)
       , [ "]"
-        , replicate 50 '-'
         ]
       ]
     where
@@ -340,15 +335,17 @@ instance Show State where
 
 data Output = Output
   { _output :: [Integer]
-  , _log    :: [State]
+  , _state  :: Maybe State
+  , _ticks  :: Int
   }
 
 instance Monoid Output where
-  mempty = Output { _output = [], _log = [] }
+  mempty = Output { _output = [], _state = Nothing, _ticks = 0 }
   o1 `mappend` o2 =
     Output
-      { _output = _output o1 <> _output o2
-      , _log    = _log    o1 <> _log    o2
+      { _output = _output o1 ++      _output o2
+      , _state  = _state  o2 `mplus` _state  o1
+      , _ticks  = _ticks  o1 +       _ticks  o2
       }
   
 newtype Mark5 a =
@@ -367,7 +364,11 @@ instance Monad Mark5 where
 
 runMark5 :: Int -> Mark5 a -> (Either String a, Output)
 runMark5 heapSize mark1 =
-  evalRWS (runExceptT (getMark5 mark1)) mempty (initState heapSize)
+  let state = initState heapSize
+      rws = do
+        tell $ mempty { _state = Just state }
+        runExceptT (getMark5 mark1)
+  in  evalRWS rws [] state
 
 stackSize :: Mark5 Int
 stackSize = gets (length . _stack)
@@ -430,9 +431,6 @@ free (Addr addr) = do
       , _free = IntSet.insert addr _free
       }
 
-tick :: Mark5 ()
-tick = modify $ \state@(State { _ticks }) -> state { _ticks = _ticks + 1 }
-
 printOutput output =
   putStr $ unlines $
     [ "Output = [" ] ++ map (\n -> "  " ++ show n) output ++ [ "]" ]
@@ -441,28 +439,29 @@ executeFile :: Int -> String -> IO ()
 executeFile heapSize file = do
   let logfile = takeWhile (/= '.') file ++ ".log"
   code <- readFile file
-  let (res, Output { _output, _log }) = execute heapSize code
+  let (res, Output { _output, _state = Just state, _ticks }) = 
+        execute heapSize code
   printOutput _output
   case res of
     Left error -> do
       putStrLn $ "Error = " ++ error
-      writeFile logfile (concatMap show _log)
     Right n    -> do
-      putStrLn $ "Ticks  = " ++ show (length _log - 1)
+      putStrLn $ "Ticks  = " ++ show _ticks
       putStrLn $ "Result = " ++ show n
-      writeFile logfile (show (last _log))
+  writeFile logfile (show state)
 
 executeIO :: Int -> String -> IO ()
 executeIO heapSize code = do
-  let (res, Output { _output, _log }) = execute heapSize code
+  let (res, Output { _output, _state = Just state, _ticks }) = 
+        execute heapSize code
   case res of
     Left error -> do
-      putStr (concatMap show _log)
+      putStr (show state)
       printOutput _output
       putStrLn $ "Error = " ++ error
     Right n -> do
       printOutput _output
-      putStrLn $ "Ticks  = " ++ show (length _log - 1)
+      putStrLn $ "Ticks  = " ++ show _ticks
       putStrLn $ "Result = " ++ show n
 
 execute :: Int -> String -> (Either String Integer, Output)
@@ -509,7 +508,7 @@ run :: Mark5 ()
 run = do
   over <- isFinal
   state <- get
-  tell $ mempty { _log = [state] }
+  tell $ mempty { _state = Just state, _ticks = 1 }
   unless over (step >> run)
 
 getNumber :: Node -> Mark5 Integer
