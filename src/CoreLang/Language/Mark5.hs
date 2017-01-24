@@ -1,4 +1,4 @@
-module CoreLang.Language.Mark4 where
+module CoreLang.Language.Mark5 where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -20,16 +20,17 @@ instance Show Addr where
         p = if length s < 4 then replicate (4-length s) '0' else ""
     in  '#' : p ++ s
 
-data Primitive = Neg | Add | Sub | Mul | Div
+data Primitive = Neg | Add | Sub | Mul | Div | If
   deriving (Eq, Ord, Show)
 
-builtins :: [(Primitive, (Identifier, Mark4 ()))]
+builtins :: [(Primitive, (Identifier, Mark5 ()))]
 builtins =
   [ (Neg, ("neg", stepUnOp negate))
   , (Add, ("+"  , stepBinOp (+)  ))
   , (Sub, ("-"  , stepBinOp (-)  ))
   , (Mul, ("*"  , stepBinOp (*)  ))
   , (Div, ("/"  , stepBinOp div  ))
+  , (If , ("if" , stepIf))
   ]
 
 data Node
@@ -38,9 +39,11 @@ data Node
   | Number      Integer
   | Indirection Addr
   | Primitive   Identifier Primitive
+  | Constructor Int Int
+  | Data        Int [Addr]
   deriving (Show)
 
-step :: Mark4 ()
+step :: Mark5 ()
 step = do
   tick
   dataStack <- isDataStack
@@ -51,6 +54,7 @@ step = do
     topNode <- deref topAddr
     case topNode of
       Number _ -> throwError "step: number applied as function"
+      Data _ _ -> throwError "step: data applied as function"
       Application addr1 addr2 -> do
         node2 <- deref addr2
         case node2 of
@@ -62,17 +66,24 @@ step = do
             _ <- pop
             Application _ addr2 <- top >>= deref
             return (arg, addr2)
-        root <- pop
+        root <- top
         local (bindings ++) (instantiateAndUpdate body root)
-        push root
       Indirection addr -> do
         _ <- pop
         push addr
       Primitive _ prim -> do
         let Just (_, primStep) = lookup prim builtins
         primStep
+      Constructor t n -> do
+        addrs <-
+          replicateM n $ do
+            _ <- pop
+            Application _ addr <- top >>= deref
+            return addr
+        root <- top
+        update root (Data t addrs)
 
-stepUnOp :: (Integer -> Integer) -> Mark4 ()
+stepUnOp :: (Integer -> Integer) -> Mark5 ()
 stepUnOp op = do
   _ <- pop
   appAddr <- top
@@ -85,7 +96,7 @@ stepUnOp op = do
     dump
     push argAddr
 
-stepBinOp :: (Integer -> Integer -> Integer) -> Mark4 ()
+stepBinOp :: (Integer -> Integer -> Integer) -> Mark5 ()
 stepBinOp op = do
   _ <- pop
   app1Addr <- top
@@ -107,7 +118,30 @@ stepBinOp op = do
     dump
     push arg1Addr
 
-instantiate :: Expr -> Mark4 Addr
+stepIf :: Mark5 ()
+stepIf = do
+  _ <- pop
+  condAppAddr <- top
+  Application _ condAddr <- deref condAppAddr
+  condNode <- deref condAddr
+  if isDataNode condNode then do
+    _ <- pop -- condAppAddr
+    thenAppAddr <- pop
+    elseAppAddr <- top
+    let rootAddr = elseAppAddr
+    Data t [] <- return condNode
+    if t /= 0 then do
+      Application _ thenAddr <- deref thenAppAddr
+      update rootAddr (Indirection thenAddr)
+    else do
+      Application _ elseAddr <- deref elseAppAddr
+      update rootAddr (Indirection elseAddr)
+  else do
+    dump
+    push condAddr
+    
+
+instantiate :: Expr -> Mark5 Addr
 instantiate body =
   case body of
     Num n -> alloc (Number n)
@@ -133,11 +167,11 @@ instantiate body =
         forM_ (zip defs bindings) $ \((_, rhs), (_, addr)) -> do
           instantiateAndUpdate rhs addr
         instantiate expr
-    Pack _ _ -> throwError "instantiate: constructors not implemented"
+    Pack t n -> alloc (Constructor t n)
     Case _ _ -> throwError "instantiate: case ... of not implemented"
     Lam  _ _ -> throwError "instantiate: lambdas not implemented"
 
-instantiateAndUpdate :: Expr -> Addr -> Mark4 ()
+instantiateAndUpdate :: Expr -> Addr -> Mark5 ()
 instantiateAndUpdate body target =
   case body of
     Num n -> update target (Number n)
@@ -163,7 +197,7 @@ instantiateAndUpdate body target =
         forM_ (zip defs bindings) $ \((_, rhs), (_, addr)) -> do
           instantiateAndUpdate rhs addr
         instantiateAndUpdate expr target
-    Pack _ _ -> throwError "instantiateAndUpdate: constructors not implemented"
+    Pack t n -> update target (Constructor t n)
     Case _ _ -> throwError "instantiateAndUpdate: case ... of not implemented"
     Lam  _ _ -> throwError "instantiateAndUpdate: lambdas not implemented"
 
@@ -209,10 +243,12 @@ instance Show State where
       showNode node =
         case node of
           Application addr1 addr2 -> unwords [ "App", show addr1, show addr2 ]
-          Function   fun _ _      -> unwords [ "Fun", fun ]
+          Function    fun _ _     -> unwords [ "Fun", fun ]
           Number      n           -> unwords [ "Num", show n ]
           Indirection addr        -> unwords [ "Ind", show addr ]
           Primitive   fun _       -> unwords [ "Pri", fun ]
+          Constructor t n         -> unwords [ "Con", show t, show n ]
+          Data        t addrs     -> unwords $ "Dat" : show t : map show addrs
       showStackItem addr@(Addr n) =
         let Just node = _heap ! n
         in  "  " ++ show addr ++ ": " ++ showNode node
@@ -225,8 +261,8 @@ instance Show State where
       showHeapItem (n, Just node) = Just $
         "  " ++ show (Addr n) ++ ": " ++ showNode node
 
-newtype Mark4 a =
-  Mark4 { getMark4 :: ExceptT String (RWS Environment String State) a }
+newtype Mark5 a =
+  Mark5 { getMark5 :: ExceptT String (RWS Environment String State) a }
   deriving ( Functor, Applicative
            , MonadError String
            , MonadReader Environment
@@ -234,49 +270,49 @@ newtype Mark4 a =
            , MonadState State
            )
 
-instance Monad Mark4 where
-  return  = Mark4 . return
-  m >>= f = Mark4 $ getMark4 m >>= getMark4 . f
-  fail    = Mark4 . throwError
+instance Monad Mark5 where
+  return  = Mark5 . return
+  m >>= f = Mark5 $ getMark5 m >>= getMark5 . f
+  fail    = Mark5 . throwError
 
-runMark4 :: Mark4 a -> (Either String a, String)
-runMark4 mark1 = evalRWS (runExceptT (getMark4 mark1)) [] emptyState
+runMark5 :: Mark5 a -> (Either String a, String)
+runMark5 mark1 = evalRWS (runExceptT (getMark5 mark1)) [] emptyState
 
-stackSize :: Mark4 Int
+stackSize :: Mark5 Int
 stackSize = gets (length . _stack)
 
-isEmpty :: Mark4 Bool
+isEmpty :: Mark5 Bool
 isEmpty = gets (null . _stack)
 
-top :: Mark4 Addr
+top :: Mark5 Addr
 top = do
   addr:_ <- gets _stack
   return addr
 
-pop :: Mark4 Addr
+pop :: Mark5 Addr
 pop = do
   addr:_stack <- gets _stack
   modify $ \state -> state { _stack }
   return addr
 
-push :: Addr -> Mark4 ()
+push :: Addr -> Mark5 ()
 push addr = 
   modify $ \state@(State { _stack }) -> state { _stack = addr:_stack }
 
-dump :: Mark4 ()
+dump :: Mark5 ()
 dump = modify $ \state@(State { _stack, _dump }) ->
   state { _stack = [], _dump = _stack : _dump }
 
-undump :: Mark4 ()
+undump :: Mark5 ()
 undump = do
   _stack:_dump <- gets _dump
   modify $ \state -> state { _stack, _dump }
     
 
-heapSize :: Mark4 Int
+heapSize :: Mark5 Int
 heapSize = gets (Array.rangeSize . Array.bounds . _heap)
 
-doubleHeap :: Mark4 ()
+doubleHeap :: Mark5 ()
 doubleHeap =
   modify $ \state@(State { _heap, _free }) ->
     let (l,h) = Array.bounds _heap
@@ -284,7 +320,7 @@ doubleHeap =
         newFree = _free ++ [h+1 .. 2*h]
     in  state { _heap = newHeap, _free = newFree }
 
-alloc :: Node -> Mark4 Addr
+alloc :: Node -> Mark5 Addr
 alloc node = do
   free <- gets _free
   case free of
@@ -297,17 +333,17 @@ alloc node = do
           }
       return (Addr addr)
 
-deref :: Addr -> Mark4 Node
+deref :: Addr -> Mark5 Node
 deref (Addr addr) = do
   Just node <- gets ((! addr) . _heap)
   return node
 
-update :: Addr -> Node -> Mark4 ()
+update :: Addr -> Node -> Mark5 ()
 update (Addr addr) node = do
   modify $ \state@(State { _heap }) ->
     state { _heap = _heap // [(addr, Just node)] }
 
-free :: Addr -> Mark4 ()
+free :: Addr -> Mark5 ()
 free (Addr addr) = do
   modify $ \state@(State { _heap, _free }) ->
     state
@@ -315,7 +351,7 @@ free (Addr addr) = do
       , _free = addr : _free
       }
 
-tick :: Mark4 ()
+tick :: Mark5 ()
 tick = modify $ \state@(State { _ticks }) -> state { _ticks = _ticks + 1 }
 
 executeFile :: String -> IO ()
@@ -330,7 +366,7 @@ executeIO code = do
     Right n    -> "main = " ++ show n
 
 execute :: String -> (Either String Integer, String)
-execute code = runMark4 $
+execute code = runMark5 $
   case parse "<interactive>" code of
     Left error -> throwError (show error)
     Right program -> do
@@ -339,7 +375,7 @@ execute code = runMark4 $
       Number n <- top >>= deref
       return n
 
-compile :: Program -> Mark4 Environment
+compile :: Program -> Mark5 Environment
 compile program = do
   functions <-
     forM (program ++ prelude) $ \(fun, args, body) ->
@@ -355,20 +391,21 @@ isDataNode :: Node -> Bool
 isDataNode node =
   case node of
     Number _ -> True
+    Data _ _ -> True
     _        -> False
 
 isSingleton :: [a] -> Bool
 isSingleton [_] = True
 isSingleton _   = False
 
-isDataStack :: Mark4 Bool
+isDataStack :: Mark5 Bool
 isDataStack =
   (&&) <$> (isDataNode <$> (top >>= deref)) <*> gets (isSingleton . _stack)
 
-isFinal :: Mark4 Bool
+isFinal :: Mark5 Bool
 isFinal = (&&) <$> isDataStack <*> gets (null . _dump)
 
-run :: Mark4 ()
+run :: Mark5 ()
 run = do
   over <- isFinal
   get >>= tell . show

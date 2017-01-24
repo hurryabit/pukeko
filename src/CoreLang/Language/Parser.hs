@@ -102,6 +102,8 @@ expr = msum
 aexpr = msum
   [ Var <$> identifier
   , Num <$> natural
-  , reserved "Pack" *> braces (Constr <$> natural <* comma <*> natural)
+  , reserved "Pack" *> braces (pack <$> natural <* comma <*> natural)
   , parens expr
   ]
+  where
+    pack t n = Pack (fromInteger t) (fromInteger n)

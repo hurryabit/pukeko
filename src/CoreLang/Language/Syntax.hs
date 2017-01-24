@@ -9,7 +9,7 @@ data IsRec = NonRecursive | Recursive
 data GenExpr a
   = Var Identifier
   | Num Integer
-  | Constr Integer Integer
+  | Pack Int Int
   | Ap (GenExpr a) (GenExpr a)
   | Let IsRec [GenLocalDefinition a] (GenExpr a)
   | Case (GenExpr a) [GenAlter a]
@@ -47,6 +47,12 @@ prelude =
                               (Ap (Var "g") (Var "x")))
   , ("compose", ["f", "g", "x"], Ap (Var "f") (Ap (Var "g") (Var "x")))
   , ("twice", ["f"], Ap (Ap (Var "compose") (Var "f")) (Var "f"))
+  , ("false", [], Pack 0 0)
+  , ("true" , [], Pack 1 0)
+  , ("not", ["x"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "false")) (Var "true"))
+  , ("and", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "y"))    (Var "false"))
+  , ("or" , ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "true")) (Var "y"))
+  , ("xor", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Ap (Var "not") (Var "y"))) (Var "y"))
   ]
 
 lhss :: [(a, b)] -> [a]
