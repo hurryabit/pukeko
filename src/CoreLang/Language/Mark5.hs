@@ -448,16 +448,18 @@ printOutput output =
 
 executeFile :: String -> IO ()
 executeFile file = do
+  let logfile = takeWhile (/= '.') file ++ ".log"
   code <- readFile file
   let (res, Output { _output, _log }) = execute code
   printOutput _output
   case res of
     Left error -> do
       putStrLn $ "Error = " ++ error
-      writeFile (file ++ ".log") (concatMap show _log)
+      writeFile logfile (concatMap show _log)
     Right n    -> do
       putStrLn $ "Ticks  = " ++ show (length _log - 1)
       putStrLn $ "Result = " ++ show n
+      writeFile logfile (show (last _log))
 
 executeIO :: String -> IO ()
 executeIO code = do
