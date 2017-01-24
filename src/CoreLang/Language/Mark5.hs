@@ -1,7 +1,7 @@
 module CoreLang.Language.Mark5 where
 
 import Control.Monad.Except
-import Control.Monad.RWS
+import Control.Monad.RWS.Strict
 
 import Data.Array (Array, (!), (//))
 import qualified Data.Array as Array
@@ -229,8 +229,11 @@ instantiate body =
       addr2 <- instantiate expr2
       alloc (Application addr1 addr2)
     Var x -> do
-      Just addr <- asks (lookup x)
-      return addr
+      env    <- ask
+      global <- gets _global
+      case lookup x (env ++ global) of
+        Nothing   -> throwError ("unknown variable " ++ x)
+        Just addr -> return addr
     Let NonRecursive defs expr -> do
       bindings <-
         forM defs $ \(x, rhs) -> do
@@ -283,20 +286,22 @@ instantiateAndUpdate body target =
 type Stack = [Addr]
 
 data State = State
-  { _stack :: Stack
-  , _dump  :: [Stack]
-  , _heap  :: Array Int Node
-  , _free  :: IntSet -- free addresses
+  { _stack  :: Stack
+  , _dump   :: [Stack]
+  , _heap   :: Array Int Node
+  , _free   :: IntSet -- free addresses
+  , _global :: Environment
   }
 
 initState :: Int -> State
 initState heapSize = 
   let _heap = Array.listArray (1,heapSize) (repeat Free)
   in  State
-        { _stack = []
-        , _dump  = []
+        { _stack  = []
+        , _dump   = []
         , _heap
-        , _free  = IntSet.fromAscList (Array.indices _heap)
+        , _free   = IntSet.fromAscList (Array.indices _heap)
+        , _global = []
         }
 
 instance Show State where
@@ -341,10 +346,10 @@ instance Show State where
         "  " ++ show (Addr n) ++ ": " ++ showNode node
 
 data Stats = Stats
-  { _ticks    :: Int
-  , _maxHeap  :: Int
-  , _gcRuns   :: Int
-  , _gcVolume :: Int
+  { _ticks    :: !Int
+  , _maxHeap  :: !Int
+  , _gcRuns   :: !Int
+  , _gcVolume :: !Int
   }
 
 instance Show Stats where
@@ -415,7 +420,7 @@ undump = do
   modify $ \state -> state { _stack, _dump }
     
 alloc :: Node -> Mark5 Addr
-alloc Free = throwError "cannot alloc free"
+alloc Free = throwError "cannot use Free"
 alloc node = do
   view <- gets (IntSet.minView . _free)
   case view of
@@ -434,7 +439,7 @@ deref :: Addr -> Mark5 Node
 deref (Addr addr) = gets ((! addr) . _heap)
 
 update :: Addr -> Node -> Mark5 ()
-update _           Free = throwError "cannot update with free"
+update _           Free = throwError "cannot use Free"
 update (Addr addr) node = do
   modify $ \state@(State { _heap }) ->
     state { _heap = _heap // [(addr, node)] }
@@ -469,12 +474,11 @@ execute heapSize code = runMark5 heapSize $
   case parse "<interactive>" code of
     Left error -> throwError (show error)
     Right program -> do
-      globals <- compile program
-      local (globals ++) run
-      Number n <- top >>= deref
-      return n
+      compile program
+      run
+      top >>= deref >>= getNumber
 
-compile :: Program -> Mark5 Environment
+compile :: Program -> Mark5 ()
 compile program = do
   functions <-
     forM (program ++ prelude) $ \(fun, args, body) ->
@@ -484,7 +488,9 @@ compile program = do
        (,) fun <$> alloc (Primitive fun prim)
   Just addr <- return (lookup "main" functions)
   push addr
-  return (functions ++ primitives)
+  modify $ \state ->
+    state { _global = functions ++ primitives }
+  return ()
 
 isDataNode :: Node -> Bool
 isDataNode node =
@@ -539,16 +545,39 @@ debug :: String -> Mark5 ()
 debug = Mark5 . liftIO . putStrLn
 
 markFrom :: Addr -> Mark5 ()
+-- markFrom :: Addr -> Mark5 Addr
 markFrom addr = do
   node <- deref addr
   case node of
+    Free     -> throwError "found Free"
     Marked _ -> return ()
     _        -> update addr (Marked node)
+    -- Indirection _ -> return ()
+    -- _             -> update addr (Marked node)
   case node of
+    Free -> throwError "found Free"
     Application addr1 addr2 -> markFrom addr1 >> markFrom addr2
     Indirection addr        -> markFrom addr
     Data        _ addrs     -> forM_ addrs markFrom
     _                       -> return ()
+    -- Marked _ -> return addr
+    -- Application addr1 addr2 -> do
+    --   addr1 <- markFrom addr1
+    --   addr2 <- markFrom addr2
+    --   update addr (Marked (Application addr1 addr2))
+    --   return addr
+    -- Indirection addr1 -> do
+    --   addr1 <- markFrom addr1
+    --   update addr (Indirection addr1)
+    --   return addr1
+    -- Data t addrs -> do
+    --   addrs <- mapM markFrom addrs
+    --   update addr (Marked (Data t addrs))
+    --   return addr
+    -- Number      _     -> return addr
+    -- Function    _ _ _ -> return addr
+    -- Primitive   _ _   -> return addr
+    -- Constructor _ _   -> return addr
 
 scan :: Mark5 ()
 scan = do
@@ -575,11 +604,17 @@ gc = do
     oldUsage <- gets heapUsage
     stackRootAddrs <- gets _stack
     dumpRootAddrs <- gets (concat . _dump)
-    globalRootAddrs <- asks (map snd)
+    globalRootAddrs <- gets (map snd . _global)
     let rootAddrs = concat
           [stackRootAddrs, dumpRootAddrs, globalRootAddrs]
+    -- debug "before gc"
+    -- debugState
     forM_ rootAddrs markFrom
+    -- debug "between gc"
+    -- debugState
     scan
+    -- debug "after gc"
+    -- debugState
     newUsage <- gets heapUsage
     tell $ mempty { _gcRuns = 1, _gcVolume = oldUsage - newUsage }
     debug $ "GC: " ++ show oldUsage ++ " -> " ++ show newUsage
