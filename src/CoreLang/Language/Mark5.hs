@@ -5,9 +5,10 @@ import Control.Monad.RWS
 
 import Data.Array (Array, (!), (//))
 import qualified Data.Array as Array
-import Data.Maybe (mapMaybe)
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import qualified Data.List as List
+import Data.Maybe (mapMaybe)
 
 import CoreLang.Language.Parser (parse)
 import CoreLang.Language.Syntax
@@ -43,7 +44,9 @@ builtins =
   ]
 
 data Node
-  = Application Addr Addr
+  = Free
+  | Marked      Node
+  | Application Addr Addr
   | Function    Identifier [Identifier] Expr
   | Number      Integer
   | Indirection Addr
@@ -87,6 +90,8 @@ step = do
             return addr
         root <- top
         update root (Data t addrs)
+      Marked _ -> throwError "marked node"
+      Free     -> throwError "free node"
 
 stepArith1 :: (Integer -> Integer) -> Mark5 ()
 stepArith1 op = stepPrim1 $ \node ->
@@ -206,7 +211,7 @@ stepPrint = do
   outNode <- deref outAddr
   if isDataNode outNode then do
     num <- getNumber outNode
-    tell $ mempty { _output = [num] }
+    Mark5 $ liftIO $ print num
     _ <- pop -- outAppAddr
     retAppAddr <- top -- rootAddr
     Application _ retAddr <- deref retAppAddr
@@ -280,13 +285,13 @@ type Stack = [Addr]
 data State = State
   { _stack :: Stack
   , _dump  :: [Stack]
-  , _heap  :: Array Int (Maybe Node)
+  , _heap  :: Array Int Node
   , _free  :: IntSet -- free addresses
   }
 
 initState :: Int -> State
 initState heapSize = 
-  let _heap = Array.listArray (1,heapSize) (repeat Nothing)
+  let _heap = Array.listArray (1,heapSize) (repeat Free)
   in  State
         { _stack = []
         , _dump  = []
@@ -295,9 +300,10 @@ initState heapSize =
         }
 
 instance Show State where
-  show (State { _stack, _dump, _heap }) =
-    unlines $ concat $
-      [ [ "Stack = ["
+  show (state@State { _stack, _dump, _heap }) =
+    List.intercalate "\n" $ concat $
+      [ [ concat ["Heap Usage = ", show (heapUsage state), " / ", show (heapSize state)]
+        , "Stack = ["
         ]
       , map showStackItem _stack
       , [ "]"
@@ -321,39 +327,51 @@ instance Show State where
           Primitive   fun _       -> unwords [ "Pri", fun ]
           Constructor t n         -> unwords [ "Con", show t, show n ]
           Data        t addrs     -> unwords $ "Dat" : show t : map show addrs
+          Marked      node        -> "*" ++ showNode node ++ "*"
+          Free                    -> ""
       showStackItem addr@(Addr n) =
-        let Just node = _heap ! n
-        in  "  " ++ show addr ++ ": " ++ showNode node
+        "  " ++ show addr ++ ": " ++ showNode (_heap ! n)
       showDumpItem stack = concat
         [ "  ["
         , unwords $ map show stack
         , "]"
         ]
-      showHeapItem (_, Nothing)   = Nothing
-      showHeapItem (n, Just node) = Just $
+      showHeapItem (_, Free) = Nothing
+      showHeapItem (n, node) = Just $
         "  " ++ show (Addr n) ++ ": " ++ showNode node
 
-data Output = Output
-  { _output :: [Integer]
-  , _state  :: Maybe State
-  , _ticks  :: Int
+data Stats = Stats
+  { _ticks    :: Int
+  , _maxHeap  :: Int
+  , _gcRuns   :: Int
+  , _gcVolume :: Int
   }
 
-instance Monoid Output where
-  mempty = Output { _output = [], _state = Nothing, _ticks = 0 }
-  o1 `mappend` o2 =
-    Output
-      { _output = _output o1 ++      _output o2
-      , _state  = _state  o2 `mplus` _state  o1
-      , _ticks  = _ticks  o1 +       _ticks  o2
+instance Show Stats where
+  show (Stats { _ticks, _maxHeap, _gcRuns, _gcVolume }) =
+    List.intercalate "; "
+    [ "Ticks = "          ++ show _ticks
+    , "Max Heap Usage = " ++ show _maxHeap
+    , "GC Runs = "        ++ show _gcRuns
+    , "GC Volume = "      ++ show _gcVolume
+    ]
+
+instance Monoid Stats where
+  mempty = Stats { _ticks = 0, _maxHeap = 0, _gcRuns = 0, _gcVolume = 0 }
+  s1 `mappend` s2 = 
+    Stats
+      { _ticks    = _ticks    s1 +     _ticks    s2
+      , _maxHeap  = _maxHeap  s1 `max` _maxHeap  s2
+      , _gcRuns   = _gcRuns   s1 +     _gcRuns   s2
+      , _gcVolume = _gcVolume s1 +     _gcVolume s2
       }
   
 newtype Mark5 a =
-  Mark5 { getMark5 :: ExceptT String (RWS Environment Output State) a }
+  Mark5 { getMark5 :: ExceptT String (RWST Environment Stats State IO) a }
   deriving ( Functor, Applicative
            , MonadError String
            , MonadReader Environment
-           , MonadWriter Output
+           , MonadWriter Stats
            , MonadState State
            )
 
@@ -362,13 +380,9 @@ instance Monad Mark5 where
   m >>= f = Mark5 $ getMark5 m >>= getMark5 . f
   fail    = Mark5 . throwError
 
-runMark5 :: Int -> Mark5 a -> (Either String a, Output)
+runMark5 :: Int -> Mark5 a -> IO (Either String a, State, Stats)
 runMark5 heapSize mark1 =
-  let state = initState heapSize
-      rws = do
-        tell $ mempty { _state = Just state }
-        runExceptT (getMark5 mark1)
-  in  evalRWS rws [] state
+  runRWST (runExceptT (getMark5 mark1)) [] (initState heapSize)
 
 stackSize :: Mark5 Int
 stackSize = gets (length . _stack)
@@ -401,6 +415,7 @@ undump = do
   modify $ \state -> state { _stack, _dump }
     
 alloc :: Node -> Mark5 Addr
+alloc Free = throwError "cannot alloc free"
 alloc node = do
   view <- gets (IntSet.minView . _free)
   case view of
@@ -408,63 +423,48 @@ alloc node = do
     Just (addr, _free) -> do
       modify $ \state@(State { _heap }) ->
         state
-          { _heap = _heap // [(addr, Just node)]
+          { _heap = _heap // [(addr, node)]
           , _free
           }
+      usage <- gets heapUsage
+      tell $ mempty { _maxHeap = usage }
       return (Addr addr)
 
 deref :: Addr -> Mark5 Node
-deref (Addr addr) = do
-  Just node <- gets ((! addr) . _heap)
-  return node
+deref (Addr addr) = gets ((! addr) . _heap)
 
 update :: Addr -> Node -> Mark5 ()
+update _           Free = throwError "cannot update with free"
 update (Addr addr) node = do
   modify $ \state@(State { _heap }) ->
-    state { _heap = _heap // [(addr, Just node)] }
-
-free :: Addr -> Mark5 ()
-free (Addr addr) = do
-  modify $ \state@(State { _heap, _free }) ->
-    state
-      { _heap = _heap // [(addr, Nothing)]
-      , _free = IntSet.insert addr _free
-      }
-
-printOutput output =
-  putStr $ unlines $
-    [ "Output = [" ] ++ map (\n -> "  " ++ show n) output ++ [ "]" ]
+    state { _heap = _heap // [(addr, node)] }
 
 executeFile :: Int -> String -> IO ()
 executeFile heapSize file = do
   let logfile = takeWhile (/= '.') file ++ ".log"
   code <- readFile file
-  let (res, Output { _output, _state = Just state, _ticks }) = 
-        execute heapSize code
-  printOutput _output
+  (res, state, stats) <- execute heapSize code
   case res of
     Left error -> do
       putStrLn $ "Error = " ++ error
     Right n    -> do
-      putStrLn $ "Ticks  = " ++ show _ticks
+      print stats
       putStrLn $ "Result = " ++ show n
   writeFile logfile (show state)
 
 executeIO :: Int -> String -> IO ()
 executeIO heapSize code = do
-  let (res, Output { _output, _state = Just state, _ticks }) = 
-        execute heapSize code
+  (res, state, stats) <- execute heapSize code
   case res of
     Left error -> do
       putStr (show state)
-      printOutput _output
       putStrLn $ "Error = " ++ error
     Right n -> do
-      printOutput _output
-      putStrLn $ "Ticks  = " ++ show _ticks
+      print state
+      print stats
       putStrLn $ "Result = " ++ show n
 
-execute :: Int -> String -> (Either String Integer, Output)
+execute :: Int -> String -> IO (Either String Integer, State, Stats)
 execute heapSize code = runMark5 heapSize $
   case parse "<interactive>" code of
     Left error -> throwError (show error)
@@ -507,9 +507,8 @@ isFinal = (&&) <$> isDataStack <*> gets (null . _dump)
 run :: Mark5 ()
 run = do
   over <- isFinal
-  state <- get
-  tell $ mempty { _state = Just state, _ticks = 1 }
-  unless over (step >> run)
+  tell $ mempty { _ticks = 1 }
+  unless over (gc >> step >> run)
 
 getNumber :: Node -> Mark5 Integer
 getNumber node = do
@@ -523,3 +522,66 @@ getBool :: Node -> Mark5 Bool
 getBool node = do
   Data t [] <- return node
   return $ toEnum t
+
+markFrom :: Addr -> Mark5 ()
+markFrom addr = do
+  node <- deref addr
+  case node of
+    Marked _ -> return ()
+    _        -> update addr (Marked node)
+  case node of
+    Application addr1 addr2 -> markFrom addr1 >> markFrom addr2
+    Indirection addr        -> markFrom addr
+    Data        _ addrs     -> forM_ addrs markFrom
+    _                       -> return ()
+
+scan :: Mark5 ()
+scan = do
+  modify $ \state@(State { _heap, _free }) ->
+    let isCollectible node =
+          case node of
+            Free     -> False
+            Marked _ -> False
+            _        -> True
+        collectibleAddrs =
+          [ addr | (addr, node) <- Array.assocs _heap, isCollectible node ]
+        unmark node =
+          case node of
+            Marked node -> node
+            _           -> Free
+    in  state
+          { _heap = fmap unmark _heap
+          , _free = IntSet.union _free (IntSet.fromAscList collectibleAddrs)
+          }
+
+heapSize, heapFree, heapUsage :: State -> Int
+heapSize (State { _heap }) = Array.rangeSize (Array.bounds _heap)
+heapFree (State { _free }) = IntSet.size _free
+heapUsage = (-) <$> heapSize <*> heapFree
+
+debugState :: Mark5 ()
+debugState = do
+  let sep = replicate 50 '='
+  debug sep
+  get >>= debug . show
+  debug sep
+
+debug :: String -> Mark5 ()
+debug = Mark5 . liftIO . putStrLn
+
+gc :: Mark5 ()
+gc = do
+  needed <- gets (\state -> 5 * heapFree state < heapSize state)
+  when needed $ do
+    oldUsage <- gets heapUsage
+    stackRootAddrs <- gets _stack
+    dumpRootAddrs <- gets (concat . _dump)
+    globalRootAddrs <- asks (map snd)
+    let rootAddrs = concat
+          [stackRootAddrs, dumpRootAddrs, globalRootAddrs]
+    forM_ rootAddrs markFrom
+    scan
+    newUsage <- gets heapUsage
+    tell $ mempty { _gcRuns = 1, _gcVolume = oldUsage - newUsage }
+    debug $ "GC: " ++ show oldUsage ++ " -> " ++ show newUsage
+    -- debugState
