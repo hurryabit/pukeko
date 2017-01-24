@@ -53,6 +53,9 @@ prelude =
   , ("&", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "y"))    (Var "false"))
   , ("|" , ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Var "true")) (Var "y"))
   , ("xor", ["x", "y"], Ap (Ap (Ap (Var "if") (Var "x")) (Ap (Var "not") (Var "y"))) (Var "y"))
+  , ("pair", [], Pack 0 2)
+  , ("fst",["p"],Ap (Ap (Var "unpair") (Var "p")) (Var "K"))
+  , ("snd",["p"],Ap (Ap (Var "unpair") (Var "p")) (Var "K1"))
   ]
 
 lhss :: [(a, b)] -> [a]

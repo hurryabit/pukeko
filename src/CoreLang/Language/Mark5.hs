@@ -23,7 +23,7 @@ instance Show Addr where
 data Primitive 
   = Neg | Add | Sub | Mul | Div 
   | Lss | Leq | Eq  | Neq | Geq | Gtr
-  | If
+  | If  | Unpair
   deriving (Eq, Ord, Show)
 
 builtins :: [(Primitive, (Identifier, Mark5 ()))]
@@ -40,6 +40,7 @@ builtins =
   , (Geq, (">=" , stepRel2 (>=)))
   , (Leq, (">"  , stepRel2 (>) ))
   , (If , ("if" , stepIf))
+  , (Unpair, ("unpair", stepUnpair))
   ]
 
 data Node
@@ -73,8 +74,8 @@ step = do
         bindings <-
           forM args $ \arg -> do
             _ <- pop
-            Application _ addr2 <- top >>= deref
-            return (arg, addr2)
+            Application _ argAddr <- top >>= deref
+            return (arg, argAddr)
         root <- top
         local (bindings ++) (instantiateAndUpdate body root)
       Indirection addr -> do
@@ -159,7 +160,23 @@ stepIf = do
   else do
     dump
     push condAddr
-    
+
+stepUnpair :: Mark5 ()
+stepUnpair = do
+  _ <- pop
+  pairAppNode <- top
+  Application _ pairAddr <-deref pairAppNode
+  pairNode <- deref pairAddr
+  if isDataNode pairNode then do
+    Data 0 [arg1Addr, arg2Addr] <- return pairNode
+    _ <- pop -- pairAppNode
+    rootAddr <- top
+    Application _ funAddr <- deref rootAddr
+    arg1AppAddr <- alloc (Application funAddr arg1Addr)
+    update rootAddr (Application arg1AppAddr arg2Addr)
+  else do
+    dump
+    push pairAddr
 
 instantiate :: Expr -> Mark5 Addr
 instantiate body =
