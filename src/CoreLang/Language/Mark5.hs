@@ -523,6 +523,21 @@ getBool node = do
   Data t [] <- return node
   return $ toEnum t
 
+heapSize, heapFree, heapUsage :: State -> Int
+heapSize (State { _heap }) = Array.rangeSize (Array.bounds _heap)
+heapFree (State { _free }) = IntSet.size _free
+heapUsage = (-) <$> heapSize <*> heapFree
+
+debugState :: Mark5 ()
+debugState = do
+  let sep = replicate 50 '='
+  debug sep
+  get >>= debug . show
+  debug sep
+
+debug :: String -> Mark5 ()
+debug = Mark5 . liftIO . putStrLn
+
 markFrom :: Addr -> Mark5 ()
 markFrom addr = do
   node <- deref addr
@@ -553,22 +568,6 @@ scan = do
           { _heap = fmap unmark _heap
           , _free = IntSet.union _free (IntSet.fromAscList collectibleAddrs)
           }
-
-heapSize, heapFree, heapUsage :: State -> Int
-heapSize (State { _heap }) = Array.rangeSize (Array.bounds _heap)
-heapFree (State { _free }) = IntSet.size _free
-heapUsage = (-) <$> heapSize <*> heapFree
-
-debugState :: Mark5 ()
-debugState = do
-  let sep = replicate 50 '='
-  debug sep
-  get >>= debug . show
-  debug sep
-
-debug :: String -> Mark5 ()
-debug = Mark5 . liftIO . putStrLn
-
 gc :: Mark5 ()
 gc = do
   needed <- gets (\state -> 5 * heapFree state < heapSize state)
