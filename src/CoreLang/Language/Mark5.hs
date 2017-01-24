@@ -451,6 +451,7 @@ executeFile heapSize file = do
   (res, state, stats) <- execute heapSize code
   case res of
     Left error -> do
+      print state
       putStrLn $ "Error = " ++ error
     Right n    -> do
       print stats
@@ -512,9 +513,12 @@ isFinal = (&&) <$> isDataStack <*> gets (null . _dump)
 
 run :: Mark5 ()
 run = do
+  gc
   over <- isFinal
-  tell $ mempty { _ticks = 1 }
-  unless over (gc >> step >> run)
+  unless over $ do
+    step
+    tell $ mempty { _ticks = 1 }
+    run
 
 getNumber :: Node -> Mark5 Integer
 getNumber node = do
@@ -543,41 +547,55 @@ debugState = do
 
 debug :: String -> Mark5 ()
 debug = Mark5 . liftIO . putStrLn
+gc :: Mark5 ()
+gc = do
+  needed <- gets (\state -> 5 * heapFree state < heapSize state)
+  when needed $ do
+    oldUsage <- gets heapUsage
+    -- debug "before gc"
+    -- debugState
+    _stack  <- gets _stack  >>= mapM markFrom
+    _dump   <- gets _dump   >>= mapM (mapM markFrom)
+    _global <- gets _global >>= mapM (\(x, addr) -> (,) x <$> markFrom addr)
+    modify $ \state -> state { _stack, _dump, _global }
+    -- debug "between gc"
+    -- debugState
+    scan
+    -- debug "after gc"
+    -- debugState
+    newUsage <- gets heapUsage
+    tell $ mempty { _gcRuns = 1, _gcVolume = oldUsage - newUsage }
+    -- debug $ "GC: " ++ show oldUsage ++ " -> " ++ show newUsage
+    -- debugState
 
-markFrom :: Addr -> Mark5 ()
--- markFrom :: Addr -> Mark5 Addr
+markFrom :: Addr -> Mark5 Addr
 markFrom addr = do
   node <- deref addr
   case node of
-    Free     -> throwError "found Free"
-    Marked _ -> return ()
-    _        -> update addr (Marked node)
-    -- Indirection _ -> return ()
-    -- _             -> update addr (Marked node)
+    Free          -> throwError "found Free"
+    Marked      _ -> return ()
+    Indirection _ -> return ()
+    _             -> update addr (Marked node)
   case node of
     Free -> throwError "found Free"
-    Application addr1 addr2 -> markFrom addr1 >> markFrom addr2
-    Indirection addr        -> markFrom addr
-    Data        _ addrs     -> forM_ addrs markFrom
-    _                       -> return ()
-    -- Marked _ -> return addr
-    -- Application addr1 addr2 -> do
-    --   addr1 <- markFrom addr1
-    --   addr2 <- markFrom addr2
-    --   update addr (Marked (Application addr1 addr2))
-    --   return addr
-    -- Indirection addr1 -> do
-    --   addr1 <- markFrom addr1
-    --   update addr (Indirection addr1)
-    --   return addr1
-    -- Data t addrs -> do
-    --   addrs <- mapM markFrom addrs
-    --   update addr (Marked (Data t addrs))
-    --   return addr
-    -- Number      _     -> return addr
-    -- Function    _ _ _ -> return addr
-    -- Primitive   _ _   -> return addr
-    -- Constructor _ _   -> return addr
+    Marked _ -> return addr
+    Application addr1 addr2 -> do
+      addr1 <- markFrom addr1
+      addr2 <- markFrom addr2
+      update addr (Marked (Application addr1 addr2))
+      return addr
+    Indirection addr1 -> do
+      addr1 <- markFrom addr1
+      update addr (Indirection addr1)
+      return addr1
+    Data t addrs -> do
+      addrs <- mapM markFrom addrs
+      update addr (Marked (Data t addrs))
+      return addr
+    Number      _     -> return addr
+    Function    _ _ _ -> return addr
+    Primitive   _ _   -> return addr
+    Constructor _ _   -> return addr
 
 scan :: Mark5 ()
 scan = do
@@ -597,25 +615,3 @@ scan = do
           { _heap = fmap unmark _heap
           , _free = IntSet.union _free (IntSet.fromAscList collectibleAddrs)
           }
-gc :: Mark5 ()
-gc = do
-  needed <- gets (\state -> 5 * heapFree state < heapSize state)
-  when needed $ do
-    oldUsage <- gets heapUsage
-    stackRootAddrs <- gets _stack
-    dumpRootAddrs <- gets (concat . _dump)
-    globalRootAddrs <- gets (map snd . _global)
-    let rootAddrs = concat
-          [stackRootAddrs, dumpRootAddrs, globalRootAddrs]
-    -- debug "before gc"
-    -- debugState
-    forM_ rootAddrs markFrom
-    -- debug "between gc"
-    -- debugState
-    scan
-    -- debug "after gc"
-    -- debugState
-    newUsage <- gets heapUsage
-    tell $ mempty { _gcRuns = 1, _gcVolume = oldUsage - newUsage }
-    debug $ "GC: " ++ show oldUsage ++ " -> " ++ show newUsage
-    -- debugState
