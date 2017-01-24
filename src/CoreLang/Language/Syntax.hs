@@ -56,6 +56,8 @@ prelude =
   , ("pair", [], Pack 0 2)
   , ("fst",["p"],Ap (Ap (Var "unpair") (Var "p")) (Var "K"))
   , ("snd",["p"],Ap (Ap (Var "unpair") (Var "p")) (Var "K1"))
+  , ("nil" , [], Pack 0 0)
+  , ("cons", [], Pack 1 2)
   ]
 
 lhss :: [(a, b)] -> [a]

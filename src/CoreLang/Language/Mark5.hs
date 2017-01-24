@@ -23,7 +23,7 @@ instance Show Addr where
 data Primitive 
   = Neg | Add | Sub | Mul | Div 
   | Lss | Leq | Eq  | Neq | Geq | Gtr
-  | If  | Unpair
+  | Unbool  | Unpair | Unlist
   deriving (Eq, Ord, Show)
 
 builtins :: [(Primitive, (Identifier, Mark5 ()))]
@@ -39,8 +39,9 @@ builtins =
   , (Neq, ("!=" , stepRel2 (/=)))
   , (Geq, (">=" , stepRel2 (>=)))
   , (Leq, (">"  , stepRel2 (>) ))
-  , (If , ("if" , stepIf))
+  , (Unbool, ("if"    , stepUnbool))
   , (Unpair, ("unpair", stepUnpair))
+  , (Unlist, ("unlist", stepUnlist))
   ]
 
 data Node
@@ -139,8 +140,8 @@ stepPrim2 impl = do
     dump
     push arg1Addr
 
-stepIf :: Mark5 ()
-stepIf = do
+stepUnbool :: Mark5 ()
+stepUnbool = do
   _ <- pop
   condAppAddr <- top
   Application _ condAddr <- deref condAppAddr
@@ -164,19 +165,43 @@ stepIf = do
 stepUnpair :: Mark5 ()
 stepUnpair = do
   _ <- pop
-  pairAppNode <- top
-  Application _ pairAddr <-deref pairAppNode
+  pairAppAddr <- top
+  Application _ pairAddr <- deref pairAppAddr
   pairNode <- deref pairAddr
   if isDataNode pairNode then do
+    _ <- pop -- pairAppAddr
+    funAppAddr <- top -- rootAddr
     Data 0 [arg1Addr, arg2Addr] <- return pairNode
-    _ <- pop -- pairAppNode
-    rootAddr <- top
-    Application _ funAddr <- deref rootAddr
+    Application _ funAddr <- deref funAppAddr
     arg1AppAddr <- alloc (Application funAddr arg1Addr)
-    update rootAddr (Application arg1AppAddr arg2Addr)
+    update funAppAddr (Application arg1AppAddr arg2Addr)
   else do
     dump
     push pairAddr
+
+stepUnlist :: Mark5 ()
+stepUnlist = do
+  _ <- pop
+  listAppAddr <- top
+  Application _ listAddr <- deref listAppAddr
+  listNode <- deref listAddr
+  if isDataNode listNode then do
+    _ <- pop -- listAppAddr
+    baseAppAddr <- pop
+    stepAppAddr <- top -- rootAddr
+    Data t argAddrs <- return listNode
+    case (t, argAddrs) of
+      (0, []) -> do
+        Application _ baseAddr <- deref baseAppAddr
+        update stepAppAddr (Indirection baseAddr)
+      (1, [arg1Addr, arg2Addr]) -> do
+        Application _ stepAddr <- deref stepAppAddr
+        arg1AppAddr <- alloc (Application stepAddr arg1Addr)
+        update stepAppAddr (Application arg1AppAddr arg2Addr)
+      _ -> throwError "pattern match failed in stepUnlist"
+  else do
+    dump
+    push listAddr
 
 instantiate :: Expr -> Mark5 Addr
 instantiate body =
@@ -392,7 +417,13 @@ tick :: Mark5 ()
 tick = modify $ \state@(State { _ticks }) -> state { _ticks = _ticks + 1 }
 
 executeFile :: String -> IO ()
-executeFile file = readFile file >>= executeIO
+executeFile file = do
+  code <- readFile file
+  let (res, log) = execute code
+  writeFile (file ++ ".log") log
+  putStrLn $ case res of
+    Left error -> "error: " ++ error
+    Right n    -> show n
 
 executeIO :: String -> IO ()
 executeIO code = do
