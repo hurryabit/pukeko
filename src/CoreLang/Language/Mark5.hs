@@ -25,6 +25,7 @@ data Primitive
   | Lss | Leq | Eq  | Neq | Geq | Gtr
   | Unbool  | Unpair | Unlist
   | Abort
+  | Print
   deriving (Eq, Ord, Show)
 
 builtins :: [(Primitive, (Identifier, Mark5 ()))]
@@ -44,6 +45,7 @@ builtins =
   , (Unpair, ("unpair", stepUnpair))
   , (Unlist, ("unlist", stepUnlist))
   , (Abort, ("abort", throwError "user aborted execution"))
+  , (Print, ("print", stepPrint))
   ]
 
 data Node
@@ -204,6 +206,24 @@ stepUnlist = do
   else do
     dump
     push listAddr
+
+stepPrint :: Mark5 ()
+stepPrint = do
+  [] <- gets _dump
+  _ <- pop
+  outAppAddr <- top
+  Application _ outAddr <- deref outAppAddr
+  outNode <- deref outAddr
+  if isDataNode outNode then do
+    num <- getNumber outNode
+    tell $ mempty { _output = [num] }
+    _ <- pop -- outAppAddr
+    retAppAddr <- top -- rootAddr
+    Application _ retAddr <- deref retAppAddr
+    update retAppAddr (Indirection retAddr)
+  else do
+    dump
+    push outAddr
 
 instantiate :: Expr -> Mark5 Addr
 instantiate body =
@@ -441,11 +461,13 @@ executeFile :: String -> IO ()
 executeFile file = do
   code <- readFile file
   let (res, Output { _output, _log }) = execute code
-  writeFile (file ++ ".log") (concatMap show _log)
   printOutput _output
   case res of
     Left error -> putStrLn $ "Error = " ++ error
-    Right n    -> putStrLn $ "Result = " ++ show n
+    Right n    -> do
+      putStrLn $ "Ticks  = " ++ show (length _log - 1)
+      putStrLn $ "Result = " ++ show n
+  writeFile (file ++ ".log") (concatMap show _log)
 
 executeIO :: String -> IO ()
 executeIO code = do
@@ -457,6 +479,7 @@ executeIO code = do
       putStrLn $ "Error = " ++ error
     Right n -> do
       printOutput _output
+      putStrLn $ "Ticks  = " ++ show (length _log - 1)
       putStrLn $ "Result = " ++ show n
 
 execute :: String -> (Either String Integer, Output)
