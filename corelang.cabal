@@ -19,6 +19,7 @@ library
                      , CoreLang.Language.Mark1
                      , CoreLang.Language.Mark2
                      , CoreLang.Language.Mark3
+                     , CoreLang.Language.Mark4
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Syntax
