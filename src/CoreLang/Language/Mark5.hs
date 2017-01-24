@@ -286,9 +286,9 @@ data State = State
   , _ticks :: Int
   }
 
-emptyState :: State
-emptyState = 
-  let _heap = Array.listArray (1,128) (repeat Nothing)
+initState :: Int -> State
+initState heapSize = 
+  let _heap = Array.listArray (1,heapSize) (repeat Nothing)
   in  State
         { _stack = []
         , _dump  = []
@@ -365,8 +365,9 @@ instance Monad Mark5 where
   m >>= f = Mark5 $ getMark5 m >>= getMark5 . f
   fail    = Mark5 . throwError
 
-runMark5 :: Mark5 a -> (Either String a, Output)
-runMark5 mark1 = evalRWS (runExceptT (getMark5 mark1)) mempty emptyState
+runMark5 :: Int -> Mark5 a -> (Either String a, Output)
+runMark5 heapSize mark1 =
+  evalRWS (runExceptT (getMark5 mark1)) mempty (initState heapSize)
 
 stackSize :: Mark5 Int
 stackSize = gets (length . _stack)
@@ -398,30 +399,18 @@ undump = do
   _stack:_dump <- gets _dump
   modify $ \state -> state { _stack, _dump }
     
-
-heapSize :: Mark5 Int
-heapSize = gets (Array.rangeSize . Array.bounds . _heap)
-
-doubleHeap :: Mark5 ()
-doubleHeap =
-  modify $ \state@(State { _heap, _free }) ->
-    let (l,h) = Array.bounds _heap
-    in  state
-          { _heap = Array.listArray (l,2*h) (Array.elems _heap ++ repeat Nothing)
-          , _free = IntSet.union _free (IntSet.fromAscList [h+1 .. 2*h])
-          }
-
 alloc :: Node -> Mark5 Addr
 alloc node = do
-  heapFull <- gets (IntSet.null . _free)
-  when heapFull doubleHeap
-  Just (addr, _free) <- gets (IntSet.minView . _free)
-  modify $ \state@(State { _heap }) ->
-    state
-      { _heap = _heap // [(addr, Just node)]
-      , _free
-      }
-  return (Addr addr)
+  view <- gets (IntSet.minView . _free)
+  case view of
+    Nothing -> throwError "heap full"
+    Just (addr, _free) -> do
+      modify $ \state@(State { _heap }) ->
+        state
+          { _heap = _heap // [(addr, Just node)]
+          , _free
+          }
+      return (Addr addr)
 
 deref :: Addr -> Mark5 Node
 deref (Addr addr) = do
@@ -448,11 +437,11 @@ printOutput output =
   putStr $ unlines $
     [ "Output = [" ] ++ map (\n -> "  " ++ show n) output ++ [ "]" ]
 
-executeFile :: String -> IO ()
-executeFile file = do
+executeFile :: Int -> String -> IO ()
+executeFile heapSize file = do
   let logfile = takeWhile (/= '.') file ++ ".log"
   code <- readFile file
-  let (res, Output { _output, _log }) = execute code
+  let (res, Output { _output, _log }) = execute heapSize code
   printOutput _output
   case res of
     Left error -> do
@@ -463,9 +452,9 @@ executeFile file = do
       putStrLn $ "Result = " ++ show n
       writeFile logfile (show (last _log))
 
-executeIO :: String -> IO ()
-executeIO code = do
-  let (res, Output { _output, _log }) = execute code
+executeIO :: Int -> String -> IO ()
+executeIO heapSize code = do
+  let (res, Output { _output, _log }) = execute heapSize code
   case res of
     Left error -> do
       putStr (concatMap show _log)
@@ -476,8 +465,8 @@ executeIO code = do
       putStrLn $ "Ticks  = " ++ show (length _log - 1)
       putStrLn $ "Result = " ++ show n
 
-execute :: String -> (Either String Integer, Output)
-execute code = runMark5 $
+execute :: Int -> String -> (Either String Integer, Output)
+execute heapSize code = runMark5 heapSize $
   case parse "<interactive>" code of
     Left error -> throwError (show error)
     Right program -> do
