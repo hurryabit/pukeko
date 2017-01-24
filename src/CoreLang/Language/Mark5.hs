@@ -20,32 +20,24 @@ instance Show Addr where
         p = if length s < 4 then replicate (4-length s) '0' else ""
     in  '#' : p ++ s
 
-data Primitive 
-  = Neg | Add | Sub | Mul | Div 
-  | Lss | Leq | Eq  | Neq | Geq | Gtr
-  | Unbool  | Unpair | Unlist
-  | Abort
-  | Print
-  deriving (Eq, Ord, Show)
-
-builtins :: [(Primitive, (Identifier, Mark5 ()))]
+builtins :: [(Identifier, Mark5 ())]
 builtins =
-  [ (Neg, ("neg", stepArith1 negate))
-  , (Add, ("+"  , stepArith2 (+)))
-  , (Sub, ("-"  , stepArith2 (-)))
-  , (Mul, ("*"  , stepArith2 (*)))
-  , (Div, ("/"  , stepArith2 div))
-  , (Lss, ("<"  , stepRel2 (<) ))
-  , (Leq, ("<=" , stepRel2 (<=)))
-  , (Eq , ("==" , stepRel2 (==)))
-  , (Neq, ("!=" , stepRel2 (/=)))
-  , (Geq, (">=" , stepRel2 (>=)))
-  , (Leq, (">"  , stepRel2 (>) ))
-  , (Unbool, ("if"    , stepUnbool))
-  , (Unpair, ("unpair", stepUnpair))
-  , (Unlist, ("unlist", stepUnlist))
-  , (Abort, ("abort", throwError "user aborted execution"))
-  , (Print, ("print", stepPrint))
+  [ ("neg", stepArith1 negate)
+  , ("+"  , stepArith2 (+))
+  , ("-"  , stepArith2 (-))
+  , ("*"  , stepArith2 (*))
+  , ("/"  , stepArith2 div)
+  , ("<"  , stepRel2 (<) )
+  , ("<=" , stepRel2 (<=))
+  , ("==" , stepRel2 (==))
+  , ("!=" , stepRel2 (/=))
+  , (">=" , stepRel2 (>=))
+  , (">"  , stepRel2 (>) )
+  , ("if"    , stepUnbool)
+  , ("unpair", stepUnpair)
+  , ("unlist", stepUnlist)
+  , ("abort" , throwError "user aborted execution")
+  , ("print" , stepPrint)
   ]
 
 data Node
@@ -53,10 +45,9 @@ data Node
   | Function    Identifier [Identifier] Expr
   | Number      Integer
   | Indirection Addr
-  | Primitive   Identifier Primitive
+  | Primitive   Identifier (Mark5 ())
   | Constructor Int Int
   | Data        Int [Addr]
-  deriving (Show)
 
 step :: Mark5 ()
 step = do
@@ -86,9 +77,7 @@ step = do
       Indirection addr -> do
         _ <- pop
         push addr
-      Primitive _ prim -> do
-        let Just (_, primStep) = lookup prim builtins
-        primStep
+      Primitive _ primStep -> primStep
       Constructor t n -> do
         addrs <-
           replicateM n $ do
@@ -463,11 +452,12 @@ executeFile file = do
   let (res, Output { _output, _log }) = execute code
   printOutput _output
   case res of
-    Left error -> putStrLn $ "Error = " ++ error
+    Left error -> do
+      putStrLn $ "Error = " ++ error
+      writeFile (file ++ ".log") (concatMap show _log)
     Right n    -> do
       putStrLn $ "Ticks  = " ++ show (length _log - 1)
       putStrLn $ "Result = " ++ show n
-  writeFile (file ++ ".log") (concatMap show _log)
 
 executeIO :: String -> IO ()
 executeIO code = do
@@ -498,7 +488,7 @@ compile program = do
     forM (program ++ prelude) $ \(fun, args, body) ->
       (,) fun <$> alloc (Function fun args body)
   primitives <-
-    forM builtins $ \(prim, (fun, _)) ->
+    forM builtins $ \(fun, prim) ->
        (,) fun <$> alloc (Primitive fun prim)
   Just addr <- return (lookup "main" functions)
   push addr
