@@ -327,12 +327,25 @@ instance Show State where
       showHeapItem (n, Just node) = Just $
         "  " ++ show (Addr n) ++ ": " ++ showNode node
 
+data Output = Output
+  { _output :: [Integer]
+  , _log    :: [State]
+  }
+
+instance Monoid Output where
+  mempty = Output { _output = [], _log = [] }
+  o1 `mappend` o2 =
+    Output
+      { _output = _output o1 <> _output o2
+      , _log    = _log    o1 <> _log    o2
+      }
+  
 newtype Mark5 a =
-  Mark5 { getMark5 :: ExceptT String (RWS Environment String State) a }
+  Mark5 { getMark5 :: ExceptT String (RWS Environment Output State) a }
   deriving ( Functor, Applicative
            , MonadError String
            , MonadReader Environment
-           , MonadWriter String
+           , MonadWriter Output
            , MonadState State
            )
 
@@ -341,8 +354,8 @@ instance Monad Mark5 where
   m >>= f = Mark5 $ getMark5 m >>= getMark5 . f
   fail    = Mark5 . throwError
 
-runMark5 :: Mark5 a -> (Either String a, String)
-runMark5 mark1 = evalRWS (runExceptT (getMark5 mark1)) [] emptyState
+runMark5 :: Mark5 a -> (Either String a, Output)
+runMark5 mark1 = evalRWS (runExceptT (getMark5 mark1)) mempty emptyState
 
 stackSize :: Mark5 Int
 stackSize = gets (length . _stack)
@@ -420,24 +433,33 @@ free (Addr addr) = do
 tick :: Mark5 ()
 tick = modify $ \state@(State { _ticks }) -> state { _ticks = _ticks + 1 }
 
+printOutput output =
+  putStr $ unlines $
+    [ "Output = [" ] ++ map (\n -> "  " ++ show n) output ++ [ "]" ]
+
 executeFile :: String -> IO ()
 executeFile file = do
   code <- readFile file
-  let (res, log) = execute code
-  writeFile (file ++ ".log") log
-  putStrLn $ case res of
-    Left error -> "error: " ++ error
-    Right n    -> show n
+  let (res, Output { _output, _log }) = execute code
+  writeFile (file ++ ".log") (concatMap show _log)
+  printOutput _output
+  case res of
+    Left error -> putStrLn $ "Error = " ++ error
+    Right n    -> putStrLn $ "Result = " ++ show n
 
 executeIO :: String -> IO ()
 executeIO code = do
-  let (res, log) = execute code
-  putStr log
-  putStrLn $ case res of
-    Left error -> "error: " ++ error
-    Right n    -> "main = " ++ show n
+  let (res, Output { _output, _log }) = execute code
+  case res of
+    Left error -> do
+      putStr (concatMap show _log)
+      printOutput _output
+      putStrLn $ "Error = " ++ error
+    Right n -> do
+      printOutput _output
+      putStrLn $ "Result = " ++ show n
 
-execute :: String -> (Either String Integer, String)
+execute :: String -> (Either String Integer, Output)
 execute code = runMark5 $
   case parse "<interactive>" code of
     Left error -> throwError (show error)
@@ -480,7 +502,8 @@ isFinal = (&&) <$> isDataStack <*> gets (null . _dump)
 run :: Mark5 ()
 run = do
   over <- isFinal
-  get >>= tell . show
+  state <- get
+  tell $ mempty { _log = [state] }
   unless over (step >> run)
 
 getNumber :: Node -> Mark5 Integer
