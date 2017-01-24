@@ -13,7 +13,7 @@ parse = Parsec.parse program
 
 parseExpr = Parsec.parse (expr <* eof) ""
 
-relOpNames = ["<", "<=", "==", "~=", ">=", ">"]
+relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
 
 coreLangDef = Language.haskellStyle
   { Token.reservedNames =

@@ -20,16 +20,25 @@ instance Show Addr where
         p = if length s < 4 then replicate (4-length s) '0' else ""
     in  '#' : p ++ s
 
-data Primitive = Neg | Add | Sub | Mul | Div | If
+data Primitive 
+  = Neg | Add | Sub | Mul | Div 
+  | Lss | Leq | Equ | Neq | Geq | Gtr
+  | If
   deriving (Eq, Ord, Show)
 
 builtins :: [(Primitive, (Identifier, Mark5 ()))]
 builtins =
-  [ (Neg, ("neg", stepUnOp negate))
-  , (Add, ("+"  , stepBinOp (+)  ))
-  , (Sub, ("-"  , stepBinOp (-)  ))
-  , (Mul, ("*"  , stepBinOp (*)  ))
-  , (Div, ("/"  , stepBinOp div  ))
+  [ (Neg, ("neg", stepArith1 negate))
+  , (Add, ("+"  , stepArith2 (+)))
+  , (Sub, ("-"  , stepArith2 (-)))
+  , (Mul, ("*"  , stepArith2 (*)))
+  , (Div, ("/"  , stepArith2 div))
+  , (Lss, ("<"  , stepRel2 (<) ))
+  , (Leq, ("<=" , stepRel2 (<=)))
+  , (Equ, ("==" , stepRel2 (==)))
+  , (Neq, ("!=" , stepRel2 (/=)))
+  , (Geq, (">=" , stepRel2 (>=)))
+  , (Leq, (">"  , stepRel2 (>) ))
   , (If , ("if" , stepIf))
   ]
 
@@ -83,21 +92,39 @@ step = do
         root <- top
         update root (Data t addrs)
 
-stepUnOp :: (Integer -> Integer) -> Mark5 ()
-stepUnOp op = do
+stepArith1 :: (Integer -> Integer) -> Mark5 ()
+stepArith1 op = stepPrim1 $ \node -> do
+  Number n <- return node
+  return $ Number (op n)
+
+stepPrim1 :: (Node -> Mark5 Node) -> Mark5 ()
+stepPrim1 impl = do
   _ <- pop
   appAddr <- top
   Application _ argAddr <- deref appAddr
   argNode <- deref argAddr
   if isDataNode argNode then do
-    Number n <- return argNode
-    update appAddr (Number $ op n)
+    resNode <- impl argNode
+    update appAddr resNode
   else do
     dump
     push argAddr
 
-stepBinOp :: (Integer -> Integer -> Integer) -> Mark5 ()
-stepBinOp op = do
+stepArith2 :: (Integer -> Integer -> Integer) -> Mark5 ()
+stepArith2 op = stepPrim2 $ \node1 node2 -> do
+  Number n1 <- return node1
+  Number n2 <- return node2
+  return $ Number (n1 `op` n2)
+
+stepRel2 :: (Integer -> Integer -> Bool) -> Mark5 ()
+stepRel2 rel = stepPrim2 $ \node1 node2 -> do
+  Number n1 <- return node1
+  Number n2 <- return node2
+  let t = fromEnum (n1 `rel` n2)
+  return $ Data t []
+
+stepPrim2 :: (Node -> Node -> Mark5 Node) -> Mark5 ()
+stepPrim2 impl = do
   _ <- pop
   app1Addr <- top
   Application _ arg1Addr <- deref app1Addr
@@ -108,9 +135,8 @@ stepBinOp op = do
     Application _ arg2Addr <- deref app2Addr
     arg2Node <- deref arg2Addr
     if isDataNode arg2Node then do
-      Number n1 <- return arg1Node
-      Number n2 <- return arg2Node
-      update app2Addr (Number $ n1 `op` n2)
+      resNode <- impl arg1Node arg2Node
+      update app2Addr resNode
     else do
       dump
       push arg2Addr
