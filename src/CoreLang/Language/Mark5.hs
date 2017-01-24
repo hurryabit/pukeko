@@ -24,6 +24,7 @@ data Primitive
   = Neg | Add | Sub | Mul | Div 
   | Lss | Leq | Eq  | Neq | Geq | Gtr
   | Unbool  | Unpair | Unlist
+  | Abort
   deriving (Eq, Ord, Show)
 
 builtins :: [(Primitive, (Identifier, Mark5 ()))]
@@ -42,6 +43,7 @@ builtins =
   , (Unbool, ("if"    , stepUnbool))
   , (Unpair, ("unpair", stepUnpair))
   , (Unlist, ("unlist", stepUnlist))
+  , (Abort, ("abort", throwError "user aborted execution"))
   ]
 
 data Node
@@ -274,13 +276,15 @@ data State = State
   }
 
 emptyState :: State
-emptyState = State
-  { _stack = []
-  , _dump  = []
-  , _heap  = Array.listArray (1,1) [Nothing]
-  , _free  = [1]
-  , _ticks = 0
-  }
+emptyState = 
+  let _heap = Array.listArray (1,128) (repeat Nothing)
+  in  State
+        { _stack = []
+        , _dump  = []
+        , _heap
+        , _free  = Array.indices _heap
+        , _ticks = 0
+        }
 
 instance Show State where
   show (State { _stack, _dump, _heap, _ticks }) =
