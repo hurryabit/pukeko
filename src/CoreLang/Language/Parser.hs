@@ -1,7 +1,11 @@
-{-# LANGUAGE NamedFieldPuns #-}
-module CoreLang.Language.Parser where
+module CoreLang.Language.Parser 
+  ( parseExpr
+  , parseProgram
+  )
+  where
 
 import Control.Monad (msum)
+import Control.Monad.Except
 import Text.Parsec as Parsec
 import Text.Parsec.Expr
 import qualified Text.Parsec.Language as Language
@@ -9,13 +13,18 @@ import qualified Text.Parsec.Token as Token
 
 import CoreLang.Language.Syntax
 
-parse = Parsec.parse program
 
-parseExpr :: String -> Either String Expr
+parseProgram :: MonadError String m => String -> String -> m Program
+parseProgram file code =
+  case Parsec.parse (program <* eof) file code of
+    Left error -> throwError (show error)
+    Right prog -> return prog
+
+parseExpr :: MonadError String m => String -> m Expr
 parseExpr code = 
   case Parsec.parse (expr <* eof) "<expr>" code of
-    Left error -> Left (show error)
-    Right expr -> Right expr
+    Left error -> throwError (show error)
+    Right expr -> return expr
 
 relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
 

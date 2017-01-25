@@ -18,7 +18,7 @@ bottomUp f e = f $
   case e of
     Var x -> Var x
     Num n -> Num n
-    Constr m n -> Constr m n
+    Pack m n -> Pack m n
     Ap e1 e2 -> Ap (bottomUp f e1) (bottomUp f e2)
     Let r ds e1 ->
       let ds' = [ (x, bottomUp f e2) | (x, e2) <- ds ]

@@ -25,7 +25,7 @@ interpret heapSize = interpret' heapSize "<interactive>"
 interpret' :: Int -> String -> String -> IO ()
 interpret' heapSize file code = do
   (res, state, stats) <- runTIM heapSize $ do
-    case Parser.parse file code of
+    case Parser.parseProgram file code of
       Left error -> throwError (show error)
       Right program -> do
         load program

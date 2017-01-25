@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 module CoreLang.Language.TypeChecker where
 
 import Control.Monad
@@ -14,7 +13,7 @@ import qualified Data.Set as Set
 
 import CoreLang.Language.Syntax
 
-import CoreLang.Language.Parser (parseExpr)
+import CoreLang.Language.Parser (parseProgram)
 
 newtype TypeVar = MkTypeVar String
   deriving (Eq, Ord)
@@ -22,6 +21,7 @@ newtype TypeVar = MkTypeVar String
 data TypeExpr
   = TypeVar TypeVar
   | TypeCons String [TypeExpr]
+  deriving (Eq)
 
 int, bool :: TypeExpr
 int  = TypeCons "int"  []
@@ -72,6 +72,32 @@ builtins =
   , ("abort"    , alpha)
   ]
 
+checkFile file = do
+  code <- readFile file
+  case parseProgram file code >>= checkProgram of
+    Left error -> printf "Error = %s\n" (show error)
+    Right ()   -> putStrLn "OK"
+
+check code = 
+  case parseProgram "<interactive>" code >>= checkProgram of
+    Left error -> printf "Error = %s\n" (show error)
+    Right ()   -> putStrLn "OK"
+
+checkExpr :: MonadError String m => Expr -> m TypeExpr
+checkExpr expr = do
+  let env = [ (fun, MkTypeScheme (variables t) t) | (fun, t) <- builtins ]
+  (_, t) <- runTC (Map.fromList env) (tc expr)
+  return t
+
+checkProgram :: MonadError String m => Program -> m ()
+checkProgram defs = do
+  let local (fun, args, body) = (fun, Lam args body)
+      expr = Let Recursive (map local defs) (Var "main")
+  t <- checkExpr expr
+  when (t /= int) $
+    throwError $ printf "main has type %s instead of int" (show t)
+  return ()
+    
 
 
 variables :: TypeExpr -> Set TypeVar
@@ -167,21 +193,15 @@ newtype TC a = TC { unTC :: ExceptT String (RWS Environment () [String]) a }
            , MonadReader Environment
            )
 
-runTC :: Environment -> TC a -> Either String a
-runTC env checker = 
+runTC :: MonadError String m => Environment -> TC a -> m a
+runTC env checker = do
   let vars = "_":liftM2 (\xs x -> xs ++ [x]) vars ['a'..'y']
-  in  fst (evalRWS (runExceptT (unTC checker)) env (tail vars))
+  case fst (evalRWS (runExceptT (unTC checker)) env (tail vars)) of
+    Left error -> throwError error
+    Right t -> return t
 
 freshVar :: TC TypeExpr
 freshVar = TC $ state (\(v:vs) -> (TypeVar (MkTypeVar v), vs))
-
-testTC code = do
-  let env =
-        [ (fun, MkTypeScheme (variables t) t) | (fun, t) <- builtins ]
-  expr <- parseExpr code
-  (_, t) <- runTC (Map.fromList env) (tc expr)
-  return t
-    
 
 tc :: Expr -> TC (Subst, TypeExpr)
 tc e =
