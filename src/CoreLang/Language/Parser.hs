@@ -11,7 +11,11 @@ import CoreLang.Language.Syntax
 
 parse = Parsec.parse program
 
-parseExpr = Parsec.parse (expr <* eof) ""
+parseExpr :: String -> Either String Expr
+parseExpr code = 
+  case Parsec.parse (expr <* eof) "<expr>" code of
+    Left error -> Left (show error)
+    Right expr -> Right expr
 
 relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
 
