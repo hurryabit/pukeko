@@ -1,6 +1,7 @@
 module CoreLang.TempInst.Interpreter
    ( interpret
    , interpretFile
+   , interpretProgram
    )
    where
 
@@ -14,6 +15,17 @@ import qualified CoreLang.Language.Parser   as Parser
 import qualified CoreLang.TempInst.Builtins as Builtins
 import qualified CoreLang.TempInst.GC       as GC
 import qualified CoreLang.TempInst.Stats    as Stats
+
+interpretProgram :: Int -> Program -> ExceptT String IO (Integer, String)
+interpretProgram heapSize program = do
+  (res, state, stats) <- liftIO $ runTIM heapSize $ do
+    load program
+    run
+    top >>= deref >>= getNumber
+  case res of
+    Left error -> throwError $ printf "%s\nError = %s" (show state) (show error)
+    Right num  -> return (num, show stats)
+  
 
 interpretFile :: Int -> String -> IO ()
 interpretFile heapSize file =
