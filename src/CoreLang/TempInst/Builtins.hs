@@ -27,21 +27,21 @@ everything =
   ]
 
 
-topArgAddr :: TIM Addr
-topArgAddr = do
+getArgAddr :: TIM Addr
+getArgAddr = do
+  pop
   appAddr <- top
   Application _ argAddr <- deref appAddr
   return argAddr
 
-updateTopNode :: Node -> TIM ()
-updateTopNode node = do
+updateRoot :: Node -> TIM ()
+updateRoot node = do
   addr <- top
   update addr node
 
 withDataArg :: (Node -> TIM ()) -> TIM ()
 withDataArg cont = do
-  pop
-  argAddr <- topArgAddr
+  argAddr <- getArgAddr
   argNode <- deref argAddr
   if isDataNode argNode then do
     cont argNode
@@ -53,7 +53,7 @@ withDataArg cont = do
 prim1 :: (Node -> TIM Node) -> TIM ()
 prim1 impl =
   withDataArg $ \argNode ->
-    impl argNode >>= updateTopNode
+    impl argNode >>= updateRoot
 
 arith1 :: (Integer -> Integer) -> TIM ()
 arith1 op = prim1 $ \node -> mkNumber <$> op <$> getNumber node
@@ -63,7 +63,7 @@ prim2 :: (Node -> Node -> TIM Node) -> TIM ()
 prim2 impl = 
   withDataArg $ \arg1Node -> do
     withDataArg $ \arg2Node -> do
-      impl arg1Node arg2Node >>= updateTopNode
+      impl arg1Node arg2Node >>= updateRoot
 
 arith2 :: (Integer -> Integer -> Integer) -> TIM ()
 arith2 op = prim2 $ \node1 node2 ->
@@ -77,39 +77,33 @@ rel2 cmp = prim2 $ \node1 node2 ->
 if_ :: TIM ()
 if_ =
   withDataArg $ \condNode -> do
-    pop
-    thenAddr <- topArgAddr
-    pop
-    elseAddr <- topArgAddr
     cond <- getBool condNode
+    thenAddr <- getArgAddr
+    elseAddr <- getArgAddr
     let rootAddr = if cond then thenAddr else elseAddr
-    updateTopNode (Indirection rootAddr)
+    updateRoot (Indirection rootAddr)
 
 casePair :: TIM ()
 casePair =
   withDataArg $ \pairNode -> do
-    pop
-    funAddr <- topArgAddr
     case pairNode of
       Data 0 [arg1Addr, arg2Addr] -> do
+        funAddr <- getArgAddr
         arg1AppAddr <- alloc (Application funAddr arg1Addr)
-        updateTopNode (Application arg1AppAddr arg2Addr)
+        updateRoot (Application arg1AppAddr arg2Addr)
       _ -> throwError "pattern match failed on case_pair"
 
 caseList :: TIM ()
 caseList =
   withDataArg $ \listNode -> do
-    pop
-    baseAddr <- topArgAddr
-    pop
-    stepAddr <- topArgAddr
-    Data t argAddrs <- return listNode
-    case (t, argAddrs) of
-      (0, []) -> do
-        updateTopNode (Indirection baseAddr)
-      (1, [arg1Addr, arg2Addr]) -> do
+    baseAddr <- getArgAddr
+    stepAddr <- getArgAddr
+    case listNode of
+      Data 0 [] -> do
+        updateRoot (Indirection baseAddr)
+      Data 1 [arg1Addr, arg2Addr] -> do
         arg1AppAddr <- alloc (Application stepAddr arg1Addr)
-        updateTopNode (Application arg1AppAddr arg2Addr)
+        updateRoot (Application arg1AppAddr arg2Addr)
       _ -> throwError "pattern match failed in case_list"
 
 
@@ -118,11 +112,10 @@ printNum = do
   no_dump <- dumpNull
   if no_dump then do
     withDataArg $ \outNode -> do
-      pop
       num <- getNumber outNode
       output (show num)
-      retAddr <- topArgAddr
-      updateTopNode (Indirection retAddr)
+      retAddr <- getArgAddr
+      updateRoot (Indirection retAddr)
   else
     throwError "dump not empty"
 
