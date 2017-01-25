@@ -63,7 +63,10 @@ getNumber node =
     _          -> throwError ("no number: " ++ show node)
 
 mkBool :: Bool -> Node
-mkBool bool = Data (fromEnum bool) []
+mkBool bool =
+  case bool of
+    False -> Data 0 []
+    True  -> Data 1 []
   
 getBool :: Node -> TIM Bool
 getBool node =

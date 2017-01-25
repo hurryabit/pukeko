@@ -37,34 +37,3 @@ type Definition = GenDefinition Identifier
 type GenProgram a = [GenDefinition a]
 
 type Program = GenProgram Identifier
-
-prelude :: Program
-prelude =
-  [ ("I", ["x"], Var "x")
-  , ("K", ["x", "y"], Var "x")
-  , ("K1", ["x", "y"], Var "y")
-  , ("S", ["f", "g", "x"], Ap (Ap (Var "f") (Var "x"))
-                              (Ap (Var "g") (Var "x")))
-  , ("compose", ["f", "g", "x"], Ap (Var "f") (Ap (Var "g") (Var "x")))
-  , ("twice", ["f"], Ap (Ap (Var "compose") (Var "f")) (Var "f"))
-  , ("false", [], Pack (fromEnum False) 0)
-  , ("true" , [], Pack (fromEnum True ) 0)
-  , ("pair", [], Pack 0 2)
-  , ("fst",["p"],Ap (Ap (Var "unpair") (Var "p")) (Var "K"))
-  , ("snd",["p"],Ap (Ap (Var "unpair") (Var "p")) (Var "K1"))
-  , ("nil" , [], Pack 0 0)
-  , ("cons", [], Pack 1 2)
-  ]
-
-lhss :: [(a, b)] -> [a]
-lhss = map fst
-
-rhss :: [(a, b)] -> [b]
-rhss = map snd
-
-isAtomic :: GenExpr a -> Bool
-isAtomic e =
-  case e of
-    Var _ -> True
-    Num _ -> True
-    _     -> False

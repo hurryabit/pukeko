@@ -1,13 +1,23 @@
 module CoreLang.TempInst.Builtins
-  ( everything
+  ( constructors
+  , primitives
   )
   where
 
 import CoreLang.Language.Syntax (Identifier)
 import CoreLang.TempInst.TIM
 
-everything :: [(Identifier, TIM ())]
-everything =
+constructors :: [(Identifier, Int, Int)]
+constructors =
+  [ ("false"  , 0, 0)
+  , ("true"   , 1, 0)
+  , ("mk_pair", 0, 2)
+  , ("nil"    , 0, 0)
+  , ("cons"   , 1, 2)
+  ]
+
+primitives :: [(Identifier, TIM ())]
+primitives =
   [ ("neg", arith1 negate)
   , ("+"  , arith2 (+))
   , ("-"  , arith2 (-))

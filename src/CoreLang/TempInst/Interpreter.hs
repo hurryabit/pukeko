@@ -11,7 +11,6 @@ import CoreLang.TempInst.Instantiate
 import CoreLang.TempInst.TIM
 
 import qualified CoreLang.Language.Parser   as Parser
-import qualified CoreLang.Language.Syntax   as Syntax
 import qualified CoreLang.TempInst.Builtins as Builtins
 import qualified CoreLang.TempInst.GC       as GC
 import qualified CoreLang.TempInst.Stats    as Stats
@@ -39,13 +38,13 @@ interpret' heapSize file code = do
 
 load :: Program -> TIM ()
 load program = do
-  functions <-
-    forM (program ++ Syntax.prelude) $ \(fun, args, body) ->
-      (,) fun <$> alloc (Function fun args body)
-  primitives <-
-    forM Builtins.everything $ \(fun, prim) ->
-       (,) fun <$> alloc (Primitive fun prim)
-  put (functions ++ primitives)
+  globals <-
+    mapM (\(fun, node) -> (,) fun <$> alloc node) $ concat
+      [ [ (fun, Function fun args body) | (fun, args, body) <- program               ]
+      , [ (fun, Constructor tag arity)  | (fun, tag, arity) <- Builtins.constructors ]
+      , [ (fun, Primitive fun tim)      | (fun, tim)        <- Builtins.primitives   ]
+      ]
+  put globals
   addr <- resolve "main"
   push addr
 
