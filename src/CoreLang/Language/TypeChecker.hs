@@ -142,6 +142,9 @@ class Unknowns s where
 
 data TypeScheme = MkTypeScheme { schematic :: Set TypeVar, body :: TypeExpr }
 
+freshScheme :: TypeExpr -> TypeScheme
+freshScheme v = MkTypeScheme Set.empty v
+
 instance Unknowns TypeScheme where
   unknowns (MkTypeScheme { schematic, body }) = Set.difference (variables body) schematic
 
@@ -169,8 +172,8 @@ runTC env checker =
   let vars = "_":liftM2 (\xs x -> xs ++ [x]) vars ['a'..'y']
   in  fst (evalRWS (runExceptT (unTC checker)) env (tail vars))
 
-freshVar :: TC TypeVar
-freshVar = TC $ state (\(v:vs) -> (MkTypeVar v, vs))
+freshVar :: TC TypeExpr
+freshVar = TC $ state (\(v:vs) -> (TypeVar (MkTypeVar v), vs))
 
 testTC code = do
   let env =
@@ -187,22 +190,23 @@ tc e =
       env <- ask
       case Map.lookup x env of
         Nothing     -> throwError (printf "unknown identifier %s" x)
-        Just scheme ->
-          (,) mempty <$> instantiate scheme
+        Just scheme -> do
+          MkTypeScheme { body } <- instantiate scheme
+          return (mempty,body)
     Num _ -> return (mempty, int)
-    Pack _ _ -> throwError "type checking of constructors not implemented"
+    Pack _ _ -> throwError "type checking constructors not implemented"
     Ap ef ex -> do
       (phi, [tf, tx]) <- tcMany [ef, ex]
       vy <- freshVar
-      phi <- unify phi tf (tx ~> TypeVar vy)
-      return (phi, runSubst phi vy)
+      phi <- unify phi tf (tx ~> vy)
+      return (phi, subst phi vy)
     Lam []     e -> tc e
     Lam (x:xs) e -> do
       let e' = Lam xs e
       v <- freshVar
-      let scheme = MkTypeScheme Set.empty (TypeVar v)
+      let scheme = freshScheme v
       (phi, t) <- local (Map.insert x scheme) (tc e')
-      return (phi, runSubst phi v ~> t)
+      return (phi, subst phi v ~> t)
     Let NonRecursive xes f -> do
       let (xs, es) = unzip xes
       (phi, ts) <- tcMany es
@@ -213,30 +217,16 @@ tc e =
     Let Recursive xes f -> do
       let (xs, es) = unzip xes
       vs <- mapM (\_ -> freshVar) xs
-      let env = Map.fromList (zipWith (\x v -> (x, MkTypeScheme Set.empty (TypeVar v))) xs vs)
+      let env = Map.fromList (zipWith (\x v -> (x, freshScheme v)) xs vs)
       (phi, ts) <- local (Map.union env) (tcMany es)
       local (subst phi) $ do
-        let phi_vs = map (runSubst phi) vs
+        let phi_vs = map (subst phi) vs
         psi <- unifyMany phi (zip ts phi_vs)
         local (subst psi) $ do
           localDecls xs (map (subst psi) phi_vs) $ do
             (rho, t) <- tc f
             return (rho <> psi, t)
-    Case _ _ -> throwError "pattern matches not implemented"
-
-localDecls xs ts cont = do
-  unks <- asks unknowns
-  schemes <-
-    forM ts $ \t -> do
-      let schematic = Set.difference (variables t) unks
-      -- TODO: eliminate code duplication with instantiate
-      bindings <- mapM (\_ -> freshVar) (Map.fromSet id schematic)
-      let t' = subst (fromMap (fmap TypeVar bindings)) t
-      return $ MkTypeScheme (Set.fromList (Map.elems bindings)) t'
-  let env = Map.fromList (zip xs schemes)
-  local (Map.union env) cont
-
-
+    Case _ _ -> throwError "type checking pattern matches not implemented"
 
 tcMany :: [Expr] -> TC (Subst, [TypeExpr])
 tcMany [] = return (mempty, [])
@@ -245,11 +235,26 @@ tcMany (e:es) = do
   (psi, ts) <- local (subst phi) (tcMany es)
   return (psi <> phi, subst psi t : ts)
 
-instantiate :: TypeScheme -> TC TypeExpr
+localDecls :: [Identifier] -> [TypeExpr] -> TC a -> TC a
+localDecls xs ts cont = do
+  unks <- asks unknowns
+  schemes <-
+    forM ts $ \t ->
+      instantiate $ MkTypeScheme
+        { schematic = Set.difference (variables t) unks
+        , body      = t
+        }
+  let env = Map.fromList (zip xs schemes)
+  local (Map.union env) cont
+
+instantiate :: TypeScheme -> TC TypeScheme
 instantiate (MkTypeScheme { schematic, body }) = do
-  bindings <- mapM (\_ -> TypeVar <$> freshVar) (Map.fromSet id schematic)
-  let phi = fromMap bindings
-  return (subst phi body)
+  bindings <- mapM (\_ ->freshVar) (Map.fromSet id schematic)
+  return $
+    MkTypeScheme
+      { schematic = Set.fromList [ v | TypeVar v <- Map.elems bindings ]
+      , body      = subst (fromMap bindings) body
+      }
 
 -- Show instances
 instance Show TypeVar where
