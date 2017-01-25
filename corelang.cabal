@@ -24,6 +24,13 @@ library
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Syntax
+                     , CoreLang.TempInst.Builtins
+                     , CoreLang.TempInst.GC
+                     , CoreLang.TempInst.Instantiate
+                     , CoreLang.TempInst.Interpreter
+                     , CoreLang.TempInst.Machine
+                     , CoreLang.TempInst.Stats
+                     , CoreLang.TempInst.TIM
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers
