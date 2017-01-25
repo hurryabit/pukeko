@@ -19,6 +19,9 @@ everything =
   , ("!=" , rel2 (/=))
   , (">=" , rel2 (>=))
   , (">"  , rel2 (>) )
+  , ("not", not1)
+  , ("&&" , and2)
+  , ("||" , or2 )
   , ("if"       , if_     )
   , ("case_pair", casePair)
   , ("case_list", caseList)
@@ -74,14 +77,34 @@ rel2 cmp = prim2 $ \node1 node2 ->
   mkBool <$> (cmp <$> getNumber node1 <*> getNumber node2)
 
 
+not1 :: TIM ()
+not1 = prim1 $ \node -> mkBool <$> not <$> getBool node
+
+and2 :: TIM ()
+and2 =
+  withDataArg $ \arg1Node -> do
+    arg1 <- getBool arg1Node
+    arg2Addr <- getArgAddr
+    let rsltNode = if arg1 then Indirection arg2Addr else mkBool False
+    updateRoot rsltNode
+
+or2 :: TIM ()
+or2 =
+  withDataArg $ \arg1Node -> do
+    arg1 <- getBool arg1Node
+    arg2Addr <- getArgAddr
+    let rsltNode = if arg1 then mkBool True else Indirection arg2Addr
+    updateRoot rsltNode
+
+
 if_ :: TIM ()
 if_ =
   withDataArg $ \condNode -> do
     cond <- getBool condNode
     thenAddr <- getArgAddr
     elseAddr <- getArgAddr
-    let rootAddr = if cond then thenAddr else elseAddr
-    updateRoot (Indirection rootAddr)
+    let rsltAddr = if cond then thenAddr else elseAddr
+    updateRoot (Indirection rsltAddr)
 
 casePair :: TIM ()
 casePair =

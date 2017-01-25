@@ -24,7 +24,7 @@ coreLangDef = Language.haskellStyle
   , Token.reservedOpNames = concat
       [ ["+", "-", "*", "/"]
       , relOpNames
-      , ["&", "|"]
+      , ["&&", "||"]
       ]
   }
 
@@ -94,8 +94,8 @@ expr = msum
             , infixBinOp "-" AssocNone
             ]
           , map (flip infixBinOp AssocNone) relOpNames
-          , [infixBinOp "&" AssocRight]
-          , [infixBinOp "|" AssocRight]
+          , [infixBinOp "&&" AssocRight]
+          , [infixBinOp "||" AssocRight]
           ]
           (foldl1 Ap <$> many1 aexpr)
   ]
