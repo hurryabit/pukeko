@@ -255,6 +255,15 @@ tcMany (e:es) = do
   (psi, ts) <- local (subst phi) (tcMany es)
   return (psi <> phi, subst psi t : ts)
 
+instantiate :: TypeScheme -> TC TypeScheme
+instantiate (MkTypeScheme { schematic, body }) = do
+  bindings <- mapM (\_ ->freshVar) (Map.fromSet id schematic)
+  return $
+    MkTypeScheme
+      { schematic = Set.fromList [ v | TypeVar v <- Map.elems bindings ]
+      , body      = subst (fromMap bindings) body
+      }
+
 localDecls :: [Identifier] -> [TypeExpr] -> TC a -> TC a
 localDecls xs ts cont = do
   unks <- asks unknowns
@@ -266,15 +275,6 @@ localDecls xs ts cont = do
         }
   let env = Map.fromList (zip xs schemes)
   local (Map.union env) cont
-
-instantiate :: TypeScheme -> TC TypeScheme
-instantiate (MkTypeScheme { schematic, body }) = do
-  bindings <- mapM (\_ ->freshVar) (Map.fromSet id schematic)
-  return $
-    MkTypeScheme
-      { schematic = Set.fromList [ v | TypeVar v <- Map.elems bindings ]
-      , body      = subst (fromMap bindings) body
-      }
 
 -- Show instances
 instance Show TypeVar where
