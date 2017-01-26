@@ -12,16 +12,15 @@ data GenExpr a
   | Pack Int Int
   | Ap (GenExpr a) (GenExpr a)
   | Let IsRec [GenLocalDefinition a] (GenExpr a)
-  | Case (GenExpr a) [GenAlter a]
+  -- | Case (GenExpr a) [GenAlter a]
   | Lam [a] (GenExpr a)
-  deriving (Show)
 
 type Expr = GenExpr Identifier
 
 -- Alternatives of case expressions
-type GenAlter a = (Integer, [a], GenExpr a)
+-- type GenAlter a = (Integer, [a], GenExpr a)
 
-type Alter = GenAlter Identifier
+-- type Alter = GenAlter Identifier
 
 -- Local definitions
 type GenLocalDefinition a = (a, GenExpr a)

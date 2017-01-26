@@ -30,14 +30,15 @@ relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
 
 coreLangDef = Language.haskellStyle
   { Token.reservedNames =
-      [ "let", "letrec", "in"
-      , "case", "of"
+      [ "fun", "let", "letrec", "and", "in"
+      -- , "case", "of"
       , "Pack"
       ]
   , Token.reservedOpNames = concat
       [ ["+", "-", "*", "/"]
       , relOpNames
       , ["&&", "||"]
+      , ["->"]
       ]
   }
 
@@ -49,9 +50,7 @@ Token.TokenParser
   , Token.symbol
   , Token.parens
   , Token.braces
-  , Token.angles
   , Token.comma
-  , Token.dot
   , Token.semiSep1
   } =
   Token.makeTokenParser coreLangDef
@@ -59,8 +58,6 @@ Token.TokenParser
 equals = symbol "="
 
 arrow = symbol "->"
-
-lambda = symbol "\\"
 
 type Parser = Parsec String ()
 
@@ -75,12 +72,12 @@ localDefinition :: Parser LocalDefinition
 localDefinition =
   (,) <$> identifier <* equals <*> expr
 
-alter :: Parser Alter
-alter =
-  (,,)  <$> angles natural
-        <*> many identifier
-        <*  arrow
-        <*> expr
+-- alter :: Parser Alter
+-- alter =
+--   (,,)  <$> angles natural
+--         <*> many identifier
+--         <*  arrow
+--         <*> expr
 
 expr, aexpr :: Parser Expr
 expr = msum
@@ -89,14 +86,14 @@ expr = msum
           , reserved "letrec" *> pure Recursive
           ]
     in  Let <$> isRec 
-            <*> semiSep1 localDefinition 
+            <*> sepBy1 localDefinition (reserved "and")
             <*  reserved "in"
             <*> expr
-  , Case  <$> (reserved "case" *> expr)
-          <*  reserved "of"
-          <*> semiSep1 alter
-  , Lam <$> (lambda *> many1 identifier)
-        <*  dot
+  -- , Case  <$> (reserved "case" *> expr)
+  --         <*  reserved "of"
+  --         <*> semiSep1 alter
+  , Lam <$> (reserved "fun" *> many1 identifier)
+        <*  arrow
         <*> expr
   , let infixBinOp op = Infix (reservedOp op *> pure (Ap . Ap (Var op)))
     in  buildExpressionParser
@@ -115,8 +112,8 @@ expr = msum
 aexpr = msum
   [ Var <$> identifier
   , Num <$> natural
-  , reserved "Pack" *> braces (pack <$> natural <* comma <*> natural)
+  , reserved "Pack" *> braces (Pack <$> nat <* comma <*> nat)
   , parens expr
   ]
   where
-    pack t n = Pack (fromInteger t) (fromInteger n)
+    nat = fromInteger <$> natural
