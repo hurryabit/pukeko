@@ -22,9 +22,11 @@ parseProgram file code =
 
 parseExpr :: MonadError String m => String -> m Expr
 parseExpr code = 
-  case Parsec.parse (expr <* eof) "<expr>" code of
+  case parseExpr' code of
     Left error -> throwError (show error)
     Right expr -> return expr
+
+parseExpr' = Parsec.parse (expr <* eof) "<expr>"
 
 relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
 
