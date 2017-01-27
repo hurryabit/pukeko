@@ -47,7 +47,7 @@ ppExpr e =
     Var x -> text x
     Num n -> integer n
     Pack t n -> text "Pack" <> braces (hcat [int t, comma, int n])
-    Ap e1 e2 -> parens (ppExpr e1 <+> ppExpr e2)
+    Ap _ _ -> parens (hsep . map ppExpr $ collect e [])
     Let r ds e0 ->
       hsep
         [ text $ case r of { NonRecursive -> "let"; Recursive -> "letrec" }
@@ -56,12 +56,17 @@ ppExpr e =
         , ppExpr e0
         ]
     Lam xs e0 ->
-      hsep
+      parens $ hsep
         [ text "fun"
         , hsep $ map text xs
         , text "->"
         , ppExpr e0
         ]
+  where
+    collect e fs =
+      case e of
+        Ap e1 e2 -> collect e1 (e2:fs)
+        _        -> e:fs
 
 instance Show Expr where
   show e = renderStyle (style { mode = OneLineMode }) (ppExpr e)

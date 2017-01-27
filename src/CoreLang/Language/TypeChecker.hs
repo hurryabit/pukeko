@@ -3,6 +3,7 @@ module CoreLang.Language.TypeChecker where
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.RWS
+import Data.List (intercalate)
 import Data.Map (Map)
 import Data.Monoid (Monoid (..), (<>))
 import Data.Set (Set)
@@ -11,9 +12,8 @@ import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import CoreLang.Language.Parser (parseExpr, parseProgram)
 import CoreLang.Language.Syntax
-
-import CoreLang.Language.Parser (parseProgram)
 
 newtype TypeVar = MkTypeVar String
   deriving (Eq, Ord)
@@ -75,13 +75,14 @@ builtins =
 checkFile file = do
   code <- readFile file
   case parseProgram file code >>= checkProgram of
-    Left error -> printf "Error = %s\n" (show error)
+    Left error -> printf "Error = %s\n" error
     Right ()   -> putStrLn "OK"
 
-check code = 
-  case parseProgram "<interactive>" code >>= checkProgram of
-    Left error -> printf "Error = %s\n" (show error)
-    Right ()   -> putStrLn "OK"
+check code = do
+  res <- runExceptT (parseExpr code >>= checkExpr)
+  case res of
+    Left error -> printf "Error = %s\n" error
+    Right t    -> print t
 
 checkExpr :: MonadError String m => Expr -> m TypeExpr
 checkExpr expr = do
@@ -106,7 +107,10 @@ variables t =
     TypeVar v     -> Set.singleton v
     TypeCons _ ts -> Set.unions (map variables ts)
 
-newtype Subst = MkSubst { runSubst :: TypeVar -> TypeExpr }
+newtype Subst = MkSubst { unSubst :: Map TypeVar TypeExpr }
+
+runSubst :: Subst -> TypeVar -> TypeExpr
+runSubst phi v = Map.findWithDefault (TypeVar v) v (unSubst phi)
 
 class ApplySubst t where
   subst :: Subst -> t -> t
@@ -118,14 +122,14 @@ instance ApplySubst TypeExpr where
       TypeCons c ts -> TypeCons c (map (subst phi) ts) 
 
 instance Monoid Subst where
-  mempty = MkSubst $ TypeVar
-  phi `mappend` psi = MkSubst $ subst phi . runSubst psi
-
+  mempty = MkSubst Map.empty
+  phi `mappend` psi = MkSubst $ Map.union (Map.map (subst phi) (unSubst psi)) (unSubst phi)
+    
 fromMap :: Map TypeVar TypeExpr -> Subst
-fromMap m = MkSubst $ \v -> Map.findWithDefault (TypeVar v) v m
+fromMap = MkSubst
 
 delta :: TypeVar -> TypeExpr -> Subst
-delta v t = MkSubst $ \u -> if u == v then t else TypeVar u
+delta v t = MkSubst $ Map.singleton v t
 
 extend :: MonadError String m => Subst -> TypeVar -> TypeExpr -> m Subst
 extend phi v t =
@@ -137,8 +141,7 @@ extend phi v t =
       | otherwise                  -> return (delta v t <> phi)
 
 exclude :: Subst -> Set TypeVar -> Subst
-exclude phi vs = MkSubst $ \v ->
-  if Set.member v vs then TypeVar v else runSubst phi v
+exclude phi vs = MkSubst $ Map.difference (unSubst phi) (Map.fromSet TypeVar vs)
 
 unifyVar :: MonadError String m => Subst -> TypeVar -> TypeExpr -> m Subst
 unifyVar phi v t =
@@ -184,7 +187,7 @@ instance Unknowns Environment where
   unknowns = Set.unions . map unknowns . Map.elems
 
 instance ApplySubst Environment where
-  subst = fmap . subst
+  subst = Map.map . subst
 
 
 newtype TC a = TC { unTC :: ExceptT String (RWS Environment () [String]) a }
@@ -195,13 +198,14 @@ newtype TC a = TC { unTC :: ExceptT String (RWS Environment () [String]) a }
 
 runTC :: MonadError String m => Environment -> TC a -> m a
 runTC env checker = do
-  let vars = "_":liftM2 (\xs x -> xs ++ [x]) vars ['a'..'y']
-  case fst (evalRWS (runExceptT (unTC checker)) env (tail vars)) of
+  let vars = "":liftM2 (\xs x -> xs ++ [x]) vars ['A'..'Z']
+      (res, _) = evalRWS (runExceptT (unTC checker)) env (tail vars)
+  case res of
     Left error -> throwError error
     Right t -> return t
 
 freshVar :: TC TypeExpr
-freshVar = TC $ state (\(v:vs) -> (TypeVar (MkTypeVar v), vs))
+freshVar = TC $ state $ \(v:vs) -> (TypeVar (MkTypeVar v), vs)
 
 tc :: Expr -> TC (Subst, TypeExpr)
 tc e =
@@ -246,7 +250,6 @@ tc e =
           localDecls xs (map (subst psi) phi_vs) $ do
             (rho, t) <- tc f
             return (rho <> psi, t)
-    Case _ _ -> throwError "type checking pattern matches not implemented"
 
 tcMany :: [Expr] -> TC (Subst, [TypeExpr])
 tcMany [] = return (mempty, [])
@@ -286,6 +289,11 @@ instance Show TypeExpr where
       TypeVar  v               -> show v
       TypeCons "list" [t1]     -> printf "[%s]"       (show t1)
       TypeCons "pair" [t1, t2] -> printf "%s * %s"   (show t1) (show t2)
-      TypeCons "fun"  [t1, t2] -> printf "(%s -> %s)" (show t1) (show t2)
+      TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate "->" . map show . collect $ t)
       TypeCons c      []       -> c
       TypeCons c      ts       -> printf "(%s %s)"    c (unwords (map show ts))
+    where
+      collect t =
+        case t of
+          TypeCons "fun" [t1, t2] -> t1 : collect t2
+          _                       -> [t]
