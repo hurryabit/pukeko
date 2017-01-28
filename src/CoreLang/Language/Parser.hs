@@ -5,17 +5,18 @@ module CoreLang.Language.Parser
 
 import Control.Monad (msum)
 import Control.Monad.Except
-import Text.Parsec as Parsec
+import Text.Parsec -- (Parsec, parse, choice, eof, lookAhead, many, many1, sepBy1, try)
 import Text.Parsec.Expr
 import qualified Text.Parsec.Language as Language
-import qualified Text.Parsec.Token as Token
+import qualified Text.Parsec.Token    as Token
 
 import CoreLang.Language.Syntax
+import CoreLang.Language.Type (Type (..), var, cons, (~>))
 
 
 parseExpr :: MonadError String m => String -> String -> m Expr
 parseExpr file code = 
-  case Parsec.parse (expr <* eof) file code of
+  case parse (expr <* eof) file code of
     Left error -> throwError (show error)
     Right expr -> return expr
 
@@ -44,7 +45,7 @@ Token.TokenParser
   , Token.parens
   , Token.braces
   , Token.comma
-  , Token.semiSep1
+  , Token.colon
   } =
   Token.makeTokenParser coreLangDef
 
@@ -54,9 +55,26 @@ arrow = symbol "->"
 
 type Parser = Parsec String ()
 
+type_, atype :: Parser Type
+type_ =
+  buildExpressionParser
+    [ [ Infix (reservedOp "->" *> pure (~>)) AssocRight ] ]    
+    (atype <|> typeCons)
+atype = choice
+  [ typeVar
+  , parens type_
+  ]
+typeVar  = try (lookAhead upper *> (var  <$> identifier))
+typeCons = try (lookAhead lower *> (cons <$> identifier <*> many atype))
+
+declaration :: Bool -> Parser Declaration
+declaration False = (,) <$> identifier <*> optionMaybe (colon *> type_)
+declaration True  =
+  ((,) <$> identifier <*> pure Nothing)
+  <|> parens ((,) <$> identifier <*> (Just <$> type_))
+
 definition :: Parser Definition
-definition =
-  (,) <$> identifier <* equals <*> expr
+definition = (,) <$> declaration False <* equals <*> expr
 
 expr, aexpr :: Parser Expr
 expr = msum
@@ -68,7 +86,7 @@ expr = msum
             <*> sepBy1 definition (reserved "and")
             <*  reserved "in"
             <*> expr
-  , Lam <$> (reserved "fun" *> many1 identifier)
+  , Lam <$> (reserved "fun" *> many1 (declaration True))
         <*  arrow
         <*> expr
   , let infixBinOp op = Infix (reservedOp op *> pure (Ap . Ap (Var op)))
@@ -85,7 +103,7 @@ expr = msum
           ]
           (foldl1 Ap <$> many1 aexpr)
   ]
-aexpr = msum
+aexpr = choice
   [ Var <$> identifier
   , Num <$> natural
   , reserved "Pack" *> braces (Pack <$> nat <* comma <*> nat)

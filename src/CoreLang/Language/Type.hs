@@ -1,8 +1,9 @@
 module CoreLang.Language.Type
   ( TypeVar
   , typeVars
-  , polyVars
   , Type (..)
+  , var
+  , cons
   , int
   , bool
   , fun, (~>)
@@ -14,6 +15,7 @@ module CoreLang.Language.Type
   where
 
 import Control.Monad.Except
+import Data.Char (isLower, isUpper)
 import Data.List (intercalate)
 import Text.Printf
 
@@ -30,30 +32,37 @@ newtype TypeVar = MkVar String
 typeVars :: [TypeVar]
 typeVars = map MkVar (tail vars)
   where
-    vars = "":[ xs ++ [x] | xs <- vars, x <- ['A'..'Z'] ]
-
-polyVars :: [Type]
-polyVars = map (TypeVar . MkVar) [ [x] | x <- ['a'..'z']]
+    vars = "_":[ xs ++ [x] | xs <- vars, x <- ['A'..'Z'] ]
 
 data Type
   = TypeVar  TypeVar
   | TypeCons String [Type]
-  deriving (Eq)
+  deriving (Eq, Show)
 
+-- vars must start with a capital letter
+var :: String -> Type
+var name@(start:_) 
+  | isUpper start = TypeVar (MkVar name)
+var _             = error (printf "%s is not a valid type variable name")
+
+cons :: String -> [Type] -> Type
+cons name@(start:_) ts
+  | isLower start = TypeCons name ts
+cons name _       = error (printf "%s is not a valid type constructor name")
 
 int, bool :: Type
-int  = TypeCons "int"  []
-bool = TypeCons "bool" []
+int  = cons "int"  []
+bool = cons "bool" []
 
 fun, (~>) :: Type -> Type -> Type
-fun t1 t2 = TypeCons "fun" [t1, t2]
+fun t1 t2 = cons "fun" [t1, t2]
 (~>) = fun
 
 pair :: Type -> Type -> Type
-pair t1 t2 = TypeCons "pair" [t1, t2]
+pair t1 t2 = cons "pair" [t1, t2]
 
 list :: Type -> Type
-list t = TypeCons "list" [t]
+list t = cons "list" [t]
 
 
 
@@ -108,20 +117,20 @@ instance TermLike [Type] where
   subst' = fmap . subst
 
 
-instance Show Type where
-  show t =
-    case t of
-      TypeVar  v               -> show v
-      TypeCons "list" [t1]     -> printf "[%s]" (show t1)
-      TypeCons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
-      TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
-      TypeCons c      []       -> c
-      TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
-    where
-      collect t =
-        case t of
-          TypeCons "fun" [t1, t2] -> t1 : collect t2
-          _                   -> [t]
+-- instance Show Type where
+--   show t =
+--     case t of
+--       TypeVar  v               -> show v
+--       TypeCons "list" [t1]     -> printf "[%s]" (show t1)
+--       TypeCons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
+--       TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
+--       TypeCons c      []       -> c
+--       TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
+--     where
+--       collect t =
+--         case t of
+--           TypeCons "fun" [t1, t2] -> t1 : collect t2
+--           _                   -> [t]
 
 instance Show TypeVar where
   show (MkVar s) = s
