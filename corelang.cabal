@@ -22,6 +22,8 @@ library
                      , CoreLang.Language.Syntax
                      , CoreLang.Language.Term
                      , CoreLang.Language.Type
+                     , CoreLang.Monomorphic.Builtins
+                     , CoreLang.Monpmorphic.TypeChecker
                      , CoreLang.Polymorphic.Builtins
                      , CoreLang.Polymorphic.TypeChecker
                      , CoreLang.TempInst.Builtins

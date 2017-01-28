@@ -28,7 +28,7 @@ newtype TypeVar = MkVar String
   deriving (Eq, Ord)
 
 typeVars :: [TypeVar]
-typeVars = map MkVar vars
+typeVars = map MkVar (tail vars)
   where
     vars = "":[ xs ++ [x] | xs <- vars, x <- ['A'..'Z'] ]
 
