@@ -18,7 +18,6 @@ import CoreLang.Language.Supply
 import CoreLang.Language.Type (Scheme (..), (~>))
 
 import qualified CoreLang.Language.Builtins as Builtins
-import qualified CoreLang.Language.Parser   as Parser
 import qualified CoreLang.Language.Subst    as Subst
 import qualified CoreLang.Language.Syntax   as Syntax
 import qualified CoreLang.Language.Type     as Type
@@ -74,30 +73,24 @@ infer e =
       vy <- freshVar
       phi <- unify phi tf (tx ~> vy)
       return (phi, subst phi vy)
-    Syntax.Lam []     e -> infer e
-    Syntax.Lam (x:xs) e -> do
-      let e' = Syntax.Lam xs e
-      v <- freshVar
-      (phi, t) <- local (Map.insert x (Type.exprScheme v)) (infer e')
-      return (phi, subst phi v ~> t)
-    Syntax.Let Syntax.NonRecursive xes f -> do
+    Syntax.Lam xs e0 -> do
+      (phi, vs, t0) <- localFreshVars xs (infer e0)
+      return (phi, foldr (~>) t0 vs)
+    Syntax.Let Syntax.NonRecursive xes e0 -> do
       let (xs, es) = unzip xes
       (phi, ts) <- inferMany es
       local (subst phi) $ do
         localDecls xs ts $ do
-          (psi, t) <- infer f
+          (psi, t) <- infer e0
           return (psi <> phi, t)
-    Syntax.Let Syntax.Recursive xes f -> do
+    Syntax.Let Syntax.Recursive xes e0 -> do
       let (xs, es) = unzip xes
-      vs <- mapM (\_ -> freshVar) xs
-      let env = Map.fromList (zipWith (\x v -> (x, Type.exprScheme v)) xs vs)
-      (phi, ts) <- local (Map.union env) (inferMany es)
+      (phi, vs, ts) <- localFreshVars xs (inferMany es)
       local (subst phi) $ do
-        let phi_vs = map (subst phi) vs
-        psi <- unifyMany phi (zip ts phi_vs)
+        psi <- unifyMany phi (zip ts vs)
         local (subst psi) $ do
-          localDecls xs (map (subst psi) phi_vs) $ do
-            (rho, t) <- infer f
+          localDecls xs (map (subst psi) vs) $ do
+            (rho, t) <- infer e0
             return (rho <> psi, t)
 
 inferMany :: [Syntax.Expr] -> TI (Subst, [Type.Expr])
@@ -127,3 +120,10 @@ localDecls xs ts cont = do
         }
   let env = Map.fromList (zip xs schemes)
   local (Map.union env) cont
+
+localFreshVars :: [Syntax.Identifier] -> TI (Subst, a) -> TI (Subst, [Type.Expr], a)
+localFreshVars xs cont = do
+  vs <- mapM (\_ -> freshVar) xs
+  let env = Map.fromList (zipWith (\x v -> (x, Type.exprScheme v)) xs vs)
+  (phi, t) <- local (Map.union env) cont
+  return (phi, map (subst phi) vs, t)

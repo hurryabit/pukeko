@@ -1,8 +1,4 @@
-module CoreLang.Demo
-  ( inferExpr
-  , checkFile
-  )
-  where
+module CoreLang.Demo where
 
 import Text.Printf
 
@@ -23,3 +19,6 @@ checkFile file = do
   case Parser.parseProgram file code >>= TypeChecker.checkProgram of
     Left  e  -> printf "Error = %s\n" e
     Right () -> putStrLn "OK"
+
+code_foldl =
+  "letrec foldl = fun f y0 xs -> case_list xs y0 (fun x xs -> foldl f (f y0 x) xs) in foldl"

@@ -25,7 +25,6 @@ import Text.Printf
 
 import qualified Data.Set as Set
 
-import CoreLang.Language.Supply
 import CoreLang.Language.Syntax (Identifier)
 
 infixl 6 `pair`
