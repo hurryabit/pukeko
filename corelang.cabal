@@ -15,7 +15,8 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     CoreLang.Language.Builtins
+  exposed-modules:     CoreLang.Demo
+                     , CoreLang.Language.Builtins
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Subst
