@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-module CoreLang.Language.Supply
+module Control.Monad.Supply
   ( MonadSupply (..)
   , SupplyT (..)
   , runSupplyT

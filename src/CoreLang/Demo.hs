@@ -2,13 +2,13 @@ module CoreLang.Demo where
 
 import Text.Printf
 
-import qualified CoreLang.Language.Parser      as Parser
-import qualified CoreLang.Language.TypeChecker as TypeChecker
+import qualified CoreLang.Language.Parser         as Parser
+import qualified CoreLang.Polymorphic.TypeChecker as PolyChecker
 
 
 inferExpr :: String -> IO ()
 inferExpr code = do
-  case Parser.parseExpr code >>= TypeChecker.inferExpr of
+  case Parser.parseExpr code >>= PolyChecker.inferExpr of
     Left  e -> printf "Error = %s\n" e
     Right t -> print t
 
@@ -16,7 +16,7 @@ inferExpr code = do
 checkFile :: String -> IO ()
 checkFile file = do
   code <- readFile file
-  case Parser.parseProgram file code >>= TypeChecker.checkProgram of
+  case Parser.parseProgram file code >>= PolyChecker.checkProgram of
     Left  e  -> printf "Error = %s\n" e
     Right () -> putStrLn "OK"
 

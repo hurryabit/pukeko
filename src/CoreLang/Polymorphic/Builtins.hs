@@ -1,4 +1,4 @@
-module CoreLang.Language.Builtins
+module CoreLang.Polymorphic.Builtins
   ( constructors
   , primitives
   , everything
@@ -8,7 +8,12 @@ module CoreLang.Language.Builtins
 import CoreLang.Language.Syntax (Identifier)
 import CoreLang.Language.Type
 
-constructors, primitives, everything :: [(Identifier, Expr)]
+alpha, beta, gamma :: Type
+alpha:beta:gamma:_  = polyVars
+
+
+
+constructors, primitives, everything :: [(Identifier, Type)]
 constructors =
   [ ("false"  , bool)
   , ("true"   , bool)

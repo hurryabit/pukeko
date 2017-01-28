@@ -15,15 +15,15 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     CoreLang.Demo
-                     , CoreLang.Language.Builtins
+  exposed-modules:     Control.Monad.Supply
+                     , CoreLang.Demo
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
-                     , CoreLang.Language.Subst
-                     , CoreLang.Language.Supply
                      , CoreLang.Language.Syntax
-                     , CoreLang.Language.TypeChecker
+                     , CoreLang.Language.Term
                      , CoreLang.Language.Type
+                     , CoreLang.Polymorphic.Builtins
+                     , CoreLang.Polymorphic.TypeChecker
                      , CoreLang.TempInst.Builtins
                      , CoreLang.TempInst.GC
                      , CoreLang.TempInst.Instantiate
@@ -42,6 +42,7 @@ library
                      , FlexibleInstances
                      , GeneralizedNewtypeDeriving
                      , NamedFieldPuns
+                     , TypeFamilies
                      
   ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Werror
 

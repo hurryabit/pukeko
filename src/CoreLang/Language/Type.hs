@@ -1,111 +1,127 @@
 module CoreLang.Language.Type
-  ( Var
-  , vars
-  , Expr (..)
-  , alpha
-  , beta
-  , gamma
-  , delta
+  ( TypeVar
+  , typeVars
+  , polyVars
+  , Type (..)
   , int
   , bool
   , fun, (~>)
   , pair
   , list
-  , Scheme (..)
-  , exprScheme
-  , Environment
-  , FreeVars (..)
+  , unify
+  , unifyMany
   )
   where
 
+import Control.Monad.Except
 import Data.List (intercalate)
-import Data.Map (Map)
-import Data.Set (Set)
 import Text.Printf
 
 import qualified Data.Set as Set
 
-import CoreLang.Language.Syntax (Identifier)
+import CoreLang.Language.Term
 
 infixl 6 `pair`
 infixr 5 ~>, `fun`
 
-
-newtype Var = MkVar String
+newtype TypeVar = MkVar String
   deriving (Eq, Ord)
 
-vars :: [Var]
-vars = map MkVar vars
+typeVars :: [TypeVar]
+typeVars = map MkVar vars
   where
-    vars = "":[ xs ++ [x] | xs <- vars, x <- ['A'..'H'] ++ ['J'..'N'] ++ ['P'..'Z'] ]
+    vars = "":[ xs ++ [x] | xs <- vars, x <- ['A'..'Z'] ]
 
+polyVars :: [Type]
+polyVars = map (TypeVar . MkVar) [ [x] | x <- ['a'..'z']]
 
-data Expr
-  = Var  Var
-  | Cons String [Expr]
+data Type
+  = TypeVar  TypeVar
+  | TypeCons String [Type]
   deriving (Eq)
 
-alpha, beta, gamma, delta :: Expr
-alpha = Var (MkVar "a")
-beta  = Var (MkVar "b")
-gamma = Var (MkVar "c")
-delta = Var (MkVar "d")
 
-int, bool :: Expr
-int  = Cons "int"  []
-bool = Cons "bool" []
+int, bool :: Type
+int  = TypeCons "int"  []
+bool = TypeCons "bool" []
 
-fun, (~>) :: Expr -> Expr -> Expr
-fun t1 t2 = Cons "fun" [t1, t2]
+fun, (~>) :: Type -> Type -> Type
+fun t1 t2 = TypeCons "fun" [t1, t2]
 (~>) = fun
 
-pair :: Expr -> Expr -> Expr
-pair t1 t2 = Cons "pair" [t1, t2]
+pair :: Type -> Type -> Type
+pair t1 t2 = TypeCons "pair" [t1, t2]
 
-list :: Expr -> Expr
-list t = Cons "list" [t]
-
-
-data Scheme = MkScheme { _schematicVars :: Set Var, _expr :: Expr }
-
-exprScheme :: Expr -> Scheme
-exprScheme t = MkScheme { _schematicVars = Set.empty, _expr = t }
+list :: Type -> Type
+list t = TypeCons "list" [t]
 
 
-type Environment = Map Identifier Scheme
+
+extend :: MonadError String m => Subst Type -> TypeVar -> Type -> m (Subst Type)
+extend phi v t =
+  case t of
+    TypeVar u
+      | u == v                    -> return phi
+    _
+      | Set.member v (freeVars t) -> throwError ("cyclic type variable " ++ show v)
+      | otherwise                 -> return (assign v t <> phi)
+
+unifyVar :: MonadError String m => Subst Type -> TypeVar -> Type -> m (Subst Type)
+unifyVar phi v t =
+  case substVar phi v of
+    TypeVar u
+      | u == v -> extend phi v phi_t
+    phi_v      -> unify phi phi_v phi_t
+    where
+      phi_t = subst phi t
+
+unify :: MonadError String m => Subst Type -> Type -> Type -> m (Subst Type)
+unify phi t1 t2 =
+  case (t1, t2) of
+    (TypeVar  v1    , _              ) -> unifyVar phi v1 t2
+    (TypeCons _ _   , TypeVar  v2    ) -> unifyVar phi v2 t1
+    (TypeCons c1 ts1, TypeCons c2 ts2)
+      | c1 /= c2                       -> throwError (printf "mismatching types %s and %s" (show t1) (show t2))
+      | otherwise                      -> unifyMany phi (zip ts1 ts2)
+
+unifyMany :: MonadError String m => Subst Type -> [(Type, Type)] -> m (Subst Type)
+unifyMany = foldM (uncurry . unify)
 
 
-class FreeVars a where
-  freeVars :: a -> Set Var
 
-instance (Foldable t, FreeVars a) => FreeVars (t a) where
-  freeVars = foldMap freeVars
+type instance TermVar Type = TypeVar
 
-instance FreeVars Expr where
+instance Term Type where
+  promoteVar = TypeVar
   freeVars t =
     case t of
-      Var  v    -> Set.singleton v
-      Cons _ ts -> freeVars ts
+      TypeVar  v    -> Set.singleton v
+      TypeCons _ ts -> freeVars' ts
+  subst phi t =
+    case t of
+      TypeVar  v    -> substVar phi v
+      TypeCons c ts -> TypeCons c (subst' phi ts)
 
-instance FreeVars Scheme where
-  freeVars (MkScheme { _schematicVars, _expr }) = 
-    Set.difference (freeVars _expr) _schematicVars
+instance TermLike [Type] where
+  type BaseTerm [Type] = Type
+  freeVars' = foldMap freeVars
+  subst' = fmap . subst
 
 
-instance Show Expr where
+instance Show Type where
   show t =
     case t of
-      Var  v               -> show v
-      Cons "list" [t1]     -> printf "[%s]" (show t1)
-      Cons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
-      Cons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
-      Cons c      []       -> c
-      Cons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
+      TypeVar  v               -> show v
+      TypeCons "list" [t1]     -> printf "[%s]" (show t1)
+      TypeCons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
+      TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
+      TypeCons c      []       -> c
+      TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
     where
       collect t =
         case t of
-          Cons "fun" [t1, t2] -> t1 : collect t2
+          TypeCons "fun" [t1, t2] -> t1 : collect t2
           _                   -> [t]
 
-instance Show Var where
+instance Show TypeVar where
   show (MkVar s) = s
