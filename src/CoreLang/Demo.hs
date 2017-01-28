@@ -3,38 +3,33 @@ module CoreLang.Demo where
 import Text.Printf
 
 import qualified CoreLang.Language.Parser         as Parser
-import qualified CoreLang.Monomorphic.TypeChecker as MonoChecker
-import qualified CoreLang.Polymorphic.TypeChecker as PolyChecker
+import qualified CoreLang.Monomorphic.TypeChecker as Mono.Checker
+import qualified CoreLang.Polymorphic.TypeChecker as Poly.Checker
 
 
-inferExpr :: String -> IO ()
-inferExpr code = do
-  case Parser.parseExpr code >>= PolyChecker.inferExpr of
+polyInfer :: String -> IO ()
+polyInfer = polyInferIO "<interactive>"
+
+polyInferFile :: String -> IO ()
+polyInferFile file = readFile file >>= polyInferIO file
+
+polyInferIO :: String -> String -> IO ()
+polyInferIO file code = do
+  case Parser.parseExpr file code >>= Poly.Checker.inferExpr of
     Left  e -> printf "Error = %s\n" e
-    Right t -> print t
+    Right t -> printf "Type = %s\n" (show t)
 
+monoInfer :: String -> IO ()
+monoInfer = monoInferIO "<interactive>"
 
-checkFile :: String -> IO ()
-checkFile file = do
-  code <- readFile file
-  case Parser.parseProgram file code >>= PolyChecker.checkProgram of
-    Left  e  -> printf "Error = %s\n" e
-    Right () -> putStrLn "OK"
+monoInferFile :: String -> IO ()
+monoInferFile file = readFile file >>= monoInferIO file
 
-monoInferExpr :: String -> IO ()
-monoInferExpr code = do
-  case Parser.parseExpr code >>= MonoChecker.inferExpr of
+monoInferIO :: String -> String -> IO ()
+monoInferIO file code = do
+  case Parser.parseExpr file code >>= Mono.Checker.inferExpr of
     Left  e -> printf "Error = %s\n" e
-    Right t -> print t
-
-
-monoCheckFile :: String -> IO ()
-monoCheckFile file = do
-  code <- readFile file
-  case Parser.parseProgram file code >>= MonoChecker.checkProgram of
-    Left  e  -> printf "Error = %s\n" e
-    Right () -> putStrLn "OK"
-
+    Right t -> printf "Type = %s\n" (show t)
 
 code_foldl =
   "letrec foldl = fun f y0 xs -> case_list xs y0 (fun x xs -> foldl f (f y0 x) xs) in foldl"

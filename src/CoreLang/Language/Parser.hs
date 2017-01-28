@@ -1,6 +1,5 @@
 module CoreLang.Language.Parser 
   ( parseExpr
-  , parseProgram
   )
   where
 
@@ -14,19 +13,11 @@ import qualified Text.Parsec.Token as Token
 import CoreLang.Language.Syntax
 
 
-parseProgram :: MonadError String m => String -> String -> m Program
-parseProgram file code =
-  case Parsec.parse (program <* eof) file code of
-    Left error -> throwError (show error)
-    Right prog -> return prog
-
-parseExpr :: MonadError String m => String -> m Expr
-parseExpr code = 
-  case parseExpr' code of
+parseExpr :: MonadError String m => String -> String -> m Expr
+parseExpr file code = 
+  case Parsec.parse (expr <* eof) file code of
     Left error -> throwError (show error)
     Right expr -> return expr
-
-parseExpr' = Parsec.parse (expr <* eof) "<expr>"
 
 relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
 
@@ -63,23 +54,9 @@ arrow = symbol "->"
 
 type Parser = Parsec String ()
 
-program :: Parser Program
-program = semiSep1 definition <* eof
-
 definition :: Parser Definition
 definition =
-  (,,) <$> identifier <*> many identifier <* equals <*> expr
-
-localDefinition :: Parser LocalDefinition
-localDefinition =
   (,) <$> identifier <* equals <*> expr
-
--- alter :: Parser Alter
--- alter =
---   (,,)  <$> angles natural
---         <*> many identifier
---         <*  arrow
---         <*> expr
 
 expr, aexpr :: Parser Expr
 expr = msum
@@ -88,12 +65,9 @@ expr = msum
           , reserved "letrec" *> pure Recursive
           ]
     in  Let <$> isRec 
-            <*> sepBy1 localDefinition (reserved "and")
+            <*> sepBy1 definition (reserved "and")
             <*  reserved "in"
             <*> expr
-  -- , Case  <$> (reserved "case" *> expr)
-  --         <*  reserved "of"
-  --         <*> semiSep1 alter
   , Lam <$> (reserved "fun" *> many1 identifier)
         <*  arrow
         <*> expr

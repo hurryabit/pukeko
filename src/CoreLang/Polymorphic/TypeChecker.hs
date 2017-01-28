@@ -1,6 +1,5 @@
 module CoreLang.Polymorphic.TypeChecker
   ( inferExpr
-  , checkProgram
   )
   where
 
@@ -15,7 +14,7 @@ import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import CoreLang.Language.Syntax (Expr, Identifier, Program)
+import CoreLang.Language.Syntax (Expr, Identifier)
 import CoreLang.Language.Term
 import CoreLang.Language.Type (Type, TypeVar, (~>))
 
@@ -23,16 +22,6 @@ import qualified CoreLang.Language.Syntax      as Syntax
 import qualified CoreLang.Language.Type        as Type
 import qualified CoreLang.Polymorphic.Builtins as Builtins
 
-
-checkProgram :: MonadError String m => Program -> m ()
-checkProgram defs = do
-  let local (fun, args, body) = (fun, Syntax.Lam args body)
-      expr = Syntax.Let Syntax.Recursive (map local defs) (Syntax.Var "main")
-  t <- inferExpr expr
-  if t /= Type.int then
-    return ()
-  else
-    throwError $ printf "main has type %s instead of %s" (show t) (show Type.int)
 
 inferExpr :: MonadError String m => Expr -> m Type
 inferExpr expr = do
