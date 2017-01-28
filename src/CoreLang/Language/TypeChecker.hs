@@ -1,299 +1,129 @@
-module CoreLang.Language.TypeChecker where
+module CoreLang.Language.TypeChecker
+  ( inferExpr
+  , checkProgram
+  )
+  where
 
 import Control.Monad
 import Control.Monad.Except
-import Control.Monad.RWS
-import Data.List (intercalate)
-import Data.Map (Map)
+import Control.Monad.Reader
 import Data.Monoid (Monoid (..), (<>))
-import Data.Set (Set)
 import Text.Printf
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import CoreLang.Language.Parser (parseExpr, parseProgram)
-import CoreLang.Language.Syntax
+import CoreLang.Language.Subst (Subst, subst, unify, unifyMany)
+import CoreLang.Language.Supply
+import CoreLang.Language.Type (Scheme (..), (~>))
 
-newtype TypeVar = MkTypeVar String
-  deriving (Eq, Ord)
+import qualified CoreLang.Language.Builtins as Builtins
+import qualified CoreLang.Language.Parser   as Parser
+import qualified CoreLang.Language.Subst    as Subst
+import qualified CoreLang.Language.Syntax   as Syntax
+import qualified CoreLang.Language.Type     as Type
 
-data TypeExpr
-  = TypeVar TypeVar
-  | TypeCons String [TypeExpr]
-  deriving (Eq)
 
-int, bool :: TypeExpr
-int  = TypeCons "int"  []
-bool = TypeCons "bool" []
+checkProgram :: MonadError String m => Syntax.Program -> m ()
+checkProgram defs = do
+  let local (fun, args, body) = (fun, Syntax.Lam args body)
+      expr = Syntax.Let Syntax.Recursive (map local defs) (Syntax.Var "main")
+  t <- inferExpr expr
+  if t /= Type.int then
+    return ()
+  else
+    throwError $ printf "main has type %s instead of %s" (show t) (show Type.int)
 
-list :: TypeExpr -> TypeExpr
-list t = TypeCons "list" [t]
-
-pair :: TypeExpr -> TypeExpr -> TypeExpr
-pair t1 t2 = TypeCons "pair" [t1, t2]
-
-fun, (~>) :: TypeExpr -> TypeExpr -> TypeExpr
-fun t1 t2 = TypeCons "fun" [t1, t2]
-(~>) = fun
-
-alpha, beta, gamma :: TypeExpr
-alpha = TypeVar (MkTypeVar "a")
-beta  = TypeVar (MkTypeVar "b")
-gamma = TypeVar (MkTypeVar "c")
-
-infixl 6 `pair`
-infixr 5 ~>, `fun`
-
-builtins = 
-  [ ("false"  , bool)
-  , ("true"   , bool)
-  , ("mk_pair", alpha ~> beta ~> pair alpha beta)
-  , ("nil"    , list alpha)
-  , ("cons"   , alpha ~> list alpha ~> list alpha)
-  , ("neg", int  ~> int        )
-  , ("+"  , int  ~> int  ~> int )
-  , ("-"  , int  ~> int  ~> int )
-  , ("*"  , int  ~> int  ~> int )
-  , ("/"  , int  ~> int  ~> int )
-  , ("<"  , int  ~> int  ~> bool)
-  , ("<=" , int  ~> int  ~> bool)
-  , ("==" , int  ~> int  ~> bool)
-  , ("!=" , int  ~> int  ~> bool)
-  , (">=" , int  ~> int  ~> bool)
-  , (">"  , int  ~> int  ~> bool)
-  , ("not", bool ~> bool        )
-  , ("&&" , bool ~> bool ~> bool)
-  , ("||" , bool ~> bool ~> bool)
-  , ("if"       , bool ~> alpha ~> alpha ~> alpha)
-  , ("case_pair", pair alpha beta ~> (alpha ~> beta ~> gamma) ~> gamma)
-  , ("case_list", list alpha ~> beta ~> (alpha ~> list alpha ~> beta) ~> beta)
-  , ("print"    , int ~> alpha ~> alpha)
-  , ("abort"    , alpha)
-  ]
-
-checkFile file = do
-  code <- readFile file
-  case parseProgram file code >>= checkProgram of
-    Left error -> printf "Error = %s\n" error
-    Right ()   -> putStrLn "OK"
-
-check code = do
-  res <- runExceptT (parseExpr code >>= checkExpr)
-  case res of
-    Left error -> printf "Error = %s\n" error
-    Right t    -> print t
-
-checkExpr :: MonadError String m => Expr -> m TypeExpr
-checkExpr expr = do
-  let env = [ (fun, MkTypeScheme (variables t) t) | (fun, t) <- builtins ]
-  (_, t) <- runTC (Map.fromList env) (tc expr)
+inferExpr :: MonadError String m => Syntax.Expr -> m Type.Expr
+inferExpr expr = do
+  let  env = [ (fun, MkScheme (Type.freeVars t) t) | (fun, t) <- Builtins.everything ]
+  (_, t) <- runTI (Map.fromList env) (infer expr)
   return t
 
-checkProgram :: MonadError String m => Program -> m ()
-checkProgram defs = do
-  let local (fun, args, body) = (fun, Lam args body)
-      expr = Let Recursive (map local defs) (Var "main")
-  t <- checkExpr expr
-  when (t /= int) $
-    throwError $ printf "main has type %s instead of int" (show t)
-  return ()
-    
-
-
-variables :: TypeExpr -> Set TypeVar
-variables t =
-  case t of
-    TypeVar v     -> Set.singleton v
-    TypeCons _ ts -> Set.unions (map variables ts)
-
-newtype Subst = MkSubst { unSubst :: Map TypeVar TypeExpr }
-
-runSubst :: Subst -> TypeVar -> TypeExpr
-runSubst phi v = Map.findWithDefault (TypeVar v) v (unSubst phi)
-
-class ApplySubst t where
-  subst :: Subst -> t -> t
-
-instance ApplySubst TypeExpr where
-  subst phi t =
-    case t of
-      TypeVar  v    -> runSubst phi v
-      TypeCons c ts -> TypeCons c (map (subst phi) ts) 
-
-instance Monoid Subst where
-  mempty = MkSubst Map.empty
-  phi `mappend` psi = MkSubst $ Map.union (Map.map (subst phi) (unSubst psi)) (unSubst phi)
-    
-fromMap :: Map TypeVar TypeExpr -> Subst
-fromMap = MkSubst
-
-delta :: TypeVar -> TypeExpr -> Subst
-delta v t = MkSubst $ Map.singleton v t
-
-extend :: MonadError String m => Subst -> TypeVar -> TypeExpr -> m Subst
-extend phi v t =
-  case t of
-    TypeVar u
-      | u == v                     -> return phi
-    _
-      | Set.member v (variables t) -> throwError ("cyclic type variable " ++ show v)
-      | otherwise                  -> return (delta v t <> phi)
-
-exclude :: Subst -> Set TypeVar -> Subst
-exclude phi vs = MkSubst $ Map.difference (unSubst phi) (Map.fromSet TypeVar vs)
-
-unifyVar :: MonadError String m => Subst -> TypeVar -> TypeExpr -> m Subst
-unifyVar phi v t =
-  case runSubst phi v of
-    TypeVar u
-      | u == v -> extend phi v phi_t
-    phi_v      -> unify phi phi_v phi_t
-    where
-      phi_t = subst phi t
-
-unify :: MonadError String m => Subst -> TypeExpr -> TypeExpr -> m Subst
-unify phi t1 t2 =
-  case (t1, t2) of
-    (TypeVar v1     , _              ) -> unifyVar phi v1 t2
-    (TypeCons _ _   , TypeVar v2     ) -> unifyVar phi v2 t1
-    (TypeCons c1 ts1, TypeCons c2 ts2)
-      | c1 /= c2                       -> throwError (printf "mismatching types %s and %s" (show t1) (show t2))
-      | otherwise                      -> unifyMany phi (zip ts1 ts2)
-
--- TODO: Inline unifyMany in unify?
-unifyMany :: MonadError String m => Subst -> [(TypeExpr, TypeExpr)] -> m Subst
-unifyMany = foldM (uncurry . unify)
-
-
-class Unknowns s where
-  unknowns :: s -> Set TypeVar
-
-data TypeScheme = MkTypeScheme { schematic :: Set TypeVar, body :: TypeExpr }
-
-freshScheme :: TypeExpr -> TypeScheme
-freshScheme v = MkTypeScheme Set.empty v
-
-instance Unknowns TypeScheme where
-  unknowns (MkTypeScheme { schematic, body }) = Set.difference (variables body) schematic
-
-instance ApplySubst TypeScheme where
-  subst phi (scheme@MkTypeScheme { schematic, body }) =
-    scheme { body = subst (exclude phi schematic) body }
-
-type Environment = Map Identifier TypeScheme
-
-instance Unknowns Environment where
-  unknowns = Set.unions . map unknowns . Map.elems
-
-instance ApplySubst Environment where
-  subst = Map.map . subst
-
-
-newtype TC a = TC { unTC :: ExceptT String (RWS Environment () [String]) a }
+newtype TI a =
+  TI  { unTI :: ExceptT String (ReaderT Type.Environment (Supply Type.Var)) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
-           , MonadReader Environment
+           , MonadReader Type.Environment
+           , MonadSupply Type.Var
            )
 
-runTC :: MonadError String m => Environment -> TC a -> m a
-runTC env checker = do
-  let vars = "":liftM2 (\xs x -> xs ++ [x]) vars ['A'..'Z']
-      (res, _) = evalRWS (runExceptT (unTC checker)) env (tail vars)
-  case res of
-    Left error -> throwError error
-    Right t -> return t
+runTI :: MonadError String m => Type.Environment -> TI a -> m a
+runTI env ti =
+  case evalSupply (runReaderT (runExceptT (unTI ti)) env) Type.vars of
+    Left  e -> throwError e
+    Right x -> return x
 
-freshVar :: TC TypeExpr
-freshVar = TC $ state $ \(v:vs) -> (TypeVar (MkTypeVar v), vs)
+freshVar :: TI Type.Expr
+freshVar = Type.Var <$> fresh
 
-tc :: Expr -> TC (Subst, TypeExpr)
-tc e =
+infer :: Syntax.Expr -> TI (Subst, Type.Expr)
+infer e =
   case e of
-    Var x -> do
+    Syntax.Var x -> do
       env <- ask
       case Map.lookup x env of
         Nothing     -> throwError (printf "unknown identifier %s" x)
         Just scheme -> do
-          MkTypeScheme { body } <- instantiate scheme
-          return (mempty,body)
-    Num _ -> return (mempty, int)
-    Pack _ _ -> throwError "type checking constructors not implemented"
-    Ap ef ex -> do
-      (phi, [tf, tx]) <- tcMany [ef, ex]
+          MkScheme { _expr } <- instantiate scheme
+          return (mempty, _expr)
+    Syntax.Num _ -> return (mempty, Type.int)
+    Syntax.Pack _ _ -> throwError "type checking constructors not implemented"
+    Syntax.Ap ef ex -> do
+      (phi, [tf, tx]) <- inferMany [ef, ex]
       vy <- freshVar
       phi <- unify phi tf (tx ~> vy)
       return (phi, subst phi vy)
-    Lam []     e -> tc e
-    Lam (x:xs) e -> do
-      let e' = Lam xs e
+    Syntax.Lam []     e -> infer e
+    Syntax.Lam (x:xs) e -> do
+      let e' = Syntax.Lam xs e
       v <- freshVar
-      let scheme = freshScheme v
-      (phi, t) <- local (Map.insert x scheme) (tc e')
+      (phi, t) <- local (Map.insert x (Type.exprScheme v)) (infer e')
       return (phi, subst phi v ~> t)
-    Let NonRecursive xes f -> do
+    Syntax.Let Syntax.NonRecursive xes f -> do
       let (xs, es) = unzip xes
-      (phi, ts) <- tcMany es
+      (phi, ts) <- inferMany es
       local (subst phi) $ do
         localDecls xs ts $ do
-          (psi, t) <- tc f
+          (psi, t) <- infer f
           return (psi <> phi, t)
-    Let Recursive xes f -> do
+    Syntax.Let Syntax.Recursive xes f -> do
       let (xs, es) = unzip xes
       vs <- mapM (\_ -> freshVar) xs
-      let env = Map.fromList (zipWith (\x v -> (x, freshScheme v)) xs vs)
-      (phi, ts) <- local (Map.union env) (tcMany es)
+      let env = Map.fromList (zipWith (\x v -> (x, Type.exprScheme v)) xs vs)
+      (phi, ts) <- local (Map.union env) (inferMany es)
       local (subst phi) $ do
         let phi_vs = map (subst phi) vs
         psi <- unifyMany phi (zip ts phi_vs)
         local (subst psi) $ do
           localDecls xs (map (subst psi) phi_vs) $ do
-            (rho, t) <- tc f
+            (rho, t) <- infer f
             return (rho <> psi, t)
 
-tcMany :: [Expr] -> TC (Subst, [TypeExpr])
-tcMany [] = return (mempty, [])
-tcMany (e:es) = do
-  (phi, t)  <- tc e
-  (psi, ts) <- local (subst phi) (tcMany es)
+inferMany :: [Syntax.Expr] -> TI (Subst, [Type.Expr])
+inferMany [] = return (mempty, [])
+inferMany (e:es) = do
+  (phi, t)  <- infer e
+  (psi, ts) <- local (subst phi) (inferMany es)
   return (psi <> phi, subst psi t : ts)
 
-instantiate :: TypeScheme -> TC TypeScheme
-instantiate (MkTypeScheme { schematic, body }) = do
-  bindings <- mapM (\_ ->freshVar) (Map.fromSet id schematic)
-  return $
-    MkTypeScheme
-      { schematic = Set.fromList [ v | TypeVar v <- Map.elems bindings ]
-      , body      = subst (fromMap bindings) body
-      }
 
-localDecls :: [Identifier] -> [TypeExpr] -> TC a -> TC a
+instantiate :: Type.Scheme -> TI Type.Scheme
+instantiate (MkScheme { _schematicVars, _expr }) = do
+  bindings <- mapM (\_ -> freshVar) (Map.fromSet id _schematicVars)
+  return $ MkScheme
+    { _schematicVars = Set.fromList [ v | Type.Var v <- Map.elems bindings ]
+    , _expr          = subst (Subst.fromMap bindings) _expr
+    }
+
+localDecls :: [Syntax.Identifier] -> [Type.Expr] -> TI a -> TI a
 localDecls xs ts cont = do
-  unks <- asks unknowns
+  fvs <- asks Type.freeVars
   schemes <-
     forM ts $ \t ->
-      instantiate $ MkTypeScheme
-        { schematic = Set.difference (variables t) unks
-        , body      = t
+      instantiate $ MkScheme
+        { _schematicVars = Set.difference (Type.freeVars t) fvs
+        , _expr          = t
         }
   let env = Map.fromList (zip xs schemes)
   local (Map.union env) cont
-
--- Show instances
-instance Show TypeVar where
-  show (MkTypeVar s) = s
-  
-instance Show TypeExpr where
-  show t =
-    case t of
-      TypeVar  v               -> show v
-      TypeCons "list" [t1]     -> printf "[%s]"       (show t1)
-      TypeCons "pair" [t1, t2] -> printf "%s * %s"   (show t1) (show t2)
-      TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate "->" . map show . collect $ t)
-      TypeCons c      []       -> c
-      TypeCons c      ts       -> printf "(%s %s)"    c (unwords (map show ts))
-    where
-      collect t =
-        case t of
-          TypeCons "fun" [t1, t2] -> t1 : collect t2
-          _                       -> [t]
