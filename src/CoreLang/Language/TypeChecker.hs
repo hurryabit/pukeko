@@ -86,12 +86,11 @@ infer e =
     Syntax.Let Syntax.Recursive xes e0 -> do
       let (xs, es) = unzip xes
       (phi, vs, ts) <- localFreshVars xs (inferMany es)
-      local (subst phi) $ do
-        psi <- unifyMany phi (zip ts vs)
-        local (subst psi) $ do
-          localDecls xs (map (subst psi) vs) $ do
-            (rho, t) <- infer e0
-            return (rho <> psi, t)
+      psi <- unifyMany phi (zip ts vs)
+      local (subst (psi <> phi)) $ do -- TODO: Is phi really needed here?
+        localDecls xs (map (subst psi) ts) $ do
+          (rho, t) <- infer e0
+          return (rho <> psi, t)
 
 inferMany :: [Syntax.Expr] -> TI (Subst, [Type.Expr])
 inferMany [] = return (mempty, [])
