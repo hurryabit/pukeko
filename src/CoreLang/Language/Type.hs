@@ -37,6 +37,7 @@ typeVars = map MkVar (tail vars)
 data Type
   = TypeVar  TypeVar
   | TypeCons String [Type]
+  | TypeFun  Type Type
   deriving (Eq)
 
 -- vars must start with a capital letter
@@ -50,20 +51,19 @@ cons name@(start:_) ts
   | isLower start = TypeCons name ts
 cons name _       = error (printf "%s is not a valid type constructor name" name)
 
+fun, (~>) :: Type -> Type -> Type
+fun = TypeFun
+(~>) = fun
+
 int, bool :: Type
 int  = cons "int"  []
 bool = cons "bool" []
-
-fun, (~>) :: Type -> Type -> Type
-fun t1 t2 = cons "fun" [t1, t2]
-(~>) = fun
 
 pair :: Type -> Type -> Type
 pair t1 t2 = cons "pair" [t1, t2]
 
 list :: Type -> Type
 list t = cons "list" [t]
-
 
 
 extend :: MonadError String m => Subst Type -> TypeVar -> Type -> m (Subst Type)
@@ -87,11 +87,13 @@ unifyVar phi v t =
 unify :: MonadError String m => Subst Type -> Type -> Type -> m (Subst Type)
 unify phi t1 t2 =
   case (t1, t2) of
-    (TypeVar  v1    , _              ) -> unifyVar phi v1 t2
-    (TypeCons _ _   , TypeVar  v2    ) -> unifyVar phi v2 t1
-    (TypeCons c1 ts1, TypeCons c2 ts2)
-      | c1 /= c2                       -> throwError (printf "mismatching types %s and %s" (show t1) (show t2))
-      | otherwise                      -> unifyMany phi (zip ts1 ts2)
+    (TypeVar  v1     , _               ) -> unifyVar phi v1 t2
+    (_               , TypeVar  v2     ) -> unifyVar phi v2 t1
+    (TypeCons c1 ts1 , TypeCons c2 ts2 )
+      | c1 == c2                         -> unifyMany phi (zip ts1 ts2)
+    (TypeFun  tx1 ty1, TypeFun  tx2 ty2) -> unifyMany phi [(tx1, tx2), (ty1, ty2)]
+    _                                    ->
+      throwError (printf "mismatching types %s and %s" (show t1) (show t2))
 
 unifyMany :: MonadError String m => Subst Type -> [(Type, Type)] -> m (Subst Type)
 unifyMany = foldM (uncurry . unify)
@@ -121,16 +123,14 @@ instance Show Type where
   show t =
     case t of
       TypeVar  v               -> show v
-      TypeCons "list" [t1]     -> printf "[%s]" (show t1)
-      TypeCons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
-      TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
+      TypeFun  _ _             -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
       TypeCons c      []       -> c
       TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
     where
       collect t =
         case t of
-          TypeCons "fun" [t1, t2] -> t1 : collect t2
-          _                   -> [t]
+          TypeFun t1 t2 -> t1 : collect t2
+          _         -> [t]
 
 instance Show TypeVar where
   show (MkVar s) = s

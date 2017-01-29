@@ -50,7 +50,7 @@ check e =
       t1 <- check e1
       t2 <- check e2
       case t1 of
-        Type.TypeCons "fun" [tx, ty]
+        Type.TypeFun tx ty
           | t2 == tx  -> return ty
           | otherwise -> throwError $ "expected " ++ show tx ++ ", found " ++ show t2
         _ -> throwError $ "expected function, found " ++ show t1
