@@ -36,8 +36,8 @@ typeVars = map MkVar (tail vars)
 
 data Type
   = TypeVar  TypeVar
-  | TypeCons String [Type]
   | TypeFun  Type Type
+  | TypeCons String [Type]
   deriving (Eq)
 
 -- vars must start with a capital letter
@@ -46,14 +46,14 @@ var name@(start:_)
   | isUpper start = TypeVar (MkVar name)
 var name          = error (printf "%s is not a valid type variable name" name)
 
+fun, (~>) :: Type -> Type -> Type
+fun = TypeFun
+(~>) = fun
+
 cons :: String -> [Type] -> Type
 cons name@(start:_) ts
   | isLower start = TypeCons name ts
 cons name _       = error (printf "%s is not a valid type constructor name" name)
-
-fun, (~>) :: Type -> Type -> Type
-fun = TypeFun
-(~>) = fun
 
 int, bool :: Type
 int  = cons "int"  []
@@ -89,9 +89,9 @@ unify phi t1 t2 =
   case (t1, t2) of
     (TypeVar  v1     , _               ) -> unifyVar phi v1 t2
     (_               , TypeVar  v2     ) -> unifyVar phi v2 t1
+    (TypeFun  tx1 ty1, TypeFun  tx2 ty2) -> unifyMany phi [(tx1, tx2), (ty1, ty2)]
     (TypeCons c1 ts1 , TypeCons c2 ts2 )
       | c1 == c2                         -> unifyMany phi (zip ts1 ts2)
-    (TypeFun  tx1 ty1, TypeFun  tx2 ty2) -> unifyMany phi [(tx1, tx2), (ty1, ty2)]
     _                                    ->
       throwError (printf "mismatching types %s and %s" (show t1) (show t2))
 
@@ -106,31 +106,28 @@ instance Term Type where
   promoteVar = TypeVar
   freeVars t =
     case t of
-      TypeVar  v    -> Set.singleton v
-      TypeCons _ ts -> freeVars' ts
+      TypeVar  v     -> Set.singleton v
+      TypeFun  tx ty -> Set.union (freeVars tx) (freeVars ty)
+      TypeCons _  ts -> Set.unions (map freeVars ts)
   subst phi t =
     case t of
-      TypeVar  v    -> substVar phi v
-      TypeCons c ts -> TypeCons c (subst' phi ts)
-
-instance TermLike [Type] where
-  type BaseTerm [Type] = Type
-  freeVars' = foldMap freeVars
-  subst' = fmap . subst
+      TypeVar  v     -> substVar phi v
+      TypeFun  tx ty -> TypeFun (subst phi tx) (subst phi ty)
+      TypeCons c  ts -> TypeCons c (map (subst phi) ts)
 
 
 instance Show Type where
   show t =
     case t of
-      TypeVar  v               -> show v
-      TypeFun  _ _             -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
-      TypeCons c      []       -> c
-      TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
+      TypeVar  v    -> show v
+      TypeFun  _ _  -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
+      TypeCons c [] -> c
+      TypeCons c ts -> printf "(%s %s)" c (unwords (map show ts))
     where
       collect t =
         case t of
           TypeFun t1 t2 -> t1 : collect t2
-          _         -> [t]
+          _             -> [t]
 
 instance Show TypeVar where
   show (MkVar s) = s
