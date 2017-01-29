@@ -23,7 +23,7 @@ parseExpr file code =
 
 parseType :: MonadError String m => String -> m Type
 parseType code = 
-  case parse (type_ <* eof) "<type>" code of
+  case parse (type_ <* eof) "<input>" code of
     Left error -> throwError (show error)
     Right expr -> return expr
 
@@ -66,50 +66,60 @@ type_, atype :: Parser Type
 type_ =
   buildExpressionParser
     [ [ Infix (reservedOp "->" *> pure (~>)) AssocRight ] ]    
-    (atype <|> typeCons)
+    (typeCons <|> atype)
+  <?> "type"
 atype = choice
   [ typeVar
+  , typeCons0
   , parens type_
   ]
-typeVar  = try (lookAhead upper *> (var  <$> identifier))
-typeCons = try (lookAhead lower *> (cons <$> identifier <*> many atype))
+typeVar   = try (lookAhead upper *> (var  <$> identifier))
+typeCons  = try (lookAhead lower *> (cons <$> identifier <*> many atype))
+typeCons0 = try (lookAhead lower *> (cons <$> identifier <*> pure []))
 
 declaration :: Bool -> Parser Declaration
-declaration False = (,) <$> identifier <*> optionMaybe (colon *> type_)
-declaration True  =
-  ((,) <$> identifier <*> pure Nothing)
-  <|> parens ((,) <$> identifier <*> (Just <$> type_))
+declaration needParens =
+  case needParens of
+    False -> (,) <$> identifier <*> optionMaybe (colon *> type_)
+    True  -> 
+      ((,) <$> identifier <*> pure Nothing)
+      <|> parens ((,) <$> identifier <*> (Just <$> type_))
+  <?> "declaration"
 
 definition :: Parser Definition
-definition = (,) <$> declaration False <* equals <*> expr
+definition = 
+  (,) <$> declaration False <* equals <*> expr 
+  <?> "definition"
 
 expr, aexpr :: Parser Expr
-expr = msum
-  [ let isRec = msum
-          [ reserved "let"    *> pure NonRecursive
-          , reserved "letrec" *> pure Recursive
-          ]
-    in  Let <$> isRec 
-            <*> sepBy1 definition (reserved "and")
-            <*  reserved "in"
-            <*> expr
-  , Lam <$> (reserved "fun" *> many1 (declaration True))
-        <*  arrow
-        <*> expr
-  , let infixBinOp op = Infix (reservedOp op *> pure (Ap . Ap (Var op)))
-    in  buildExpressionParser
-          [ [ infixBinOp "*" AssocRight
-            , infixBinOp "/" AssocNone
+expr =
+  choice
+    [ let isRec = msum
+            [ reserved "let"    *> pure NonRecursive
+            , reserved "letrec" *> pure Recursive
             ]
-          , [ infixBinOp "+" AssocRight
-            , infixBinOp "-" AssocNone
+      in  Let <$> isRec 
+              <*> sepBy1 definition (reserved "and")
+              <*  reserved "in"
+              <*> expr
+    , Lam <$> (reserved "fun" *> many1 (declaration True))
+          <*  arrow
+          <*> expr
+    , let infixBinOp op = Infix (reservedOp op *> pure (Ap . Ap (Var op)))
+      in  buildExpressionParser
+            [ [ infixBinOp "*" AssocRight
+              , infixBinOp "/" AssocNone
+              ]
+            , [ infixBinOp "+" AssocRight
+              , infixBinOp "-" AssocNone
+              ]
+            , map (flip infixBinOp AssocNone) relOpNames
+            , [infixBinOp "&&" AssocRight]
+            , [infixBinOp "||" AssocRight]
             ]
-          , map (flip infixBinOp AssocNone) relOpNames
-          , [infixBinOp "&&" AssocRight]
-          , [infixBinOp "||" AssocRight]
-          ]
-          (foldl1 Ap <$> many1 aexpr)
-  ]
+            (foldl1 Ap <$> many1 aexpr)
+    ]
+  <?> "expression"
 aexpr = choice
   [ Var <$> identifier
   , Num <$> natural
