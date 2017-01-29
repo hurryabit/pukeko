@@ -18,6 +18,7 @@ data Expr
   | Ap   Expr Expr
   | Let  IsRec [Definition] Expr
   | Lam  [Declaration] Expr
+  | If   Expr Expr Expr
 
 type Declaration = (Identifier, Maybe Type)
 
@@ -44,6 +45,15 @@ ppExpr e =
         , hsep [ text x | (x, _) <- xs ]
         , text "->"
         , ppExpr e0
+        ]
+    If ec et ef ->
+      hsep $
+        [ text "if"
+        , ppExpr ec
+        , text "then"
+        , ppExpr et
+        , text "else"
+        , ppExpr ef
         ]
   where
     collect e fs =

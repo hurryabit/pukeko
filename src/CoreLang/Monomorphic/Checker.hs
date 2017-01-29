@@ -36,6 +36,11 @@ runTI env ti =
     Left  e -> throwError e
     Right x -> return x
 
+match :: Type -> Type -> TI ()
+match expected found
+  | expected == found = return ()
+  | otherwise         = throwError ("expected " ++ show expected ++ ", but found " ++ show found)
+
 check :: Expr -> TI Type
 check e =
   case e of
@@ -45,14 +50,13 @@ check e =
         Nothing -> throwError $ "unknown identifier: " ++ show x
         Just  t -> return t
     Syntax.Num _ -> return Type.int
-    Syntax.Pack _ _ -> throwError "type checking constructors not implemented"
     Syntax.Ap e1 e2 -> do
       t1 <- check e1
-      t2 <- check e2
       case t1 of
-        Type.TypeFun tx ty
-          | t2 == tx  -> return ty
-          | otherwise -> throwError $ "expected " ++ show tx ++ ", found " ++ show t2
+        Type.TypeFun tx ty -> do
+          t2 <- check e2
+          match tx t2
+          return ty
         _ -> throwError $ "expected function, found " ++ show t1
     Syntax.Lam xs e0 -> do
       (ts, t0) <- localDecls xs (check e0)
@@ -60,15 +64,21 @@ check e =
     Syntax.Let Syntax.NonRecursive xes e0 -> do
       env_list <- forM xes $ \((xi, ti_opt), ei) -> do
         ti <- check ei
-        case ti_opt of
-          Just ti'
-            | ti /= ti' -> throwError $ "expected " ++ show ti' ++ ", found " ++ show ti
-          _             -> return (xi, ti)
+        forM_ ti_opt $ \ti' -> match ti' ti
+        return (xi, ti)
       let env = Map.fromList env_list
       local (Map.union env) (check e0)
     Syntax.Let Syntax.Recursive xes e0 -> do
       (_, t) <- localDecls (map fst xes) (check (Syntax.Let Syntax.NonRecursive xes e0))
       return t
+    Syntax.If ec et ef -> do
+      tc <- check ec
+      match Type.bool tc
+      tt <- check et
+      tf <- check ef
+      match tt tf
+      return tt
+    Syntax.Pack _ _ -> throwError "type checking constructors not implemented"
 
 localDecls :: [Declaration] -> TI a -> TI ([Type], a)
 localDecls xs cont = do

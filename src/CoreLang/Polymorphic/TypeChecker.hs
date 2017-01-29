@@ -63,7 +63,6 @@ infer e =
           MkScheme { _type } <- instantiate scheme
           return (mempty, _type)
     Syntax.Num _ -> return (mempty, Type.int)
-    Syntax.Pack _ _ -> throwError "type checking constructors not implemented"
     Syntax.Ap ef ex -> do
       (phi, [tf, tx]) <- inferMany [ef, ex]
       vy <- freshVar
@@ -87,6 +86,8 @@ infer e =
         localDecls xs (map (subst psi) ts) $ do
           (rho, t) <- infer e0
           return (rho <> psi, t)
+    Syntax.Pack _ _   -> throwError "type checking constructors not implemented"
+    Syntax.If   _ _ _ -> throwError "type for if-then-else not implemented"
 
 inferMany :: [Expr] -> TI (Subst Type, [Type])
 inferMany [] = return (mempty, [])
