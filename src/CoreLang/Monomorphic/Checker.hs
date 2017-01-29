@@ -61,15 +61,15 @@ check e =
     Syntax.Lam xs e0 -> do
       (ts, t0) <- localDecls xs (check e0)
       return $ foldr (~>) t0 ts
-    Syntax.Let Syntax.NonRecursive xes e0 -> do
+    Syntax.Let xes e0 -> do
       env_list <- forM xes $ \((xi, ti_opt), ei) -> do
         ti <- check ei
         forM_ ti_opt $ \ti' -> match ti' ti
         return (xi, ti)
       let env = Map.fromList env_list
       local (Map.union env) (check e0)
-    Syntax.Let Syntax.Recursive xes e0 -> do
-      (_, t) <- localDecls (map fst xes) (check (Syntax.Let Syntax.NonRecursive xes e0))
+    Syntax.LetRec xes e0 -> do
+      (_, t) <- localDecls (map fst xes) (check (Syntax.Let xes e0))
       return t
     Syntax.If ec et ef -> do
       tc <- check ec

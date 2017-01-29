@@ -4,7 +4,6 @@ module CoreLang.Language.Parser
   )
   where
 
-import Control.Monad (msum)
 import Control.Monad.Except
 import Text.Parsec -- (Parsec, parse, choice, eof, lookAhead, many, many1, sepBy1, try)
 import Text.Parsec.Expr
@@ -95,13 +94,13 @@ definition =
 expr, aexpr :: Parser Expr
 expr =
   choice
-    [ let isRec = msum
-            [ reserved "let"    *> pure NonRecursive
-            , reserved "letrec" *> pure Recursive
-            ]
-      in  Let <$> isRec 
-              <*> sepBy1 definition (reserved "and")
-              <*> (reserved "in" *> expr)
+    [ let let_ =
+            choice
+              [ reserved "let"    *> pure Let
+              , reserved "letrec" *> pure LetRec
+              ]
+      in  let_ <*> sepBy1 definition (reserved "and")
+               <*> (reserved "in" *> expr)
     , Lam <$> (reserved "fun" *> many1 (declaration True))
           <*> (arrow *> expr)
     , If  <$> (reserved "if"   *> expr) 

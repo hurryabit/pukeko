@@ -67,14 +67,14 @@ infer e =
     Syntax.Lam xs e0 -> do
       (phi, vs, t0) <- localFreshVars xs (infer e0)
       return (phi, foldr (~>) t0 vs)
-    Syntax.Let Syntax.NonRecursive xes e0 -> do
+    Syntax.Let xes e0 -> do
       let (xs, es) = unzip xes
       (phi, ts) <- inferMany es
       local (subst' phi) $ do
         localDecls xs ts $ do
           (psi, t) <- infer e0
           return (psi <> phi, t)
-    Syntax.Let Syntax.Recursive xes e0 -> do
+    Syntax.LetRec xes e0 -> do
       let (xs, es) = unzip xes
       (phi, vs, ts) <- localFreshVars xs (inferMany es)
       psi <- Type.unifyMany phi (zip ts vs)
