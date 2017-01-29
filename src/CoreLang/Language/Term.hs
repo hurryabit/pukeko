@@ -1,7 +1,5 @@
-{-# LANGUAGE TypeFamilyDependencies #-}
 module CoreLang.Language.Term
-  ( TermVar
-  , Term (..)
+  ( Term (..)
   , Subst
   , substVar
   , mkSubst
@@ -18,26 +16,27 @@ import Data.Set (Set)
 
 import qualified Data.Map as Map
 
-type family TermVar t = v | v -> t
 
-class Ord (TermVar t) => Term t where
-  promoteVar :: TermVar t -> t
-  freeVars   :: t -> Set (TermVar t)
-  subst      :: Subst t -> t -> t
+class Ord (Var t) => Term t where
+  data Var t
+  supply   :: [Var t]
+  promote  :: Var t -> t
+  freeVars :: t -> Set (Var t)
+  subst    :: Subst t -> t -> t
 
-newtype Subst t = MkSubst { unSubst :: Map (TermVar t) t }
+newtype Subst t = MkSubst { unSubst :: Map (Var t) t }
 
-substVar :: Term t => Subst t -> TermVar t -> t
-substVar phi v = Map.findWithDefault (promoteVar v) v (unSubst phi)
+substVar :: Term t => Subst t -> Var t -> t
+substVar phi v = Map.findWithDefault (promote v) v (unSubst phi)
 
-mkSubst :: Map (TermVar t) t -> Subst t
+mkSubst :: Map (Var t) t -> Subst t
 mkSubst = MkSubst
 
-assign :: TermVar t -> t -> Subst t
+assign :: Var t -> t -> Subst t
 assign v t = MkSubst $ Map.singleton v t
 
-exclude :: Term t => Subst t -> Set (TermVar t) -> Subst t
-exclude phi vs = MkSubst $ Map.difference (unSubst phi) (Map.fromSet promoteVar vs)
+exclude :: Term t => Subst t -> Set (Var t) -> Subst t
+exclude phi vs = MkSubst $ Map.difference (unSubst phi) (Map.fromSet promote vs)
 
 instance Term t => Monoid (Subst t) where
   mempty = MkSubst Map.empty
@@ -46,5 +45,5 @@ instance Term t => Monoid (Subst t) where
 
 class Term (BaseTerm ts) => TermLike ts where
   type BaseTerm ts
-  freeVars' :: ts -> Set (TermVar (BaseTerm ts))
+  freeVars' :: ts -> Set (Var (BaseTerm ts))
   subst'    :: Subst (BaseTerm ts) -> ts -> ts

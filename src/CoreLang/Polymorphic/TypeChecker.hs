@@ -16,7 +16,7 @@ import qualified Data.Set as Set
 
 import CoreLang.Language.Syntax (Declaration, Expr, Identifier)
 import CoreLang.Language.Term
-import CoreLang.Language.Type (Type, TypeVar, (~>))
+import CoreLang.Language.Type (Type, (~>))
 
 import qualified CoreLang.Language.Syntax      as Syntax
 import qualified CoreLang.Language.Type        as Type
@@ -30,27 +30,27 @@ inferExpr expr = do
   return t
 
 
-data TypeScheme = MkScheme { _schematicVars :: Set TypeVar, _type :: Type }
+data TypeScheme = MkScheme { _schematicVars :: Set (Var Type), _type :: Type }
 
 type Environment = Map Identifier TypeScheme
 
 
 newtype TI a =
-  TI  { unTI :: ExceptT String (ReaderT Environment (Supply TypeVar)) a }
+  TI  { unTI :: ExceptT String (ReaderT Environment (Supply (Var Type))) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader Environment
-           , MonadSupply TypeVar
+           , MonadSupply (Var Type)
            )
 
 runTI :: MonadError String m => Environment -> TI a -> m a
 runTI env ti =
-  case evalSupply (runReaderT (runExceptT (unTI ti)) env) Type.typeVars of
+  case evalSupply (runReaderT (runExceptT (unTI ti)) env) Type.supply of
     Left  e -> throwError e
     Right x -> return x
 
 freshVar :: TI Type
-freshVar = Type.TypeVar <$> fresh
+freshVar = Type.Var <$> fresh
 
 infer :: Expr -> TI (Subst Type, Type)
 infer e =
@@ -101,7 +101,7 @@ instantiate :: TypeScheme -> TI TypeScheme
 instantiate (MkScheme { _schematicVars, _type }) = do
   bindings <- mapM (\_ -> freshVar) (Map.fromSet id _schematicVars)
   return $ MkScheme
-    { _schematicVars = Set.fromList [ v | Type.TypeVar v <- Map.elems bindings ]
+    { _schematicVars = Set.fromList [ v | Type.Var v <- Map.elems bindings ]
     , _type          = subst (mkSubst bindings) _type
     }
 

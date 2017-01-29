@@ -53,7 +53,7 @@ check e =
     Syntax.Ap e1 e2 -> do
       t1 <- check e1
       case t1 of
-        Type.TypeFun tx ty -> do
+        Type.Fun tx ty -> do
           t2 <- check e2
           match tx t2
           return ty

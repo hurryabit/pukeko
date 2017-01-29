@@ -11,7 +11,7 @@ import qualified Text.Parsec.Language as Language
 import qualified Text.Parsec.Token    as Token
 
 import CoreLang.Language.Syntax
-import CoreLang.Language.Type (Type (..), var, cons, (~>))
+import CoreLang.Language.Type (Type, var, app, (~>))
 
 
 parseExpr :: MonadError String m => String -> String -> m Expr
@@ -73,9 +73,9 @@ atype = choice
   , typeCons0
   , parens type_
   ]
-typeVar   = try (lookAhead upper *> (var  <$> identifier               ))
-typeCons  = try (lookAhead lower *> (cons <$> identifier <*> many atype))
-typeCons0 = try (lookAhead lower *> (cons <$> identifier <*> pure []   ))
+typeVar   = try (lookAhead upper *> (var <$> identifier               ))
+typeCons  = try (lookAhead lower *> (app <$> identifier <*> many atype))
+typeCons0 = try (lookAhead lower *> (app <$> identifier <*> pure []   ))
 
 declaration :: Bool -> Parser Declaration
 declaration needParens =
