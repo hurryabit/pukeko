@@ -83,7 +83,7 @@ declaration needParens =
     False -> (,) <$> identifier <*> optionMaybe (colon *> type_)
     True  -> 
       ((,) <$> identifier <*> pure Nothing)
-      <|> parens ((,) <$> identifier <*> (Just <$> type_))
+      <|> parens ((,) <$> identifier <* colon <*> (Just <$> type_))
   <?> "declaration"
 
 definition :: Parser Definition
