@@ -1,4 +1,4 @@
-module CoreLang.Monomorphic.TypeChecker
+module CoreLang.Monomorphic.Inferrer
   ( inferExpr
   )
   where
@@ -11,7 +11,7 @@ import Text.Printf
 
 import qualified Data.Map as Map
 
-import CoreLang.Language.Syntax (Expr, Identifier)
+import CoreLang.Language.Syntax (Declaration, Expr, Identifier)
 import CoreLang.Language.Term hiding (BaseTerm, TermLike (..))
 import CoreLang.Language.Type (Type, TypeVar, (~>))
 
@@ -92,12 +92,12 @@ inferMany (e:es) = do
   return (psi <> phi, subst psi t : ts)
 
 
-localDecls :: [Identifier] -> [Type] -> TI a -> TI a
+localDecls :: [Declaration] -> [Type] -> TI a -> TI a
 localDecls xs ts cont = do
-  let env = Map.fromList (zip xs ts)
+  let env = Map.fromList (zipWith (\(x,_) t -> (x,t)) xs ts)
   local (Map.union env) cont
 
-localFreshVars :: [Identifier] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
+localFreshVars :: [Declaration] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
 localFreshVars xs cont = do
   vs <- mapM (\_ -> freshVar) xs
   (phi, t) <- localDecls xs vs cont

@@ -37,18 +37,18 @@ typeVars = map MkVar (tail vars)
 data Type
   = TypeVar  TypeVar
   | TypeCons String [Type]
-  deriving (Eq, Show)
+  deriving (Eq)
 
 -- vars must start with a capital letter
 var :: String -> Type
 var name@(start:_) 
   | isUpper start = TypeVar (MkVar name)
-var _             = error (printf "%s is not a valid type variable name")
+var name          = error (printf "%s is not a valid type variable name" name)
 
 cons :: String -> [Type] -> Type
 cons name@(start:_) ts
   | isLower start = TypeCons name ts
-cons name _       = error (printf "%s is not a valid type constructor name")
+cons name _       = error (printf "%s is not a valid type constructor name" name)
 
 int, bool :: Type
 int  = cons "int"  []
@@ -117,20 +117,20 @@ instance TermLike [Type] where
   subst' = fmap . subst
 
 
--- instance Show Type where
---   show t =
---     case t of
---       TypeVar  v               -> show v
---       TypeCons "list" [t1]     -> printf "[%s]" (show t1)
---       TypeCons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
---       TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
---       TypeCons c      []       -> c
---       TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
---     where
---       collect t =
---         case t of
---           TypeCons "fun" [t1, t2] -> t1 : collect t2
---           _                   -> [t]
+instance Show Type where
+  show t =
+    case t of
+      TypeVar  v               -> show v
+      TypeCons "list" [t1]     -> printf "[%s]" (show t1)
+      TypeCons "pair" [t1, t2] -> printf "%s * %s" (show t1) (show t2)
+      TypeCons "fun"  [_ , _ ] -> printf "(%s)" (intercalate " -> " . map show . collect $ t)
+      TypeCons c      []       -> c
+      TypeCons c      ts       -> printf "(%s %s)" c (unwords (map show ts))
+    where
+      collect t =
+        case t of
+          TypeCons "fun" [t1, t2] -> t1 : collect t2
+          _                   -> [t]
 
 instance Show TypeVar where
   show (MkVar s) = s

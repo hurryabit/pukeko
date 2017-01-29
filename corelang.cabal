@@ -23,7 +23,8 @@ library
                      , CoreLang.Language.Term
                      , CoreLang.Language.Type
                      , CoreLang.Monomorphic.Builtins
-                     , CoreLang.Monpmorphic.TypeChecker
+                     , CoreLang.Monomorphic.Checker
+                     , CoreLang.Monomorphic.Inferer
                      , CoreLang.Polymorphic.Builtins
                      , CoreLang.Polymorphic.TypeChecker
                      , CoreLang.TempInst.Builtins

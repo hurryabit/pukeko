@@ -1,5 +1,6 @@
 module CoreLang.Language.Parser 
   ( parseExpr
+  , parseType
   )
   where
 
@@ -17,6 +18,12 @@ import CoreLang.Language.Type (Type (..), var, cons, (~>))
 parseExpr :: MonadError String m => String -> String -> m Expr
 parseExpr file code = 
   case parse (expr <* eof) file code of
+    Left error  -> throwError (show error)
+    Right expr -> return expr
+
+parseType :: MonadError String m => String -> m Type
+parseType code = 
+  case parse (type_ <* eof) "<type>" code of
     Left error -> throwError (show error)
     Right expr -> return expr
 

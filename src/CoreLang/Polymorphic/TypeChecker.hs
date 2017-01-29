@@ -14,7 +14,7 @@ import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import CoreLang.Language.Syntax (Expr, Identifier)
+import CoreLang.Language.Syntax (Declaration, Expr, Identifier)
 import CoreLang.Language.Term
 import CoreLang.Language.Type (Type, TypeVar, (~>))
 
@@ -104,23 +104,26 @@ instantiate (MkScheme { _schematicVars, _type }) = do
     , _type          = subst (mkSubst bindings) _type
     }
 
-localDecls :: [Identifier] -> [Type] -> TI a -> TI a
+localDecls :: [Declaration] -> [Type] -> TI a -> TI a
 localDecls xs ts cont = do
   fvs <- asks freeVars'
-  schemes <-
-    forM ts $ \t ->
-      instantiate $ MkScheme
-        { _schematicVars = Set.difference (freeVars t) fvs
-        , _type          = t
-        }
-  let env = Map.fromList (zip xs schemes)
+  let entry (x, _) t = do
+        scheme <- instantiate $ MkScheme
+          { _schematicVars = Set.difference (freeVars t) fvs
+          , _type          = t
+          }
+        return (x, scheme)
+  env <- Map.fromList <$> zipWithM entry xs ts
   local (Map.union env) cont
 
-localFreshVars :: [Identifier] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
+localFreshVars :: [Declaration] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
 localFreshVars xs cont = do
-  vs <- mapM (\_ -> freshVar) xs
-  let mkScheme v = MkScheme { _schematicVars = Set.empty, _type = v }
-      env = Map.fromList (zipWith (\x v -> (x, mkScheme v)) xs vs)
+  let entry (x, _) = do
+        v <- freshVar
+        let scheme = MkScheme { _schematicVars = Set.empty, _type = v }
+        return (v, (x, scheme))
+  (vs, env_list) <- unzip <$> mapM entry xs
+  let env = Map.fromList env_list
   (phi, t) <- local (Map.union env) cont
   return (phi, map (subst phi) vs, t)
 

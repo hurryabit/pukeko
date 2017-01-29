@@ -9,9 +9,9 @@ import CoreLang.Language.Syntax (Identifier)
 import CoreLang.Language.Type
 
 alpha, beta, gamma :: Type
-alpha:beta:gamma:_  = polyVars
-
-
+alpha = var "A"
+beta  = var "B"
+gamma = var "C"
 
 constructors, primitives, everything :: [(Identifier, Type)]
 constructors =
