@@ -5,17 +5,19 @@ module CoreLang.Monomorphic.Builtins
   )
   where
 
-import CoreLang.Language.Syntax (Identifier)
+import Control.Arrow (first)
+
+import CoreLang.Language.Ident
 import CoreLang.Language.Type
 
-constructors, primitives, everything :: [(Identifier, Type)]
-constructors =
+constructors, primitives, everything :: [(Ident, Type)]
+constructors = map (first MkIdent)
   [ ("false"  , bool)
   , ("true"   , bool)
   , ("nil"    , list int)
   , ("cons"   , int ~> list int ~> list int)
   ]
-primitives = 
+primitives = map (first MkIdent)
   [ ("neg", int  ~> int         )
   , ("+"  , int  ~> int  ~> int )
   , ("-"  , int  ~> int  ~> int )

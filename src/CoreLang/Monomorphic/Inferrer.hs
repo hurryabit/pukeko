@@ -11,7 +11,7 @@ import Text.Printf
 
 import qualified Data.Map as Map
 
-import CoreLang.Language.Syntax (Declaration, Expr, Identifier)
+import CoreLang.Language.Syntax
 import CoreLang.Language.Term hiding (BaseTerm, TermLike (..))
 import CoreLang.Language.Type (Type, (~>))
 

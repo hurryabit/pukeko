@@ -4,15 +4,15 @@ import CoreLang.Language.Syntax (Expr)
 
 import qualified CoreLang.Language.Parser         as Parser
 import qualified CoreLang.Monomorphic.Checker     as Mono.Checker
-import qualified CoreLang.Monomorphic.Inferrer    as Mono.Inferrer
-import qualified CoreLang.Polymorphic.TypeChecker as Poly.Inferrer
+-- import qualified CoreLang.Monomorphic.Inferrer    as Mono.Inferrer
+-- import qualified CoreLang.Polymorphic.TypeChecker as Poly.Inferrer
 
 
-polyInfer :: String -> IO ()
-polyInfer = onInput Poly.Inferrer.inferExpr
-
-polyInferFile :: String -> IO ()
-polyInferFile = onFile Poly.Inferrer.inferExpr
+-- polyInfer :: String -> IO ()
+-- polyInfer = onInput Poly.Inferrer.inferExpr
+--
+-- polyInferFile :: String -> IO ()
+-- polyInferFile = onFile Poly.Inferrer.inferExpr
 
 
 monoCheck :: String -> IO ()
@@ -22,11 +22,11 @@ monoCheckFile :: String -> IO ()
 monoCheckFile = onFile Mono.Checker.checkExpr
 
 
-monoInfer :: String -> IO ()
-monoInfer = onInput Mono.Inferrer.inferExpr
-
-monoInferFile :: String -> IO ()
-monoInferFile = onFile Mono.Inferrer.inferExpr
+-- monoInfer :: String -> IO ()
+-- monoInfer = onInput Mono.Inferrer.inferExpr
+--
+-- monoInferFile :: String -> IO ()
+-- monoInferFile = onFile Mono.Inferrer.inferExpr
 
 
 onLabeledInput :: Show a => (Expr -> Either String a) -> String -> String -> IO ()

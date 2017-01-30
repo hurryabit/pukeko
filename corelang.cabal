@@ -17,6 +17,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Supply
                      , CoreLang.Demo
+                     , CoreLang.Pretty
+                     , CoreLang.Language.Ident
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Syntax
@@ -24,7 +26,7 @@ library
                      , CoreLang.Language.Type
                      , CoreLang.Monomorphic.Builtins
                      , CoreLang.Monomorphic.Checker
-                     , CoreLang.Monomorphic.Inferer
+                     , CoreLang.Monomorphic.Inferrer
                      , CoreLang.Polymorphic.Builtins
                      , CoreLang.Polymorphic.TypeChecker
                      , CoreLang.TempInst.Builtins
@@ -41,7 +43,8 @@ library
                      , parsec
                      , pretty
   default-language:    Haskell2010
-  default-extensions:  FlexibleContexts
+  default-extensions:  DuplicateRecordFields
+                     , FlexibleContexts
                      , FlexibleInstances
                      , GeneralizedNewtypeDeriving
                      , NamedFieldPuns

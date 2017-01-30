@@ -5,13 +5,13 @@ module CoreLang.Language.Parser
   where
 
 import Control.Monad.Except
-import Text.Parsec -- (Parsec, parse, choice, eof, lookAhead, many, many1, sepBy1, try)
+import Text.Parsec
 import Text.Parsec.Expr
 import qualified Text.Parsec.Language as Language
 import qualified Text.Parsec.Token    as Token
 
 import CoreLang.Language.Syntax
-import CoreLang.Language.Type (Type, var, app, (~>))
+import CoreLang.Language.Type (Type, var, (~>), app, record)
 
 
 parseExpr :: MonadError String m => String -> String -> m Expr
@@ -43,7 +43,7 @@ coreLangDef = Language.haskellStyle
       [ ["+", "-", "*", "/"]
       , relOpNames
       , ["&&", "||"]
-      , ["->", "="]
+      , ["=", "->", ":"]
       ]
   }
 
@@ -55,40 +55,54 @@ Token.TokenParser
   , Token.parens
   , Token.braces
   , Token.comma
-  , Token.colon
+  , Token.commaSep
   } =
   Token.makeTokenParser coreLangDef
 
-equals = reservedOp "="
-arrow  = reservedOp "->"
+nat :: Parser Int
+nat = fromInteger <$> natural
+
+equals, arrow :: Parser ()
+equals  = reservedOp "="
+arrow   = reservedOp "->"
+
+ident, typeName  :: Parser Ident
+ident = MkIdent <$> identifier
+typeName = lookAhead lower *> ident
+
+typeVar :: Parser Type
+typeVar = var <$> (lookAhead upper *> identifier)
 
 type_, atype :: Parser Type
 type_ =
   buildExpressionParser
-    [ [ Infix (arrow *> pure (~>)) AssocRight ] ]    
-    (typeCons <|> atype)
+    [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
+    ( app <$> typeName <*> many atype
+      <|> atype
+    )
   <?> "type"
 atype = choice
   [ typeVar
-  , typeCons0
+  , app <$> typeName <*> pure []
+  , record <$> braces (commaSep ((,) <$> ident <*> asType))
   , parens type_
   ]
-typeVar   = try (lookAhead upper *> (var <$> identifier               ))
-typeCons  = try (lookAhead lower *> (app <$> identifier <*> many atype))
-typeCons0 = try (lookAhead lower *> (app <$> identifier <*> pure []   ))
+  
+asType :: Parser Type
+asType = reservedOp ":" *> type_
 
-declaration :: Bool -> Parser Declaration
-declaration needParens =
+decl :: Bool -> Parser Decl
+decl needParens =
   case needParens of
-    False -> (,) <$> identifier <*> optionMaybe (colon *> type_)
+    False -> MkDecl <$> ident <*> optionMaybe asType
     True  -> 
-      ((,) <$> identifier <*> pure Nothing)
-      <|> parens ((,) <$> identifier <*> (Just <$> (colon *> type_)))
+      (MkDecl <$> ident <*> pure Nothing)
+      <|> parens (MkDecl <$> ident <*> (Just <$> asType))
   <?> "declaration"
 
-definition :: Parser Definition
-definition = 
-  (,) <$> declaration False <*> (equals *> expr)
+defn :: Parser Defn
+defn = 
+  MkDefn <$> decl False <*> (equals *> expr)
   <?> "definition"
 
 expr, aexpr :: Parser Expr
@@ -99,14 +113,14 @@ expr =
               [ reserved "let"    *> pure Let
               , reserved "letrec" *> pure LetRec
               ]
-      in  let_ <*> sepBy1 definition (reserved "and")
+      in  let_ <*> sepBy1 defn (reserved "and")
                <*> (reserved "in" *> expr)
-    , Lam <$> (reserved "fun" *> many1 (declaration True))
+    , Lam <$> (reserved "fun" *> many1 (decl True))
           <*> (arrow *> expr)
     , If  <$> (reserved "if"   *> expr) 
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
-    , let infixBinOp op = Infix (reservedOp op *> pure (Ap . Ap (Var op)))
+    , let infixBinOp op = Infix $ reservedOp op *> pure (Ap . Ap (Var (MkIdent op)))
       in  buildExpressionParser
             [ [ infixBinOp "*" AssocRight
               , infixBinOp "/" AssocNone
@@ -122,10 +136,9 @@ expr =
     ]
   <?> "expression"
 aexpr = choice
-  [ Var <$> identifier
-  , Num <$> natural
+  [ Var <$> ident
+  , Num <$> nat
   , reserved "Pack" *> braces (Pack <$> nat <*> (comma *> nat))
   , parens expr
+  , Rec <$> braces (commaSep defn)
   ]
-  where
-    nat = fromInteger <$> natural

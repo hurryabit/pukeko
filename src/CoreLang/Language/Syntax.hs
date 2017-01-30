@@ -1,67 +1,78 @@
-module CoreLang.Language.Syntax where
-
-import Data.List (intersperse)  
-import Text.PrettyPrint
-
-import CoreLang.Language.Type (Type)
-
-type Identifier = String
-
--- Expressions
-data Expr
-  = Var    Identifier
-  | Num    Integer
-  | Pack   Int Int
-  | Ap     Expr Expr
-  | Let    [Definition] Expr
-  | LetRec [Definition] Expr
-  | Lam    [Declaration] Expr
-  | If     Expr Expr Expr
-
-type Declaration = (Identifier, Maybe Type)
-
-type Definition = (Declaration, Expr)
-
-
-ppExpr :: Expr -> Doc
-ppExpr e =
-  case e of
-    Var x -> text x
-    Num n -> integer n
-    Pack t n -> text "Pack" <> braces (hcat [int t, comma, int n])
-    Ap _ _ -> parens (hsep . map ppExpr $ collect e [])
-    Let    ds e0 -> ppLet "let" ds e0
-    LetRec ds e0 -> ppLet "letrec" ds e0
-    Lam xs e0 ->
-      parens $ hsep
-        [ text "fun"
-        , hsep [ text x | (x, _) <- xs ]
-        , text "->"
-        , ppExpr e0
-        ]
-    If ec et ef ->
-      hsep $
-        [ text "if"
-        , ppExpr ec
-        , text "then"
-        , ppExpr et
-        , text "else"
-        , ppExpr ef
-        ]
+module CoreLang.Language.Syntax
+  ( Expr (..)
+  , Decl (..)
+  , Defn (..)
+  , module CoreLang.Language.Ident
+  )
   where
-    collect e fs =
-      case e of
-        Ap e1 e2 -> collect e1 (e2:fs)
-        _        -> e:fs
 
-ppLet key ds e0 =
-  hsep
-    [ text key
-    , hsep $ intersperse (text "and") [ hsep [text x, equals, ppExpr ei]| ((x, _), ei) <- ds ]
-    , text "in"
-    , ppExpr e0
-    ]
+import CoreLang.Language.Ident
+import CoreLang.Language.Type (Type)
+import CoreLang.Pretty
+
+data Expr
+  = Var    { _ident :: Ident }
+  | Num    { _int   :: Int   }
+  | Pack   { _tag   :: Int , _arity :: Int  }
+  | Ap     { _fun   :: Expr, _arg   :: Expr }
+  | Let    { _defns :: [Defn], _body  :: Expr }
+  | LetRec { _defns :: [Defn], _body  :: Expr }
+  | Lam    { _decls :: [Decl], _body  :: Expr }
+  | If     { _cond  :: Expr, _then  :: Expr, _else :: Expr }
+  | Rec    { _defns :: [Defn] }
+  deriving (Show)
+
+data Decl = MkDecl { _ident :: Ident, _type :: Maybe Type }
+  deriving (Show)
+
+data Defn = MkDefn { _decl :: Decl, _expr :: Expr }
+  deriving (Show)
+
+instance Pretty Decl where
+  pPrint (MkDecl { _ident, _type }) =
+    case _type of
+      Nothing -> pretty _ident
+      Just t  -> parens $ pretty _ident <> colon <+> pretty t
+
+instance Pretty Defn where
+  pPrint (MkDefn { _decl, _expr }) = pretty _decl <+> equals <+> pretty _expr
+
+instance Pretty Expr where
+  pPrint expr =
+    case expr of
+      Var    { _ident } -> pretty _ident
+      Num    { _int   } -> int _int
+      Pack   { _tag  , _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
+      Ap     { _fun  , _arg   } -> parens $ hsep $ map pretty (collect expr [])
+      Let    { _defns, _body  } -> let_ "let"    _defns _body
+      LetRec { _defns, _body  } -> let_ "letrec" _defns _body
+      Lam    { _decls, _body  } ->
+        parens $ hsep
+          [ text "fun"
+          , hsep (map pretty _decls)
+          , text "->"
+          , pretty _body
+          ]
+      If { _cond, _then, _else } ->
+        hsep $
+          [ text "if"
+          , pretty _cond
+          , text "then"
+          , pretty _then
+          , text "else"
+          , pretty _else
+          ]
+      Rec { _defns } -> braces $ hsep $ punctuate (comma) (map pretty _defns)
+    where
+      collect expr acc =
+        case expr of
+          Ap { _fun, _arg } -> collect _fun (_arg:acc)
+          _                 -> expr:acc
+      let_ key defns body =
+        hsep
+          [ text key
+          , hcat $ punctuate (text " and ") (map pretty defns)
+          , text "in"
+          , pretty body
+          ]
   
-
-instance Show Expr where
-  show e = renderStyle (style { mode = OneLineMode }) (ppExpr e)
