@@ -81,6 +81,15 @@ check expr =
     Rec { _defns } -> do
       t_defns <- checkDefns _defns
       return (record t_defns)
+    Sel { _expr, _field } -> do
+      t_expr <- check _expr
+      let mismatch = pthrow (text "expected record type with field" <+> pretty _field <> text ", found" <+> pretty t_expr)
+      case t_expr of
+        Type.Rec fields ->
+          case lookup _field fields of
+            Nothing      -> mismatch
+            Just t_field -> return t_field
+        _ -> mismatch
     Pack { } -> pthrow (text "type checking constructors not implemented")
 
 checkDefns :: [Defn] -> TI [(Ident, Type)]

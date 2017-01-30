@@ -43,7 +43,7 @@ coreLangDef = Language.haskellStyle
       [ ["+", "-", "*", "/"]
       , relOpNames
       , ["&&", "||"]
-      , ["=", "->", ":"]
+      , ["=", "->", ":", "."]
       ]
   }
 
@@ -105,7 +105,7 @@ defn =
   MkDefn <$> decl False <*> (equals *> expr)
   <?> "definition"
 
-expr, aexpr :: Parser Expr
+expr, aexpr1, aexpr :: Parser Expr
 expr =
   choice
     [ let let_ =
@@ -135,10 +135,11 @@ expr =
             (foldl1 Ap <$> many1 aexpr)
     ]
   <?> "expression"
-aexpr = choice
+aexpr1 = choice
   [ Var <$> ident
   , Num <$> nat
   , reserved "Pack" *> braces (Pack <$> nat <*> (comma *> nat))
   , parens expr
   , Rec <$> braces (commaSep defn)
   ]
+aexpr = foldl Sel <$> aexpr1 <*> many (reservedOp "." *> ident)

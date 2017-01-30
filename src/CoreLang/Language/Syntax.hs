@@ -20,6 +20,7 @@ data Expr
   | Lam    { _decls :: [Decl], _body  :: Expr }
   | If     { _cond  :: Expr, _then  :: Expr, _else :: Expr }
   | Rec    { _defns :: [Defn] }
+  | Sel    { _expr  :: Expr, _field :: Ident }
   deriving (Show)
 
 data Decl = MkDecl { _ident :: Ident, _type :: Maybe Type }
@@ -63,6 +64,7 @@ instance Pretty Expr where
           , pretty _else
           ]
       Rec { _defns } -> braces $ hsep $ punctuate (comma) (map pretty _defns)
+      Sel { _expr, _field } -> pretty _expr <> char '.' <> pretty _field
     where
       collect expr acc =
         case expr of
