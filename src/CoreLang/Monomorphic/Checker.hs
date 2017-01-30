@@ -18,33 +18,33 @@ import qualified CoreLang.Monomorphic.Builtins as Builtins
 
 
 checkExpr :: MonadError String m => Expr -> m Type
-checkExpr expr = runTI (Map.fromList Builtins.everything) (check expr)
+checkExpr expr = runTC (Map.fromList Builtins.everything) (check expr)
 
 
 type Environment = Map Ident Type
 
-newtype TI a =
-  TI  { unTI :: ExceptT String (Reader Environment) a }
+newtype TC a =
+  TC  { unTC :: ExceptT String (Reader Environment) a }
   deriving ( Functor, Applicative, Monad
            , MonadError  String
            , MonadReader Environment
            )
 
-runTI :: MonadError String m => Environment -> TI a -> m a
-runTI env ti =
-  case runReader (runExceptT (unTI ti)) env of
+runTC :: MonadError String m => Environment -> TC a -> m a
+runTC env tc =
+  case runReader (runExceptT (unTC tc)) env of
     Left  e -> throwError e
     Right x -> return x
 
-match :: Type -> Type -> TI ()
+match :: Type -> Type -> TC ()
 match expected found
   | expected == found = return ()
   | otherwise         = pthrow (text "expected" <+> pretty expected <> text ", but found" <+> pretty found)
 
-matchMaybe :: Maybe Type -> Type -> TI ()
+matchMaybe :: Maybe Type -> Type -> TC ()
 matchMaybe expected found = forM_ expected (`match` found)
 
-check :: Expr -> TI Type
+check :: Expr -> TC Type
 check expr =
   case expr of
     Var { _ident } -> do
@@ -92,19 +92,19 @@ check expr =
         _ -> mismatch
     Pack { } -> pthrow (text "type checking constructors not implemented")
 
-checkDefns :: [Defn] -> TI [(Ident, Type)]
+checkDefns :: [Defn] -> TC [(Ident, Type)]
 checkDefns defns =
   forM defns $ \MkDefn { _decl = MkDecl { _ident, _type }, _expr } -> do
     t_expr <- check _expr
     matchMaybe _type t_expr
     return (_ident, t_expr)
 
-localDecls :: [Decl] -> TI a -> TI ([Type], a)
-localDecls decls cont = do
+localDecls :: [Decl] -> TC a -> TC ([Type], a)
+localDecls decls tc = do
   env_list <- forM decls $ \MkDecl { _ident, _type } ->
     case _type of
       Nothing     -> pthrow (pretty _ident <+> text "lacks a type annotation")
       Just t_decl -> return (_ident, t_decl)
   let env = Map.fromList env_list
-  res <- local (Map.union env) cont
+  res <- local (Map.union env) tc
   return (map snd env_list, res)
