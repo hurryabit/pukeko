@@ -27,6 +27,7 @@ library
                      , CoreLang.Monomorphic.Builtins
                      , CoreLang.Monomorphic.Checker
                      , CoreLang.Monomorphic.Inferrer
+                     , CoreLang.Monomorphic.Subtyping
                      , CoreLang.Polymorphic.Builtins
                      , CoreLang.Polymorphic.TypeChecker
                      , CoreLang.TempInst.Builtins

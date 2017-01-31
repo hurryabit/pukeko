@@ -3,8 +3,8 @@ module CoreLang.Monomorphic.Checker
   )
   where
 
-import Control.Monad.Except
-import Control.Monad.Reader
+import Control.Monad.Except hiding (join)
+import Control.Monad.Reader hiding (join)
 import Data.Map (Map)
 
 import qualified Data.Map as Map
@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 import CoreLang.Pretty
 import CoreLang.Language.Syntax
 import CoreLang.Language.Type (Type, (~>), record)
+import CoreLang.Monomorphic.Subtyping (isSubtypeOf, join)
 
 import qualified CoreLang.Language.Type        as Type
 import qualified CoreLang.Monomorphic.Builtins as Builtins
@@ -38,11 +39,9 @@ runTC env tc =
 
 match :: Type -> Type -> TC ()
 match expected found
-  | expected == found = return ()
-  | otherwise         = pthrow (text "expected" <+> pretty expected <> text ", but found" <+> pretty found)
-
-matchMaybe :: Maybe Type -> Type -> TC ()
-matchMaybe expected found = forM_ expected (`match` found)
+  | found `isSubtypeOf` expected = return ()
+  | otherwise                    = 
+    pthrow (text "expected" <+> pretty expected <> text ", but found" <+> pretty found)
 
 check :: Expr -> TC Type
 check expr =
@@ -76,8 +75,9 @@ check expr =
       match Type.bool t_cond
       t_then <- check _then
       t_else <- check _else
-      match t_then t_else
-      return t_then
+      case t_then `join` t_else of
+        Nothing     -> pthrow (pretty t_then <+> text "and" <+> pretty t_else <+> text "have no common supertype")
+        Just t_join -> return t_join
     Rec { _defns } -> do
       t_defns <- checkDefns _defns
       return (record t_defns)
@@ -96,8 +96,11 @@ checkDefns :: [Defn] -> TC [(Ident, Type)]
 checkDefns defns =
   forM defns $ \MkDefn { _decl = MkDecl { _ident, _type }, _expr } -> do
     t_expr <- check _expr
-    matchMaybe _type t_expr
-    return (_ident, t_expr)
+    case _type of
+      Nothing     -> return (_ident, t_expr)
+      Just t_decl -> do
+        match t_decl t_expr
+        return (_ident, t_decl)
 
 localDecls :: [Decl] -> TC a -> TC ([Type], a)
 localDecls decls tc = do
