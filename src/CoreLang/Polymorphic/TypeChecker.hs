@@ -9,19 +9,17 @@ import Control.Monad.Reader
 import Control.Monad.Supply
 import Data.Map (Map)
 import Data.Set (Set)
-import Text.Printf
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import CoreLang.Language.Syntax (Declaration, Expr, Identifier)
+import CoreLang.Pretty
+import CoreLang.Language.Syntax
 import CoreLang.Language.Term
-import CoreLang.Language.Type (Type, (~>))
+import CoreLang.Language.Type (Type, Var, (~>))
 
-import qualified CoreLang.Language.Syntax      as Syntax
-import qualified CoreLang.Language.Type        as Type
-import qualified CoreLang.Polymorphic.Builtins as Builtins
-
+import qualified CoreLang.Language.Type as Type
+import qualified CoreLang.Polymorphic.Builtins as Builtins (everything)
 
 inferExpr :: MonadError String m => Expr -> m Type
 inferExpr expr = do
@@ -30,9 +28,9 @@ inferExpr expr = do
   return t
 
 
-data TypeScheme = MkScheme { _schematicVars :: Set (Var Type), _type :: Type }
+data Scheme = MkScheme { _schematicVars :: Set (Var Type), _type :: Type }
 
-type Environment = Map Identifier TypeScheme
+type Environment = Map Ident Scheme
 
 
 newtype TI a =
@@ -53,41 +51,43 @@ freshVar :: TI Type
 freshVar = Type.Var <$> fresh
 
 infer :: Expr -> TI (Subst Type, Type)
-infer e =
-  case e of
-    Syntax.Var x -> do
+infer expr =
+  case expr of
+    Var { _ident } -> do
       env <- ask
-      case Map.lookup x env of
-        Nothing     -> throwError (printf "unknown identifier %s" x)
+      case Map.lookup _ident env of
+        Nothing     -> pthrow (text "unknown identifier:" <+> pretty _ident)
         Just scheme -> do
           MkScheme { _type } <- instantiate scheme
           return (mempty, _type)
-    Syntax.Num _ -> return (mempty, Type.int)
-    Syntax.Ap ef ex -> do
-      (phi, [tf, tx]) <- inferMany [ef, ex]
-      vy <- freshVar
-      phi <- Type.unify phi tf (tx ~> vy)
-      return (phi, subst phi vy)
-    Syntax.Lam xs e0 -> do
-      (phi, vs, t0) <- localFreshVars xs (infer e0)
-      return (phi, foldr (~>) t0 vs)
-    Syntax.Let xes e0 -> do
-      let (xs, es) = unzip xes
-      (phi, ts) <- inferMany es
+    Num { } -> return (mempty, Type.int)
+    Ap { _fun, _arg } -> do
+      (phi, [t_fun, t_arg]) <- inferMany [_fun, _arg]
+      t_res <- freshVar
+      phi <- Type.unify phi t_fun (t_arg ~> t_res)
+      return (phi, subst phi t_res)
+    Lam { _decls, _body } -> do
+      (phi, t_decls, t_body) <- localFreshVars _decls (infer _body)
+      return (phi, foldr (~>) t_body t_decls)
+    Let { _defns, _body } -> do
+      let (decls, exprs) = unzip $ map (\MkDefn { _decl, _expr } -> (_decl, _expr)) _defns
+      (phi, t_exprs) <- inferMany exprs
       local (subst' phi) $ do
-        localDecls xs ts $ do
-          (psi, t) <- infer e0
-          return (psi <> phi, t)
-    Syntax.LetRec xes e0 -> do
-      let (xs, es) = unzip xes
-      (phi, vs, ts) <- localFreshVars xs (inferMany es)
-      psi <- Type.unifyMany phi (zip ts vs)
+        localDecls decls t_exprs $ do
+          (psi, t_body) <- infer _body
+          return (psi <> phi, t_body)
+    LetRec { _defns, _body } -> do
+      let (decls, exprs) = unzip $ map (\MkDefn { _decl, _expr } -> (_decl, _expr)) _defns
+      (phi, t_decls, t_exprs) <- localFreshVars decls (inferMany exprs)
+      psi <- Type.unifyMany phi (zip t_decls t_exprs)
       local (subst' (psi <> phi)) $ do -- TODO: Is phi really needed here?
-        localDecls xs (map (subst psi) ts) $ do
-          (rho, t) <- infer e0
-          return (rho <> psi, t)
-    Syntax.Pack _ _   -> throwError "type checking constructors not implemented"
-    Syntax.If   _ _ _ -> throwError "type for if-then-else not implemented"
+        localDecls decls (map (subst psi) t_decls) $ do
+          (rho, t_body) <- infer _body
+          return (rho <> psi, t_body)
+    Pack { } -> pthrow (text "type checking of constructors not implemented")
+    If   { } -> pthrow (text "type checking for if-then-else not implemented")
+    Rec  { } -> pthrow (text "type checking of records not implemented")
+    Sel  { } -> pthrow (text "type checking of records not implemented")
 
 inferMany :: [Expr] -> TI (Subst Type, [Type])
 inferMany [] = return (mempty, [])
@@ -97,7 +97,7 @@ inferMany (e:es) = do
   return (psi <> phi, subst psi t : ts)
 
 
-instantiate :: TypeScheme -> TI TypeScheme
+instantiate :: Scheme -> TI Scheme
 instantiate (MkScheme { _schematicVars, _type }) = do
   bindings <- mapM (\_ -> freshVar) (Map.fromSet id _schematicVars)
   return $ MkScheme
@@ -105,32 +105,32 @@ instantiate (MkScheme { _schematicVars, _type }) = do
     , _type          = subst (mkSubst bindings) _type
     }
 
-localDecls :: [Declaration] -> [Type] -> TI a -> TI a
-localDecls xs ts cont = do
-  fvs <- asks freeVars'
-  let entry (x, _) t = do
+localDecls :: [Decl] -> [Type] -> TI a -> TI a
+localDecls decls types sub = do
+  free_vars <- asks freeVars'
+  let entry (MkDecl { _ident }) t_found = do
         scheme <- instantiate $ MkScheme
-          { _schematicVars = Set.difference (freeVars t) fvs
-          , _type          = t
+          { _schematicVars = Set.difference (freeVars t_found) free_vars
+          , _type          = t_found
           }
-        return (x, scheme)
-  env <- Map.fromList <$> zipWithM entry xs ts
-  local (Map.union env) cont
+        return (_ident, scheme)
+  env <- Map.fromList <$> zipWithM entry decls types
+  local (Map.union env) sub
 
-localFreshVars :: [Declaration] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
-localFreshVars xs cont = do
-  let entry (x, _) = do
-        v <- freshVar
-        let scheme = MkScheme { _schematicVars = Set.empty, _type = v }
-        return (v, (x, scheme))
-  (vs, env_list) <- unzip <$> mapM entry xs
+localFreshVars :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
+localFreshVars decls sub = do
+  let entry (MkDecl { _ident }) = do
+        t_ident <- freshVar
+        let scheme = MkScheme { _schematicVars = Set.empty, _type = t_ident }
+        return (t_ident, (_ident, scheme))
+  (t_idents, env_list) <- unzip <$> mapM entry decls
   let env = Map.fromList env_list
-  (phi, t) <- local (Map.union env) cont
-  return (phi, map (subst phi) vs, t)
+  (phi, t_sub) <- local (Map.union env) sub
+  return (phi, map (subst phi) t_idents, t_sub)
 
 
-instance TermLike TypeScheme where
-  type BaseTerm TypeScheme = Type
+instance TermLike Scheme where
+  type BaseTerm Scheme = Type
   freeVars' (MkScheme { _schematicVars, _type }) = 
     Set.difference (freeVars _type) _schematicVars
   subst' phi (scheme@MkScheme { _schematicVars, _type }) =
