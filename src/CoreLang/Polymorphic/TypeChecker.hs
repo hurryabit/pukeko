@@ -71,7 +71,7 @@ infer expr =
       psi <- Type.unify phi t_fun (t_arg ~> t_res)
       return (psi, subst psi t_res)
     Lam { _decls, _body } -> do
-      (phi, t_decls, t_body) <- localFreshVars _decls (infer _body)
+      (phi, t_decls, t_body) <- introduceInstantiated _decls (infer _body)
       return (phi, foldr (~>) t_body t_decls)
     Let { _defns, _body } -> do
       let (decls, exprs) = unzipDefns _defns
@@ -79,15 +79,15 @@ infer expr =
       let (_, t_decls) = unzipDecls decls
       psi <- Type.unifyMany phi [ (t_decl, t_expr) | (Just t_decl, t_expr) <- zip t_decls t_exprs ]
       local (subst' psi) $ do
-        localDecls decls (map (subst psi) t_exprs) $ do
+        introduceGeneralized decls (map (subst psi) t_exprs) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
     LetRec { _defns, _body } -> do
       let (decls, exprs) = unzipDefns _defns
-      (phi, t_decls, t_exprs) <- localFreshVars decls (inferMany exprs)
+      (phi, t_decls, t_exprs) <- introduceInstantiated decls (inferMany exprs)
       psi <- Type.unifyMany phi (zip t_decls t_exprs)
       local (subst' psi) $ do
-        localDecls decls (map (subst psi) t_decls) $ do
+        introduceGeneralized decls (map (subst psi) t_decls) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
     Pack { } -> pthrow (text "type checking of constructors not implemented")
@@ -111,8 +111,8 @@ instantiate (MkScheme { _boundVars, _type }) = do
     , _type      = subst (mkSubst bindings) _type
     }
 
-localFreshVars :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
-localFreshVars decls sub = do
+introduceInstantiated :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
+introduceInstantiated decls sub = do
   let entry (MkDecl { _ident, _type }) = do
         t_ident <- 
           case _type of
@@ -127,8 +127,8 @@ localFreshVars decls sub = do
   (phi, t_sub) <- local (Map.union env) sub
   return (phi, map (subst phi) t_idents, t_sub)
 
-localDecls :: [Decl] -> [Type] -> TI a -> TI a
-localDecls decls types sub = do
+introduceGeneralized :: [Decl] -> [Type] -> TI a -> TI a
+introduceGeneralized decls types sub = do
   free_vars <- asks freeVars'
   let entry (MkDecl { _ident }) t_found = do
         scheme <- instantiate $ MkScheme
