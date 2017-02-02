@@ -2,6 +2,8 @@ module CoreLang.Language.Syntax
   ( Expr (..)
   , Decl (..)
   , Defn (..)
+  , unzipDecls
+  , unzipDefns
   , module CoreLang.Language.Ident
   )
   where
@@ -28,6 +30,14 @@ data Decl = MkDecl { _ident :: Ident, _type :: Maybe Type }
 
 data Defn = MkDefn { _decl :: Decl, _expr :: Expr }
   deriving (Show)
+
+
+unzipDecls :: [Decl] -> ([Ident], [Maybe Type])
+unzipDecls = unzip . map (\MkDecl { _ident, _type} -> (_ident, _type))
+
+unzipDefns :: [Defn] -> ([Decl], [Expr])
+unzipDefns = unzip . map (\MkDefn { _decl, _expr} -> (_decl, _expr))
+
 
 instance Pretty Decl where
   pPrint (MkDecl { _ident, _type }) =

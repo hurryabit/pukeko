@@ -23,16 +23,16 @@ import qualified CoreLang.Polymorphic.Builtins as Builtins (everything)
 
 inferExpr :: MonadError String m => Expr -> m Type
 inferExpr expr = do
-  let  env = map (\(i, t) -> (i, boundScheme t)) Builtins.everything
+  let  env = map (\(i, t) -> (i, mkBoundScheme t)) Builtins.everything
   (_, t) <- runTI (Map.fromList env) (infer expr)
   return t
 
 
 data Scheme = MkScheme { _boundVars :: Set (Var Type), _type :: Type }
 
-boundScheme, freeScheme :: Type -> Scheme
-boundScheme _type = MkScheme { _boundVars = freeVars _type, _type }
-freeScheme  _type = MkScheme { _boundVars = Set.empty     , _type }
+mkBoundScheme, mkFreeScheme :: Type -> Scheme
+mkBoundScheme _type = MkScheme { _boundVars = freeVars _type, _type }
+mkFreeScheme  _type = MkScheme { _boundVars = Set.empty     , _type }
 
 type Environment = Map Ident Scheme
 
@@ -74,17 +74,19 @@ infer expr =
       (phi, t_decls, t_body) <- localFreshVars _decls (infer _body)
       return (phi, foldr (~>) t_body t_decls)
     Let { _defns, _body } -> do
-      let (decls, exprs) = unzip $ map (\MkDefn { _decl, _expr } -> (_decl, _expr)) _defns
+      let (decls, exprs) = unzipDefns _defns
       (phi, t_exprs) <- inferMany exprs
-      local (subst' phi) $ do
-        localDecls decls t_exprs $ do
-          (psi, t_body) <- infer _body
-          return (psi <> phi, t_body)
+      let (_, t_decls) = unzipDecls decls
+      psi <- Type.unifyMany phi [ (t_decl, t_expr) | (Just t_decl, t_expr) <- zip t_decls t_exprs ]
+      local (subst' psi) $ do
+        localDecls decls (map (subst psi) t_exprs) $ do
+          (rho, t_body) <- infer _body
+          return (rho <> psi, t_body)
     LetRec { _defns, _body } -> do
-      let (decls, exprs) = unzip $ map (\MkDefn { _decl, _expr } -> (_decl, _expr)) _defns
+      let (decls, exprs) = unzipDefns _defns
       (phi, t_decls, t_exprs) <- localFreshVars decls (inferMany exprs)
       psi <- Type.unifyMany phi (zip t_decls t_exprs)
-      local (subst' psi) $ do -- TODO: Is phi really needed here?
+      local (subst' psi) $ do
         localDecls decls (map (subst psi) t_decls) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
@@ -111,9 +113,14 @@ instantiate (MkScheme { _boundVars, _type }) = do
 
 localFreshVars :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
 localFreshVars decls sub = do
-  let entry (MkDecl { _ident }) = do
-        t_ident <- freshVar
-        let scheme = freeScheme t_ident
+  let entry (MkDecl { _ident, _type }) = do
+        t_ident <- 
+          case _type of
+            Nothing -> freshVar
+            Just t_decl -> do
+              MkScheme { _type } <- instantiate (mkBoundScheme t_decl)
+              return _type
+        let scheme = mkFreeScheme t_ident
         return (t_ident, (_ident, scheme))
   (t_idents, env_list) <- unzip <$> mapM entry decls
   let env = Map.fromList env_list
