@@ -16,7 +16,7 @@ import qualified Data.Set as Set
 import CoreLang.Pretty
 import CoreLang.Language.Syntax
 import CoreLang.Language.Term
-import CoreLang.Language.Type (Type, Var, (~>))
+import CoreLang.Language.Type (Type, Var, (~>), unify, unifyMany)
 
 import qualified CoreLang.Language.Type as Type
 import qualified CoreLang.Polymorphic.Builtins as Builtins (everything)
@@ -62,13 +62,13 @@ infer expr =
       case Map.lookup _ident env of
         Nothing     -> pthrow (text "unknown identifier:" <+> pretty _ident)
         Just scheme -> do
-          MkScheme { _type } <- instantiate scheme
+          MkScheme { _type } <- instantiateScheme scheme
           return (mempty, _type)
     Num { } -> return (mempty, Type.int)
     Ap { _fun, _arg } -> do
       (phi, [t_fun, t_arg]) <- inferMany [_fun, _arg]
       t_res <- freshVar
-      psi <- Type.unify phi t_fun (t_arg ~> t_res)
+      psi <- unify phi t_fun (t_arg ~> t_res)
       return (psi, subst psi t_res)
     Lam { _decls, _body } -> do
       (phi, t_decls, t_body) <- introduceInstantiated _decls (infer _body)
@@ -76,22 +76,28 @@ infer expr =
     Let { _defns, _body } -> do
       let (decls, exprs) = unzipDefns _defns
       (phi, t_exprs) <- inferMany exprs
-      let (_, t_decls) = unzipDecls decls
-      psi <- Type.unifyMany phi [ (t_decl, t_expr) | (Just t_decl, t_expr) <- zip t_decls t_exprs ]
+      t_decls <- mapM (\(MkDecl { _type }) -> instantiateAnnot _type) decls
+      psi <- unifyMany phi (zip t_decls t_exprs)
       local (subst' psi) $ do
-        introduceGeneralized decls (map (subst psi) t_exprs) $ do
+        introduceGeneralized decls (map (subst psi) t_decls) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
     LetRec { _defns, _body } -> do
       let (decls, exprs) = unzipDefns _defns
       (phi, t_decls, t_exprs) <- introduceInstantiated decls (inferMany exprs)
-      psi <- Type.unifyMany phi (zip t_decls t_exprs)
+      psi <- unifyMany phi (zip t_decls t_exprs)
       local (subst' psi) $ do
         introduceGeneralized decls (map (subst psi) t_decls) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
+    If { _cond, _then, _else } -> do
+      (phi, t_cond) <- infer _cond
+      psi <- unify phi Type.bool t_cond
+      local (subst' psi) $ do
+        (rho, [t_then, t_else]) <- inferMany [_then, _else]
+        chi <- unify (rho <> psi) t_then t_else
+        return (chi, subst chi t_then)
     Pack { } -> pthrow (text "type checking of constructors not implemented")
-    If   { } -> pthrow (text "type checking for if-then-else not implemented")
     Rec  { } -> pthrow (text "type checking of records not implemented")
     Sel  { } -> pthrow (text "type checking of records not implemented")
 
@@ -103,23 +109,26 @@ inferMany (e:es) = do
   return (psi <> phi, subst psi t : ts)
 
 -- | In the result, @_boundVars@ contains the new names of the old bound variables.
-instantiate :: Scheme -> TI Scheme
-instantiate (MkScheme { _boundVars, _type }) = do
+instantiateScheme :: Scheme -> TI Scheme
+instantiateScheme (MkScheme { _boundVars, _type }) = do
   bindings <- mapM (\_ -> freshVar) (Map.fromSet id _boundVars)
   return $ MkScheme
     { _boundVars = Set.fromList [ v | Type.Var v <- Map.elems bindings ]
     , _type      = subst (mkSubst bindings) _type
     }
 
+instantiateAnnot :: Maybe Type -> TI Type
+instantiateAnnot t_annot =
+  case t_annot of
+    Nothing     -> freshVar
+    Just t_decl -> do
+      MkScheme { _type } <- instantiateScheme (mkBoundScheme t_decl)
+      return _type
+
 introduceInstantiated :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
 introduceInstantiated decls sub = do
   let entry (MkDecl { _ident, _type }) = do
-        t_ident <- 
-          case _type of
-            Nothing -> freshVar
-            Just t_decl -> do
-              MkScheme { _type } <- instantiate (mkBoundScheme t_decl)
-              return _type
+        t_ident <- instantiateAnnot _type
         let scheme = mkFreeScheme t_ident
         return (t_ident, (_ident, scheme))
   (t_idents, env_list) <- unzip <$> mapM entry decls
@@ -130,10 +139,10 @@ introduceInstantiated decls sub = do
 introduceGeneralized :: [Decl] -> [Type] -> TI a -> TI a
 introduceGeneralized decls types sub = do
   free_vars <- asks freeVars'
-  let entry (MkDecl { _ident }) t_found = do
-        scheme <- instantiate $ MkScheme
-          { _boundVars = Set.difference (freeVars t_found) free_vars
-          , _type      = t_found
+  let entry (MkDecl { _ident }) _type = do
+        scheme <- instantiateScheme $ MkScheme
+          { _boundVars = Set.difference (freeVars _type) free_vars
+          , _type
           }
         return (_ident, scheme)
   env <- Map.fromList <$> zipWithM entry decls types
