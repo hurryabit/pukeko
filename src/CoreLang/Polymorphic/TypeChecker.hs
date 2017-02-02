@@ -23,12 +23,16 @@ import qualified CoreLang.Polymorphic.Builtins as Builtins (everything)
 
 inferExpr :: MonadError String m => Expr -> m Type
 inferExpr expr = do
-  let  env = [ (fun, MkScheme (freeVars t) t) | (fun, t) <- Builtins.everything ]
+  let  env = map (\(i, t) -> (i, boundScheme t)) Builtins.everything
   (_, t) <- runTI (Map.fromList env) (infer expr)
   return t
 
 
-data Scheme = MkScheme { _schematicVars :: Set (Var Type), _type :: Type }
+data Scheme = MkScheme { _boundVars :: Set (Var Type), _type :: Type }
+
+boundScheme, freeScheme :: Type -> Scheme
+boundScheme _type = MkScheme { _boundVars = freeVars _type, _type }
+freeScheme  _type = MkScheme { _boundVars = Set.empty     , _type }
 
 type Environment = Map Ident Scheme
 
@@ -64,8 +68,8 @@ infer expr =
     Ap { _fun, _arg } -> do
       (phi, [t_fun, t_arg]) <- inferMany [_fun, _arg]
       t_res <- freshVar
-      phi <- Type.unify phi t_fun (t_arg ~> t_res)
-      return (phi, subst phi t_res)
+      psi <- Type.unify phi t_fun (t_arg ~> t_res)
+      return (psi, subst psi t_res)
     Lam { _decls, _body } -> do
       (phi, t_decls, t_body) <- localFreshVars _decls (infer _body)
       return (phi, foldr (~>) t_body t_decls)
@@ -80,7 +84,7 @@ infer expr =
       let (decls, exprs) = unzip $ map (\MkDefn { _decl, _expr } -> (_decl, _expr)) _defns
       (phi, t_decls, t_exprs) <- localFreshVars decls (inferMany exprs)
       psi <- Type.unifyMany phi (zip t_decls t_exprs)
-      local (subst' (psi <> phi)) $ do -- TODO: Is phi really needed here?
+      local (subst' psi) $ do -- TODO: Is phi really needed here?
         localDecls decls (map (subst psi) t_decls) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
@@ -96,45 +100,45 @@ inferMany (e:es) = do
   (psi, ts) <- local (subst' phi) (inferMany es)
   return (psi <> phi, subst psi t : ts)
 
-
+-- | In the result, @_boundVars@ contains the new names of the old bound variables.
 instantiate :: Scheme -> TI Scheme
-instantiate (MkScheme { _schematicVars, _type }) = do
-  bindings <- mapM (\_ -> freshVar) (Map.fromSet id _schematicVars)
+instantiate (MkScheme { _boundVars, _type }) = do
+  bindings <- mapM (\_ -> freshVar) (Map.fromSet id _boundVars)
   return $ MkScheme
-    { _schematicVars = Set.fromList [ v | Type.Var v <- Map.elems bindings ]
-    , _type          = subst (mkSubst bindings) _type
+    { _boundVars = Set.fromList [ v | Type.Var v <- Map.elems bindings ]
+    , _type      = subst (mkSubst bindings) _type
     }
-
-localDecls :: [Decl] -> [Type] -> TI a -> TI a
-localDecls decls types sub = do
-  free_vars <- asks freeVars'
-  let entry (MkDecl { _ident }) t_found = do
-        scheme <- instantiate $ MkScheme
-          { _schematicVars = Set.difference (freeVars t_found) free_vars
-          , _type          = t_found
-          }
-        return (_ident, scheme)
-  env <- Map.fromList <$> zipWithM entry decls types
-  local (Map.union env) sub
 
 localFreshVars :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
 localFreshVars decls sub = do
   let entry (MkDecl { _ident }) = do
         t_ident <- freshVar
-        let scheme = MkScheme { _schematicVars = Set.empty, _type = t_ident }
+        let scheme = freeScheme t_ident
         return (t_ident, (_ident, scheme))
   (t_idents, env_list) <- unzip <$> mapM entry decls
   let env = Map.fromList env_list
   (phi, t_sub) <- local (Map.union env) sub
   return (phi, map (subst phi) t_idents, t_sub)
 
+localDecls :: [Decl] -> [Type] -> TI a -> TI a
+localDecls decls types sub = do
+  free_vars <- asks freeVars'
+  let entry (MkDecl { _ident }) t_found = do
+        scheme <- instantiate $ MkScheme
+          { _boundVars = Set.difference (freeVars t_found) free_vars
+          , _type      = t_found
+          }
+        return (_ident, scheme)
+  env <- Map.fromList <$> zipWithM entry decls types
+  local (Map.union env) sub
+
 
 instance TermLike Scheme where
   type BaseTerm Scheme = Type
-  freeVars' (MkScheme { _schematicVars, _type }) = 
-    Set.difference (freeVars _type) _schematicVars
-  subst' phi (scheme@MkScheme { _schematicVars, _type }) =
-    scheme { _type = subst (phi `exclude` _schematicVars) _type }
+  freeVars' (MkScheme { _boundVars, _type }) = 
+    Set.difference (freeVars _type) _boundVars
+  subst' phi (scheme@MkScheme { _boundVars, _type }) =
+    scheme { _type = subst (phi `exclude` _boundVars) _type }
 
 instance TermLike Environment where
   type BaseTerm Environment = Type

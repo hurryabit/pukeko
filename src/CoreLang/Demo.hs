@@ -9,7 +9,7 @@ import CoreLang.Pretty
 import qualified CoreLang.Language.Parser         as Parser
 import qualified CoreLang.Monomorphic.Checker     as Mono
 -- import qualified CoreLang.Monomorphic.Inferrer    as Mono.Inferrer
--- import qualified CoreLang.Polymorphic.TypeChecker as Poly.Inferrer
+import qualified CoreLang.Polymorphic.TypeChecker as Poly
 
 
 repl :: Pretty a => (Expr -> Either String a) -> IO ()
@@ -48,4 +48,5 @@ commands :: [Command]
 commands =
   [ Command "parse"      pure
   , Command "mono.check" Mono.checkExpr
+  , Command "poly.infer" Poly.inferExpr
   ]

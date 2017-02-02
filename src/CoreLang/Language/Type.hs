@@ -90,6 +90,7 @@ extend phi v t =
       | Set.member v (freeVars t) -> pthrow (text "cyclic type variable" <+> pretty v)
       | otherwise                 -> return (assign v t <> phi)
 
+-- | @unify phi v t@ finds an mgu @psi@ of @phi v == phi t@ and returns @psi <> phi@.
 unifyVar :: MonadError String m => Subst Type -> Var Type -> Type -> m (Subst Type)
 unifyVar phi v t =
   case substVar phi v of
@@ -99,6 +100,7 @@ unifyVar phi v t =
     where
       phi_t = subst phi t
 
+-- | @unify phi s t@ finds an mgu @psi@ of @phi s = phi t@ and returns @psi <> phi@.
 unify :: MonadError String m => Subst Type -> Type -> Type -> m (Subst Type)
 unify phi t1 t2 =
   case (t1, t2) of
@@ -111,6 +113,8 @@ unify phi t1 t2 =
     _                          ->
       pthrow (text "mismatching types" <+> pretty t1 <+> text "and" <+> pretty t2)
 
+-- | @unifyMany phi eqs@ finds an mgu @psi@ of @{ phi s1 = phi t1, ..., phi sn = phi tn }@,
+-- where @eqs = [(s1,t1), ..., (sn,tn)]@, and returns @psi <> phi@.
 unifyMany :: MonadError String m => Subst Type -> [(Type, Type)] -> m (Subst Type)
 unifyMany = foldM (uncurry . unify)
 
