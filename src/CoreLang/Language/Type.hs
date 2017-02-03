@@ -109,9 +109,19 @@ unify phi t1 t2 =
     (Fun tx1 ty1, Fun tx2 ty2) -> unifyMany phi [(tx1, tx2), (ty1, ty2)]
     (App c1  ts1, App c2  ts2)
       | c1 == c2               -> unifyMany phi (zip ts1 ts2)
-    (Rec _      , Rec _      ) -> pthrow (text "unification of record types not implemented")
-    _                          ->
-      pthrow (text "mismatching types" <+> pretty t1 <+> text "and" <+> pretty t2)
+    (Rec ds1    , Rec ds2    ) -> do
+      let checkLabels [] [] acc = return acc
+          checkLabels ((i1, _):_) [] _ = 
+            pthrow $ hsep [text "field", pretty i1, text "not present in record", pretty t2]
+          checkLabels [] ((i2, _):_) _ =
+            pthrow $ hsep [text "field", pretty i2, text "not present in record", pretty t1]
+          checkLabels ((i1, t_i1):ds1') ((i2, t_i2):ds2') acc
+            | i1 == i2  = checkLabels ds1' ds2' ((t_i1, t_i2):acc) 
+            | otherwise =
+                pthrow $ hsep [text "record fields", pretty i1, text "and", pretty i2, text "do not match"]
+      eqs <- checkLabels ds1 ds2 []
+      unifyMany phi eqs
+    _ -> pthrow $ hsep [text "mismatching types", pretty t1, text "and", pretty t2]
 
 -- | @unifyMany phi eqs@ finds an mgu @psi@ of @{ phi s1 = phi t1, ..., phi sn = phi tn }@,
 -- where @eqs = [(s1,t1), ..., (sn,tn)]@, and returns @psi <> phi@.
@@ -131,7 +141,7 @@ instance Pretty Type where
       Var v    -> pPrint v
       Fun _ _  -> parens $ hcat $ punctuate (text " -> ") $ map pPrint (collect t)
       App c ts -> maybeParens (not (null ts)) $ hsep (pPrint c : map pPrint ts)
-      Rec fs   -> braces $ hsep $ punctuate comma (map field fs)
+      Rec ds   -> braces $ hsep $ punctuate comma (map field ds)
     where
       collect t =
         case t of
