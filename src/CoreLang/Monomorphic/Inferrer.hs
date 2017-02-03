@@ -12,7 +12,7 @@ import Text.Printf
 import qualified Data.Map as Map
 
 import CoreLang.Language.Syntax
-import CoreLang.Language.Term hiding (BaseTerm, TermLike (..))
+import CoreLang.Language.Term
 import CoreLang.Language.Type (Type, (~>))
 
 import qualified CoreLang.Language.Syntax      as Syntax
@@ -27,9 +27,6 @@ inferExpr expr = do
 
 
 type Environment = Map Identifier Type
-
-subst' :: Subst Type -> Environment -> Environment
-subst' = Map.map . subst
 
 
 newtype TI a =

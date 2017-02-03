@@ -67,8 +67,8 @@ check expr =
       t_defns <- checkDefns _defns
       let env = Map.fromList t_defns
       local (Map.union env) (check _body)
-    LetRec { _defns, _body } -> do
-      (_, t_body) <- localDecls (map _decl _defns) $ check (Let { _defns, _body })
+    LetRec { _annot, _defns, _body } -> do
+      (_, t_body) <- localDecls (map _decl _defns) $ check (Let { _annot, _defns, _body })
       return t_body
     If { _cond, _then, _else } -> do
       t_cond <- check _cond

@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 module CoreLang.Polymorphic.TypeChecker
   ( inferExpr
   )
@@ -156,14 +157,8 @@ introduceGeneralized decls types sub = do
   local (Map.union env) sub
 
 
-instance TermLike Scheme where
-  type BaseTerm Scheme = Type
+instance TermCollection Type Scheme where
   freeVars' (MkScheme { _boundVars, _type }) = 
     Set.difference (freeVars _type) _boundVars
   subst' phi (scheme@MkScheme { _boundVars, _type }) =
     scheme { _type = subst (phi `exclude` _boundVars) _type }
-
-instance TermLike Environment where
-  type BaseTerm Environment = Type
-  freeVars' = foldMap freeVars'
-  subst' = fmap . subst'

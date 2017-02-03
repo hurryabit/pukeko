@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 module CoreLang.Language.Term
   ( Term (..)
   , Subst
@@ -5,7 +6,7 @@ module CoreLang.Language.Term
   , mkSubst
   , assign
   , exclude
-  , TermLike (..)
+  , TermCollection (..)
   , module Data.Monoid
   )
   where
@@ -42,8 +43,14 @@ instance Term t => Monoid (Subst t) where
   mempty = MkSubst Map.empty
   phi `mappend` psi = MkSubst $ Map.union (Map.map (subst phi) (unSubst psi)) (unSubst phi)
 
+instance Term t => TermCollection t t where
+  freeVars' = freeVars
+  subst' = subst
 
-class Term (BaseTerm ts) => TermLike ts where
-  type BaseTerm ts
-  freeVars' :: ts -> Set (Var (BaseTerm ts))
-  subst'    :: Subst (BaseTerm ts) -> ts -> ts
+instance (Foldable f, Functor f, TermCollection t c) => TermCollection t (f c) where
+  freeVars' = foldMap freeVars'
+  subst' = fmap . subst'
+
+class Term t => TermCollection t c where
+  freeVars' :: c -> Set (Var t)
+  subst'    :: Subst t -> c -> c
