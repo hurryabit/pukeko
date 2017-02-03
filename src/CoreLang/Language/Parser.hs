@@ -91,18 +91,18 @@ atype = choice
 asType :: Parser Type
 asType = reservedOp ":" *> type_
 
-decl :: Bool -> Parser (Decl SourcePos)
-decl needParens =
+patn :: Bool -> Parser (Patn SourcePos)
+patn needParens =
   case needParens of
-    False -> MkDecl <$> getPosition <*> ident <*> optionMaybe asType
+    False -> MkPatn <$> getPosition <*> ident <*> optionMaybe asType
     True  -> 
-      (MkDecl <$> getPosition <*> ident <*> pure Nothing)
-      <|> parens (MkDecl <$> getPosition <*> ident <*> (Just <$> asType))
+      (MkPatn <$> getPosition <*> ident <*> pure Nothing)
+      <|> parens (MkPatn <$> getPosition <*> ident <*> (Just <$> asType))
   <?> "declaration"
 
 defn :: Parser (Defn SourcePos)
 defn = 
-  MkDefn <$> getPosition <*> decl False <*> (equals *> expr)
+  MkDefn <$> patn False <*> (equals *> expr)
   <?> "definition"
 
 expr, aexpr1, aexpr :: Parser (Expr SourcePos)
@@ -114,7 +114,7 @@ expr =
        <*> sepBy1 defn (reserved "and")
        <*> (reserved "in" *> expr)
     , Lam <$> getPosition 
-          <*> (reserved "fun" *> many1 (decl True))
+          <*> (reserved "fun" *> many1 (patn True))
           <*> (arrow *> expr)
     , If  <$> getPosition 
           <*> (reserved "if"   *> expr) 

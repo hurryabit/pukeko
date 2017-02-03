@@ -60,15 +60,15 @@ check expr =
           match t_x t_arg
           return t_y
         _ -> pthrow (text "expected function, found" <+> pretty t_fun)
-    Lam { _decls, _body } -> do
-      (t_decls, t_body) <- localDecls _decls (check _body)
-      return $ foldr (~>) t_body t_decls
+    Lam { _patns, _body } -> do
+      (t_patns, t_body) <- localPatns _patns (check _body)
+      return $ foldr (~>) t_body t_patns
     Let { _defns, _body } -> do
       t_defns <- checkDefns _defns
       let env = Map.fromList t_defns
       local (Map.union env) (check _body)
     LetRec { _annot, _defns, _body } -> do
-      (_, t_body) <- localDecls (map _decl _defns) $ check (Let { _annot, _defns, _body })
+      (_, t_body) <- localPatns (map _patn _defns) $ check (Let { _annot, _defns, _body })
       return t_body
     If { _cond, _then, _else } -> do
       t_cond <- check _cond
@@ -94,20 +94,20 @@ check expr =
 
 checkDefns :: [Defn a] -> TC [(Ident, Type)]
 checkDefns defns =
-  forM defns $ \MkDefn { _decl = MkDecl { _ident, _type }, _expr } -> do
+  forM defns $ \MkDefn { _patn = MkPatn { _ident, _type }, _expr } -> do
     t_expr <- check _expr
     case _type of
       Nothing     -> return (_ident, t_expr)
-      Just t_decl -> do
-        match t_decl t_expr
-        return (_ident, t_decl)
+      Just t_patn -> do
+        match t_patn t_expr
+        return (_ident, t_patn)
 
-localDecls :: [Decl a] -> TC t -> TC ([Type], t)
-localDecls decls tc = do
-  env_list <- forM decls $ \MkDecl { _ident, _type } ->
+localPatns :: [Patn a] -> TC t -> TC ([Type], t)
+localPatns patns tc = do
+  env_list <- forM patns $ \MkPatn { _ident, _type } ->
     case _type of
       Nothing     -> pthrow (pretty _ident <+> text "lacks a type annotation")
-      Just t_decl -> return (_ident, t_decl)
+      Just t_patn -> return (_ident, t_patn)
   let env = Map.fromList env_list
   res <- local (Map.union env) tc
   return (map snd env_list, res)

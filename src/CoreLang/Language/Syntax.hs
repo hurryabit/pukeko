@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveFunctor #-}
 module CoreLang.Language.Syntax
   ( Expr (..)
-  , Decl (..)
+  , Patn (..)
   , Defn (..)
-  , unzipDecls
+  , unzipPatns
   , unzipDefns
+  , Annot (..)
   , module CoreLang.Language.Ident
   )
   where
@@ -21,34 +22,38 @@ data Expr a
   | Ap     { _annot :: a, _fun   :: Expr a, _arg :: Expr a }
   | Let    { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
   | LetRec { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
-  | Lam    { _annot :: a, _decls :: [Decl a], _body  :: Expr a }
+  | Lam    { _annot :: a, _patns :: [Patn a], _body  :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
   | Rec    { _annot :: a, _defns :: [Defn a] }
   | Sel    { _annot :: a, _expr  :: Expr a, _field :: Ident }
   deriving (Show, Functor)
 
-data Decl a = MkDecl { _annot :: a, _ident :: Ident, _type :: Maybe Type }
+data Patn a = MkPatn { _annot :: a, _ident :: Ident, _type :: Maybe Type }
   deriving (Show, Functor)
 
-data Defn  a = MkDefn { _annot :: a, _decl :: Decl a, _expr :: Expr a }
+data Defn a = MkDefn { _patn :: Patn a, _expr :: Expr a }
   deriving (Show, Functor)
 
 
-unzipDecls :: [Decl a] -> ([Ident], [Maybe Type])
-unzipDecls = unzip . map (\MkDecl { _ident, _type} -> (_ident, _type))
+unzipPatns :: [Patn a] -> ([Ident], [Maybe Type])
+unzipPatns = unzip . map (\MkPatn { _ident, _type} -> (_ident, _type))
 
-unzipDefns :: [Defn a] -> ([Decl a], [Expr a])
-unzipDefns = unzip . map (\MkDefn { _decl, _expr} -> (_decl, _expr))
+unzipDefns :: [Defn a] -> ([Patn a], [Expr a])
+unzipDefns = unzip . map (\MkDefn { _patn, _expr} -> (_patn, _expr))
 
 
-instance Pretty (Decl a) where
-  pPrint (MkDecl { _ident, _type }) =
+class Annot f where
+  annot :: f a -> a
+
+
+instance Pretty (Patn a) where
+  pPrint (MkPatn { _ident, _type }) =
     case _type of
       Nothing -> pretty _ident
       Just t  -> parens $ pretty _ident <> colon <+> pretty t
 
 instance Pretty (Defn a) where
-  pPrint (MkDefn { _decl, _expr }) = pretty _decl <+> equals <+> pretty _expr
+  pPrint (MkDefn { _patn, _expr }) = pretty _patn <+> equals <+> pretty _expr
 
 instance Pretty (Expr a) where
   pPrint expr =
@@ -59,10 +64,10 @@ instance Pretty (Expr a) where
       Ap     { _fun  , _arg   } -> parens $ hsep $ map pretty (collect expr [])
       Let    { _defns, _body  } -> let_ "let"    _defns _body
       LetRec { _defns, _body  } -> let_ "letrec" _defns _body
-      Lam    { _decls, _body  } ->
+      Lam    { _patns, _body  } ->
         parens $ hsep
           [ text "fun"
-          , hsep (map pretty _decls)
+          , hsep (map pretty _patns)
           , text "->"
           , pretty _body
           ]
@@ -89,3 +94,21 @@ instance Pretty (Expr a) where
           , text "in"
           , pretty body
           ]
+
+
+instance Annot Expr where
+  annot expr =
+    case expr of
+      Var    { _annot } -> _annot
+      Num    { _annot } -> _annot
+      Pack   { _annot } -> _annot
+      Ap     { _annot } -> _annot
+      Let    { _annot } -> _annot
+      LetRec { _annot } -> _annot
+      Lam    { _annot } -> _annot
+      If     { _annot } -> _annot
+      Rec    { _annot } -> _annot
+      Sel    { _annot } -> _annot
+
+instance Annot Patn where
+  annot (MkPatn { _annot }) = _annot

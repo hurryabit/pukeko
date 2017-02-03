@@ -68,7 +68,7 @@ infer e =
       let (xs, es) = unzip xes
       (phi, ts) <- inferMany es
       local (subst' phi) $ do
-        localDecls xs ts $ do
+        localPatns xs ts $ do
           (psi, t) <- infer e0
           return (psi <> phi, t)
     Syntax.LetRec xes e0 -> do
@@ -76,7 +76,7 @@ infer e =
       (phi, vs, ts) <- localFreshVars xs (inferMany es)
       psi <- Type.unifyMany phi (zip ts vs)
       local (subst' (psi <> phi)) $ do -- TODO: Is phi really needed here?
-        localDecls xs (map (subst psi) ts) $ do
+        localPatns xs (map (subst psi) ts) $ do
           (rho, t) <- infer e0
           return (rho <> psi, t)
     Syntax.If   _ _ _ -> throwError "type for if-then-else not implemented"
@@ -91,13 +91,13 @@ inferMany (e:es) = do
   return (psi <> phi, subst psi t : ts)
 
 
-localDecls :: [Declaration] -> [Type] -> TI a -> TI a
-localDecls xs ts cont = do
+localPatns :: [Declaration] -> [Type] -> TI a -> TI a
+localPatns xs ts cont = do
   let env = Map.fromList (zipWith (\(x,_) t -> (x,t)) xs ts)
   local (Map.union env) cont
 
 localFreshVars :: [Declaration] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
 localFreshVars xs cont = do
   vs <- mapM (\_ -> freshVar) xs
-  (phi, t) <- localDecls xs vs cont
+  (phi, t) <- localPatns xs vs cont
   return (phi, map (subst phi) vs, t)
