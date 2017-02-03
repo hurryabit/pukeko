@@ -18,7 +18,7 @@ import qualified CoreLang.Language.Type        as Type
 import qualified CoreLang.Monomorphic.Builtins as Builtins
 
 
-checkExpr :: MonadError String m => Expr -> m Type
+checkExpr :: MonadError String m => (Expr a) -> m Type
 checkExpr expr = runTC (Map.fromList Builtins.everything) (check expr)
 
 
@@ -43,7 +43,7 @@ match expected found
   | otherwise                    = 
     pthrow (text "expected" <+> pretty expected <> text ", but found" <+> pretty found)
 
-check :: Expr -> TC Type
+check :: Expr a -> TC Type
 check expr =
   case expr of
     Var { _ident } -> do
@@ -92,7 +92,7 @@ check expr =
         _ -> mismatch
     Pack { } -> pthrow (text "type checking constructors not implemented")
 
-checkDefns :: [Defn] -> TC [(Ident, Type)]
+checkDefns :: [Defn a] -> TC [(Ident, Type)]
 checkDefns defns =
   forM defns $ \MkDefn { _decl = MkDecl { _ident, _type }, _expr } -> do
     t_expr <- check _expr
@@ -102,7 +102,7 @@ checkDefns defns =
         match t_decl t_expr
         return (_ident, t_decl)
 
-localDecls :: [Decl] -> TC a -> TC ([Type], a)
+localDecls :: [Decl a] -> TC t -> TC ([Type], t)
 localDecls decls tc = do
   env_list <- forM decls $ \MkDecl { _ident, _type } ->
     case _type of

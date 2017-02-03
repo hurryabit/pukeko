@@ -21,7 +21,7 @@ import CoreLang.Language.Type (Type, Var, (~>), unify, unifyMany)
 import qualified CoreLang.Language.Type as Type
 import qualified CoreLang.Polymorphic.Builtins as Builtins (everything)
 
-inferExpr :: MonadError String m => Expr -> m Type
+inferExpr :: MonadError String m => Expr a -> m Type
 inferExpr expr = do
   let  env = map (\(i, t) -> (i, mkBoundScheme t)) Builtins.everything
   (_, t) <- runTI (Map.fromList env) (infer expr)
@@ -54,7 +54,7 @@ runTI env ti =
 freshVar :: TI Type
 freshVar = Type.Var <$> fresh
 
-infer :: Expr -> TI (Subst Type, Type)
+infer :: Expr a -> TI (Subst Type, Type)
 infer expr =
   case expr of
     Var { _ident } -> do
@@ -108,7 +108,7 @@ infer expr =
     Sel  { } -> pthrow (text "type checking of record selectors not implemented")
     Pack { } -> pthrow (text "type checking of constructors not implemented")
 
-inferMany :: [Expr] -> TI (Subst Type, [Type])
+inferMany :: [Expr a] -> TI (Subst Type, [Type])
 inferMany [] = return (mempty, [])
 inferMany (e:es) = do
   (phi, t)  <- infer e
@@ -132,7 +132,7 @@ instantiateAnnot t_annot =
       MkScheme { _type } <- instantiateScheme (mkBoundScheme t_decl)
       return _type
 
-introduceInstantiated :: [Decl] -> TI (Subst Type, a) -> TI (Subst Type, [Type], a)
+introduceInstantiated :: [Decl a] -> TI (Subst Type, t) -> TI (Subst Type, [Type], t)
 introduceInstantiated decls sub = do
   let entry (MkDecl { _ident, _type }) = do
         t_ident <- instantiateAnnot _type
@@ -143,7 +143,7 @@ introduceInstantiated decls sub = do
   (phi, t_sub) <- local (Map.union env) sub
   return (phi, map (subst phi) t_idents, t_sub)
 
-introduceGeneralized :: [Decl] -> [Type] -> TI a -> TI a
+introduceGeneralized :: [Decl a] -> [Type] -> TI t -> TI t
 introduceGeneralized decls types sub = do
   free_vars <- asks freeVars'
   let entry (MkDecl { _ident }) _type = do

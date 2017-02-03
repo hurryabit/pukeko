@@ -14,7 +14,7 @@ import CoreLang.Language.Syntax
 import CoreLang.Language.Type (Type, var, (~>), app, record)
 
 
-parseExpr :: MonadError String m => String -> String -> m Expr
+parseExpr :: MonadError String m => String -> String -> m (Expr SourcePos)
 parseExpr file code = 
   case parse (expr <* eof) file code of
     Left error  -> throwError (show error)
@@ -91,36 +91,42 @@ atype = choice
 asType :: Parser Type
 asType = reservedOp ":" *> type_
 
-decl :: Bool -> Parser Decl
+decl :: Bool -> Parser (Decl SourcePos)
 decl needParens =
   case needParens of
-    False -> MkDecl <$> ident <*> optionMaybe asType
+    False -> MkDecl <$> getPosition <*> ident <*> optionMaybe asType
     True  -> 
-      (MkDecl <$> ident <*> pure Nothing)
-      <|> parens (MkDecl <$> ident <*> (Just <$> asType))
+      (MkDecl <$> getPosition <*> ident <*> pure Nothing)
+      <|> parens (MkDecl <$> getPosition <*> ident <*> (Just <$> asType))
   <?> "declaration"
 
-defn :: Parser Defn
+defn :: Parser (Defn SourcePos)
 defn = 
-  MkDefn <$> decl False <*> (equals *> expr)
+  MkDefn <$> getPosition <*> decl False <*> (equals *> expr)
   <?> "definition"
 
-expr, aexpr1, aexpr :: Parser Expr
+expr, aexpr1, aexpr :: Parser (Expr SourcePos)
 expr =
   choice
-    [ let let_ =
-            choice
-              [ reserved "let"    *> pure Let
-              , reserved "letrec" *> pure LetRec
-              ]
-      in  let_ <*> sepBy1 defn (reserved "and")
-               <*> (reserved "in" *> expr)
-    , Lam <$> (reserved "fun" *> many1 (decl True))
+    [ (Let    <$> getPosition <* reserved "let" 
+       <|>
+       LetRec <$> getPosition <* reserved "letrec")
+       <*> sepBy1 defn (reserved "and")
+       <*> (reserved "in" *> expr)
+    , Lam <$> getPosition 
+          <*> (reserved "fun" *> many1 (decl True))
           <*> (arrow *> expr)
-    , If  <$> (reserved "if"   *> expr) 
+    , If  <$> getPosition 
+          <*> (reserved "if"   *> expr) 
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
-    , let infixBinOp op = Infix $ reservedOp op *> pure (Ap . Ap (Var (MkIdent op)))
+    , let infixBinOp op = Infix $ do
+            pos <- getPosition
+            reservedOp op
+            return (Ap pos . Ap pos (Var pos (MkIdent op)))
+          partialAp = do
+            pos <- getPosition
+            foldl1 (Ap pos) <$> many1 aexpr
       in  buildExpressionParser
             [ [ infixBinOp "*" AssocRight
               , infixBinOp "/" AssocNone
@@ -132,14 +138,16 @@ expr =
             , [infixBinOp "&&" AssocRight]
             , [infixBinOp "||" AssocRight]
             ]
-            (foldl1 Ap <$> many1 aexpr)
+            partialAp
     ]
   <?> "expression"
 aexpr1 = choice
-  [ Var <$> ident
-  , Num <$> nat
-  , reserved "Pack" *> braces (Pack <$> nat <*> (comma *> nat))
+  [ Var <$> getPosition <*> ident
+  , Num <$> getPosition <*> nat
+  , reserved "Pack" *> braces (Pack <$> getPosition <*> nat <*> (comma *> nat))
   , parens expr
-  , Rec <$> braces (commaSep defn)
+  , Rec <$> getPosition <*> braces (commaSep defn)
   ]
-aexpr = foldl Sel <$> aexpr1 <*> many (reservedOp "." *> ident)
+aexpr = do
+  pos <- getPosition
+  foldl (Sel pos) <$> aexpr1 <*> many (reservedOp "." *> ident)

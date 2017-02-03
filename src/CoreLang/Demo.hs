@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module CoreLang.Demo where
 
+import Text.Parsec (SourcePos)
 import System.Console.Haskeline
 
 import CoreLang.Language.Syntax (Expr)
@@ -12,7 +13,7 @@ import qualified CoreLang.Monomorphic.Checker     as Mono
 import qualified CoreLang.Polymorphic.TypeChecker as Poly
 
 
-repl :: Pretty a => (Expr -> Either String a) -> IO ()
+repl :: Pretty t => (Expr SourcePos -> Either String t) -> IO ()
 repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
   where
     loop :: InputT IO ()
@@ -26,23 +27,23 @@ repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
             Right t -> outputStrLn $ prettyShow t
           loop
 
-onLabeledInput :: Pretty a => (Expr -> Either String a) -> String -> String -> IO ()
+onLabeledInput :: Pretty t => (Expr SourcePos -> Either String t) -> String -> String -> IO ()
 onLabeledInput f file code = do
   case Parser.parseExpr file code >>= f of
     Left  e -> putStrLn $ "error: " ++ e
     Right t -> putStrLn $ prettyShow t
 
-onInput :: Pretty a => (Expr -> Either String a) -> String -> IO ()
+onInput :: Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
 onInput f = onLabeledInput f "<input>"
 
-file ::  Pretty a => (Expr -> Either String a) -> String -> IO ()
+file ::  Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
 file f file = readFile file >>= onLabeledInput f file
 
 code_foldl =
   "letrec foldl = fun f y0 xs -> case_list xs y0 (fun x xs -> foldl f (f y0 x) xs) in foldl"
 
 data Command where
-  Command :: Pretty a => String -> (Expr -> Either String a) -> Command
+  Command :: Pretty t => String -> (Expr SourcePos -> Either String t) -> Command
 
 commands :: [Command]
 commands =
