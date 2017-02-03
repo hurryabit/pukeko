@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 module CoreLang.Language.Syntax
   ( Expr (..)
   , Decl (..)
@@ -9,6 +10,7 @@ module CoreLang.Language.Syntax
   where
 
 import CoreLang.Language.Ident
+import CoreLang.Language.Term
 import CoreLang.Language.Type (Type)
 import CoreLang.Pretty
 
@@ -16,20 +18,20 @@ data Expr a
   = Var    { _annot :: a, _ident :: Ident }
   | Num    { _annot :: a, _int   :: Int   }
   | Pack   { _annot :: a, _tag   :: Int , _arity :: Int  }
-  | Ap     { _annot :: a, _fun   :: Expr a, _arg   :: Expr a }
+  | Ap     { _annot :: a, _fun   :: Expr a, _arg :: Expr a }
   | Let    { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
   | LetRec { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
   | Lam    { _annot :: a, _decls :: [Decl a], _body  :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
   | Rec    { _annot :: a, _defns :: [Defn a] }
   | Sel    { _annot :: a, _expr  :: Expr a, _field :: Ident }
-  deriving (Show)
+  deriving (Show, Functor)
 
 data Decl a = MkDecl { _annot :: a, _ident :: Ident, _type :: Maybe Type }
-  deriving (Show)
+  deriving (Show, Functor)
 
 data Defn  a = MkDefn { _annot :: a, _decl :: Decl a, _expr :: Expr a }
-  deriving (Show)
+  deriving (Show, Functor)
 
 
 unzipDecls :: [Decl a] -> ([Ident], [Maybe Type])
@@ -87,4 +89,3 @@ instance Pretty (Expr a) where
           , text "in"
           , pretty body
           ]
-  
