@@ -78,7 +78,7 @@ liftLL = bottomUpM f_expr return return
           lifted_ident <- fresh
           let mkPatn _ident = MkPatn { _annot = Set.singleton _ident, _ident, _type = Nothing }
               free_vars = Set.toList _annot
-              lifted_expr = Lam { _annot = Set.empty, _patns = _patns ++ map mkPatn free_vars, _body }
+              lifted_expr = Lam { _annot = Set.empty, _patns = map mkPatn free_vars ++ _patns, _body }
               defn = MkDefn { _patn = mkPatn lifted_ident, _expr = lifted_expr }
               lifted_call = foldl1 (Ap _annot) $ map (Var _annot) (lifted_ident : free_vars)
           tell [defn]
