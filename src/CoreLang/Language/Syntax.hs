@@ -86,14 +86,18 @@ instance Pretty (Expr a) where
       Sel { _expr, _field } -> pretty _expr <> char '.' <> pretty _field
     where
       let_ key defns body =
-        hsep
-          [ text key , hcat $ punctuate (text " and ") (map (pPrintPrec lvl 0) defns)
-          , text "in", pPrintPrec lvl 0 body
-          ]
+        maybeParens (prec > 0) $
+          case defns of
+            [] -> pPrintPrec lvl 0 body
+            defn0:defns -> vcat
+              [ text key <+> pPrintPrec lvl 0 defn0
+              , vcat $ map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
+              , text "in" <+> pPrintPrec lvl 0 body
+              ]
 
 instance Pretty (Defn a) where
   pPrintPrec lvl _ MkDefn{ _patn, _expr } =
-    pPrintPrec lvl 0 _patn <+> equals <+> pPrintPrec lvl 0 _expr
+    hang (pPrintPrec lvl 0 _patn <+> equals) 2 (pPrintPrec lvl 0 _expr)
 
 instance Pretty (Patn a) where
   pPrintPrec _ prec MkPatn{ _ident, _type } =
