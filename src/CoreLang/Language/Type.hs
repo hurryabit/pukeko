@@ -18,6 +18,7 @@ module CoreLang.Language.Type
 import Control.Arrow (second)
 import Control.Monad.Except
 import Data.Char (isLower, isUpper)
+import Data.Ratio () -- for precedences in pretty printer
 
 import qualified Data.Set as Set
 
@@ -136,17 +137,16 @@ instance Show (Var Type) where
   show = prettyShow
 
 instance Pretty Type where
-  pPrint t =
+  pPrintPrec lvl prec t =
     case t of
-      Var v    -> pPrint v
-      Fun _ _  -> parens $ hcat $ punctuate (text " -> ") $ map pPrint (collect t)
-      App c ts -> maybeParens (not (null ts)) $ hsep (pPrint c : map pPrint ts)
+      Var v    -> pretty v
+      Fun s t  -> 
+        maybeParens (prec > 1) $ pPrintPrec lvl 2 s <+> text "->" <+> pPrintPrec lvl 1 t
+      App c [] -> pretty c
+      App c ts ->
+        maybeParens (prec > 2) $ pretty c <+> hsep (map (pPrintPrec lvl 3) ts)
       Rec ds   -> braces $ hsep $ punctuate comma (map field ds)
     where
-      collect t =
-        case t of
-          Fun t1 t2 -> t1 : collect t2
-          _         -> [t]
       field (l, t) = pPrint l <> colon <+> pPrint t
 
 instance Show Type where
