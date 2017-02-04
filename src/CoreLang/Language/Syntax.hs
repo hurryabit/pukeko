@@ -11,9 +11,12 @@ module CoreLang.Language.Syntax
   where
 
 import CoreLang.Language.Ident
+import CoreLang.Language.Operator (Spec (..), Assoc (..), aprec)
 import CoreLang.Language.Term
 import CoreLang.Language.Type (Type)
 import CoreLang.Pretty
+
+import qualified CoreLang.Language.Operator as Operator
 
 data Expr a
   = Var    { _annot :: a, _ident :: Ident }
@@ -37,65 +40,66 @@ data Defn a = MkDefn { _patn :: Patn a, _expr :: Expr a }
 
 
 unzipPatns :: [Patn a] -> ([Ident], [Maybe Type])
-unzipPatns = unzip . map (\MkPatn { _ident, _type} -> (_ident, _type))
+unzipPatns = unzip . map (\MkPatn{ _ident, _type} -> (_ident, _type))
 
 unzipDefns :: [Defn a] -> ([Patn a], [Expr a])
-unzipDefns = unzip . map (\MkDefn { _patn, _expr} -> (_patn, _expr))
+unzipDefns = unzip . map (\MkDefn{ _patn, _expr} -> (_patn, _expr))
 
 
 class Annot f where
   annot :: f a -> a
 
 
-instance Pretty (Patn a) where
-  pPrint MkPatn { _ident, _type } =
-    case _type of
-      Nothing -> pretty _ident
-      Just t  -> parens $ pretty _ident <> colon <+> pretty t
-
-instance Pretty (Defn a) where
-  pPrint MkDefn { _patn, _expr } = pretty _patn <+> equals <+> pretty _expr
-
 instance Pretty (Expr a) where
-  pPrint expr =
+  pPrintPrec lvl prec expr =
     case expr of
-      Var    { _ident } -> pretty _ident
-      Num    { _int   } -> int _int
-      Pack   { _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
-      Ap     { _fun, _arg   } -> parens $ hsep $ map pretty (collect expr [])
-      ApOp   { _op, _arg1, _arg2 } -> parens $ pretty _arg1 <> pretty _op <> pretty _arg2
+      Var  { _ident } -> pretty _ident
+      Num  { _int   } -> int _int
+      Pack { _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
+      Ap   { _fun, _arg   } -> 
+        maybeParens (prec > aprec) $
+          pPrintPrec lvl aprec _fun <+> pPrintPrec lvl (aprec+1) _arg
+      ApOp   { _op, _arg1, _arg2 } -> 
+        let MkIdent name = _op
+            MkSpec { _prec, _assoc } = Operator.find name
+            (prec1, prec2) =
+              case _assoc of
+                AssocLeft  -> (_prec  , _prec+1)
+                AssocRight -> (_prec+1, _prec  )
+                AssocNone  -> (_prec+1, _prec+1)
+        in  maybeParens (prec > _prec) $
+              pPrintPrec lvl prec1 _arg1 <> pretty _op <> pPrintPrec lvl prec2 _arg2
       Let    { _defns, _body  } -> let_ "let"    _defns _body
       LetRec { _defns, _body  } -> let_ "letrec" _defns _body
       Lam    { _patns, _body  } ->
-        parens $ hsep
-          [ text "fun"
-          , hsep (map pretty _patns)
-          , text "->"
-          , pretty _body
+        maybeParens (prec > 0) $ hsep
+          [ text "fun", hsep (map (pPrintPrec lvl 1) _patns)
+          , text "->" , pPrintPrec lvl 0 _body
           ]
       If { _cond, _then, _else } ->
-        hsep
-          [ text "if"
-          , pretty _cond
-          , text "then"
-          , pretty _then
-          , text "else"
-          , pretty _else
+        maybeParens (prec > 0) $ hsep
+          [ text "if"  , pPrintPrec lvl 0 _cond
+          , text "then", pPrintPrec lvl 0 _then
+          , text "else", pPrintPrec lvl 0 _else
           ]
       Rec { _defns } -> braces $ hsep $ punctuate comma (map pretty _defns)
       Sel { _expr, _field } -> pretty _expr <> char '.' <> pretty _field
     where
-      collect expr acc =
-        case expr of
-          Ap { _fun, _arg } -> collect _fun (_arg:acc)
-          _                 -> expr:acc
       let_ key defns body =
         hsep
-          [ text key
-          , hcat $ punctuate (text " and ") (map pretty defns)
-          , text "in"
-          , pretty body
+          [ text key , hcat $ punctuate (text " and ") (map (pPrintPrec lvl 0) defns)
+          , text "in", pPrintPrec lvl 0 body
           ]
+
+instance Pretty (Defn a) where
+  pPrintPrec lvl _ MkDefn{ _patn, _expr } =
+    pPrintPrec lvl 0 _patn <+> equals <+> pPrintPrec lvl 0 _expr
+
+instance Pretty (Patn a) where
+  pPrintPrec _ prec MkPatn{ _ident, _type } =
+    case _type of
+      Nothing -> pretty _ident
+      Just t  -> maybeParens (prec > 0) $ pretty _ident <> colon <+> pretty t
 
 
 instance Annot Expr where
@@ -114,4 +118,4 @@ instance Annot Expr where
       Sel    { _annot } -> _annot
 
 instance Annot Patn where
-  annot MkPatn { _annot } = _annot
+  annot MkPatn{ _annot } = _annot
