@@ -21,7 +21,7 @@ lifter :: Expr a -> Expr ()
 lifter expr =
   let env = Set.fromList (map fst Builtins.everything)
       (_body, _defns) = runLL (liftLL (annotFreeVars expr)) env
-      lifted_expr = LetRec { _annot = undefined, _defns, _body }
+      lifted_expr = Let { _annot = undefined, _isrec = True, _defns, _body }
   in  fmap (const ()) lifted_expr
 
 lookupFreeVars :: Ident -> Set Ident
@@ -43,12 +43,13 @@ annotFreeVars = bottomUp f_expr f_defn f_patn . fmap (const undefined)
         ApOp { _op, _arg1, _arg2 } ->
           let _annot = lookupFreeVars _op `Set.union` annot _arg1 `Set.union` annot _arg2
           in  expr { _annot }
-        Let { _defns, _body } ->
+        -- TODO: Remove code duplication.
+        Let { _isrec = False, _defns, _body } ->
           let (_patns, _exprs) = unzipDefns _defns
               _annot = (annot _body `Set.difference` Set.unions (map annot _patns))
                          `Set.union` Set.unions (map annot _exprs)
           in  expr { _annot }
-        LetRec { _defns, _body } ->
+        Let { _isrec = True, _defns, _body } ->
           let (_patns, _exprs) = unzipDefns _defns
               _annot = (annot _body `Set.union` Set.unions (map annot _exprs))
                          `Set.difference` Set.unions (map annot _patns)

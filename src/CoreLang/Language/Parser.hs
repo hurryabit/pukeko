@@ -105,11 +105,10 @@ defn =
 expr, aexpr1, aexpr :: Parser (Expr SourcePos)
 expr =
   choice
-    [ (Let    <$> getPosition <* reserved "let" 
-       <|>
-       LetRec <$> getPosition <* reserved "letrec")
-       <*> sepBy1 defn (reserved "and")
-       <*> (reserved "in" *> expr)
+    [ Let <$> getPosition
+          <*> (reserved "let" *> pure False <|> reserved "letrec" *> pure True )
+          <*> sepBy1 defn (reserved "and")
+          <*> (reserved "in" *> expr)
     , Lam <$> getPosition 
           <*> (reserved "fun" *> many1 (patn True))
           <*> (arrow *> expr)

@@ -24,8 +24,7 @@ data Expr a
   | Pack   { _annot :: a, _tag   :: Int , _arity :: Int  }
   | Ap     { _annot :: a, _fun   :: Expr a, _arg :: Expr a }
   | ApOp   { _annot :: a, _op    :: Ident, _arg1 :: Expr a, _arg2 :: Expr a }
-  | Let    { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
-  | LetRec { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
+  | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body  :: Expr a }
   | Lam    { _annot :: a, _patns :: [Patn a], _body  :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
   | Rec    { _annot :: a, _defns :: [Defn a] }
@@ -69,8 +68,14 @@ instance Pretty (Expr a) where
                 AssocNone  -> (_prec+1, _prec+1)
         in  maybeParens (prec > _prec) $
               pPrintPrec lvl prec1 _arg1 <> pretty _op <> pPrintPrec lvl prec2 _arg2
-      Let    { _defns, _body  } -> let_ "let"    _defns _body
-      LetRec { _defns, _body  } -> let_ "letrec" _defns _body
+      Let    { _isrec, _defns, _body  } ->
+        case _defns of
+          [] -> pPrintPrec lvl 0 _body
+          defn0:defns -> vcat
+            [ text (if _isrec then "letrec" else "let") <+> pPrintPrec lvl 0 defn0
+            , vcat $ map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
+            , text "in" <+> pPrintPrec lvl 0 _body
+            ]
       Lam    { _patns, _body  } ->
         maybeParens (prec > 0) $ hsep
           [ text "fun", hsep (map (pPrintPrec lvl 1) _patns)
@@ -85,15 +90,6 @@ instance Pretty (Expr a) where
       Rec { _defns } -> braces $ hsep $ punctuate comma (map pretty _defns)
       Sel { _expr, _field } -> pretty _expr <> char '.' <> pretty _field
     where
-      let_ key defns body =
-        maybeParens (prec > 0) $
-          case defns of
-            [] -> pPrintPrec lvl 0 body
-            defn0:defns -> vcat
-              [ text key <+> pPrintPrec lvl 0 defn0
-              , vcat $ map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
-              , text "in" <+> pPrintPrec lvl 0 body
-              ]
 
 instance Pretty (Defn a) where
   pPrintPrec lvl _ MkDefn{ _patn, _expr } =

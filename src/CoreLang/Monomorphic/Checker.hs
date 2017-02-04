@@ -63,12 +63,12 @@ check expr =
     Lam { _patns, _body } -> do
       (t_patns, t_body) <- localPatns _patns (check _body)
       return $ foldr (~>) t_body t_patns
-    Let { _defns, _body } -> do
+    Let { _isrec = False, _defns, _body } -> do
       t_defns <- checkDefns _defns
       let env = Map.fromList t_defns
       local (Map.union env) (check _body)
-    LetRec { _annot, _defns, _body } -> do
-      (_, t_body) <- localPatns (map _patn _defns) $ check (Let { _annot, _defns, _body })
+    Let { _isrec = True, _defns } -> do
+      (_, t_body) <- localPatns (map _patn _defns) $ check (expr { _isrec = False })
       return t_body
     If { _cond, _then, _else } -> do
       t_cond <- check _cond

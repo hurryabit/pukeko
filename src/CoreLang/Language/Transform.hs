@@ -85,10 +85,6 @@ transform MkTransformation{ _preExpr, _postExpr, _preDefn, _postDefn, _prePatn, 
             _defns <- mapM transDefn _defns
             _body  <- transExpr _body
             return $ expr { _defns, _body }
-          LetRec { _defns, _body } -> do
-            _defns <- mapM transDefn _defns
-            _body  <- transExpr _body
-            return $ expr { _defns, _body }
           Lam { _patns, _body } -> do
             _patns <- mapM transPatn _patns
             _body  <- transExpr _body

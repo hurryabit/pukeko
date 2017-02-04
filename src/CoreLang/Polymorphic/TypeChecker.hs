@@ -86,7 +86,8 @@ infer expr =
     Lam { _patns, _body } -> do
       (phi, t_patns, t_body) <- introduceInstantiated _patns (infer _body)
       return (phi, foldr (~>) t_body t_patns)
-    Let { _defns, _body } -> do
+    -- TODO: Remove code duplication.
+    Let { _isrec = False, _defns, _body } -> do
       let (patns, exprs) = unzipDefns _defns
       (phi, t_exprs) <- inferMany exprs
       t_patns <- mapM (\(MkPatn { _type }) -> instantiateAnnot _type) patns
@@ -95,7 +96,7 @@ infer expr =
         introduceGeneralized patns (map (subst psi) t_patns) $ do
           (rho, t_body) <- infer _body
           return (rho <> psi, t_body)
-    LetRec { _defns, _body } -> do
+    Let { _isrec = True, _defns, _body } -> do
       let (patns, exprs) = unzipDefns _defns
       (phi, t_patns, t_exprs) <- introduceInstantiated patns (inferMany exprs)
       psi <- unifyMany phi (zip t_patns t_exprs)
