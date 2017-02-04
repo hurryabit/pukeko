@@ -9,7 +9,7 @@ module CoreLang.Language.Operator
   where
 
 import Data.Map (Map)
-import Data.Ratio
+import Data.Ratio ()
 import Text.Parsec.Expr (Assoc (..))
 
 import qualified Data.Map as Map
