@@ -20,6 +20,7 @@ data Expr a
   | Num    { _annot :: a, _int   :: Int   }
   | Pack   { _annot :: a, _tag   :: Int , _arity :: Int  }
   | Ap     { _annot :: a, _fun   :: Expr a, _arg :: Expr a }
+  | ApOp   { _annot :: a, _op    :: Ident, _arg1 :: Expr a, _arg2 :: Expr a }
   | Let    { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
   | LetRec { _annot :: a, _defns :: [Defn a], _body  :: Expr a }
   | Lam    { _annot :: a, _patns :: [Patn a], _body  :: Expr a }
@@ -60,8 +61,9 @@ instance Pretty (Expr a) where
     case expr of
       Var    { _ident } -> pretty _ident
       Num    { _int   } -> int _int
-      Pack   { _tag  , _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
-      Ap     { _fun  , _arg   } -> parens $ hsep $ map pretty (collect expr [])
+      Pack   { _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
+      Ap     { _fun, _arg   } -> parens $ hsep $ map pretty (collect expr [])
+      ApOp   { _op, _arg1, _arg2 } -> parens $ pretty _arg1 <> pretty _op <> pretty _arg2
       Let    { _defns, _body  } -> let_ "let"    _defns _body
       LetRec { _defns, _body  } -> let_ "letrec" _defns _body
       Lam    { _patns, _body  } ->
@@ -103,6 +105,7 @@ instance Annot Expr where
       Num    { _annot } -> _annot
       Pack   { _annot } -> _annot
       Ap     { _annot } -> _annot
+      ApOp   { _annot } -> _annot
       Let    { _annot } -> _annot
       LetRec { _annot } -> _annot
       Lam    { _annot } -> _annot

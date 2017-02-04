@@ -30,6 +30,10 @@ bottomUpM f_expr f_defn f_patn = bu_expr
           _fun <- bu_expr _fun
           _arg <- bu_expr _arg
           f_expr $ expr { _fun, _arg }
+        ApOp { _arg1, _arg2 } -> do
+          _arg1 <- bu_expr _arg1
+          _arg2 <- bu_expr _arg2
+          f_expr $ expr { _arg1, _arg2 }
         Let { _defns, _body } -> do
           _defns <- mapM bu_defn _defns
           _body  <- bu_expr _body

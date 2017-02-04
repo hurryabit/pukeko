@@ -90,6 +90,7 @@ check expr =
             Nothing      -> mismatch
             Just t_field -> return t_field
         _ -> mismatch
+    ApOp { } -> pthrow (text "type checking operators not implemented")
     Pack { } -> pthrow (text "type checking constructors not implemented")
 
 checkDefns :: [Defn a] -> TC [(Ident, Type)]

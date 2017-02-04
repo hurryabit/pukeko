@@ -55,21 +55,33 @@ runTI env ti =
 freshVar :: TI Type
 freshVar = Type.Var <$> fresh
 
+lookupAndInstantiate :: Ident -> String -> TI Type
+lookupAndInstantiate ident kind = do
+  t_ident_env <- asks (Map.lookup ident)
+  case t_ident_env of
+    Nothing -> pthrow (text "unknown" <+> text kind <> colon <+> pretty ident)
+    Just scheme -> do
+      MkScheme { _type } <- instantiateScheme scheme
+      return _type
+
+
 infer :: Expr a -> TI (Subst Type, Type)
 infer expr =
   case expr of
     Var { _ident } -> do
-      env <- ask
-      case Map.lookup _ident env of
-        Nothing     -> pthrow (text "unknown identifier:" <+> pretty _ident)
-        Just scheme -> do
-          MkScheme { _type } <- instantiateScheme scheme
-          return (mempty, _type)
+      t_ident <- lookupAndInstantiate _ident "identifier"
+      return (mempty, t_ident)
     Num { } -> return (mempty, Type.int)
     Ap { _fun, _arg } -> do
       (phi, [t_fun, t_arg]) <- inferMany [_fun, _arg]
       t_res <- freshVar
       psi <- unify phi t_fun (t_arg ~> t_res)
+      return (psi, subst psi t_res)
+    ApOp { _op, _arg1, _arg2 } -> do
+      t_op <- lookupAndInstantiate _op "operator"
+      (phi, [t_arg1, t_arg2]) <- inferMany [_arg1, _arg2]
+      t_res <- freshVar
+      psi <- unify phi t_op (t_arg1 ~> t_arg2 ~> t_res)
       return (psi, subst psi t_res)
     Lam { _patns, _body } -> do
       (phi, t_patns, t_body) <- introduceInstantiated _patns (infer _body)

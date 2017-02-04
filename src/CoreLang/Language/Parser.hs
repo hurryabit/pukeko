@@ -121,10 +121,7 @@ expr =
           <*> (reserved "if"   *> expr) 
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
-    , let infixBinOp op = Infix $ do
-            pos <- getPosition
-            reservedOp op
-            return (Ap pos . Ap pos (Var pos (MkIdent op)))
+    , let infixBinOp op = Infix $ ApOp <$> getPosition <*> (reservedOp op *> pure (MkIdent op))
           partialAp = do
             pos <- getPosition
             foldl1 (Ap pos) <$> many1 aexpr

@@ -20,21 +20,25 @@ lifter expr =
       _expr = LetRec { _annot = undefined, _defns, _body }
   in  fmap (const ()) _expr
 
+lookupFreeVars :: Ident -> Set Ident
+lookupFreeVars ident =
+  case lookup ident Builtins.everything of
+    Nothing -> Set.singleton ident
+    Just _  -> Set.empty
+
 annotFreeVars :: Expr a -> Expr (Set Ident)
 annotFreeVars = bottomUp f_expr f_defn f_patn . fmap (const undefined)
   where
     f_expr :: Expr (Set Ident) -> Expr (Set Ident)
     f_expr expr =
       case expr of
-        Var { _ident } -> 
-          let _annot =
-                case lookup _ident Builtins.everything of
-                  Nothing -> Set.singleton _ident
-                  Just _  -> Set.empty
-          in  expr { _annot }
-        Num { } -> expr { _annot = Set.empty }
+        Var { _ident } -> expr { _annot = lookupFreeVars _ident }
+        Num  { } -> expr { _annot = Set.empty }
         Pack { } -> expr { _annot = Set.empty }
         Ap { _fun, _arg } -> expr { _annot = annot _fun `Set.union` annot _arg }
+        ApOp { _op, _arg1, _arg2 } ->
+          let _annot = lookupFreeVars _op `Set.union` annot _arg1 `Set.union` annot _arg2
+          in  expr { _annot }
         Let { _defns, _body } ->
           let (_patns, _exprs) = unzipDefns _defns
               _annot = (annot _body `Set.difference` Set.unions (map annot _patns))
