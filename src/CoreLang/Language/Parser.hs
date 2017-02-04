@@ -7,12 +7,14 @@ module CoreLang.Language.Parser
 import Control.Monad.Except
 import Text.Parsec
 import Text.Parsec.Expr
-import qualified Text.Parsec.Language as Language
+import Text.Parsec.Language
 import qualified Text.Parsec.Token    as Token
 
+import CoreLang.Language.Operator (Spec (..))
 import CoreLang.Language.Syntax
 import CoreLang.Language.Type (Type, var, (~>), app, record)
 
+import qualified CoreLang.Language.Operator as Operator
 
 parseExpr :: MonadError String m => String -> String -> m (Expr SourcePos)
 parseExpr file code = 
@@ -29,9 +31,8 @@ parseType code =
 
 type Parser = Parsec String ()
 
-relOpNames = ["<", "<=", "==", "!=", ">=", ">"]
-
-coreLangDef = Language.haskellStyle
+coreLangDef :: LanguageDef st
+coreLangDef = haskellStyle
   { Token.reservedNames =
       [ "fun"
       , "let", "letrec", "and", "in"
@@ -39,12 +40,7 @@ coreLangDef = Language.haskellStyle
       -- , "case", "of"
       , "Pack"
       ]
-  , Token.reservedOpNames = concat
-      [ ["+", "-", "*", "/"]
-      , relOpNames
-      , ["&&", "||"]
-      , ["=", "->", ":", "."]
-      ]
+  , Token.reservedOpNames = ["=", "->", ":", "."] ++ Operator.names
   }
 
 Token.TokenParser
@@ -121,22 +117,10 @@ expr =
           <*> (reserved "if"   *> expr) 
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
-    , let infixBinOp op = Infix $ ApOp <$> getPosition <*> (reservedOp op *> pure (MkIdent op))
-          partialAp = do
+    , let partialAp = do
             pos <- getPosition
             foldl1 (Ap pos) <$> many1 aexpr
-      in  buildExpressionParser
-            [ [ infixBinOp "*" AssocRight
-              , infixBinOp "/" AssocNone
-              ]
-            , [ infixBinOp "+" AssocRight
-              , infixBinOp "-" AssocNone
-              ]
-            , map (`infixBinOp` AssocNone) relOpNames
-            , [infixBinOp "&&" AssocRight]
-            , [infixBinOp "||" AssocRight]
-            ]
-            partialAp
+      in  buildExpressionParser operatorTable partialAp
     ]
   <?> "expression"
 aexpr1 = choice
@@ -149,3 +133,8 @@ aexpr1 = choice
 aexpr = do
   pos <- getPosition
   foldl (Sel pos) <$> aexpr1 <*> many (reservedOp "." *> ident)
+
+operatorTable = map (map f) (reverse Operator.table)
+  where
+    f MkSpec { _name, _assoc } =
+      Infix (ApOp <$> getPosition <*> (reservedOp _name *> pure (MkIdent _name))) _assoc

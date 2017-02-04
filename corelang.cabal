@@ -20,6 +20,7 @@ library
                      , CoreLang.Pretty
                      , CoreLang.Language.Ident
                      , CoreLang.Language.LambdaLifter
+                     , CoreLang.Language.Operator
                      , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Syntax
