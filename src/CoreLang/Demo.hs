@@ -1,11 +1,10 @@
 {-# LANGUAGE GADTs #-}
 module CoreLang.Demo where
 
-import Data.Foldable (toList)
 import Text.Parsec (SourcePos)
 import System.Console.Haskeline
 
-import CoreLang.Language.Syntax (Expr, annot)
+import CoreLang.Language.Syntax (Expr)
 import CoreLang.Pretty
 
 import qualified CoreLang.Language.LambdaLifter   as Lifter
@@ -52,5 +51,5 @@ commands =
   [ Command "parse"      pure
   , Command "mono.check" Mono.checkExpr
   , Command "poly.infer" Poly.inferExpr
-  , Command "lambdalift" (return . toList . annot . Lifter.annotFreeVars)
+  , Command "lambdalift" (return . Lifter.lifter)
   ]
