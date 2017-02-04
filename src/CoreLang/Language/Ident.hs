@@ -5,7 +5,7 @@ module CoreLang.Language.Ident
 
 import CoreLang.Pretty
 
-newtype Ident = MkIdent String
+newtype Ident = MkIdent { unIdent :: String }
   deriving (Show, Eq, Ord)
 
 instance Pretty Ident where

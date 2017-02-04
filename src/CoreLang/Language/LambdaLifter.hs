@@ -1,12 +1,15 @@
 module CoreLang.Language.LambdaLifter
   ( lifter
+  , annotFreeVars
   )
   where
 
-import Control.Monad.Supply
-import Control.Monad.Writer
+import Control.Monad.RWS
+import Data.Map (Map)
+import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import CoreLang.Language.Syntax
@@ -16,9 +19,10 @@ import qualified CoreLang.Polymorphic.Builtins as Builtins
 
 lifter :: Expr a -> Expr ()
 lifter expr =
-  let (_body, _defns) = runLL $ liftLL (annotFreeVars expr)
-      _expr = LetRec { _annot = undefined, _defns, _body }
-  in  fmap (const ()) _expr
+  let env = Set.fromList (map fst Builtins.everything)
+      (_body, _defns) = runLL (liftLL (annotFreeVars expr)) env
+      lifted_expr = LetRec { _annot = undefined, _defns, _body }
+  in  fmap (const ()) lifted_expr
 
 lookupFreeVars :: Ident -> Set Ident
 lookupFreeVars ident =
@@ -60,14 +64,37 @@ annotFreeVars = bottomUp f_expr f_defn f_patn . fmap (const undefined)
     f_patn :: Patn (Set Ident) -> Patn (Set Ident)
     f_patn patn@MkPatn { _ident } = patn { _annot = Set.singleton _ident }
 
-newtype LL a = MkLL { unLL :: WriterT [Defn (Set Ident)] (Supply Ident) a }
+data State = MkState
+  { _path :: [Ident]
+  , _next :: Map [Ident] Int
+  }
+
+emptyState :: State
+emptyState = MkState { _path = [], _next = Map.empty }
+
+newtype LL a = MkLL { unLL :: RWS (Set Ident) [Defn (Set Ident)] State a }
   deriving ( Functor, Applicative, Monad
+           , MonadReader (Set Ident)
            , MonadWriter [Defn (Set Ident)]
-           , MonadSupply Ident
            )
 
-runLL :: LL a -> (a, [Defn (Set Ident)])
-runLL ll = evalSupply (runWriterT (unLL ll)) (map (\n -> MkIdent $ '$':show n) [1::Int ..])
+push :: Ident -> LL ()
+push ident = 
+  MkLL $ modify (\state@MkState { _path} -> state { _path = ident:_path})
+
+pop :: LL ()
+pop = MkLL $ modify (\state@MkState {_path} -> state { _path = tail _path})
+
+fresh :: LL Ident
+fresh =
+  MkLL $ state $ \state@MkState{ _path, _next = old_next } ->
+    let (n_opt, _next) = Map.insertLookupWithKey (const (+)) _path 1 old_next
+        n = fromMaybe 0 n_opt
+        ident = MkIdent $ concatMap ('$':) $ reverse $ show n : map unIdent _path
+    in  (ident, state { _next })
+
+runLL :: LL a -> Set Ident -> (a, [Defn (Set Ident)])
+runLL ll env = evalRWS (unLL ll) env emptyState
 
 liftLL :: Expr (Set Ident) -> LL (Expr (Set Ident))
 liftLL = bottomUpM f_expr return return
