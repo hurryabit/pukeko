@@ -25,7 +25,10 @@ repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
         Just code -> do
           case Parser.parseExpr "<repl>" code >>= cmd of
             Left  e -> outputStrLn $ "ERROR: " ++ e
-            Right t -> outputStrLn $ prettyShow t
+            Right t -> do
+              outputStrLn (replicate 60 '=')
+              outputStrLn $ prettyShow t
+              outputStrLn (replicate 60 '=')
           loop
 
 onLabeledInput :: Pretty t => (Expr SourcePos -> Either String t) -> String -> String -> IO ()
@@ -42,6 +45,11 @@ file f file = readFile file >>= onLabeledInput f file
 
 code_foldl =
   "letrec foldl = fun f y0 xs -> case_list xs y0 (fun x xs -> foldl f (f y0 x) xs) in foldl"
+
+lambdaLifter :: Expr SourcePos -> Either String (Expr ())
+lambdaLifter expr = do
+  _ <- Poly.inferExpr expr
+  return (Lifter.lifter expr)
 
 data Command where
   Command :: Pretty t => String -> (Expr SourcePos -> Either String t) -> Command
