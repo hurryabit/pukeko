@@ -47,13 +47,13 @@ class Annot f where
 
 
 instance Pretty (Patn a) where
-  pPrint (MkPatn { _ident, _type }) =
+  pPrint MkPatn { _ident, _type } =
     case _type of
       Nothing -> pretty _ident
       Just t  -> parens $ pretty _ident <> colon <+> pretty t
 
 instance Pretty (Defn a) where
-  pPrint (MkDefn { _patn, _expr }) = pretty _patn <+> equals <+> pretty _expr
+  pPrint MkDefn { _patn, _expr } = pretty _patn <+> equals <+> pretty _expr
 
 instance Pretty (Expr a) where
   pPrint expr =
@@ -72,7 +72,7 @@ instance Pretty (Expr a) where
           , pretty _body
           ]
       If { _cond, _then, _else } ->
-        hsep $
+        hsep
           [ text "if"
           , pretty _cond
           , text "then"
@@ -80,7 +80,7 @@ instance Pretty (Expr a) where
           , text "else"
           , pretty _else
           ]
-      Rec { _defns } -> braces $ hsep $ punctuate (comma) (map pretty _defns)
+      Rec { _defns } -> braces $ hsep $ punctuate comma (map pretty _defns)
       Sel { _expr, _field } -> pretty _expr <> char '.' <> pretty _field
     where
       collect expr acc =
@@ -111,4 +111,4 @@ instance Annot Expr where
       Sel    { _annot } -> _annot
 
 instance Annot Patn where
-  annot (MkPatn { _annot }) = _annot
+  annot MkPatn { _annot } = _annot

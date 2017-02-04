@@ -93,11 +93,12 @@ asType = reservedOp ":" *> type_
 
 patn :: Bool -> Parser (Patn SourcePos)
 patn needParens =
-  case needParens of
-    False -> MkPatn <$> getPosition <*> ident <*> optionMaybe asType
-    True  -> 
-      (MkPatn <$> getPosition <*> ident <*> pure Nothing)
-      <|> parens (MkPatn <$> getPosition <*> ident <*> (Just <$> asType))
+  if needParens then
+    MkPatn <$> getPosition <*> ident <*> pure Nothing
+    <|> 
+    parens (MkPatn <$> getPosition <*> ident <*> (Just <$> asType))
+  else
+    MkPatn <$> getPosition <*> ident <*> optionMaybe asType
   <?> "declaration"
 
 defn :: Parser (Defn SourcePos)
@@ -134,7 +135,7 @@ expr =
             , [ infixBinOp "+" AssocRight
               , infixBinOp "-" AssocNone
               ]
-            , map (flip infixBinOp AssocNone) relOpNames
+            , map (`infixBinOp` AssocNone) relOpNames
             , [infixBinOp "&&" AssocRight]
             , [infixBinOp "||" AssocRight]
             ]
