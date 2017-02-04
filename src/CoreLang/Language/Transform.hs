@@ -3,8 +3,8 @@ module CoreLang.Language.Transform
   , bottomUpM
   , topDown
   , topDownM
-  , Transformation ( _preExpr, _postExpr, _preDefn, _postDefn, _prePatn, _postPatn)
-  , empty
+  , Transformation (_preExpr, _postExpr, _preDefn, _postDefn, _prePatn, _postPatn)
+  , emptyTransformation
   , transform
   )
   where
@@ -26,7 +26,7 @@ bottomUpM :: Monad m => (Expr a -> m (Expr a))
                      -> (Patn a -> m (Patn a))
                      -> (Expr a -> m (Expr a))
 bottomUpM _postExpr _postDefn _postPatn =
-  transform $ empty { _postExpr, _postDefn, _postPatn }
+  transform $ emptyTransformation { _postExpr, _postDefn, _postPatn }
 
 topDown :: (Expr a -> Expr a)
         -> (Defn a -> Defn a)
@@ -41,7 +41,7 @@ topDownM :: Monad m => (Expr a -> m (Expr a))
                     -> (Patn a -> m (Patn a))
                     -> (Expr a -> m (Expr a))
 topDownM _preExpr _preDefn _prePatn =
-  transform $ empty { _preExpr, _preDefn, _prePatn }
+  transform $ emptyTransformation { _preExpr, _preDefn, _prePatn }
 
 data Transformation m a = MkTransformation
   { _preExpr  :: Expr a -> m (Expr a)
@@ -52,8 +52,8 @@ data Transformation m a = MkTransformation
   , _postPatn :: Patn a -> m (Patn a)
   }
 
-empty :: Monad m => Transformation m a
-empty = MkTransformation
+emptyTransformation :: Monad m => Transformation m a
+emptyTransformation = MkTransformation
   { _preExpr  = return
   , _postExpr = return
   , _preDefn  = return

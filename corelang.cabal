@@ -21,7 +21,6 @@ library
                      , CoreLang.Language.Ident
                      , CoreLang.Language.LambdaLifter
                      , CoreLang.Language.Operator
-                     , CoreLang.Language.Optimizer
                      , CoreLang.Language.Parser
                      , CoreLang.Language.Syntax
                      , CoreLang.Language.Term
@@ -29,17 +28,16 @@ library
                      , CoreLang.Language.Type
                      , CoreLang.Monomorphic.Builtins
                      , CoreLang.Monomorphic.Checker
-                     , CoreLang.Monomorphic.Inferrer
                      , CoreLang.Monomorphic.Subtyping
                      , CoreLang.Polymorphic.Builtins
                      , CoreLang.Polymorphic.TypeChecker
-                     , CoreLang.TempInst.Builtins
-                     , CoreLang.TempInst.GC
-                     , CoreLang.TempInst.Instantiate
-                     , CoreLang.TempInst.Interpreter
-                     , CoreLang.TempInst.Machine
-                     , CoreLang.TempInst.Stats
-                     , CoreLang.TempInst.TIM
+--                     , CoreLang.TempInst.Builtins
+--                     , CoreLang.TempInst.GC
+--                     , CoreLang.TempInst.Instantiate
+--                     , CoreLang.TempInst.Interpreter
+--                     , CoreLang.TempInst.Machine
+--                     , CoreLang.TempInst.Stats
+--                     , CoreLang.TempInst.TIM
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers

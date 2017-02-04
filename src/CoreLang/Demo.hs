@@ -21,7 +21,7 @@ repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
     loop = do
       input <- getInputLine "[CoReLaNG] "
       case input of
-        Nothing   -> return ()
+        Nothing -> return ()
         Just code -> do
           case Parser.parseExpr "<repl>" code >>= cmd of
             Left  e -> outputStrLn $ "ERROR: " ++ e
@@ -32,7 +32,7 @@ repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
           loop
 
 onLabeledInput :: Pretty t => (Expr SourcePos -> Either String t) -> String -> String -> IO ()
-onLabeledInput f file code = do
+onLabeledInput f file code =
   case Parser.parseExpr file code >>= f of
     Left  e -> putStrLn $ "error: " ++ e
     Right t -> putStrLn $ prettyShow t
@@ -42,9 +42,6 @@ onInput f = onLabeledInput f "<input>"
 
 file ::  Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
 file f file = readFile file >>= onLabeledInput f file
-
-code_foldl =
-  "letrec foldl = fun f y0 xs -> case_list xs y0 (fun x xs -> foldl f (f y0 x) xs) in foldl"
 
 lambdaLifter :: Expr SourcePos -> Either String (Expr ())
 lambdaLifter expr = do

@@ -80,7 +80,7 @@ newtype LL a = MkLL { unLL :: RWS (Set Ident) [Defn (Set Ident)] State a }
            )
 
 push :: Ident -> LL ()
-push ident = 
+push ident =
   MkLL $ modify (\state@MkState { _path} -> state { _path = ident:_path})
 
 pop :: LL ()
@@ -98,9 +98,9 @@ runLL :: LL a -> Set Ident -> (a, [Defn (Set Ident)])
 runLL ll env = evalRWS (unLL ll) env emptyState
 
 liftLL :: Expr (Set Ident) -> LL (Expr (Set Ident))
-liftLL = bottomUpM f_expr return return
+liftLL = transform $ emptyTransformation { _postExpr, _preDefn, _postDefn }
   where
-    f_expr expr = 
+    _postExpr expr =
       case expr of
         Lam { _annot, _patns, _body } -> do
           lifted_ident <- fresh
@@ -112,3 +112,5 @@ liftLL = bottomUpM f_expr return return
           tell [defn]
           return lifted_call
         _ -> return expr
+    _preDefn defn@MkDefn{ _patn = MkPatn{ _ident } } = push _ident >> return defn
+    _postDefn defn = pop >> return defn
