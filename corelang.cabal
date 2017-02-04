@@ -53,9 +53,10 @@ library
                      , FlexibleInstances
                      , GeneralizedNewtypeDeriving
                      , NamedFieldPuns
+                     , PartialTypeSignatures
                      , TypeFamilies
                      
-  ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Werror
+  ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Wno-partial-type-signatures -Werror
 
 executable corelang
   hs-source-dirs:      app

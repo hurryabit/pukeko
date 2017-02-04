@@ -107,19 +107,7 @@ instance Pretty (Patn a) where
 
 
 instance Annot Expr where
-  annot expr =
-    case expr of
-      Var    { _annot } -> _annot
-      Num    { _annot } -> _annot
-      Pack   { _annot } -> _annot
-      Ap     { _annot } -> _annot
-      ApOp   { _annot } -> _annot
-      Let    { _annot } -> _annot
-      LetRec { _annot } -> _annot
-      Lam    { _annot } -> _annot
-      If     { _annot } -> _annot
-      Rec    { _annot } -> _annot
-      Sel    { _annot } -> _annot
+  annot = _annot :: Expr _ -> _
 
 instance Annot Patn where
-  annot MkPatn{ _annot } = _annot
+  annot = _annot :: Patn _ -> _
