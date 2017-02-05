@@ -1,15 +1,13 @@
 module Main where
 
 import Control.Monad
-import Control.Monad.Except
 import Data.Monoid
 import Options.Applicative
-import System.Exit
 
 import CoreLang.Demo
 
 lifter :: Int -> String -> IO ()
-lifter _ = onFile lazyLifter
+lifter _ = onFile liftExpr
 
 opts :: Parser (IO ())
 opts =

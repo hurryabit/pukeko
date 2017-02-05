@@ -45,10 +45,10 @@ onInput f = onLabeledInput f "<input>"
 onFile ::  Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
 onFile f file = readFile file >>= onLabeledInput f file
 
-lazyLifter :: Expr SourcePos -> Either String (Expr (Set Ident))
-lazyLifter expr = do
+liftExpr :: Expr SourcePos -> Either String (Expr (Set Ident))
+liftExpr expr = do
   t1 <- Poly.inferExpr expr
-  let lifted_expr = Lifter.lazyLifter (map fst Builtins.everything) expr
+  let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
   _ <- (Poly.inferExpr lifted_expr >>= Type.unify mempty t1)
         `catchError` \msg -> throwError (prettyShow lifted_expr ++ '\n':msg)
   return lifted_expr
@@ -61,7 +61,7 @@ commands =
   [ Command "parse"      pure
   , Command "mono.check" Mono.checkExpr
   , Command "poly.infer" Poly.inferExpr
-  , Command "lambdalift" lazyLifter
+  , Command "lambdalift" liftExpr
   ]
 
 debug :: (Show t, Pretty t) => (Expr SourcePos -> Either String t)

@@ -1,5 +1,5 @@
 module CoreLang.Language.LambdaLifter
-  ( lazyLifter
+  ( liftExpr
   )
   where
 
@@ -15,11 +15,11 @@ import qualified Data.Set as Set
 import CoreLang.Language.Rewrite
 import CoreLang.Language.Syntax
 
-lazyLifter :: [Ident] -> Expr a -> FvExpr
-lazyLifter globals_list expr =
+liftExpr :: [Ident] -> Expr a -> FvExpr
+liftExpr globals_list expr =
   let globals = Set.fromList globals_list
       fv_expr = fvExpr globals expr
-      (_body, _defns) = runLL (liftLazy True fv_expr) globals
+      (_body, _defns) = runLL (llExpr fv_expr) globals
   in  fvAdjust $ Let { _annot = undefined, _isrec = True, _defns, _body }
 
 data Scope = Local | Global
@@ -140,9 +140,9 @@ mkDefn :: Ident -> FvExpr -> FvDefn
 mkDefn _ident _expr = MkDefn { _patn = mkPatn _ident, _expr }
 
 
-liftLambdaAs :: Ident -> Set Ident -> [FvPatn] -> FvExpr -> LL FvExpr
-liftLambdaAs global_ident old_annot old_patns old_body = do
-  new_body <- liftLazy True old_body
+llLamAs :: Ident -> Set Ident -> [FvPatn] -> FvExpr -> LL FvExpr
+llLamAs global_ident old_annot old_patns old_body = do
+  new_body <- llExpr old_body
   let fv_lambda = Set.toList old_annot
       new_patns = map mkPatn fv_lambda ++ old_patns
       lifted_lambda = fvAdjust $
@@ -152,32 +152,32 @@ liftLambdaAs global_ident old_annot old_patns old_body = do
         fvAdjust $ Ap { _annot = undefined, _fun, _arg = mkVar Local ident }
   return $ foldl ap (mkVar Global global_ident) fv_lambda
 
-liftLazyAs :: Ident -> FvExpr -> LL ()
-liftLazyAs global_ident expr =
+llExprAs :: Ident -> FvExpr -> LL ()
+llExprAs global_ident expr =
   case expr of
     Lam { _annot, _patns, _body } -> do
-      _ <- liftLambdaAs global_ident _annot _patns _body
+      _ <- llLamAs global_ident _annot _patns _body
       return ()
     _ -> do
-      lifted_expr <- liftLazy False expr
+      lifted_expr <- llExpr expr
       tell [mkDefn global_ident lifted_expr]
 
-liftLazy :: Bool -> FvExpr -> LL FvExpr
-liftLazy lazy old_expr = do
+llExpr :: FvExpr -> LL FvExpr
+llExpr old_expr = do
   new_expr <-
     case old_expr of
       Lam { _annot, _patns, _body } -> do
         global_ident <- fresh Lambda
-        liftLambdaAs global_ident _annot _patns _body
+        llLamAs global_ident _annot _patns _body
       Let { _isrec, _defns = old_defns, _body = old_body }
         | _isrec && Set.null (fvRecDefns old_defns) -> do
           let (local_idents, _, old_rhss) = unzipDefns3 old_defns
           renaming <-
             forM local_idents $ \ident -> (,) ident <$> within ident (fresh Nice)
           forM_ (zip renaming old_rhss) $ \((local_ident, global_ident), old_rhs) ->
-            within local_ident $ liftLazyAs global_ident (rename renaming old_rhs)
+            within local_ident $ llExprAs global_ident (rename renaming old_rhs)
           let renamed_body = rename renaming old_body
-          liftLazy lazy renamed_body
+          llExpr renamed_body
         | otherwise -> do
           let (lift_defns, keep_defns) =
                 partition (\MkDefn{ _expr } -> Set.null (annot _expr)) old_defns
@@ -185,14 +185,14 @@ liftLazy lazy old_expr = do
             \MkDefn{ _patn = MkPatn{ _ident = local_ident }, _expr } ->
               within local_ident $ do
                 global_ident <- fresh Nice
-                liftLazyAs global_ident _expr
+                llExprAs global_ident _expr
                 return (local_ident, global_ident)
-          let renameAndLiftLazy expr = liftLazy False (rename renaming expr)
+          let renameAndLiftLazy expr = llExpr (rename renaming expr)
           new_defns <- forM keep_defns $
             \defn@MkDefn{ _patn = MkPatn{ _ident }, _expr = old_rhs } ->
               within _ident $ do
                 new_rhs <-
-                  if _isrec then renameAndLiftLazy old_rhs else liftLazy False old_rhs
+                  if _isrec then renameAndLiftLazy old_rhs else llExpr old_rhs
                 return (defn { _expr = new_rhs } :: FvDefn)
           new_body <- renameAndLiftLazy old_body
           return $ old_expr { _defns = new_defns, _body = new_body }
@@ -201,17 +201,17 @@ liftLazy lazy old_expr = do
       Num { }  -> return old_expr
       Pack { } -> return old_expr
       Ap { _fun, _arg } -> do
-        _fun <- liftLazy lazy _fun
-        _arg <- liftLazy lazy _arg
+        _fun <- llExpr _fun
+        _arg <- llExpr _arg
         return $ old_expr { _fun, _arg }
       ApOp { _arg1, _arg2 } -> do
-        _arg1 <- liftLazy lazy _arg1
-        _arg2 <- liftLazy lazy _arg2
+        _arg1 <- llExpr _arg1
+        _arg2 <- llExpr _arg2
         return $ old_expr { _arg1, _arg2 }
       If { _cond, _then, _else } -> do
-        _cond <- liftLazy lazy _cond
-        _then <- liftLazy lazy _then
-        _else <- liftLazy lazy _else
+        _cond <- llExpr _cond
+        _then <- llExpr _then
+        _else <- llExpr _else
         return $ old_expr { _cond, _then, _else }
       Rec {} -> undefined
       Sel {} -> undefined
