@@ -5,6 +5,7 @@ module CoreLang.Language.LambdaLifter
 
 import Control.Monad.Reader
 import Control.Monad.RWS
+import Data.List (partition)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
@@ -38,7 +39,7 @@ fvExpr globals expr =
   let rewrite = emptyRewrite { rewrite_expr, rewrite_patn }
       fv_expr = fmap (const undefined) expr
   in  runReader (runRewrite rewrite fv_expr) (Set.fromList globals)
-  where 
+  where
     localize idents = local (`Set.difference` Set.fromList idents)
     rewrite_expr descend old_expr = do
       post_expr <-
@@ -148,17 +149,16 @@ mkDefn :: Ident -> FvExpr -> FvDefn
 mkDefn _ident _expr = MkDefn { _patn = mkPatn _ident, _expr }
 
 
--- liftConst :: FvExpr -> LL FvExpr
--- liftConst expr = do
---   lifted_expr <- liftLazy False expr
---   global_ident <- fresh
---   tell [mkDefn global_ident lifted_expr]
---   return (mkVar Global global_ident)
-
-liftLambda :: Set Ident -> [FvPatn] -> FvExpr -> LL FvExpr
-liftLambda old_annot old_patns old_body = do
-  new_body <- liftLazy True old_body
+liftConst :: FvExpr -> LL FvExpr
+liftConst expr = do
+  lifted_expr <- liftLazy False expr
   global_ident <- fresh
+  tell [mkDefn global_ident lifted_expr]
+  return (mkVar Global global_ident)
+
+liftLambdaAs :: Ident -> Set Ident -> [FvPatn] -> FvExpr -> LL FvExpr
+liftLambdaAs global_ident old_annot old_patns old_body = do
+  new_body <- liftLazy True old_body
   let fv_lambda = Set.toList old_annot
       new_patns = map mkPatn fv_lambda ++ old_patns
       lifted_lambda = fvAdjust $
@@ -168,30 +168,52 @@ liftLambda old_annot old_patns old_body = do
         fvAdjust $ Ap { _annot = undefined, _fun, _arg = mkVar Local ident }
   return $ foldl ap (mkVar Global global_ident) fv_lambda
 
+liftLazyAs :: Ident -> FvExpr -> LL ()
+liftLazyAs global_ident expr =
+  case expr of
+    Lam { _annot, _patns, _body } -> do
+      _ <- liftLambdaAs global_ident _annot _patns _body
+      return ()
+    _ -> do
+      lifted_expr <- liftLazy False expr
+      tell [mkDefn global_ident lifted_expr]
+
 liftLazy :: Bool -> FvExpr -> LL FvExpr
 liftLazy lazy old_expr
---  | lazy && Set.null (annot old_expr) = liftConst old_expr
+  | False && lazy && Set.null (annot old_expr) = liftConst old_expr
   | otherwise = do
     new_expr <-
       case old_expr of
-        Lam { _annot, _patns, _body } -> liftLambda _annot _patns _body
+        Lam { _annot, _patns, _body } -> do
+          global_ident <- fresh
+          liftLambdaAs global_ident _annot _patns _body
         Let { _isrec, _defns = old_defns, _body = old_body }
-          | _isrec && Set.null (fvDefns old_defns) -> do
+          | _isrec && Set.null (fvRecDefns old_defns) -> do
             let (local_idents, _, old_rhss) = unzipDefns3 old_defns
-            renaming <- forM local_idents $ \ident -> (,) ident <$> fresh
-            forM_ (zip renaming old_rhss) $ \((local_ident, global_ident), old_rhs) -> do
-              let renamed_rhs = rename renaming old_rhs
-              lifted_rhs <- within local_ident (liftLazy False renamed_rhs)
-              tell [mkDefn global_ident lifted_rhs]
+            renaming <- forM local_idents $ \ident -> (,) ident <$> within ident fresh
+            forM_ (zip renaming old_rhss) $
+              \((local_ident, global_ident), old_rhs) ->
+                within local_ident $
+                  liftLazyAs global_ident (rename renaming old_rhs)
             let renamed_body = rename renaming old_body
             liftLazy lazy renamed_body
           | otherwise -> do
-            new_defns <-
-              forM old_defns $ \defn@MkDefn{ _patn, _expr = old_rhs } -> do
-                let MkPatn{ _ident } = _patn
-                new_rhs <- within _ident (liftLazy lazy old_rhs)
-                return (defn { _expr = new_rhs } :: FvDefn)
-            new_body <- liftLazy lazy old_body
+            let (lift_defns, keep_defns) =
+                  partition (\MkDefn{ _expr } -> Set.null (annot _expr)) old_defns
+            renaming <- forM lift_defns $
+              \MkDefn{ _patn = MkPatn{ _ident = local_ident }, _expr } ->
+                within local_ident $ do
+                  global_ident <- fresh
+                  liftLazyAs global_ident _expr
+                  return (local_ident, global_ident)
+            let renameAndLiftLazy expr = liftLazy False (rename renaming expr)
+            new_defns <- forM keep_defns $
+              \defn@MkDefn{ _patn = MkPatn{ _ident }, _expr = old_rhs } ->
+                within _ident $ do
+                  new_rhs <-
+                    if _isrec then renameAndLiftLazy old_rhs else liftLazy False old_rhs
+                  return (defn { _expr = new_rhs } :: FvDefn)
+            new_body <- renameAndLiftLazy old_body
             return $ old_expr { _defns = new_defns, _body = new_body }
         -- The remaining cases are boilerplate.
         Var { }  -> return old_expr
@@ -214,8 +236,8 @@ liftLazy lazy old_expr
         Sel {} -> undefined
     return $ fvAdjust new_expr
 
-fvDefns :: [FvDefn] -> Set Ident
-fvDefns defns = 
+fvRecDefns :: [FvDefn] -> Set Ident
+fvRecDefns defns =
   let (idents, _, rhss) = unzipDefns3 defns
       fv_rhss = Set.unions (map annot rhss)
   in  fv_rhss `Set.difference` Set.fromList idents
@@ -232,7 +254,7 @@ rename table expr =
           Var { _ident = old_ident } -> do
             new_ident_opt <- asks (Map.lookup old_ident)
             case new_ident_opt of
-              Nothing        -> return old_expr
+              Nothing        -> return $ old_expr
               Just new_ident -> return $ mkVar Global new_ident
           Lam { _patns, _body } -> do
             let (bound_idents, _) = unzipPatns _patns

@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 module CoreLang.Demo where
 
+import Control.Monad.Except
 import Data.Set (Set)
 import Text.Parsec (SourcePos)
 import System.Console.Haskeline
@@ -10,6 +11,7 @@ import CoreLang.Pretty
 
 import qualified CoreLang.Language.LambdaLifter   as Lifter
 import qualified CoreLang.Language.Parser         as Parser
+import qualified CoreLang.Language.Type           as Type
 import qualified CoreLang.Monomorphic.Checker     as Mono
 import qualified CoreLang.Polymorphic.TypeChecker as Poly
 import qualified CoreLang.Polymorphic.Builtins    as Builtins
@@ -45,8 +47,11 @@ onFile f file = readFile file >>= onLabeledInput f file
 
 lazyLifter :: Expr SourcePos -> Either String (Expr (Set Ident))
 lazyLifter expr = do
-  _ <- Poly.inferExpr expr
-  return (Lifter.lazyLifter (map fst Builtins.everything) expr)
+  t1 <- Poly.inferExpr expr
+  let lifted_expr = Lifter.lazyLifter (map fst Builtins.everything) expr
+  _ <- (Poly.inferExpr lifted_expr >>= Type.unify mempty t1)
+        `catchError` \msg -> throwError (prettyShow lifted_expr ++ '\n':msg)
+  return lifted_expr
 
 data Command where
   Command :: Pretty t => String -> (Expr SourcePos -> Either String t) -> Command
