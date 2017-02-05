@@ -97,10 +97,20 @@ patn needParens =
     MkPatn <$> getPosition <*> ident <*> optionMaybe asType
   <?> "declaration"
 
+defnVal :: Parser (Defn SourcePos)
+defnVal = MkDefn <$> patn False <*> (equals *> expr)
+
+defnFun :: Parser (Defn SourcePos)
+defnFun =
+  MkDefn <$> (MkPatn <$> getPosition
+                     <*> ident
+                     <*> pure Nothing)
+         <*> (Lam <$> getPosition
+                  <*> many1 (patn True)
+                  <*> (equals *> expr))
+
 defn :: Parser (Defn SourcePos)
-defn =
-  MkDefn <$> patn False <*> (equals *> expr)
-  <?> "definition"
+defn = try defnVal <|> defnFun <?> "definition"
 
 expr, aexpr1, aexpr :: Parser (Expr SourcePos)
 expr =

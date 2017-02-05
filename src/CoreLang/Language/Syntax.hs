@@ -97,7 +97,11 @@ instance Pretty (Expr a) where
 
 instance Pretty (Defn a) where
   pPrintPrec lvl _ MkDefn{ _patn, _expr } =
-    hang (pPrintPrec lvl 0 _patn <+> equals) 2 (pPrintPrec lvl 0 _expr)
+    case _expr of
+      Lam { _patns, _body } ->
+        let lhs = pPrintPrec lvl 0 _patn <+> hsep (map (pPrintPrec lvl 1) _patns)
+        in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
+      _ -> hang (pPrintPrec lvl 0 _patn <+> equals) 2 (pPrintPrec lvl 0 _expr)
 
 instance Pretty (Patn a) where
   pPrintPrec _ prec MkPatn{ _ident, _type } =
