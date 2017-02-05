@@ -116,7 +116,7 @@ infer expr =
       (phi, t_exprs) <- inferMany exprs
       t_patns <- mapM (\(MkPatn { _type }) -> instantiateAnnot _type) patns
       psi <- unifyMany phi (zip t_patns t_exprs)
-      let t_rec = Type.record $ 
+      let t_rec = Type.record $
             zipWith (\(MkPatn { _ident }) t_patn -> (_ident, subst psi t_patn)) patns t_patns
       return (psi, t_rec)
     Sel  { } -> pthrow (text "type checking of record selectors not implemented")
@@ -171,7 +171,7 @@ introduceGeneralized patns types sub = do
 
 
 instance TermCollection Type Scheme where
-  freeVars' (MkScheme { _boundVars, _type }) = 
+  freeVars' (MkScheme { _boundVars, _type }) =
     Set.difference (freeVars _type) _boundVars
   subst' phi (scheme@MkScheme { _boundVars, _type }) =
     scheme { _type = subst (phi `exclude` _boundVars) _type }

@@ -1,4 +1,4 @@
-module CoreLang.Language.Parser 
+module CoreLang.Language.Parser
   ( parseExpr
   , parseType
   )
@@ -17,13 +17,13 @@ import CoreLang.Language.Type (Type, var, (~>), app, record)
 import qualified CoreLang.Language.Operator as Operator
 
 parseExpr :: MonadError String m => String -> String -> m (Expr SourcePos)
-parseExpr file code = 
+parseExpr file code =
   case parse (expr <* eof) file code of
     Left error  -> throwError (show error)
     Right expr -> return expr
 
 parseType :: MonadError String m => String -> m Type
-parseType code = 
+parseType code =
   case parse (type_ <* eof) "<input>" code of
     Left error -> throwError (show error)
     Right expr -> return expr
@@ -83,7 +83,7 @@ atype = choice
   , record <$> braces (commaSep ((,) <$> ident <*> asType))
   , parens type_
   ]
-  
+
 asType :: Parser Type
 asType = reservedOp ":" *> type_
 
@@ -91,14 +91,14 @@ patn :: Bool -> Parser (Patn SourcePos)
 patn needParens =
   if needParens then
     MkPatn <$> getPosition <*> ident <*> pure Nothing
-    <|> 
+    <|>
     parens (MkPatn <$> getPosition <*> ident <*> (Just <$> asType))
   else
     MkPatn <$> getPosition <*> ident <*> optionMaybe asType
   <?> "declaration"
 
 defn :: Parser (Defn SourcePos)
-defn = 
+defn =
   MkDefn <$> patn False <*> (equals *> expr)
   <?> "definition"
 
@@ -109,11 +109,11 @@ expr =
           <*> (reserved "let" *> pure False <|> reserved "letrec" *> pure True )
           <*> sepBy1 defn (reserved "and")
           <*> (reserved "in" *> expr)
-    , Lam <$> getPosition 
+    , Lam <$> getPosition
           <*> (reserved "fun" *> many1 (patn True))
           <*> (arrow *> expr)
-    , If  <$> getPosition 
-          <*> (reserved "if"   *> expr) 
+    , If  <$> getPosition
+          <*> (reserved "if"   *> expr)
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
     , let partialAp = do

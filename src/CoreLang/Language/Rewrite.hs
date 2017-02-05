@@ -18,7 +18,7 @@ bottomUp :: (Expr a -> Expr a)
          -> (Patn a -> Patn a)
          -> (Expr a -> Expr a)
 bottomUp post_expr post_defn post_patn =
-  runIdentity . 
+  runIdentity .
     bottomUpM (Identity . post_expr) (Identity . post_defn) (Identity . post_patn)
 
 bottomUpM :: Monad m => (Expr a -> m (Expr a))
@@ -37,7 +37,7 @@ topDown :: (Expr a -> Expr a)
         -> (Patn a -> Patn a)
         -> (Expr a -> Expr a)
 topDown pre_expr pre_defn pre_patn =
-  runIdentity . 
+  runIdentity .
     bottomUpM (Identity . pre_expr) (Identity . pre_defn) (Identity . pre_patn)
 
 topDownM :: Monad m => (Expr a -> m (Expr a))

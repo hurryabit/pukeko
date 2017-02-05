@@ -56,7 +56,7 @@ instance Term Type where
       Rec fs    -> Rec $ map (second $ subst phi) fs
 
 var :: String -> Type
-var name@(start:_) 
+var name@(start:_)
   | isUpper start = Var (MkVar name)
 var name          = perror $ text name <+> text "is not a valid variable name"
 
@@ -112,12 +112,12 @@ unify phi t1 t2 =
       | c1 == c2               -> unifyMany phi (zip ts1 ts2)
     (Rec ds1    , Rec ds2    ) -> do
       let checkLabels [] [] acc = return acc
-          checkLabels ((i1, _):_) [] _ = 
+          checkLabels ((i1, _):_) [] _ =
             pthrow $ hsep [text "field", pretty i1, text "not present in record", pretty t2]
           checkLabels [] ((i2, _):_) _ =
             pthrow $ hsep [text "field", pretty i2, text "not present in record", pretty t1]
           checkLabels ((i1, t_i1):ds1') ((i2, t_i2):ds2') acc
-            | i1 == i2  = checkLabels ds1' ds2' ((t_i1, t_i2):acc) 
+            | i1 == i2  = checkLabels ds1' ds2' ((t_i1, t_i2):acc)
             | otherwise =
                 pthrow $ hsep [text "record fields", pretty i1, text "and", pretty i2, text "do not match"]
       eqs <- checkLabels ds1 ds2 []
@@ -140,7 +140,7 @@ instance Pretty Type where
   pPrintPrec lvl prec t =
     case t of
       Var v    -> pretty v
-      Fun s t  -> 
+      Fun s t  ->
         maybeParens (prec > 1) $ pPrintPrec lvl 2 s <+> text "->" <+> pPrintPrec lvl 1 t
       App c [] -> pretty c
       App c ts ->

@@ -46,7 +46,7 @@ unzipDefns :: [Defn a] -> ([Patn a], [Expr a])
 unzipDefns = unzip . map (\MkDefn{ _patn, _expr} -> (_patn, _expr))
 
 unzipDefns3 :: [Defn a] -> ([Ident], [Maybe Type], [Expr a])
-unzipDefns3 = unzip3 . 
+unzipDefns3 = unzip3 .
   map (\MkDefn{ _patn = MkPatn{ _ident, _type }, _expr } -> (_ident, _type, _expr))
 
 class Annot f where
@@ -59,10 +59,10 @@ instance Pretty (Expr a) where
       Var  { _ident } -> pretty _ident
       Num  { _int   } -> int _int
       Pack { _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
-      Ap   { _fun, _arg   } -> 
+      Ap   { _fun, _arg   } ->
         maybeParens (prec > aprec) $
           pPrintPrec lvl aprec _fun <+> pPrintPrec lvl (aprec+1) _arg
-      ApOp   { _op, _arg1, _arg2 } -> 
+      ApOp   { _op, _arg1, _arg2 } ->
         let MkIdent name = _op
             MkSpec { _prec, _assoc } = Operator.find name
             (prec1, prec2) =

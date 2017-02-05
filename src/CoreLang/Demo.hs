@@ -59,7 +59,7 @@ commands =
   , Command "lambdalift" lazyLifter
   ]
 
-debug :: (Show t, Pretty t) => (Expr SourcePos -> Either String t) 
+debug :: (Show t, Pretty t) => (Expr SourcePos -> Either String t)
                             -> (Expr SourcePos -> Either String (Debug t))
 debug action expr = do
   res <- action expr
@@ -73,7 +73,7 @@ debug action expr = do
         , post
         ]
   return (Debug doc)
-  
+
 
 newtype Debug t = Debug Doc
 
