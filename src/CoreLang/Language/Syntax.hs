@@ -5,6 +5,7 @@ module CoreLang.Language.Syntax
   , Defn (..)
   , unzipPatns
   , unzipDefns
+  , unzipDefns3
   , Annot (..)
   , module CoreLang.Language.Ident
   )
@@ -44,6 +45,9 @@ unzipPatns = unzip . map (\MkPatn{ _ident, _type} -> (_ident, _type))
 unzipDefns :: [Defn a] -> ([Patn a], [Expr a])
 unzipDefns = unzip . map (\MkDefn{ _patn, _expr} -> (_patn, _expr))
 
+unzipDefns3 :: [Defn a] -> ([Ident], [Maybe Type], [Expr a])
+unzipDefns3 = unzip3 . 
+  map (\MkDefn{ _patn = MkPatn{ _ident, _type }, _expr } -> (_ident, _type, _expr))
 
 class Annot f where
   annot :: f a -> a

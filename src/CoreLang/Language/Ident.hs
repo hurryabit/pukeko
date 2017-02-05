@@ -6,7 +6,10 @@ module CoreLang.Language.Ident
 import CoreLang.Pretty
 
 newtype Ident = MkIdent { unIdent :: String }
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance Show Ident where
+  show (MkIdent s) = "Ident " ++ show s
 
 instance Pretty Ident where
   pPrint (MkIdent x) = text x

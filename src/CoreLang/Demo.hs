@@ -1,18 +1,18 @@
 {-# LANGUAGE GADTs #-}
 module CoreLang.Demo where
 
+import Data.Set (Set)
 import Text.Parsec (SourcePos)
 import System.Console.Haskeline
 
-import CoreLang.Language.Syntax (Expr)
+import CoreLang.Language.Syntax
 import CoreLang.Pretty
 
 import qualified CoreLang.Language.LambdaLifter   as Lifter
 import qualified CoreLang.Language.Parser         as Parser
 import qualified CoreLang.Monomorphic.Checker     as Mono
--- import qualified CoreLang.Monomorphic.Inferrer    as Mono.Inferrer
 import qualified CoreLang.Polymorphic.TypeChecker as Poly
-
+import qualified CoreLang.Polymorphic.Builtins    as Builtins
 
 repl :: Pretty t => (Expr SourcePos -> Either String t) -> IO ()
 repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
@@ -40,13 +40,13 @@ onLabeledInput f file code =
 onInput :: Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
 onInput f = onLabeledInput f "<input>"
 
-file ::  Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
-file f file = readFile file >>= onLabeledInput f file
+onFile ::  Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
+onFile f file = readFile file >>= onLabeledInput f file
 
-lambdaLifter :: Expr SourcePos -> Either String (Expr ())
-lambdaLifter expr = do
+lazyLifter :: Expr SourcePos -> Either String (Expr (Set Ident))
+lazyLifter expr = do
   _ <- Poly.inferExpr expr
-  return (Lifter.lifter expr)
+  return (Lifter.lazyLifter (map fst Builtins.everything) expr)
 
 data Command where
   Command :: Pretty t => String -> (Expr SourcePos -> Either String t) -> Command
@@ -56,5 +56,26 @@ commands =
   [ Command "parse"      pure
   , Command "mono.check" Mono.checkExpr
   , Command "poly.infer" Poly.inferExpr
-  , Command "lambdalift" (return . Lifter.lifter)
+  , Command "lambdalift" lazyLifter
   ]
+
+debug :: (Show t, Pretty t) => (Expr SourcePos -> Either String t) 
+                            -> (Expr SourcePos -> Either String (Debug t))
+debug action expr = do
+  res <- action expr
+  let pre  = text $ show $ fmap (const ()) expr
+      post = text $ show $ res
+      doc = vcat
+        [ pre
+        , text (replicate 60 '-')
+        , pretty res
+        , text (replicate 60 '-')
+        , post
+        ]
+  return (Debug doc)
+  
+
+newtype Debug t = Debug Doc
+
+instance Pretty (Debug t) where
+  pPrint (Debug doc) = doc
