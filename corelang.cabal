@@ -22,6 +22,7 @@ library
                      , CoreLang.Language.LambdaLifter
                      , CoreLang.Language.Operator
                      , CoreLang.Language.Parser
+                     , CoreLang.Language.Rewrite
                      , CoreLang.Language.Syntax
                      , CoreLang.Language.Term
                      , CoreLang.Language.Transform
