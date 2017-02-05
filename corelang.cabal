@@ -25,7 +25,6 @@ library
                      , CoreLang.Language.Rewrite
                      , CoreLang.Language.Syntax
                      , CoreLang.Language.Term
-                     , CoreLang.Language.Transform
                      , CoreLang.Language.Type
                      , CoreLang.Monomorphic.Builtins
                      , CoreLang.Monomorphic.Checker
@@ -54,7 +53,7 @@ library
                      , NamedFieldPuns
                      , PartialTypeSignatures
                      , TypeFamilies
-                     
+
   ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Wno-partial-type-signatures -Werror
 
 executable corelang
