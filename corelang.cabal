@@ -17,7 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Supply
                      , CoreLang.Demo
-                     , CoreLang.Pretty
+                     , CoreLang.GMachine.Machine
                      , CoreLang.Language.Ident
                      , CoreLang.Language.LambdaLifter
                      , CoreLang.Language.Operator
@@ -31,6 +31,7 @@ library
                      , CoreLang.Monomorphic.Subtyping
                      , CoreLang.Polymorphic.Builtins
                      , CoreLang.Polymorphic.TypeChecker
+                     , CoreLang.Pretty
 --                     , CoreLang.TempInst.Builtins
 --                     , CoreLang.TempInst.GC
 --                     , CoreLang.TempInst.Instantiate
@@ -41,6 +42,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers
+                     , fclabels
                      , haskeline
                      , mtl
                      , parsec

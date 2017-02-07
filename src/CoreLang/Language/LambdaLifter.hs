@@ -162,6 +162,7 @@ llExprAs global_ident expr =
       lifted_expr <- llExpr expr
       tell [mkDefn global_ident lifted_expr]
 
+-- TODO: Change to rewrite style.
 llExpr :: FvExpr -> LL FvExpr
 llExpr old_expr = do
   new_expr <-

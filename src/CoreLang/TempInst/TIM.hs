@@ -67,7 +67,7 @@ mkBool bool =
   case bool of
     False -> Data 0 []
     True  -> Data 1 []
-  
+
 getBool :: Node -> TIM Bool
 getBool node =
   case node of
