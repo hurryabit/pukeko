@@ -57,16 +57,11 @@ type Reg = Lens (->) GState Addr
 type Mem a = Lens (->) GState (IOArray Addr a)
 
 newtype GM a = GM { unGM :: ExceptT String (StateT GState IO) a }
-  deriving ( Functor, Applicative
+  deriving ( Functor, Applicative, Monad
            , MonadIO
            , MonadError String
            , MonadState GState
            )
-
-instance Monad GM where
-  return  = GM . return
-  m >>= f = GM $ unGM m >>= unGM . f
-  fail    = GM . throwError
 
 execute :: String -> Int -> Int -> IO ()
 execute file stack_size heap_size = do
