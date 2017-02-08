@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Supply
                      , CoreLang.Demo
+                     , CoreLang.GMachine.GCode
                      , CoreLang.GMachine.Machine
                      , CoreLang.Language.Ident
                      , CoreLang.Language.LambdaLifter

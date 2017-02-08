@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, DeriveTraversable, TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 module CoreLang.TempInst.Machine
   where
 
@@ -6,58 +6,17 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State (StateT, runStateT, MonadState)
 import Data.Array.IO
-import Data.Char (isSpace)
 import Data.Label.Derive
 import Data.Label.Monadic
 import Data.Label.Mono (Lens)
-import Data.Map (Map)
 import Data.Maybe (catMaybes)
 
 import qualified Data.Map as Map
 
-data GInst lab
-  = EVAL
-  | UNWIND
-  | RETURN
-  | EXIT
-  | JUMP        lab
-  | JUMPNIL     lab
-  | LABEL       lab
-  | PUSH        Int
-  | PUSHINT     Int
-  | PUSHGLOBAL  lab
-  | GLOBSTART   lab Int
-  | POP         Int
-  | SLIDE       Int
-  | UPDATE      Int
-  | ALLOC       Int
-  | MKAP
-  | CONS0       Int
-  | CONS1       Int
-  | CONS2       Int
-  | HEAD
-  | TAIL
-  | NEG
-  | ADD
-  | SUB
-  | MUL
-  | DIV
-  | MOD
-  | LES
-  | LEQ
-  | EQU
-  | NEQ
-  | GEQ
-  | GTR
-  | PRINT
-  deriving (Eq, Read, Show, Foldable, Functor, Traversable)
+import CoreLang.GMachine.GCode
+
 
 type Inst = GInst Addr
-
-newtype Name = Name String
-  deriving (Eq, Ord)
-
-type GCode = [GInst Name]
 
 type Addr = Int
 
@@ -136,16 +95,13 @@ execute file stack_size heap_size = do
 
 compile :: MonadError String m => GCode -> m [Inst]
 compile code = do
-  let target_entry :: Addr -> GInst Name -> Maybe (Name, Addr)
-      target_entry addr inst =
+  let target_entry addr inst =
         case inst of
           LABEL     lab   -> Just (lab, addr)
           GLOBSTART lab _ -> Just (lab, addr)
           _               -> Nothing
-      target_table :: Map Name Addr
       target_table =
         Map.fromList $ catMaybes $ zipWith target_entry [0 ..] code
-      lookup_target :: MonadError String m => Name -> m Addr
       lookup_target lab =
         case Map.lookup lab target_table of
           Just addr -> return addr
@@ -333,12 +289,3 @@ restore = do
   bptr =: dump_bptr
   cptr =: dump_cptr
   dump =. tail
-
-instance Show Name where
-  show (Name name) = name
-
-instance Read Name where
-  readsPrec _ input =
-    case break isSpace (dropWhile isSpace input) of
-      ("", _)      -> []
-      (name, rest) -> [(Name name, rest)]
