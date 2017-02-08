@@ -43,6 +43,12 @@ data GInst lab
   | MUL
   | DIV
   | MOD
+  | LES
+  | LEQ
+  | EQU
+  | NEQ
+  | GEQ
+  | GTR
   | PRINT
   deriving (Eq, Read, Show, Foldable, Functor, Traversable)
 
@@ -211,11 +217,17 @@ step inst = do
       addr <- stck !# sptr                        -- get top
       Cell Int num_ dat_ <- heap !@ addr          -- deref top
       (heap, addr) =@ Cell Int (negate num_) dat_ -- update deref top with negation
-    ADD -> arith (+)
-    SUB -> arith (-)
-    MUL -> arith (*)
-    DIV -> arith div
-    MOD -> arith mod
+    ADD -> binop (+)
+    SUB -> binop (-)
+    MUL -> binop (*)
+    DIV -> binop div
+    MOD -> binop mod
+    LES -> relop (<)
+    LEQ -> relop (<=)
+    EQU -> relop (==)
+    NEQ -> relop (/=)
+    GEQ -> relop (>=)
+    GTR -> relop (>)
     PRINT -> do
       Cell Int num_ _ <- stck !# sptr >>= (heap !@) -- get top
       liftIO (print num_)
@@ -255,14 +267,22 @@ unwind = do
         restore                 -- restore bptr and cptr from dump
     Nix   -> throwError "UNWIND NIX"
 
-arith :: (Int -> Int -> Int) -> GM ()
-arith op = do
+binop :: (Int -> Int -> Int) -> GM ()
+binop op = do
   Cell Int num1 _    <- stck !# sptr >>= (heap !@) -- deref top
   sptr =. pred                                     -- pop
   addr <- stck !# sptr                             -- get top-1
-  Cell Int num2 dat2 <- heap !@ addr               -- deref top-1
-  (heap, addr) =@ Cell Int (num1 `op` num2) dat2   -- update deref top-1 with result
+  Cell Int num2 _ <- heap !@ addr                  -- deref top-1
+  (heap, addr) =@ Cell Int (num1 `op` num2) hell   -- update deref top-1 with result
 
+relop :: (Int -> Int -> Bool) -> GM ()
+relop op = do
+  Cell Int num1 _    <- stck !# sptr >>= (heap !@) -- deref top
+  sptr =. pred                                     -- pop
+  addr <- stck !# sptr                             -- get top-1
+  Cell Int num2 _ <- heap !@ addr                  -- deref top-1
+  let tag = fromEnum (num1 `op` num2)              -- determine tag
+  (heap, addr) =@ Cell (Con tag) hell hell         -- update deref top-1 with result
 
 infix  3 !@, !#, =@, =#
 infixl 9 >>>
