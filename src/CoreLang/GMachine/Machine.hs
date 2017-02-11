@@ -84,7 +84,7 @@ execute (GProg code) stck_size heap_size = do
           _bptr = frst_stck
           _dump = []
       _heap <- newArray (frst_heap, last_heap) (Cell Nix hell hell)
-      let _hptr = frst_heap - 1
+      let _hptr = frst_heap
       _code <- newListArray (frst_code, last_code) code
       let _cptr = 1
           _tick = 0
@@ -120,10 +120,10 @@ cafs = do
     inst <- code !@ cadr
     case inst of
       GLOBSTART (name, _) 0 -> do
-        hptr =. succ
         hadr <- gets hptr
         (heap, hadr) =@ Cell Fun 0 cadr
         (code, cadr) =@ GLOBSTART (name, hadr) 0
+        hptr =. succ
       _ -> return ()
 
 exec :: GM ()
@@ -297,9 +297,9 @@ mem !# reg = gets reg >>= (mem !@)
 alloc :: HeapCell -> GM ()
 alloc cell = do
   -- TODO: Check heap limit
-  hptr =. succ
   (heap, hptr) =# cell
   gets hptr >>= push
+  hptr =. succ
 
 push :: Addr -> GM ()
 push addr = do
@@ -383,7 +383,7 @@ prettyHeap :: GState Array -> Doc
 prettyHeap gstate@GState{ _heap, _hptr } =
   let prettyHeapCell addr cell =
         paddr addr <> colon <+> pretty cell <+> braces (prettyExpr gstate addr)
-  in  vcat $ map (uncurry prettyHeapCell) $ takeWhile ((_hptr >=) . fst) $ assocs _heap
+  in  vcat $ map (uncurry prettyHeapCell) $ takeWhile ((_hptr >) . fst) $ assocs _heap
 
 prettyDump :: GState Array -> Doc
 prettyDump GState{ _dump } =
