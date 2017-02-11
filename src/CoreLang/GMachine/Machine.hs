@@ -69,23 +69,30 @@ instance MonadFail GM where
   fail = throwError
 
 execute :: GProg -> Int -> Int -> IO ()
-execute (GProg code) stack_size heap_size = do
+execute (GProg code) stck_size heap_size = do
   case compile code of
     Left error -> putStrLn error
     Right code -> do
-      let last_code  = length code
-          last_stack = last_code + stack_size
-          last_heap  = last_stack + heap_size
-      _stck <- newArray (last_code+1, last_stack) hell
-      let _sptr = last_code
-          _bptr = last_code+1
+      let frst_code = 1
+          last_code = frst_code - 1 + length code
+          frst_heap = last_code + 1
+          last_heap = frst_heap - 1 + heap_size
+          frst_stck = last_heap + 1
+          last_stck = frst_stck - 1 + stck_size
+      _stck <- newArray (frst_stck, last_stck) hell
+      let _sptr = frst_stck - 1
+          _bptr = frst_stck
           _dump = []
-      _heap <- newArray (last_stack+1, last_heap) (Cell Nix hell hell)
-      let _hptr = last_stack
-      _code <- newListArray (1, last_code) code
+      _heap <- newArray (frst_heap, last_heap) (Cell Nix hell hell)
+      let _hptr = frst_heap - 1
+      _code <- newListArray (frst_code, last_code) code
       let _cptr = 1
           _tick = 0
-          gstate = GState { _stck, _sptr, _bptr, _dump, _heap, _hptr, _code, _cptr, _tick }
+          gstate = GState { _stck, _sptr, _bptr, _dump
+                          , _heap, _hptr
+                          , _code, _cptr
+                          , _tick
+                          }
       (res, _) <- runStateT (runExceptT (unGM exec)) gstate
       case res of
         Left error -> putStrLn $ "ERROR: " ++ error
