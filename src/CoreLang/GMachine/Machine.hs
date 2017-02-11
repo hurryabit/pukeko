@@ -93,7 +93,7 @@ execute (GProg code) stck_size heap_size = do
                           , _code, _cptr
                           , _tick
                           }
-      (res, _) <- runStateT (runExceptT (unGM exec)) gstate
+      (res, _) <- runStateT (runExceptT (unGM $ cafs >> exec)) gstate
       case res of
         Left error -> putStrLn $ "ERROR: " ++ error
         Right _ -> putStrLn "SUCCESS!"
@@ -106,13 +106,25 @@ compile code = do
           LABEL     lab   -> Just (lab, addr)
           GLOBSTART lab _ -> Just (lab, addr)
           _               -> Nothing
-      target_table =
-        Map.fromList $ catMaybes $ zipWith target_entry [1 ..] code
+      target_table = Map.fromList $ catMaybes $ zipWith target_entry [1 ..] code
       lookup_target lab =
         case Map.lookup lab target_table of
           Just addr -> return (lab, addr)
           Nothing   -> throwError $ "UNKNOWN LABEL: " ++ show lab
   mapM (traverse lookup_target) code
+
+cafs :: GM ()
+cafs = do
+  bnds <- gets code >>= liftIO . getBounds
+  forM_ (range bnds) $ \cadr -> do
+    inst <- code !@ cadr
+    case inst of
+      GLOBSTART (name, _) 0 -> do
+        hptr =. succ
+        hadr <- gets hptr
+        (heap, hadr) =@ Cell Fun 0 cadr
+        (code, cadr) =@ GLOBSTART (name, hadr) 0
+      _ -> return ()
 
 exec :: GM ()
 exec = do
@@ -137,16 +149,19 @@ step inst = do
     JUMP (_, addr) -> cptr =: addr -- jump to offset addr
     JUMPZERO (_, addr) -> do
       Cell (Con t) _ _ <- stck !# sptr >>= (heap !@) -- deref top
-      sptr =. pred                             -- pop
-      when (t == 0) $ cptr =: addr         -- jump to addr
+      sptr =. pred                                   -- pop
+      when (t == 0) $ cptr =: addr                   -- jump to addr
     LABEL _ -> return ()
     PUSH k ->
       gets sptr >>= subtract k >>> (stck !@) -- get top-k
-      >>= push                              -- push
+      >>= push                               -- push
     PUSHINT n -> alloc (Cell Int n hell)
-    PUSHGLOBAL (_, addr) -> do
-      GLOBSTART _ narg <- code !@ addr -- determine fun arity
-      alloc (Cell Fun narg addr)
+    PUSHGLOBAL (_, cadr) -> do
+      GLOBSTART (_, hadr) narg <- code !@ cadr -- determine fun arity
+      if narg == 0 then                        -- check if handling CAF
+        push hadr                              -- if CAF, push addr of its heap cell
+      else
+        alloc (Cell Fun narg cadr)             -- alloc new fun cell
     GLOBSTART _ narg -> do
       forM_ [1 .. narg] $ \i -> do           -- replace app nodes by args
         Cell App _ addr <-                   -- addr of i-th arg
