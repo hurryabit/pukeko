@@ -196,7 +196,10 @@ llExpr old_expr = do
                   if _isrec then renameAndLiftLazy old_rhs else llExpr old_rhs
                 return (defn { _expr = new_rhs } :: FvDefn)
           new_body <- renameAndLiftLazy old_body
-          return $ old_expr { _defns = new_defns, _body = new_body }
+          let new_expr
+                | null new_defns = new_body
+                | otherwise      = old_expr { _defns = new_defns, _body = new_body }
+          return new_expr
       -- The remaining cases are boilerplate.
       Var { }  -> return old_expr
       Num { }  -> return old_expr

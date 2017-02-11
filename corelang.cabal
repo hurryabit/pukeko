@@ -17,6 +17,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Supply
                      , CoreLang.Demo
+                     , CoreLang.GMachine.Builtins
+                     , CoreLang.GMachine.Compiler
                      , CoreLang.GMachine.GCode
                      , CoreLang.GMachine.Machine
                      , CoreLang.Language.Ident
@@ -53,11 +55,12 @@ library
                      , FlexibleContexts
                      , FlexibleInstances
                      , GeneralizedNewtypeDeriving
+                     , MonadFailDesugaring
                      , NamedFieldPuns
                      , PartialTypeSignatures
                      , TypeFamilies
 
-  ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Wno-partial-type-signatures -Werror
+  ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Wno-partial-type-signatures
 
 executable corelang
   hs-source-dirs:      app
@@ -65,6 +68,7 @@ executable corelang
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , corelang
+                     , filepath
                      , mtl
                      , optparse-applicative
   default-language:    Haskell2010

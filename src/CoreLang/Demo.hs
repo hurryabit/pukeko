@@ -2,13 +2,15 @@
 module CoreLang.Demo where
 
 import Control.Monad.Except
-import Data.Set (Set)
+-- import Data.Set (Set)
 import Text.Parsec (SourcePos)
 import System.Console.Haskeline
 
+import CoreLang.GMachine.Compiler (GProg)
 import CoreLang.Language.Syntax
 import CoreLang.Pretty
 
+import qualified CoreLang.GMachine.Compiler       as Compiler
 import qualified CoreLang.Language.LambdaLifter   as Lifter
 import qualified CoreLang.Language.Parser         as Parser
 import qualified CoreLang.Language.Type           as Type
@@ -45,13 +47,14 @@ onInput f = onLabeledInput f "<input>"
 onFile ::  Pretty t => (Expr SourcePos -> Either String t) -> String -> IO ()
 onFile f file = readFile file >>= onLabeledInput f file
 
-liftExpr :: Expr SourcePos -> Either String (Expr (Set Ident))
+liftExpr :: Expr SourcePos -> Either String GProg
 liftExpr expr = do
   t1 <- Poly.inferExpr expr
   let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
   _ <- (Poly.inferExpr lifted_expr >>= Type.unify mempty t1)
         `catchError` \msg -> throwError (prettyShow lifted_expr ++ '\n':msg)
-  return lifted_expr
+  prog <- Compiler.compile (fmap (const ()) lifted_expr)
+  return prog
 
 data Command where
   Command :: Pretty t => String -> (Expr SourcePos -> Either String t) -> Command

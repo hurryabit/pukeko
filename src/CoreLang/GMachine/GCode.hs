@@ -3,6 +3,9 @@ module CoreLang.GMachine.GCode where
 
 import Data.Char (isSpace)
 
+import CoreLang.Pretty
+
+newtype GProg = GProg GCode
 
 type GCode = [GInst Name]
 
@@ -12,7 +15,7 @@ data GInst lab
   | RETURN
   | EXIT
   | JUMP        lab
-  | JUMPNIL     lab
+  | JUMPZERO    lab
   | LABEL       lab
   | PUSH        Int
   | PUSHINT     Int
@@ -36,11 +39,12 @@ data GInst lab
   | MOD
   | LES
   | LEQ
-  | EQU
+  | EQV
   | NEQ
   | GEQ
   | GTR
   | PRINT
+  | ABORT
   deriving (Eq, Read, Show, Foldable, Functor, Traversable)
 
 newtype Name = Name String
@@ -54,3 +58,6 @@ instance Read Name where
     case break isSpace (dropWhile isSpace input) of
       ("", _)      -> []
       (name, rest) -> [(Name name, rest)]
+
+instance Pretty GProg where
+  pPrint (GProg insts) = vcat $ map (text . show) insts

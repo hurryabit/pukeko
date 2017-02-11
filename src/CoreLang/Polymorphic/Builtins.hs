@@ -8,18 +8,17 @@ module CoreLang.Polymorphic.Builtins
 import CoreLang.Language.Syntax (Ident (..))
 import CoreLang.Language.Type
 
-alpha, beta, gamma :: Type
+alpha, beta :: Type
 alpha = var "A"
 beta  = var "B"
-gamma = var "C"
 
 constructors, primitives :: [(String, Type)]
 constructors =
   [ ("false"  , bool)
   , ("true"   , bool)
-  , ("mk_pair", alpha ~> beta ~> pair alpha beta)
   , ("nil"    , list alpha)
   , ("cons"   , alpha ~> list alpha ~> list alpha)
+  , ("mk_pair", alpha ~> beta ~> pair alpha beta)
   ]
 primitives =
   [ ("neg", int  ~> int         )
@@ -33,14 +32,17 @@ primitives =
   , ("!=" , int  ~> int  ~> bool)
   , (">=" , int  ~> int  ~> bool)
   , (">"  , int  ~> int  ~> bool)
-  , ("not", bool ~> bool        )
+  , ("not", bool ~> bool)
   , ("&&" , bool ~> bool ~> bool)
   , ("||" , bool ~> bool ~> bool)
-  , ("if"       , bool ~> alpha ~> alpha ~> alpha)
-  , ("case_pair", pair alpha beta ~> (alpha ~> beta ~> gamma) ~> gamma)
-  , ("case_list", list alpha ~> beta ~> (alpha ~> list alpha ~> beta) ~> beta)
-  , ("print"    , int ~> alpha ~> alpha)
-  , ("abort"    , alpha)
+  , ("if" , bool ~> alpha ~> alpha ~> alpha)
+  , ("is_nil", list alpha ~> bool )
+  , ("hd"    , list alpha ~> alpha)
+  , ("tl"    , list alpha ~> list alpha)
+  , ("fst"   , pair alpha beta ~> alpha)
+  , ("snd"   , pair alpha beta ~> beta )
+  , ("print" , int ~> alpha ~> alpha)
+  , ("abort" , alpha)
   ]
 
 everything :: [(Ident, Type)]

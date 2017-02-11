@@ -6,6 +6,7 @@ module CoreLang.Polymorphic.TypeChecker
 
 import Control.Monad
 import Control.Monad.Except
+import Control.Monad.Fail
 import Control.Monad.Reader
 import Control.Monad.Supply
 import Data.Map (Map)
@@ -45,6 +46,9 @@ newtype TI a =
            , MonadReader Environment
            , MonadSupply (Var Type)
            )
+
+instance MonadFail TI where
+  fail = throwError
 
 runTI :: MonadError String m => Environment -> TI a -> m a
 runTI env ti =
