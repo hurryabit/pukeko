@@ -19,14 +19,14 @@ enum Inst {
   JUMP,       /* label */
   JUMPZERO,   /* label */
   LABEL,      /* label */
-  PUSH,       /* int */
-  PUSHINT,    /* int */
+  PUSH,       /* long */
+  PUSHINT,    /* long */
   PUSHGLOBAL, /* label */
-  GLOBSTART,  /* label int */
-  POP,        /* int */
-  SLIDE,      /* int */
-  UPDATE,     /* int */
-  ALLOC,      /* int */
+  GLOBSTART,  /* label long */
+  POP,        /* long */
+  SLIDE,      /* long */
+  UPDATE,     /* long */
+  ALLOC,      /* long */
   MKAP,
   CONS0,      /* tag */
   CONS1,      /* tag */
@@ -94,7 +94,7 @@ vector<pair<string, ArgType>> inst_table =
     { "ABORT"		, NO_ARG }
   };
 
-int code_size(Inst inst) {
+long code_size(Inst inst) {
   switch (inst_table[inst].second) {
   case NO_ARG:
     return 1;
@@ -112,7 +112,7 @@ private:
   ifstream file;
   map<string, pair<Inst, ArgType>> keyword_map;
   vector<string> labels;
-  map<string, int> label_map;
+  map<string, long> label_map;
     
   void error(string line) {
     cout << "Invalid input: " << line << endl;
@@ -127,8 +127,8 @@ public:
     }
   }
     
-  list<int> run() {
-    list<int> result;
+  list<long> run() {
+    list<long> result;
     string line;
         
     while (getline(file, line)) {
@@ -150,7 +150,7 @@ public:
 	  if (label_map.count(label) > 0)
 	    result.push_back(label_map[label]);
 	  else {
-	    int id = label_map.size();
+	    long id = label_map.size();
 	    result.push_back(id);
 	    labels.push_back(label);
 	    label_map[label] = id;
@@ -158,7 +158,7 @@ public:
 	}
                 
 	if (arg_type == INT_ARG || arg_type == LABEL_INT_ARG) {
-	  int offset;
+	  long offset;
 	  input >> offset;
 	  result.push_back(offset);
 	}
@@ -174,7 +174,7 @@ public:
     return result;
   }
     
-  void reconstruct(const list<int>& code) {
+  void reconstruct(const list<long>& code) {
     for (auto it = code.cbegin(); it != code.cend(); ++it) {
       auto inst = inst_table[*it];
       cout << *it << " " << inst.first;
@@ -193,9 +193,9 @@ public:
 
 class GMachine {
 private:
-  vector<int> memory;
-  int sptr, bptr, send, hptr, hbeg, hlim, hend, cptr;
-  stack<pair<int,int>> dump;
+  vector<long> memory;
+  long sptr, bptr, send, hptr, hbeg, hlim, hend, cptr;
+  stack<pair<long,long>> dump;
     
   enum Tag { Nix = 0, App, Int, Fun, Fwd, Con0, Con1, Con2 };
     
@@ -204,8 +204,8 @@ private:
     exit(EXIT_FAILURE);
   }
     
-  int alloc(Tag tag, int dat1, int dat2) {
-    int addr = hptr;
+  long alloc(Tag tag, long dat1, long dat2) {
+    long addr = hptr;
     hptr += 3;
     if (hptr > hend)
       fail("HEAP OVERFLOW");
@@ -215,12 +215,12 @@ private:
     return addr;
   }
     
-  void copy(int src, int tgt) {
-    for (int i = 0; i < 3; ++i)
+  void copy(long src, long tgt) {
+    for (long i = 0; i < 3; ++i)
       memory[tgt+i] = memory[src+i];
   }
     
-  void push(int addr) {
+  void push(long addr) {
     sptr += 1;
     if (sptr > send)
       fail("STACK OVERFLOW");
@@ -239,7 +239,7 @@ private:
   }
     
 public:
-  GMachine(const list<int>& code, int heap_size, int stack_size) :
+  GMachine(const list<long>& code, long heap_size, long stack_size) :
     memory(code.size() + heap_size + stack_size + 1, 0), dump() {
     cptr = 1;
     for (auto inst : code) {
@@ -258,7 +258,7 @@ public:
     
 private:
   void calc_jumps() {
-    map<int, int> table;
+    map<long, long> table;
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       switch (memory[cptr]) {
       case LABEL:
@@ -270,7 +270,7 @@ private:
     }
         
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
-      int label;
+      long label;
       switch (memory[cptr]) {
       case JUMP:
       case JUMPZERO:
@@ -302,7 +302,7 @@ private:
   }
     
   void unwind() {
-    int addr;
+    long addr;
     while (memory[addr = memory[sptr]] == App) {
       push(memory[addr+1]);
     }
@@ -326,7 +326,7 @@ private:
   }
     
   void eval() {
-    int addr = memory[sptr];
+    long addr = memory[sptr];
     switch (memory[addr]) {
     case Nix:
     case Fwd:
@@ -377,7 +377,7 @@ private:
       break;
     case PUSH:
       {
-	int k = memory[cptr];
+	long k = memory[cptr];
 	cptr += 1;
 	push(memory[sptr-k]);
       }
@@ -388,9 +388,9 @@ private:
       break;
     case PUSHGLOBAL:
       {
-	int addr = memory[cptr]; // addr points to the corresponding GLOBSTART
+	long addr = memory[cptr]; // addr points to the corresponding GLOBSTART
 	cptr += 1;
-	int arity = memory[addr+2];
+	long arity = memory[addr+2];
 	if (arity == 0)
 	  push(memory[addr+1]);
 	else
@@ -399,75 +399,75 @@ private:
       break;
     case GLOBSTART:
       {
-	int arity = memory[cptr+1];
+	long arity = memory[cptr+1];
 	cptr += 2;
-	for (int i = 1; i <= arity; ++i)
+	for (long i = 1; i <= arity; ++i)
 	  memory[sptr-(i-1)] = memory[memory[sptr-i]+2];
       }
       break;
     case POP:
       {
-	int k = memory[cptr];
+	long k = memory[cptr];
 	cptr += 1;
 	sptr -= k;
       }
       break;
     case SLIDE:
       {
-	int k = memory[cptr];
+	long k = memory[cptr];
 	cptr += 1;
-	int addr = memory[sptr];
+	long addr = memory[sptr];
 	sptr -= k;
 	memory[sptr] = addr;
       }
       break;
     case UPDATE:
       {
-	int k = memory[cptr];
+	long k = memory[cptr];
 	cptr += 1;
-	int addr = memory[sptr-k];
+	long addr = memory[sptr-k];
 	copy(memory[sptr], addr);
 	sptr -= 1;
       }
       break;
     case ALLOC:
       {
-	int k = memory[cptr];
+	long k = memory[cptr];
 	cptr += 1;
-	for (int i = 0; i < k; ++i)
+	for (long i = 0; i < k; ++i)
 	  push(alloc(Nix, 0, 0));
       }
       break;
     case MKAP:
       {
-	int adr1 = memory[sptr];
+	long adr1 = memory[sptr];
 	sptr -= 1;
-	int adr2 = memory[sptr];
+	long adr2 = memory[sptr];
 	memory[sptr] = alloc(App, adr1, adr2);
       }
       break;
     case CONS0:
       {
-	int t = memory[cptr];
+	long t = memory[cptr];
 	cptr += 1;
 	push(alloc(Tag(Con0+t), 0, 0));
       }
       break;
     case CONS1:
       {
-	int t = memory[cptr];
+	long t = memory[cptr];
 	cptr += 1;
-	int addr = memory[sptr];
+	long addr = memory[sptr];
 	memory[sptr] = alloc(Tag(Con0+t), addr, 0);
       }
       break;
     case CONS2:
       {
-	int t = memory[cptr];
+	long t = memory[cptr];
 	cptr += 1;
-	int adr1 = memory[sptr];
+	long adr1 = memory[sptr];
 	sptr -= 1;
-	int adr2 = memory[sptr];      
+	long adr2 = memory[sptr];      
 	memory[sptr] = alloc(Tag(Con0+t), adr1, adr2);
       }
       break;
@@ -479,7 +479,7 @@ private:
       break;
     case NEG:
       {
-	int num = memory[memory[sptr]+1];
+	long num = memory[memory[sptr]+1];
 	memory[sptr] = alloc(Int, -num, 0);
       }
       break;
@@ -489,9 +489,9 @@ private:
     case DIV:
     case MOD:
       {
-	int num1 = memory[memory[sptr]+1];
+	long num1 = memory[memory[sptr]+1];
 	sptr -= 1;
-	int num2 = memory[memory[sptr]+1];
+	long num2 = memory[memory[sptr]+1];
 	switch (inst) {
 	case ADD:
 	  num1 += num2;
@@ -521,9 +521,9 @@ private:
     case GEQ:
     case GTR:
       {
-	int num1 = memory[memory[sptr]+1];
+	long num1 = memory[memory[sptr]+1];
 	sptr -= 1;
-	int num2 = memory[memory[sptr]+1];
+	long num2 = memory[memory[sptr]+1];
 	bool res = false;
 	switch (inst) {
 	case LES:
@@ -552,7 +552,7 @@ private:
       break;
     case PRINT:
       {
-	int num = memory[memory[sptr]+1];
+	long num = memory[memory[sptr]+1];
 	sptr -= 1;
 	cout << "OUTPUT: " << num << endl;
       }
@@ -570,7 +570,7 @@ private:
     }
   }
     
-  void follow(int addr, int level) {
+  void follow(long addr, long level) {
     if (level > 0) {
       level -= 1;
       switch (memory[addr]) {
@@ -614,14 +614,14 @@ private:
     
   void stack_trace() {
     cout << "============================================================" << endl;
-    for (int sadr = bptr; sadr <= sptr; ++sadr) {
+    for (long sadr = bptr; sadr <= sptr; ++sadr) {
       cout << setw(4) << sadr << ": ";
       follow(memory[sadr], 3);
       cout << endl;
     }
     Inst inst = Inst(memory[cptr]);
     cout << endl << "INSTRUCTION: " << inst_table[inst].first;
-    for (int i = 1; i < code_size(inst); ++i)
+    for (long i = 1; i < code_size(inst); ++i)
       cout << " " << memory[cptr+i];
     cout << endl;
     cout << "============================================================" << endl;
@@ -649,7 +649,7 @@ void usage(char* prog) {
 }
 
 int main (int argc, char** argv) {
-  int heap_size = 3072, stack_size = 1024;
+  long heap_size = 3072, stack_size = 1024;
   int curr_opt;
     
   while ((curr_opt = getopt (argc, argv, "h:s:")) != -1) {
@@ -669,7 +669,7 @@ int main (int argc, char** argv) {
     usage(argv[0]);
     
   Parser parser(argv[optind]);
-  list<int> insts = parser.run();
+  list<long> insts = parser.run();
     
   GMachine gm(insts, heap_size, stack_size);
   gm.exec();
