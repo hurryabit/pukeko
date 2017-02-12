@@ -204,6 +204,12 @@ private:
   long debug_level;
   map<int, string> sym_table;
 
+  long ticks = 0;
+  long allocations = 0;
+  long max_stack = 0;
+  long gc_runs = 0;
+  long gc_free = 0;
+
   enum Tag {
     Nix = 0, // 0
     App,     // 1
@@ -346,7 +352,9 @@ private:
     }
 
     long new_usage = heap_usage();
-    cerr << "[GC: " << old_usage << " -> " << new_usage << "]" << endl;
+    // cerr << "[GC: " << old_usage << " -> " << new_usage << "]" << endl;
+    gc_runs += 1;
+    gc_free += (old_usage - new_usage) / 3;
   }
 
   void claim(long heap, long stck) {
@@ -361,6 +369,7 @@ private:
   }
 
   long alloc(Tag tag, long dat1, long dat2) {
+    allocations += 1;
     long addr = hptr;
     hptr += 3;
     // This check should not be necessary. It's only purpose is to spot bugs.
@@ -378,6 +387,7 @@ private:
     if (sptr > slim)
       fail("UNDETECTED STACK OVERFLOW");
     memory[sptr] = addr;
+    max_stack = max(max_stack, sptr - bptr + 1);
   }
 
   void store() {
@@ -453,6 +463,7 @@ private:
   void unwind() {
     long addr;
     while (memory[addr = memory[sptr]] == App) {
+      ticks += 1;
       push(memory[addr+1]);
     }
 
@@ -495,6 +506,7 @@ private:
   }
 
   void step() {
+    ticks += 1;
     Inst inst = Inst(memory[cptr]);
     cptr += 1;
 
@@ -757,6 +769,13 @@ public:
       step();
     }
   }
+
+  void print_stats() const {
+    cerr << "Reductions:  " << setw(5) << ticks << endl;
+    cerr << "Allocations: " << setw(5) << allocations << endl;
+    cerr << "Stack depth: " << setw(5) << max_stack << endl;
+    cerr << "GC runs:     " << setw(5) << gc_runs << endl;
+  }
 };
 
 void usage(string prog) {
@@ -802,6 +821,7 @@ int main (int argc, char** argv) {
 
   GMachine gm(code, heap_size, stack_size, use_gc, debug_level);
   gm.exec(parser.get_labels());
+  gm.print_stats();
 
   return 0;
 }
