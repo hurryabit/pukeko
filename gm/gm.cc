@@ -57,41 +57,41 @@ enum ArgType {
 };
 
 vector<pair<string, ArgType>> inst_table =
-  { { "EVAL"		, NO_ARG },
-    { "UNWIND"		, NO_ARG },
-    { "RETURN"		, NO_ARG },
-    { "EXIT"		, NO_ARG },
-    { "JUMP"		, LABEL_ARG },
-    { "JUMPZERO"	, LABEL_ARG },
-    { "LABEL"		, LABEL_ARG },
-    { "PUSH"		, INT_ARG },
-    { "PUSHINT"		, INT_ARG },
-    { "PUSHGLOBAL"	, LABEL_ARG },
-    { "GLOBSTART"	, LABEL_INT_ARG },
-    { "POP"		, INT_ARG },
-    { "SLIDE"		, INT_ARG },
-    { "UPDATE"		, INT_ARG },
-    { "ALLOC"		, INT_ARG },
-    { "MKAP"		, NO_ARG },
-    { "CONS0"		, INT_ARG },
-    { "CONS1"		, INT_ARG },
-    { "CONS2"		, INT_ARG },
-    { "HEAD"		, NO_ARG },
-    { "TAIL"		, NO_ARG },
-    { "NEG"		, NO_ARG },
-    { "ADD"		, NO_ARG },
-    { "SUB"		, NO_ARG },
-    { "MUL"		, NO_ARG },
-    { "DIV"		, NO_ARG },
-    { "MOD"		, NO_ARG },
-    { "LES"		, NO_ARG },
-    { "LEQ"		, NO_ARG },
-    { "EQV"		, NO_ARG },
-    { "NEQ"		, NO_ARG },
-    { "GEQ"		, NO_ARG },
-    { "GTR"		, NO_ARG },
-    { "PRINT"		, NO_ARG },
-    { "ABORT"		, NO_ARG }
+  { { "EVAL"      , NO_ARG },
+    { "UNWIND"    , NO_ARG },
+    { "RETURN"    , NO_ARG },
+    { "EXIT"      , NO_ARG },
+    { "JUMP"      , LABEL_ARG },
+    { "JUMPZERO"  , LABEL_ARG },
+    { "LABEL"     , LABEL_ARG },
+    { "PUSH"      , INT_ARG },
+    { "PUSHINT"   , INT_ARG },
+    { "PUSHGLOBAL", LABEL_ARG },
+    { "GLOBSTART" , LABEL_INT_ARG },
+    { "POP"       , INT_ARG },
+    { "SLIDE"     , INT_ARG },
+    { "UPDATE"    , INT_ARG },
+    { "ALLOC"     , INT_ARG },
+    { "MKAP"      , NO_ARG },
+    { "CONS0"     , INT_ARG },
+    { "CONS1"     , INT_ARG },
+    { "CONS2"     , INT_ARG },
+    { "HEAD"      , NO_ARG },
+    { "TAIL"      , NO_ARG },
+    { "NEG"       , NO_ARG },
+    { "ADD"       , NO_ARG },
+    { "SUB"       , NO_ARG },
+    { "MUL"       , NO_ARG },
+    { "DIV"       , NO_ARG },
+    { "MOD"       , NO_ARG },
+    { "LES"       , NO_ARG },
+    { "LEQ"       , NO_ARG },
+    { "EQV"       , NO_ARG },
+    { "NEQ"       , NO_ARG },
+    { "GEQ"       , NO_ARG },
+    { "GTR"       , NO_ARG },
+    { "PRINT"     , NO_ARG },
+    { "ABORT"     , NO_ARG }
   };
 
 long code_size(Inst inst) {
@@ -167,7 +167,7 @@ public:
       else {
 	error(line);
       }
-      if (input.bad())
+      if (input.fail())
 	error(line);
     }
         
@@ -509,7 +509,6 @@ private:
       num1 = memory[memory[sptr]+1];
       sptr -= 1;
       num2 = memory[memory[sptr]+1];
-      t = false;
       switch (inst) {
       case LES:
 	t = num1 < num2;
@@ -611,11 +610,8 @@ private:
     
 public:
   void exec() {
-    cout << "starting exec" << endl;
     calc_jumps();
-    cout << "calculated jumps" << endl;
     alloc_cafs();
-    cout << "finished pre-processing" << endl;
         
     cptr = 1;
     while (memory[cptr] != EXIT) {
@@ -625,35 +621,40 @@ public:
   }
 };
 
-void usage(char* prog) {
-  printf("usage: %s [-h HEAP_SIZE] [-s STACK_SIZE] FILE\n", prog);
+void usage(string prog) {
+  cout << "usage: "<< prog << " [-h HEAP_SIZE] [-s STACK_SIZE] FILE\n" << endl;
   exit(EXIT_FAILURE);
 }
 
 int main (int argc, char** argv) {
   long heap_size = 3072, stack_size = 1024;
   int curr_opt;
+  string prog = argv[0];
     
   while ((curr_opt = getopt (argc, argv, "h:s:")) != -1) {
+    istringstream arg(optarg);
     switch (curr_opt) {
     case 'h':
-      heap_size = atoi(optarg);
+      arg >> heap_size;
       break;
     case 's':
-      stack_size = atoi(optarg);
+      arg >> stack_size;
       break;
     default:
-      usage(argv[0]);
+      usage(prog);
+      break;
     }
+    if (arg.fail())
+      usage(prog);
   }
     
   if (optind != argc-1)
-    usage(argv[0]);
+    usage(prog);
     
   Parser parser(argv[optind]);
-  list<long> insts = parser.run();
+  list<long> code = parser.run();
     
-  GMachine gm(insts, heap_size, stack_size);
+  GMachine gm(code, heap_size, stack_size);
   gm.exec();
     
   return 0;
