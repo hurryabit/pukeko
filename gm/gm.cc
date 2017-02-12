@@ -4,7 +4,6 @@
 #include <list>
 #include <map>
 #include <sstream>
-#include <stack>
 #include <vector>
 
 #include <unistd.h>
@@ -197,13 +196,12 @@ private:
   long cptr, clim;
   long hptr, hbeg, hlim, hend; // (hlim - hptr) / 3 cells are left on the heap
   long sptr, bptr, slim;       // slim - sptr cells are left on the stack
-  stack<pair<long,long>> dump;
     
   enum Tag { Nix = 0, App, Int, Fun, Fwd, Con0, Con1, Con2 };
     
 public:
   GMachine(const list<long>& code, long heap_size, long stack_size) :
-    memory(code.size() + heap_size + stack_size + 1, 0), dump() {
+    memory(code.size() + heap_size + stack_size + 1, 0) {
     cptr = 1;
     for (auto inst : code) {
       memory[cptr] = inst;
@@ -251,14 +249,19 @@ private:
   }
     
   void store() {
-    dump.push(make_pair(bptr, cptr));
+    long addr = memory[sptr];
+    memory[sptr] = bptr;
+    push(cptr);
+    push(addr);
     bptr = sptr;
   }
 
   void restore() {
-    bptr = dump.top().first;
-    cptr = dump.top().second;
-    dump.pop();
+    long addr = memory[sptr];
+    sptr -= 2;
+    bptr = memory[sptr];
+    cptr = memory[sptr+1];
+    memory[sptr] = addr;
   }
     
   void calc_jumps() {
@@ -359,9 +362,9 @@ private:
     cptr += 1;
 
     long k = 0;
-    int arity = 0, t = 0;
-    int addr = 0, adr1 = 0, adr2 = 0;
-    int num1 = 0, num2 = 0;
+    long arity = 0, t = 0;
+    long addr = 0, adr1 = 0, adr2 = 0;
+    long num1 = 0, num2 = 0;
         
     switch (inst) {
     case EVAL:
