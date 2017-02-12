@@ -1,0 +1,10 @@
+Everywhere:
+* Handle builtins and prelude in a better way
+
+Lambda Lifter:
+* Generate a list of super combinators and one start symbol
+* Try eta lifting on super combinators to potentially end up with an "alias"
+* Replace "aliases" by their definition
+
+GCode Generator:
+* Eliminate dead code
