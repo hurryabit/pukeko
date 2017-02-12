@@ -364,7 +364,7 @@ private:
       if (3*heap > hlim - hptr)
 	fail("HEAP FULL");
     }
-    if (stck > slim - sptr)
+    if (sptr + stck > slim)
       fail("STACK OVERFLOW");
   }
 
@@ -387,7 +387,7 @@ private:
     if (sptr > slim)
       fail("UNDETECTED STACK OVERFLOW");
     memory[sptr] = addr;
-    max_stack = max(max_stack, sptr - bptr + 1);
+    max_stack = max(max_stack, sptr - hend + 1);
   }
 
   void store() {
@@ -464,6 +464,7 @@ private:
     long addr;
     while (memory[addr = memory[sptr]] == App) {
       ticks += 1;
+      claim(0, 1);
       push(memory[addr+1]);
     }
 
@@ -771,10 +772,10 @@ public:
   }
 
   void print_stats() const {
-    cerr << "Reductions:  " << setw(5) << ticks << endl;
-    cerr << "Allocations: " << setw(5) << allocations << endl;
-    cerr << "Stack depth: " << setw(5) << max_stack << endl;
-    cerr << "GC runs:     " << setw(5) << gc_runs << endl;
+    cerr << "Reductions:  " << setw(10) << ticks << endl;
+    cerr << "Allocations: " << setw(10) << allocations << endl;
+    cerr << "Stack depth: " << setw(10) << max_stack << endl;
+    cerr << "GC runs:     " << setw(10) << gc_runs << endl;
   }
 };
 

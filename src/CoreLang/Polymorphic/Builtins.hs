@@ -26,6 +26,7 @@ primitives =
   , ("-"  , int  ~> int  ~> int )
   , ("*"  , int  ~> int  ~> int )
   , ("/"  , int  ~> int  ~> int )
+  , ("%"  , int  ~> int  ~> int )
   , ("<"  , int  ~> int  ~> bool)
   , ("<=" , int  ~> int  ~> bool)
   , ("==" , int  ~> int  ~> bool)

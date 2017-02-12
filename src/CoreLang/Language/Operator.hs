@@ -26,7 +26,7 @@ table = fixPrecs
   , [right "&&"]
   , map none ["<", "<=", "==", "!=", ">=", ">"]
   , [right "+", none "-"]
-  , [right "*", none "/"]
+  , [right "*", none "/", none "%"]
   ]
 
 names :: [String]
