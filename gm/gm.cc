@@ -223,12 +223,20 @@ private:
     cout << msg << endl;
     exit(EXIT_FAILURE);
   }
+
+  void claim(long heap, long stck) {
+    if (3*heap > hlim - hptr)
+      fail("HEAP OVERFLOW");
+    if (stck > slim - sptr)
+      fail("STACK OVERFLOW");
+  }
     
   long alloc(Tag tag, long dat1, long dat2) {
     long addr = hptr;
     hptr += 3;
-    if (hptr > hend)
-      fail("HEAP OVERFLOW");
+    // This check should not be necessary. It's only purpose is to spot bugs.
+    if (hptr > hlim)
+      fail("UNDETECTED HEAP OVERFLOW");
     memory[addr]   = tag;
     memory[addr+1] = dat1;
     memory[addr+2] = dat2;
@@ -243,12 +251,14 @@ private:
     
   void push(long addr) {
     sptr += 1;
+    // This check should not be necessary. It's only purpose is to spot bugs.
     if (sptr > slim)
-      fail("STACK OVERFLOW");
+      fail("UNDETECTED STACK OVERFLOW");
     memory[sptr] = addr;
   }
     
   void store() {
+    claim(0, 2);
     long addr = memory[sptr];
     memory[sptr] = bptr;
     push(cptr);
@@ -301,6 +311,7 @@ private:
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       if (memory[cptr] == GLOBSTART && memory[cptr+2] == 0) {
 	memory[cptr+1] = hptr;
+	claim(1, 0);
 	alloc(Fun, 0, cptr);
       }
     }
@@ -391,11 +402,13 @@ private:
       cptr += 1;
       break;
     case PUSH:
+      claim(0, 1);
       k = memory[cptr];
       cptr += 1;
       push(memory[sptr-k]);
       break;
     case PUSHINT:
+      claim(1, 1);
       push(alloc(Int, memory[cptr], 0));
       cptr += 1;
       break;
@@ -403,10 +416,14 @@ private:
       addr = memory[cptr]; // addr points to the corresponding GLOBSTART
       cptr += 1;
       arity = memory[addr+2];
-      if (arity == 0)
+      if (arity == 0) {
+	claim(0, 1);
 	push(memory[addr+1]);
-      else
+      }
+      else {
+	claim(1, 1);
 	push(alloc(Fun, arity, addr));
+      }
       break;
     case GLOBSTART:
       arity = memory[cptr+1];
@@ -436,6 +453,7 @@ private:
     case ALLOC:
       k = memory[cptr];
       cptr += 1;
+      claim(k, k);
       for (t = 0; t < k; ++t)
 	push(alloc(Nix, 0, 0));
       break;
@@ -443,17 +461,20 @@ private:
       adr1 = memory[sptr];
       sptr -= 1;
       adr2 = memory[sptr];
+      claim(1, 0);
       memory[sptr] = alloc(App, adr1, adr2);
       break;
     case CONS0:
       t = memory[cptr];
       cptr += 1;
+      claim(1, 1);
       push(alloc(Tag(Con0+t), 0, 0));
       break;
     case CONS1:
       t = memory[cptr];
       cptr += 1;
       addr = memory[sptr];
+      claim(1, 0);
       memory[sptr] = alloc(Tag(Con0+t), addr, 0);
       break;
     case CONS2:
@@ -461,7 +482,8 @@ private:
       cptr += 1;
       adr1 = memory[sptr];
       sptr -= 1;
-      adr2 = memory[sptr];      
+      adr2 = memory[sptr];
+      claim(1, 0);
       memory[sptr] = alloc(Tag(Con0+t), adr1, adr2);
       break;
     case HEAD:
@@ -472,6 +494,7 @@ private:
       break;
     case NEG:
       num1 = memory[memory[sptr]+1];
+      claim(1, 0);
       memory[sptr] = alloc(Int, -num1, 0);
       break;
     case ADD:
@@ -501,6 +524,7 @@ private:
       default:
 	fail("IMPOSSIBLE");
       }
+      claim(1, 0);
       memory[sptr] = alloc(Int, num1, 0);
       break;
     case LES:
@@ -534,6 +558,7 @@ private:
       default:
 	fail("IMPOSSIBLE");
       }
+      claim(1, 0);
       memory[sptr] = alloc(Tag(Con0+t), 0, 0);
       break;
     case PRINT:
