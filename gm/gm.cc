@@ -112,12 +112,12 @@ private:
   map<string, pair<Inst, ArgType>> keyword_map;
   vector<string> labels;
   map<string, long> label_map;
-    
+
   void error(string line) {
     cout << "Invalid input: " << line << endl;
     exit(EXIT_FAILURE);
   }
-    
+
 public:
   Parser(string filename) : file(filename) {
     for (size_t inst = 0; inst < inst_table.size(); ++inst) {
@@ -125,24 +125,24 @@ public:
       keyword_map[inst_desc.first] = make_pair(Inst(inst), inst_desc.second);
     }
   }
-    
+
   list<long> run() {
     list<long> result;
     string line;
-        
+
     while (getline(file, line)) {
       istringstream input(line);
       string keyword;
       input >> keyword;
-            
+
       if (keyword.empty()) {
       }
       else if (keyword_map.count(keyword) > 0) {
 	pair<Inst, ArgType> inst_desc = keyword_map[keyword];
 	result.push_back(inst_desc.first);
 	ArgType arg_type = inst_desc.second;
-                
-                
+
+
 	if (arg_type == LABEL_ARG || arg_type == LABEL_INT_ARG) {
 	  string label;
 	  input >> label;
@@ -155,13 +155,13 @@ public:
 	    label_map[label] = id;
 	  }
 	}
-                
+
 	if (arg_type == INT_ARG || arg_type == LABEL_INT_ARG) {
 	  long offset;
 	  input >> offset;
 	  result.push_back(offset);
 	}
-                
+
       }
       else {
 	error(line);
@@ -169,10 +169,10 @@ public:
       if (input.fail())
 	error(line);
     }
-        
+
     return result;
   }
-    
+
   void reconstruct(const list<long>& code) {
     for (auto it = code.cbegin(); it != code.cend(); ++it) {
       auto inst = inst_table[*it];
@@ -196,9 +196,9 @@ private:
   long cptr, clim;
   long hptr, hbeg, hlim, hend; // (hlim - hptr) / 3 cells are left on the heap
   long sptr, bptr, slim;       // slim - sptr cells are left on the stack
-    
+
   enum Tag { Nix = 0, App, Int, Fun, Fwd, Con0, Con1, Con2 };
-    
+
 public:
   GMachine(const list<long>& code, long heap_size, long stack_size) :
     memory(code.size() + heap_size + stack_size + 1, 0) {
@@ -208,7 +208,7 @@ public:
       ++cptr;
     }
     clim = cptr;
-        
+
     hbeg = code.size() + 1;
     hend = hbeg + heap_size;
     hptr = hbeg;
@@ -230,7 +230,7 @@ private:
     if (stck > slim - sptr)
       fail("STACK OVERFLOW");
   }
-    
+
   long alloc(Tag tag, long dat1, long dat2) {
     long addr = hptr;
     hptr += 3;
@@ -242,13 +242,13 @@ private:
     memory[addr+2] = dat2;
     return addr;
   }
-    
+
   void copy(long src, long tgt) {
     memory[tgt  ] = memory[src  ];
     memory[tgt+1] = memory[src+1];
     memory[tgt+2] = memory[src+2];
   }
-    
+
   void push(long addr) {
     sptr += 1;
     // This check should not be necessary. It's only purpose is to spot bugs.
@@ -256,7 +256,7 @@ private:
       fail("UNDETECTED STACK OVERFLOW");
     memory[sptr] = addr;
   }
-    
+
   void store() {
     claim(0, 2);
     long addr = memory[sptr];
@@ -273,7 +273,7 @@ private:
     cptr = memory[sptr+1];
     memory[sptr] = addr;
   }
-    
+
   void calc_jumps() {
     map<long, long> table;
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
@@ -286,7 +286,7 @@ private:
 	break;
       }
     }
-        
+
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       long label;
       switch (memory[cptr]) {
@@ -306,7 +306,7 @@ private:
       }
     }
   }
-    
+
   void alloc_cafs() {
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       if (memory[cptr] == GLOBSTART && memory[cptr+2] == 0) {
@@ -320,13 +320,13 @@ private:
     if ((hend - hptr) % 2 == 1)
       hend -= 1;
   }
-    
+
   void unwind() {
     long addr;
     while (memory[addr = memory[sptr]] == App) {
       push(memory[addr+1]);
     }
-        
+
     switch (memory[addr]) {
     case Nix:
     case Fwd:
@@ -345,7 +345,7 @@ private:
       break;
     }
   }
-    
+
   void eval() {
     long addr = memory[sptr];
     switch (memory[addr]) {
@@ -367,7 +367,7 @@ private:
       break;
     }
   }
-    
+
   void step() {
     Inst inst = Inst(memory[cptr]);
     cptr += 1;
@@ -376,7 +376,7 @@ private:
     long arity = 0, t = 0;
     long addr = 0, adr1 = 0, adr2 = 0;
     long num1 = 0, num2 = 0;
-        
+
     switch (inst) {
     case EVAL:
       eval();
@@ -578,7 +578,7 @@ private:
       break;
     }
   }
-    
+
   void follow(long addr, long level) {
     if (level > 0) {
       level -= 1;
@@ -620,7 +620,7 @@ private:
       }
     }
   }
-    
+
   void stack_trace() {
     cout << "============================================================" << endl;
     for (long sadr = bptr; sadr <= sptr; ++sadr) {
@@ -635,12 +635,12 @@ private:
     cout << endl;
     cout << "============================================================" << endl;
   }
-    
+
 public:
   void exec() {
     calc_jumps();
     alloc_cafs();
-        
+
     cptr = 1;
     while (memory[cptr] != EXIT) {
       // stack_trace();
@@ -658,7 +658,7 @@ int main (int argc, char** argv) {
   long heap_size = 3072, stack_size = 1024;
   int curr_opt;
   string prog = argv[0];
-    
+
   while ((curr_opt = getopt (argc, argv, "h:s:")) != -1) {
     istringstream arg(optarg);
     switch (curr_opt) {
@@ -675,15 +675,15 @@ int main (int argc, char** argv) {
     if (arg.fail())
       usage(prog);
   }
-    
+
   if (optind != argc-1)
     usage(prog);
-    
+
   Parser parser(argv[optind]);
   list<long> code = parser.run();
-    
+
   GMachine gm(code, heap_size, stack_size);
   gm.exec();
-    
+
   return 0;
 }
