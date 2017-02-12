@@ -173,6 +173,10 @@ public:
     return result;
   }
 
+  const vector<string>& get_labels() const {
+    return labels;
+  }
+
   void reconstruct(const list<long>& code) {
     for (auto it = code.cbegin(); it != code.cend(); ++it) {
       auto inst = inst_table[*it];
@@ -196,12 +200,23 @@ private:
   long cptr, clim;
   long hptr, hbeg, hlim, hend; // (hlim - hptr) / 3 cells are left on the heap
   long sptr, bptr, slim;       // slim - sptr cells are left on the stack
+  long debug_level;
+  map<int, string> sym_table;
 
-  enum Tag { Nix = 0, App, Int, Fun, Fwd, Con0, Con1, Con2 };
+  enum Tag {
+    Nix = 0, // 0
+    App,     // 1
+    Int,     // 2
+    Fun,     // 3
+    Fwd,     // 4
+    Con0,    // 5
+    Con1,    // 6
+    Con2     // 7
+  };
 
 public:
-  GMachine(const list<long>& code, long heap_size, long stack_size) :
-    memory(code.size() + heap_size + stack_size + 1, 0) {
+  GMachine(const list<long>& code, long heap_size, long stack_size, long _debug_level) :
+    memory(code.size() + heap_size + stack_size + 1, 0), debug_level(_debug_level) {
     cptr = 1;
     for (auto inst : code) {
       memory[cptr] = inst;
@@ -209,10 +224,11 @@ public:
     }
     clim = cptr;
 
-    hbeg = code.size() + 1;
+    hbeg = clim;
     hend = hbeg + heap_size;
     hptr = hbeg;
-    hlim = hend;
+    hlim = (hbeg + hend) / 2;
+
     bptr = hend;
     sptr = bptr - 1;
     slim = sptr + stack_size;
@@ -224,9 +240,132 @@ private:
     exit(EXIT_FAILURE);
   }
 
+  // copy heap cell from scr to tgt
+  void copy(long src, long tgt) {
+    memory[tgt  ] = memory[src  ];
+    memory[tgt+1] = memory[src+1];
+    memory[tgt+2] = memory[src+2];
+  }
+
+  // copy heap cell from src in from-space to to-space during gc and leave fwd pointer
+  long gc_copy(long src) {
+    // cout << "COPY: " << src << " @ ["
+    // 	 << memory[src] << " "
+    // 	 << memory[src+1] << " "
+    // 	 << memory[src+2] << "] -> "
+    // 	 << hptr << endl;
+    if (src < hbeg)
+      return src;
+    else if (memory[src] == Fwd)
+      return memory[src+1];
+    else {
+      long tgt = hptr;
+      hptr += 3;
+      copy(src, tgt);
+      memory[src] = Fwd;
+      memory[src+1] = tgt;
+      return tgt;
+    }
+  }
+
+  void gc_handle(long qptr) {
+    // cout << "HANDLE: " << qptr << " @ ["
+    // 	 << memory[qptr] << " "
+    // 	 << memory[qptr+1] << " "
+    // 	 << memory[qptr+2] << "]" << endl;
+    bool cpy1 = false, cpy2 = false;
+    switch (Tag(memory[qptr])) {
+    case Nix:
+      fail("HANDLE NIX");
+      break;
+    case Fwd:
+      fail("HANDLE FWD");
+      break;
+    case App:
+      cpy1 = true;
+      cpy2 = true;
+      break;
+    case Int:
+    case Fun:
+      break;
+    case Con0:
+    case Con1:
+    case Con2:
+      cpy1 = memory[qptr+1] != 0;
+      if (cpy1)
+	cpy2 = memory[qptr+2] != 0;
+      break;
+    default:
+      cout << memory[qptr] << endl;
+      fail("UNKNOWN TAG");
+      break;
+    }
+
+    if (cpy1)
+      memory[qptr+1] = gc_copy(memory[qptr+1]);
+    if (cpy2)
+      memory[qptr+2] = gc_copy(memory[qptr+2]);
+  }
+
+  void gc_stack_frame(long bptr, long sptr) {
+    for (long src = sptr; src >= bptr; --src)
+      memory[src] = gc_copy(memory[src]);
+  }
+
+  long heap_usage() const {
+    if (hlim == hend)
+      return hptr - (hbeg + hend) / 2;
+    else
+      return hptr - hbeg;
+  }
+
+  void gc() {
+    long old_usage = heap_usage();
+    // cout << "OLD: hbeg = " << hbeg
+    // 	 << " / hptr = " << hptr
+    // 	 << " / hlim = " << hlim << endl;
+    if (hlim == hend) {
+      hptr = hbeg;
+      hlim = (hbeg + hend) / 2;
+    }
+    else {
+      hptr = hlim;
+      hlim = hend;
+    }
+    // cout << "MID: hptr = " << hptr << " / hlim = " << hlim << endl;
+
+    long qptr = hptr;
+
+    // copy caf cells
+    for (long fptr = clim; fptr < hbeg; fptr += 3)
+      gc_handle(fptr);
+
+    // copy cells reachable from current stack frame
+    gc_stack_frame(bptr, sptr);
+
+    // copy cells reachable from old stack frames
+    long obptr = bptr;
+    while (obptr - 2 >= hend) { // hend is the first stack cell
+      long osptr = obptr - 3;
+      obptr = memory[obptr-2];
+      gc_stack_frame(obptr, osptr);
+    }
+
+    while (qptr < hptr) {
+      gc_handle(qptr);
+      qptr += 3;
+    }
+
+    long new_usage = heap_usage();
+    cout << "GC: " << old_usage << " -> " << new_usage << endl;
+  }
+
   void claim(long heap, long stck) {
-    if (3*heap > hlim - hptr)
-      fail("HEAP OVERFLOW");
+    if (3*heap > hlim - hptr) {
+      //gc();
+      if (3*heap > hlim - hptr)
+	fail("HEAP FULL");
+    }
     if (stck > slim - sptr)
       fail("STACK OVERFLOW");
   }
@@ -241,12 +380,6 @@ private:
     memory[addr+1] = dat1;
     memory[addr+2] = dat2;
     return addr;
-  }
-
-  void copy(long src, long tgt) {
-    memory[tgt  ] = memory[src  ];
-    memory[tgt+1] = memory[src+1];
-    memory[tgt+2] = memory[src+2];
   }
 
   void push(long addr) {
@@ -274,7 +407,7 @@ private:
     memory[sptr] = addr;
   }
 
-  void calc_jumps() {
+  void calc_jumps(const vector<string>& labels) {
     map<long, long> table;
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       switch (memory[cptr]) {
@@ -305,13 +438,16 @@ private:
 	break;
       }
     }
+
+    for (int i = 0; i < labels.size(); ++i)
+      sym_table[table[i]] = labels[i];
   }
 
   void alloc_cafs() {
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       if (memory[cptr] == GLOBSTART && memory[cptr+2] == 0) {
 	memory[cptr+1] = hptr;
-	claim(1, 0);
+	// claim(1, 0);
 	alloc(Fun, 0, cptr);
       }
     }
@@ -328,9 +464,8 @@ private:
     }
 
     switch (memory[addr]) {
-    case Nix:
-    case Fwd:
-      fail("NIX/FWD");
+    case Nix: fail("UNWIND NIX"); break;
+    case Fwd: fail("UNWIND FWD"); break;
       break;
     case Fun:
       if (memory[addr+1] <= sptr - bptr) // all arguments are present
@@ -349,10 +484,8 @@ private:
   void eval() {
     long addr = memory[sptr];
     switch (memory[addr]) {
-    case Nix:
-    case Fwd:
-      fail("NIX/FWD");
-      break;
+    case Nix: fail("EVAL NIX"); break;
+    case Fwd: fail("EVAL FWD"); break;
     case App:
       store();
       unwind();
@@ -413,17 +546,14 @@ private:
       cptr += 1;
       break;
     case PUSHGLOBAL:
+      claim(1, 1);
       addr = memory[cptr]; // addr points to the corresponding GLOBSTART
       cptr += 1;
       arity = memory[addr+2];
-      if (arity == 0) {
-	claim(0, 1);
+      if (arity == 0)
 	push(memory[addr+1]);
-      }
-      else {
-	claim(1, 1);
+      else
 	push(alloc(Fun, arity, addr));
-      }
       break;
     case GLOBSTART:
       arity = memory[cptr+1];
@@ -451,39 +581,39 @@ private:
       sptr -= 1;
       break;
     case ALLOC:
+      claim(k, k);
       k = memory[cptr];
       cptr += 1;
-      claim(k, k);
       for (t = 0; t < k; ++t)
 	push(alloc(Nix, 0, 0));
       break;
     case MKAP:
+      claim(1, 0);
       adr1 = memory[sptr];
       sptr -= 1;
       adr2 = memory[sptr];
-      claim(1, 0);
       memory[sptr] = alloc(App, adr1, adr2);
       break;
     case CONS0:
+      claim(1, 1);
       t = memory[cptr];
       cptr += 1;
-      claim(1, 1);
       push(alloc(Tag(Con0+t), 0, 0));
       break;
     case CONS1:
+      claim(1, 0);
       t = memory[cptr];
       cptr += 1;
       addr = memory[sptr];
-      claim(1, 0);
       memory[sptr] = alloc(Tag(Con0+t), addr, 0);
       break;
     case CONS2:
+      claim(1, 0);
       t = memory[cptr];
       cptr += 1;
       adr1 = memory[sptr];
       sptr -= 1;
       adr2 = memory[sptr];
-      claim(1, 0);
       memory[sptr] = alloc(Tag(Con0+t), adr1, adr2);
       break;
     case HEAD:
@@ -493,8 +623,8 @@ private:
       memory[sptr] = memory[memory[sptr]+2];
       break;
     case NEG:
-      num1 = memory[memory[sptr]+1];
       claim(1, 0);
+      num1 = memory[memory[sptr]+1];
       memory[sptr] = alloc(Int, -num1, 0);
       break;
     case ADD:
@@ -502,29 +632,18 @@ private:
     case MUL:
     case DIV:
     case MOD:
+      claim(1, 0);
       num1 = memory[memory[sptr]+1];
       sptr -= 1;
       num2 = memory[memory[sptr]+1];
       switch (inst) {
-      case ADD:
-	num1 += num2;
-	break;
-      case SUB:
-	num1 -= num2;
-	break;
-      case MUL:
-	num1 *= num2;
-	break;
-      case DIV:
-	num1 /= num2;
-	break;
-      case MOD:
-	num1 %= num2;
-	break;
-      default:
-	fail("IMPOSSIBLE");
+      case ADD:	num1 += num2; break;
+      case SUB:	num1 -= num2; break;
+      case MUL:	num1 *= num2; break;
+      case DIV:	num1 /= num2; break;
+      case MOD:	num1 %= num2; break;
+      default:	fail("IMPOSSIBLE");
       }
-      claim(1, 0);
       memory[sptr] = alloc(Int, num1, 0);
       break;
     case LES:
@@ -533,32 +652,19 @@ private:
     case NEQ:
     case GEQ:
     case GTR:
+      claim(1, 0);
       num1 = memory[memory[sptr]+1];
       sptr -= 1;
       num2 = memory[memory[sptr]+1];
       switch (inst) {
-      case LES:
-	t = num1 < num2;
-	break;
-      case LEQ:
-	t = num1 <= num2;
-	break;
-      case EQV:
-	t = num1 == num2;
-	break;
-      case NEQ:
-	t = num1 != num2;
-	break;
-      case GEQ:
-	t = num1 >= num2;
-	break;
-      case GTR:
-	t = num1 > num2;
-	break;
-      default:
-	fail("IMPOSSIBLE");
+      case LES: t = num1 <  num2; break;
+      case LEQ:	t = num1 <= num2; break;
+      case EQV:	t = num1 == num2; break;
+      case NEQ: t = num1 != num2; break;
+      case GEQ: t = num1 >= num2; break;
+      case GTR:	t = num1 >  num2; break;
+      default:	fail("IMPOSSIBLE");
       }
-      claim(1, 0);
       memory[sptr] = alloc(Tag(Con0+t), 0, 0);
       break;
     case PRINT:
@@ -580,29 +686,36 @@ private:
   }
 
   void follow(long addr, long level) {
-    if (level > 0) {
-      level -= 1;
-      switch (memory[addr]) {
-      case Nix:
-      case Fwd:
-	fail("NIX/Fwd");
-	break;
-      case App:
+    switch (memory[addr]) {
+    case Nix:
+      fail("FOLLOW NIX");
+      break;
+    case Fwd:
+      fail("FOLLOW FWD");
+      break;
+    case App:
+      if (level > 0) {
 	cout << "(";
+	level -= 1;
 	follow(memory[addr+1], level);
 	cout << " ";
 	follow(memory[addr+2], level);
 	cout << ")";
-	break;
-      case Int:
-	cout << memory[addr+1];
-	break;
-      case Fun:
-	cout << "f[" << memory[addr+1] << "]" << memory[addr+2];
-	break;
-      case Con0:
-      case Con1:
-      case Con2:
+      }
+      else
+	cout << "(..)";
+      break;
+    case Int:
+      cout << memory[addr+1];
+      break;
+    case Fun:
+      cout << sym_table[memory[addr+2]];
+      break;
+    case Con0:
+    case Con1:
+    case Con2:
+      if (level > 0) {
+	level -= 1;
 	cout << "(Con" << (memory[addr]-Con0);
 	if (memory[addr+1] != 0) {
 	  cout << " ";
@@ -613,11 +726,13 @@ private:
 	  }
 	}
 	cout << ")";
-	break;
-      default:
-	cout << endl << memory[addr] << endl;
-	fail("INVALID TAG");
       }
+      else
+	cout << "(..)";
+      break;
+    default:
+      cout << endl << memory[addr] << endl;
+      fail("INVALID TAG");
     }
   }
 
@@ -625,7 +740,7 @@ private:
     cout << "============================================================" << endl;
     for (long sadr = bptr; sadr <= sptr; ++sadr) {
       cout << setw(4) << sadr << ": ";
-      follow(memory[sadr], 3);
+      follow(memory[sadr], debug_level);
       cout << endl;
     }
     Inst inst = Inst(memory[cptr]);
@@ -637,8 +752,8 @@ private:
   }
 
 public:
-  void exec() {
-    calc_jumps();
+  void exec(const vector<string>& labels) {
+    calc_jumps(labels);
     alloc_cafs();
 
     cptr = 1;
@@ -655,11 +770,11 @@ void usage(string prog) {
 }
 
 int main (int argc, char** argv) {
-  long heap_size = 3072, stack_size = 1024;
+  long heap_size = 3072, stack_size = 1024, debug_level = 5;
   int curr_opt;
   string prog = argv[0];
 
-  while ((curr_opt = getopt (argc, argv, "h:s:")) != -1) {
+  while ((curr_opt = getopt (argc, argv, "h:s:d:")) != -1) {
     istringstream arg(optarg);
     switch (curr_opt) {
     case 'h':
@@ -667,6 +782,9 @@ int main (int argc, char** argv) {
       break;
     case 's':
       arg >> stack_size;
+      break;
+    case 'd':
+      arg >> debug_level;
       break;
     default:
       usage(prog);
@@ -682,8 +800,8 @@ int main (int argc, char** argv) {
   Parser parser(argv[optind]);
   list<long> code = parser.run();
 
-  GMachine gm(code, heap_size, stack_size);
-  gm.exec();
+  GMachine gm(code, heap_size, stack_size, debug_level);
+  gm.exec(parser.get_labels());
 
   return 0;
 }
