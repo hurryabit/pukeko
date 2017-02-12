@@ -33,30 +33,32 @@ uncompiled =
                       }
         }
 
-compiled :: GCode
-compiled = map (fmap Name) $ concat
-  [ neg
-  , concat binops
-  , concat constructors
-  , if_
-  , is_nil, hd, tl
-  , fst_, snd_
-  , print_, abort
+mkGlobal :: String -> Int -> [GInst String] -> Global
+mkGlobal name _arity code =
+  let _name = Name name
+      _code = GLOBSTART _name _arity : map (fmap Name) code
+  in  MkGlobal { _name, _arity, _code }
+
+compiled :: [Global]
+compiled = concat
+  [ neg : binops
+  , constructors
+  , [if_
+    , is_nil, hd, tl
+    , fst_, snd_
+    , print_, abort
+    ]
   ]
 
-
-type SCode = [GInst String]
-
-neg :: SCode
-neg =
-  [ GLOBSTART "neg" 1
-  , EVAL
+neg :: Global
+neg = mkGlobal "neg" 1
+  [ EVAL
   , NEG
   , UPDATE 1
   , RETURN
   ]
 
-binops :: [SCode]
+binops :: [Global]
 binops =
   [ mk "+"  ADD
   , mk "-"  SUB
@@ -71,9 +73,8 @@ binops =
   , mk ">"  GTR
   ]
   where
-    mk name inst =
-      [ GLOBSTART name 2
-      , PUSH 1
+    mk name inst = mkGlobal name 2
+      [ PUSH 1
       , EVAL
       , PUSH 1
       , EVAL
@@ -83,7 +84,7 @@ binops =
       , RETURN
       ]
 
-constructors :: [SCode]
+constructors :: [Global]
 constructors =
   [ mk "false"   0 (CONS0 0)
   , mk "true"    0 (CONS0 1)
@@ -92,17 +93,15 @@ constructors =
   , mk "mk_pair" 2 (CONS2 0)
   ]
   where
-    mk name arity inst =
-      [ GLOBSTART name arity
-      , inst
+    mk name arity inst = mkGlobal name arity
+      [ inst
       , UPDATE 1
       , RETURN
       ]
 
-if_ :: SCode
-if_ =
-  [ GLOBSTART "if" 3
-  , PUSH 0
+if_ :: Global
+if_ = mkGlobal "if" 3
+  [ PUSH 0
   , EVAL
   , JUMPZERO ".if_false"
   , PUSH 1
@@ -116,10 +115,9 @@ if_ =
   , UNWIND
   ]
 
-is_nil, hd, tl :: SCode
-is_nil =
-  [ GLOBSTART "is_nil" 1
-  , EVAL
+is_nil, hd, tl :: Global
+is_nil = mkGlobal "is_nil" 1
+  [ EVAL
   , JUMPZERO ".is_nil"
   , CONS0 0
   , JUMP ".lin_si"
@@ -133,8 +131,8 @@ hd = hd_or_tl "hd" HEAD
 tl = hd_or_tl "tl" TAIL
 hd_or_tl name inst =
   let dot_empty = "." ++ name ++ "_empty"
-  in  [ GLOBSTART name 1
-      , EVAL
+  in  mkGlobal name 1
+      [ EVAL
       , PUSH 0
       , JUMPZERO dot_empty
       , inst
@@ -145,30 +143,25 @@ hd_or_tl name inst =
       , ABORT
       ]
 
-fst_, snd_ :: SCode
+fst_, snd_ :: Global
 fst_ = fst_or_snd "fst" HEAD
 snd_ = fst_or_snd "snd" TAIL
-fst_or_snd name inst =
-  [ GLOBSTART name 1
-  , EVAL
+fst_or_snd name inst = mkGlobal name 1
+  [ EVAL
   , inst
   , EVAL
   , UPDATE 1
   , UNWIND
   ]
 
-print_ :: SCode
-print_ =
-  [ GLOBSTART "print" 2
-  , EVAL
+print_ :: Global
+print_ = mkGlobal "print" 2
+  [ EVAL
   , PRINT
   , EVAL
   , UPDATE 1
   , UNWIND
   ]
 
-abort :: SCode
-abort =
-  [ GLOBSTART "abort" 0
-  , ABORT
-  ]
+abort :: Global
+abort = mkGlobal "abort" 0 [ABORT]

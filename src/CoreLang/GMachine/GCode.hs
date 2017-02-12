@@ -2,6 +2,9 @@
 module CoreLang.GMachine.GCode where
 
 import Data.Char (isSpace)
+import Data.Set (Set)
+
+import qualified Data.Set as Set
 
 import CoreLang.Pretty
 
@@ -47,8 +50,22 @@ data GInst lab
   | ABORT
   deriving (Eq, Read, Show, Foldable, Functor, Traversable)
 
-newtype Name = Name String
+newtype Name = Name { unName :: String }
   deriving (Eq, Ord)
+
+data Global = MkGlobal
+  { _name  :: Name
+  , _arity :: Int
+  , _code  :: GCode
+  }
+
+dependencies :: Global -> Set Name
+dependencies MkGlobal{ _code } =
+  let extend set inst =
+        case inst of
+          PUSHGLOBAL name -> Set.insert name set
+          _               -> set
+  in  foldl extend Set.empty _code
 
 instance Show Name where
   show (Name name) = name
