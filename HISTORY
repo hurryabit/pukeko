@@ -1,0 +1,26 @@
+v0.1: 2017-02-12
+
+* Type inference. Lambda lifting. Compilation to G-code. Dead code elimination
+* G-code interpreter in C++. CAF sharing. Basic stop-and-copy GC. No CAF collection.
+
+test/Makefile:
+HEAP=131072
+STACK=8192
+
+fibs93:
+Reductions:       35297
+Allocations:       8471
+Stack depth:        879
+GC runs:              0
+
+qsort:
+Reductions:      241961
+Allocations:      66504
+Stack depth:       1077
+GC runs:              3
+
+isort:
+Reductions:      430426
+Allocations:     109058
+Stack depth:       3575
+GC runs:              5
