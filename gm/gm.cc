@@ -194,11 +194,33 @@ public:
 class GMachine {
 private:
   vector<long> memory;
-  long sptr, bptr, send, hptr, hbeg, hlim, hend, cptr;
+  long cptr, clim;
+  long hptr, hbeg, hlim, hend; // (hlim - hptr) / 3 cells are left on the heap
+  long sptr, bptr, slim;       // slim - sptr cells are left on the stack
   stack<pair<long,long>> dump;
     
   enum Tag { Nix = 0, App, Int, Fun, Fwd, Con0, Con1, Con2 };
     
+public:
+  GMachine(const list<long>& code, long heap_size, long stack_size) :
+    memory(code.size() + heap_size + stack_size + 1, 0), dump() {
+    cptr = 1;
+    for (auto inst : code) {
+      memory[cptr] = inst;
+      ++cptr;
+    }
+    clim = cptr;
+        
+    hbeg = code.size() + 1;
+    hend = hbeg + heap_size;
+    hptr = hbeg;
+    hlim = hend;
+    bptr = hend;
+    sptr = bptr - 1;
+    slim = sptr + stack_size;
+  }
+
+private:
   void fail(string msg) {
     cout << msg << endl;
     exit(EXIT_FAILURE);
@@ -209,20 +231,21 @@ private:
     hptr += 3;
     if (hptr > hend)
       fail("HEAP OVERFLOW");
-    memory[addr] = tag;
+    memory[addr]   = tag;
     memory[addr+1] = dat1;
     memory[addr+2] = dat2;
     return addr;
   }
     
   void copy(long src, long tgt) {
-    for (long i = 0; i < 3; ++i)
-      memory[tgt+i] = memory[src+i];
+    memory[tgt  ] = memory[src  ];
+    memory[tgt+1] = memory[src+1];
+    memory[tgt+2] = memory[src+2];
   }
     
   void push(long addr) {
     sptr += 1;
-    if (sptr > send)
+    if (sptr > slim)
       fail("STACK OVERFLOW");
     memory[sptr] = addr;
   }
@@ -231,32 +254,13 @@ private:
     dump.push(make_pair(bptr, cptr));
     bptr = sptr;
   }
-    
+
   void restore() {
     bptr = dump.top().first;
     cptr = dump.top().second;
     dump.pop();
   }
     
-public:
-  GMachine(const list<long>& code, long heap_size, long stack_size) :
-    memory(code.size() + heap_size + stack_size + 1, 0), dump() {
-    cptr = 1;
-    for (auto inst : code) {
-      memory[cptr] = inst;
-      ++cptr;
-    }
-        
-    hbeg = code.size() + 1;
-    hend = hbeg + heap_size;
-    hptr = hbeg;
-    hlim = hend;
-    bptr = hend;
-    sptr = bptr - 1;
-    send = sptr + stack_size;
-  }
-    
-private:
   void calc_jumps() {
     map<long, long> table;
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
@@ -265,7 +269,8 @@ private:
       case GLOBSTART:
 	table[memory[cptr+1]] = cptr;
 	break;
-      default: ;
+      default:
+	break;
       }
     }
         
@@ -283,7 +288,8 @@ private:
 	else
 	  fail("UNKNOWN LABEL");
 	break;
-      default: ;
+      default:
+	break;
       }
     }
   }
@@ -322,6 +328,7 @@ private:
       break;
     default:
       restore();
+      break;
     }
   }
     
@@ -350,6 +357,11 @@ private:
   void step() {
     Inst inst = Inst(memory[cptr]);
     cptr += 1;
+
+    long k = 0;
+    int arity = 0, t = 0;
+    int addr = 0, adr1 = 0, adr2 = 0;
+    int num1 = 0, num2 = 0;
         
     switch (inst) {
     case EVAL:
@@ -376,100 +388,78 @@ private:
       cptr += 1;
       break;
     case PUSH:
-      {
-	long k = memory[cptr];
-	cptr += 1;
-	push(memory[sptr-k]);
-      }
+      k = memory[cptr];
+      cptr += 1;
+      push(memory[sptr-k]);
       break;
     case PUSHINT:
       push(alloc(Int, memory[cptr], 0));
       cptr += 1;
       break;
     case PUSHGLOBAL:
-      {
-	long addr = memory[cptr]; // addr points to the corresponding GLOBSTART
-	cptr += 1;
-	long arity = memory[addr+2];
-	if (arity == 0)
-	  push(memory[addr+1]);
-	else
-	  push(alloc(Fun, arity, addr));
-      }
+      addr = memory[cptr]; // addr points to the corresponding GLOBSTART
+      cptr += 1;
+      arity = memory[addr+2];
+      if (arity == 0)
+	push(memory[addr+1]);
+      else
+	push(alloc(Fun, arity, addr));
       break;
     case GLOBSTART:
-      {
-	long arity = memory[cptr+1];
-	cptr += 2;
-	for (long i = 1; i <= arity; ++i)
-	  memory[sptr-(i-1)] = memory[memory[sptr-i]+2];
-      }
+      arity = memory[cptr+1];
+      cptr += 2;
+      for (k = 1; k <= arity; ++k)
+	memory[sptr-(k-1)] = memory[memory[sptr-k]+2];
       break;
     case POP:
-      {
-	long k = memory[cptr];
-	cptr += 1;
-	sptr -= k;
-      }
+      k = memory[cptr];
+      cptr += 1;
+      sptr -= k;
       break;
     case SLIDE:
-      {
-	long k = memory[cptr];
-	cptr += 1;
-	long addr = memory[sptr];
-	sptr -= k;
-	memory[sptr] = addr;
-      }
+      k = memory[cptr];
+      cptr += 1;
+      addr = memory[sptr];
+      sptr -= k;
+      memory[sptr] = addr;
       break;
     case UPDATE:
-      {
-	long k = memory[cptr];
-	cptr += 1;
-	long addr = memory[sptr-k];
-	copy(memory[sptr], addr);
-	sptr -= 1;
-      }
+      k = memory[cptr];
+      cptr += 1;
+      addr = memory[sptr-k];
+      copy(memory[sptr], addr);
+      sptr -= 1;
       break;
     case ALLOC:
-      {
-	long k = memory[cptr];
-	cptr += 1;
-	for (long i = 0; i < k; ++i)
-	  push(alloc(Nix, 0, 0));
-      }
+      k = memory[cptr];
+      cptr += 1;
+      for (t = 0; t < k; ++t)
+	push(alloc(Nix, 0, 0));
       break;
     case MKAP:
-      {
-	long adr1 = memory[sptr];
-	sptr -= 1;
-	long adr2 = memory[sptr];
-	memory[sptr] = alloc(App, adr1, adr2);
-      }
+      adr1 = memory[sptr];
+      sptr -= 1;
+      adr2 = memory[sptr];
+      memory[sptr] = alloc(App, adr1, adr2);
       break;
     case CONS0:
-      {
-	long t = memory[cptr];
-	cptr += 1;
-	push(alloc(Tag(Con0+t), 0, 0));
-      }
+      t = memory[cptr];
+      cptr += 1;
+      push(alloc(Tag(Con0+t), 0, 0));
       break;
     case CONS1:
-      {
-	long t = memory[cptr];
-	cptr += 1;
-	long addr = memory[sptr];
-	memory[sptr] = alloc(Tag(Con0+t), addr, 0);
-      }
+      t = memory[cptr];
+      cptr += 1;
+      addr = memory[sptr];
+      memory[sptr] = alloc(Tag(Con0+t), addr, 0);
       break;
     case CONS2:
-      {
-	long t = memory[cptr];
-	cptr += 1;
-	long adr1 = memory[sptr];
-	sptr -= 1;
-	long adr2 = memory[sptr];      
-	memory[sptr] = alloc(Tag(Con0+t), adr1, adr2);
-      }
+      t = memory[cptr];
+      cptr += 1;
+      adr1 = memory[sptr];
+      sptr -= 1;
+      adr2 = memory[sptr];      
+      memory[sptr] = alloc(Tag(Con0+t), adr1, adr2);
       break;
     case HEAD:
       memory[sptr] = memory[memory[sptr]+1];
@@ -478,41 +468,37 @@ private:
       memory[sptr] = memory[memory[sptr]+2];
       break;
     case NEG:
-      {
-	long num = memory[memory[sptr]+1];
-	memory[sptr] = alloc(Int, -num, 0);
-      }
+      num1 = memory[memory[sptr]+1];
+      memory[sptr] = alloc(Int, -num1, 0);
       break;
     case ADD:
     case SUB:
     case MUL:
     case DIV:
     case MOD:
-      {
-	long num1 = memory[memory[sptr]+1];
-	sptr -= 1;
-	long num2 = memory[memory[sptr]+1];
-	switch (inst) {
-	case ADD:
-	  num1 += num2;
-	  break;
-	case SUB:
-	  num1 -= num2;
-	  break;
-	case MUL:
-	  num1 *= num2;
-	  break;
-	case DIV:
-	  num1 /= num2;
-	  break;
-	case MOD:
-	  num1 %= num2;
-	  break;
-	default:
-	  fail("IMPOSSIBLE");
-	}
-	memory[sptr] = alloc(Int, num1, 0);
+      num1 = memory[memory[sptr]+1];
+      sptr -= 1;
+      num2 = memory[memory[sptr]+1];
+      switch (inst) {
+      case ADD:
+	num1 += num2;
+	break;
+      case SUB:
+	num1 -= num2;
+	break;
+      case MUL:
+	num1 *= num2;
+	break;
+      case DIV:
+	num1 /= num2;
+	break;
+      case MOD:
+	num1 %= num2;
+	break;
+      default:
+	fail("IMPOSSIBLE");
       }
+      memory[sptr] = alloc(Int, num1, 0);
       break;
     case LES:
     case LEQ:
@@ -520,42 +506,38 @@ private:
     case NEQ:
     case GEQ:
     case GTR:
-      {
-	long num1 = memory[memory[sptr]+1];
-	sptr -= 1;
-	long num2 = memory[memory[sptr]+1];
-	bool res = false;
-	switch (inst) {
-	case LES:
-	  res = num1 < num2;
-	  break;
-	case LEQ:
-	  res = num1 <= num2;
-	  break;
-	case EQV:
-	  res = num1 == num2;
-	  break;
-	case NEQ:
-	  res = num1 != num2;
-	  break;
-	case GEQ:
-	  res = num1 >= num2;
-	  break;
-	case GTR:
-	  res = num1 > num2;
-	  break;
-	default:
-	  fail("IMPOSSIBLE");
-	}
-	memory[sptr] = alloc(Tag(Con0+res), 0, 0);
+      num1 = memory[memory[sptr]+1];
+      sptr -= 1;
+      num2 = memory[memory[sptr]+1];
+      t = false;
+      switch (inst) {
+      case LES:
+	t = num1 < num2;
+	break;
+      case LEQ:
+	t = num1 <= num2;
+	break;
+      case EQV:
+	t = num1 == num2;
+	break;
+      case NEQ:
+	t = num1 != num2;
+	break;
+      case GEQ:
+	t = num1 >= num2;
+	break;
+      case GTR:
+	t = num1 > num2;
+	break;
+      default:
+	fail("IMPOSSIBLE");
       }
+      memory[sptr] = alloc(Tag(Con0+t), 0, 0);
       break;
     case PRINT:
-      {
-	long num = memory[memory[sptr]+1];
-	sptr -= 1;
-	cout << "OUTPUT: " << num << endl;
-      }
+      num1 = memory[memory[sptr]+1];
+      sptr -= 1;
+      cout << "OUTPUT: " << num1 << endl;
       break;
     case EXIT:
       fail("STEP EXIT");
