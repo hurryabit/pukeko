@@ -1,6 +1,6 @@
-letrec foldr f y0 xs = if is_nil xs then y0 else f (hd xs) (foldr f y0 (tl xs)) in
 letrec foldl f y0 xs = if is_nil xs then y0 else foldl f (f y0 (hd xs)) (tl xs) in
 let sum = foldl (fun x y -> x+y) 0 in
+letrec foldr f y0 xs = if is_nil xs then y0 else f (hd xs) (foldr f y0 (tl xs)) in
 letrec iter f x = cons x (iter f (f x)) in
 letrec take_while p xs =
   if is_nil xs then
@@ -31,7 +31,7 @@ letrec ints = cons 1 (map (fun x -> x+1) ints) in
 letrec zip_with f xs ys =
   if is_nil xs || is_nil ys then
     nil
-  else 
+  else
     cons (f (hd xs) (hd ys)) (zip_with f (tl xs) (tl ys))
 in
 letrec fibs = cons 0 (cons 1 (zip_with (fun x y -> x+y) fibs (tl fibs))) in

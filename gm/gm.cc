@@ -114,7 +114,7 @@ private:
   map<string, long> label_map;
 
   void error(string line) {
-    cout << "Invalid input: " << line << endl;
+    cerr << "INVALID INPUT: " << line << endl;
     exit(EXIT_FAILURE);
   }
 
@@ -239,7 +239,7 @@ public:
 
 private:
   void fail(string msg) {
-    cout << msg << endl;
+    cerr << msg << endl;
     exit(EXIT_FAILURE);
   }
 
@@ -290,7 +290,6 @@ private:
 	cpy2 = memory[qptr+2] != 0;
       break;
     default:
-      cout << memory[qptr] << endl;
       fail("UNKNOWN TAG");
       break;
     }
@@ -347,7 +346,7 @@ private:
     }
 
     long new_usage = heap_usage();
-    cout << "GC: " << old_usage << " -> " << new_usage << endl;
+    cerr << "[GC: " << old_usage << " -> " << new_usage << "]" << endl;
   }
 
   void claim(long heap, long stck) {
@@ -438,7 +437,6 @@ private:
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       if (memory[cptr] == GLOBSTART && memory[cptr+2] == 0) {
 	memory[cptr+1] = hptr;
-	// claim(1, 0);
 	alloc(Fun, 0, cptr);
       }
     }
@@ -665,7 +663,7 @@ private:
     case PRINT:
       num1 = memory[memory[sptr]+1];
       sptr -= 1;
-      cout << "OUTPUT: " << num1 << endl;
+      cout << num1 << endl;
       break;
     case EXIT:
       fail("STEP EXIT");
@@ -674,7 +672,6 @@ private:
       fail("ABORT");
       break;
     default:
-      cout << inst << endl;
       fail("UNKNOWN INSTRUCTION");
       break;
     }
@@ -690,61 +687,61 @@ private:
       break;
     case App:
       if (level > 0) {
-	cout << "(";
+	cerr << "(";
 	level -= 1;
 	follow(memory[addr+1], level);
-	cout << " ";
+	cerr << " ";
 	follow(memory[addr+2], level);
-	cout << ")";
+	cerr << ")";
       }
       else
-	cout << "(..)";
+	cerr << "(..)";
       break;
     case Int:
-      cout << memory[addr+1];
+      cerr << memory[addr+1];
       break;
     case Fun:
-      cout << sym_table[memory[addr+2]];
+      cerr << sym_table[memory[addr+2]];
       break;
     case Con0:
     case Con1:
     case Con2:
       if (level > 0) {
 	level -= 1;
-	cout << "(Con" << (memory[addr]-Con0);
+	cerr << "(Con" << (memory[addr]-Con0);
 	if (memory[addr+1] != 0) {
-	  cout << " ";
+	  cerr << " ";
 	  follow(memory[addr+1], level);
 	  if (memory[addr+2] != 0) {
-	    cout << " ";
+	    cerr << " ";
 	    follow(memory[addr+2], level);
 	  }
 	}
-	cout << ")";
+	cerr << ")";
       }
       else
-	cout << "(..)";
+	cerr << "(..)";
       break;
     default:
-      cout << endl << memory[addr] << endl;
+      cerr << endl << memory[addr] << endl;
       fail("INVALID TAG");
     }
   }
 
   void stack_trace() {
     if (debug_level > 0) {
-      cout << "============================================================" << endl;
+      cerr << "============================================================" << endl;
       for (long sadr = bptr; sadr <= sptr; ++sadr) {
-	cout << setw(4) << sadr << ": ";
+	cerr << setw(4) << sadr << ": ";
 	follow(memory[sadr], debug_level);
-	cout << endl;
+	cerr << endl;
       }
       Inst inst = Inst(memory[cptr]);
-      cout << endl << "INSTRUCTION: " << inst_table[inst].first;
+      cerr << endl << "INSTRUCTION: " << inst_table[inst].first;
       for (long i = 1; i < code_size(inst); ++i)
-	cout << " " << memory[cptr+i];
-      cout << endl;
-      cout << "============================================================" << endl;
+	cerr << " " << memory[cptr+i];
+      cerr << endl;
+      cerr << "============================================================" << endl;
     }
   }
 
@@ -763,7 +760,7 @@ public:
 };
 
 void usage(string prog) {
-  cout << "usage: "<< prog
+  cerr << "usage: "<< prog
        << " [-g] [-h HEAP_SIZE] [-s STACK_SIZE] [-d DEBUG_LEVEL] FILE\n" << endl;
   exit(EXIT_FAILURE);
 }

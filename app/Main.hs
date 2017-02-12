@@ -4,39 +4,42 @@ import Control.Monad
 import Data.Monoid
 import Options.Applicative
 import System.FilePath
+import System.Exit
 
 import CoreLang.Pretty
 import qualified CoreLang.GMachine.Compiler       as Compiler
-import qualified CoreLang.GMachine.Machine        as GMachine
 import qualified CoreLang.Language.LambdaLifter   as Lifter
 import qualified CoreLang.Language.Parser         as Parser
 import qualified CoreLang.Language.Type           as Type
-import qualified CoreLang.Monomorphic.Checker     as Mono
 import qualified CoreLang.Polymorphic.TypeChecker as Poly
 import qualified CoreLang.Polymorphic.Builtins    as Builtins
 
 
-doit :: Int -> Int -> String -> IO ()
-doit stack heap file = do
+compile :: Bool -> String -> IO ()
+compile write_ll file = do
   code <- readFile file
   let gprog_or_error = do
         expr <- Parser.parseExpr file code
-        _ <- Poly.inferExpr expr
+        t <- Poly.inferExpr expr
+        _ <- Type.unify mempty t (Type.int)
         let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
         gprog <- Compiler.compile (fmap (const ()) lifted_expr)
         return (lifted_expr, gprog)
   case gprog_or_error of
-    Left error -> putStrLn $ "Error: " ++ error
+    Left error -> do
+      putStrLn $ "Error: " ++ error
+      exitWith (ExitFailure 1)
     Right (lifted_expr, gprog) -> do
-      writeFile (file `replaceExtension` ".ll") (prettyShow lifted_expr)
+      when write_ll $
+        writeFile (file `replaceExtension` ".ll") (prettyShow lifted_expr)
       writeFile (file `replaceExtension` ".gm") (prettyShow gprog)
-      GMachine.execute gprog stack heap
+      exitWith ExitSuccess
 
 opts :: Parser (IO ())
 opts =
-  doit
-    <$> option auto (short 's' <> long "stack" <> value 1000 <> metavar "SIZE")
-    <*> option auto (short 'h' <> long "heap"  <> value 1000 <> metavar "SIZE")
+  compile
+    <$> switch (short 'l' <> long "lifted" <> help "Write result of lambda lifter")
+    -- <*> option auto (short 'h' <> long "heap"  <> value 1000 <> metavar "SIZE")
     <*> argument str (metavar "FILE")
 
 main :: IO ()

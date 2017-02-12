@@ -20,7 +20,6 @@ library
                      , CoreLang.GMachine.Builtins
                      , CoreLang.GMachine.Compiler
                      , CoreLang.GMachine.GCode
-                     , CoreLang.GMachine.Machine
                      , CoreLang.Language.Ident
                      , CoreLang.Language.LambdaLifter
                      , CoreLang.Language.Operator
