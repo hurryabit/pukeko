@@ -94,7 +94,7 @@ vector<pair<string, ArgType>> inst_table =
   };
 
 long code_size(Inst inst) {
-  switch (inst_table[inst].second) {
+  switch (ArgType(inst_table[inst].second)) {
   case NO_ARG:
     return 1;
   case LABEL_ARG:
@@ -200,6 +200,7 @@ private:
   long cptr, clim;
   long hptr, hbeg, hlim, hend; // (hlim - hptr) / 3 cells are left on the heap
   long sptr, bptr, slim;       // slim - sptr cells are left on the stack
+  bool use_gc;
   long debug_level;
   map<int, string> sym_table;
 
@@ -215,8 +216,10 @@ private:
   };
 
 public:
-  GMachine(const list<long>& code, long heap_size, long stack_size, long _debug_level) :
-    memory(code.size() + heap_size + stack_size + 1, 0), debug_level(_debug_level) {
+  GMachine(const list<long>& code, long heap_size, long stack_size, bool _use_gc,
+	   long _debug_level) :
+    memory(code.size() + heap_size + stack_size + 1, 0), use_gc(_use_gc),
+    debug_level(_debug_level) {
     cptr = 1;
     for (auto inst : code) {
       memory[cptr] = inst;
@@ -227,7 +230,7 @@ public:
     hbeg = clim;
     hend = hbeg + heap_size;
     hptr = hbeg;
-    hlim = (hbeg + hend) / 2;
+    hlim = hend;
 
     bptr = hend;
     sptr = bptr - 1;
@@ -249,11 +252,6 @@ private:
 
   // copy heap cell from src in from-space to to-space during gc and leave fwd pointer
   long gc_copy(long src) {
-    // cout << "COPY: " << src << " @ ["
-    // 	 << memory[src] << " "
-    // 	 << memory[src+1] << " "
-    // 	 << memory[src+2] << "] -> "
-    // 	 << hptr << endl;
     if (src < hbeg)
       return src;
     else if (memory[src] == Fwd)
@@ -269,10 +267,6 @@ private:
   }
 
   void gc_handle(long qptr) {
-    // cout << "HANDLE: " << qptr << " @ ["
-    // 	 << memory[qptr] << " "
-    // 	 << memory[qptr+1] << " "
-    // 	 << memory[qptr+2] << "]" << endl;
     bool cpy1 = false, cpy2 = false;
     switch (Tag(memory[qptr])) {
     case Nix:
@@ -321,9 +315,6 @@ private:
 
   void gc() {
     long old_usage = heap_usage();
-    // cout << "OLD: hbeg = " << hbeg
-    // 	 << " / hptr = " << hptr
-    // 	 << " / hlim = " << hlim << endl;
     if (hlim == hend) {
       hptr = hbeg;
       hlim = (hbeg + hend) / 2;
@@ -332,7 +323,6 @@ private:
       hptr = hlim;
       hlim = hend;
     }
-    // cout << "MID: hptr = " << hptr << " / hlim = " << hlim << endl;
 
     long qptr = hptr;
 
@@ -362,7 +352,8 @@ private:
 
   void claim(long heap, long stck) {
     if (3*heap > hlim - hptr) {
-      //gc();
+      if (use_gc)
+	gc();
       if (3*heap > hlim - hptr)
 	fail("HEAP FULL");
     }
@@ -410,7 +401,7 @@ private:
   void calc_jumps(const vector<string>& labels) {
     map<long, long> table;
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
-      switch (memory[cptr]) {
+      switch (Inst(memory[cptr])) {
       case LABEL:
       case GLOBSTART:
 	table[memory[cptr+1]] = cptr;
@@ -422,7 +413,7 @@ private:
 
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       long label;
-      switch (memory[cptr]) {
+      switch (Inst(memory[cptr])) {
       case JUMP:
       case JUMPZERO:
       case LABEL:
@@ -452,9 +443,13 @@ private:
       }
     }
     hbeg = hptr;
-    hlim = (hbeg + hend) / 2;
-    if ((hend - hptr) % 2 == 1)
-      hend -= 1;
+  }
+
+  void setup_gc() {
+    if (use_gc) {
+      hlim = (hbeg + hend) / 2;
+      hend -= (hend - hptr) % 2;
+    }
   }
 
   void unwind() {
@@ -463,7 +458,7 @@ private:
       push(memory[addr+1]);
     }
 
-    switch (memory[addr]) {
+    switch (Tag(memory[addr])) {
     case Nix: fail("UNWIND NIX"); break;
     case Fwd: fail("UNWIND FWD"); break;
       break;
@@ -483,7 +478,7 @@ private:
 
   void eval() {
     long addr = memory[sptr];
-    switch (memory[addr]) {
+    switch (Tag(memory[addr])) {
     case Nix: fail("EVAL NIX"); break;
     case Fwd: fail("EVAL FWD"); break;
     case App:
@@ -686,7 +681,7 @@ private:
   }
 
   void follow(long addr, long level) {
-    switch (memory[addr]) {
+    switch (Tag(memory[addr])) {
     case Nix:
       fail("FOLLOW NIX");
       break;
@@ -737,45 +732,50 @@ private:
   }
 
   void stack_trace() {
-    cout << "============================================================" << endl;
-    for (long sadr = bptr; sadr <= sptr; ++sadr) {
-      cout << setw(4) << sadr << ": ";
-      follow(memory[sadr], debug_level);
+    if (debug_level > 0) {
+      cout << "============================================================" << endl;
+      for (long sadr = bptr; sadr <= sptr; ++sadr) {
+	cout << setw(4) << sadr << ": ";
+	follow(memory[sadr], debug_level);
+	cout << endl;
+      }
+      Inst inst = Inst(memory[cptr]);
+      cout << endl << "INSTRUCTION: " << inst_table[inst].first;
+      for (long i = 1; i < code_size(inst); ++i)
+	cout << " " << memory[cptr+i];
       cout << endl;
+      cout << "============================================================" << endl;
     }
-    Inst inst = Inst(memory[cptr]);
-    cout << endl << "INSTRUCTION: " << inst_table[inst].first;
-    for (long i = 1; i < code_size(inst); ++i)
-      cout << " " << memory[cptr+i];
-    cout << endl;
-    cout << "============================================================" << endl;
   }
 
 public:
   void exec(const vector<string>& labels) {
     calc_jumps(labels);
     alloc_cafs();
+    setup_gc();
 
     cptr = 1;
     while (memory[cptr] != EXIT) {
-      // stack_trace();
+      stack_trace();
       step();
     }
   }
 };
 
 void usage(string prog) {
-  cout << "usage: "<< prog << " [-h HEAP_SIZE] [-s STACK_SIZE] FILE\n" << endl;
+  cout << "usage: "<< prog
+       << " [-g] [-h HEAP_SIZE] [-s STACK_SIZE] [-d DEBUG_LEVEL] FILE\n" << endl;
   exit(EXIT_FAILURE);
 }
 
 int main (int argc, char** argv) {
-  long heap_size = 3072, stack_size = 1024, debug_level = 5;
+  long heap_size = 3072, stack_size = 1024, debug_level = -1;
+  bool use_gc = false;
   int curr_opt;
   string prog = argv[0];
 
-  while ((curr_opt = getopt (argc, argv, "h:s:d:")) != -1) {
-    istringstream arg(optarg);
+  while ((curr_opt = getopt (argc, argv, "gh:s:d:")) != -1) {
+    istringstream arg(optarg == nullptr ? "" : optarg);
     switch (curr_opt) {
     case 'h':
       arg >> heap_size;
@@ -785,6 +785,9 @@ int main (int argc, char** argv) {
       break;
     case 'd':
       arg >> debug_level;
+      break;
+    case 'g':
+      use_gc = true;
       break;
     default:
       usage(prog);
@@ -800,7 +803,7 @@ int main (int argc, char** argv) {
   Parser parser(argv[optind]);
   list<long> code = parser.run();
 
-  GMachine gm(code, heap_size, stack_size, debug_level);
+  GMachine gm(code, heap_size, stack_size, use_gc, debug_level);
   gm.exec(parser.get_labels());
 
   return 0;
