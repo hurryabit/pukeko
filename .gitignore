@@ -1,3 +1,4 @@
 .stack-work/
 .history
-corelang.sublime-workspace
+gm/gm
+test/*.gm
