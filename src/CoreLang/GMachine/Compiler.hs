@@ -126,8 +126,6 @@ ccExpr expr =
                                  , _arg = _cond }
                      , _arg = _then }
          , _arg = _else }
-    Rec { } -> throwError "Records are not supported yet"
-    Sel { } -> throwError "Records are not supported yet"
 
 localDecls :: [Ident] -> Int -> CC a -> CC a
 localDecls idents n cc = do

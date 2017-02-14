@@ -37,8 +37,6 @@ coreLangDef = haskellStyle
       [ "fun"
       , "let", "letrec", "and", "in"
       , "if", "then", "else"
-      -- , "case", "of"
-      , "Pack"
       ]
   , Token.reservedOpNames = ["=", "->", ":", "."] ++ Operator.names
   }
@@ -50,7 +48,6 @@ Token.TokenParser
   , Token.natural
   , Token.parens
   , Token.braces
-  , Token.comma
   , Token.commaSep
   } =
   Token.makeTokenParser coreLangDef
@@ -112,7 +109,7 @@ defnFun =
 defn :: Parser (Defn SourcePos)
 defn = try defnVal <|> defnFun <?> "definition"
 
-expr, aexpr1, aexpr :: Parser (Expr SourcePos)
+expr, aexpr :: Parser (Expr SourcePos)
 expr =
   choice
     [ Let <$> getPosition
@@ -132,16 +129,11 @@ expr =
       in  buildExpressionParser operatorTable partialAp
     ]
   <?> "expression"
-aexpr1 = choice
+aexpr = choice
   [ Var <$> getPosition <*> ident
   , Num <$> getPosition <*> nat
-  , reserved "Pack" *> braces (Pack <$> getPosition <*> nat <*> (comma *> nat))
   , parens expr
-  , Rec <$> getPosition <*> braces (commaSep defn)
   ]
-aexpr = do
-  pos <- getPosition
-  foldl (Sel pos) <$> aexpr1 <*> many (reservedOp "." *> ident)
 
 operatorTable = map (map f) (reverse Operator.table)
   where

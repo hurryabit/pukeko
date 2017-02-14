@@ -115,16 +115,8 @@ infer expr =
         (rho, [t_then, t_else]) <- inferMany [_then, _else]
         chi <- unify (rho <> psi) t_then t_else
         return (chi, subst chi t_then)
-    Rec  { _defns } -> do
-      let (patns, exprs) = unzipDefns _defns
-      (phi, t_exprs) <- inferMany exprs
-      t_patns <- mapM (\(MkPatn { _type }) -> instantiateAnnot _type) patns
-      psi <- unifyMany phi (zip t_patns t_exprs)
-      let t_rec = Type.record $
-            zipWith (\(MkPatn { _ident }) t_patn -> (_ident, subst psi t_patn)) patns t_patns
-      return (psi, t_rec)
-    Sel  { } -> pthrow (text "type checking of record selectors not implemented")
-    Pack { } -> pthrow (text "type checking of constructors not implemented")
+    Pack { } ->
+      pthrow (text "Pack expressions should only be introduced after type checking!")
 
 inferMany :: [Expr a] -> TI (Subst Type, [Type])
 inferMany [] = return (mempty, [])

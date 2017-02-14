@@ -28,8 +28,6 @@ data Expr a
   | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body  :: Expr a }
   | Lam    { _annot :: a, _patns :: [Patn a], _body  :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
-  | Rec    { _annot :: a, _defns :: [Defn a] }
-  | Sel    { _annot :: a, _expr  :: Expr a, _field :: Ident }
   deriving (Show, Functor)
 
 data Patn a = MkPatn { _annot :: a, _ident :: Ident, _type :: Maybe Type }
@@ -91,8 +89,6 @@ instance Pretty (Expr a) where
           , text "then", pPrintPrec lvl 0 _then
           , text "else", pPrintPrec lvl 0 _else
           ]
-      Rec { _defns } -> braces $ hsep $ punctuate comma (map pretty _defns)
-      Sel { _expr, _field } -> pretty _expr <> char '.' <> pretty _field
     where
 
 instance Pretty (Defn a) where

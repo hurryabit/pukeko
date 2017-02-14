@@ -96,12 +96,6 @@ runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_patn } = whole_expr
           _then <- whole_expr _then
           _else <- whole_expr _else
           return $ expr { _cond, _then, _else }
-        Rec { _defns } -> do
-          _defns <- mapM whole_defn _defns
-          return $ expr { _defns }
-        Sel { _expr } -> do
-          _expr <- whole_expr _expr
-          return $ (expr { _expr } :: Expr _)
     sub_defn defn@MkDefn{ _patn , _expr } = do
       _patn <- whole_patn _patn
       _expr <- whole_expr _expr

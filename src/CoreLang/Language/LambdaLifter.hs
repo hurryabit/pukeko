@@ -67,8 +67,6 @@ fvExpr globals expr =
           Ap   {} -> descend old_expr
           ApOp {} -> descend old_expr
           If   {} -> descend old_expr
-          Rec  {} -> descend old_expr
-          Sel  {} -> descend old_expr
       return $ fvAdjust post_expr
     rewrite_patn _ patn@MkPatn{ _ident } =
       return (patn { _annot = Set.singleton _ident } :: FvPatn)
@@ -96,8 +94,6 @@ fvAdjust expr =
       expr { _annot = annot _body `Set.difference` Set.unions (map annot _patns) }
     If { _cond, _then, _else } ->
       expr { _annot = annot _cond `Set.union` annot _then `Set.union` annot _else }
-    Rec { } -> error "Lambda lifiting for records not implemented"
-    Sel { } -> error "Lambda lifiting for records not implemented"
 
 fvPatn :: Patn a -> FvPatn
 fvPatn patn@MkPatn { _ident } = patn { _annot = Set.singleton _ident }
@@ -217,8 +213,6 @@ llExpr old_expr = do
         _then <- llExpr _then
         _else <- llExpr _else
         return $ old_expr { _cond, _then, _else }
-      Rec {} -> undefined
-      Sel {} -> undefined
   return $ fvAdjust new_expr
 
 fvRecDefns :: [FvDefn] -> Set Ident
@@ -259,6 +253,4 @@ rename table expr =
           Ap   {} -> descend old_expr
           ApOp {} -> descend old_expr
           If   {} -> descend old_expr
-          Rec  {} -> descend old_expr
-          Sel  {} -> descend old_expr
       return $ fvAdjust post_expr
