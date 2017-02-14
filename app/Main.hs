@@ -7,13 +7,13 @@ import System.FilePath
 import System.Exit
 
 import CoreLang.Pretty
-import qualified CoreLang.GMachine.Compiler       as Compiler
-import qualified CoreLang.Language.LambdaLifter   as Lifter
-import qualified CoreLang.Language.Parser         as Parser
-import qualified CoreLang.Language.Type           as Type
-import qualified CoreLang.Polymorphic.TypeChecker as Poly
-import qualified CoreLang.Polymorphic.Builtins    as Builtins
 
+import qualified CoreLang.GMachine.Compiler     as Compiler
+import qualified CoreLang.Language.Builtins     as Builtins
+import qualified CoreLang.Language.LambdaLifter as Lifter
+import qualified CoreLang.Language.Parser       as Parser
+import qualified CoreLang.Language.Type         as Type
+import qualified CoreLang.Language.TypeChecker  as Poly
 
 compile :: Bool -> String -> IO ()
 compile write_ll file = do

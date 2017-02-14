@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-module CoreLang.Polymorphic.TypeChecker
+module CoreLang.Language.TypeChecker
   ( inferExpr
   )
   where
@@ -20,8 +20,8 @@ import CoreLang.Language.Syntax
 import CoreLang.Language.Term
 import CoreLang.Language.Type (Type, Var, (~>), unify, unifyMany)
 
+import qualified CoreLang.Language.Builtins as Builtins (everything)
 import qualified CoreLang.Language.Type as Type
-import qualified CoreLang.Polymorphic.Builtins as Builtins (everything)
 
 inferExpr :: MonadError String m => Expr a -> m Type
 inferExpr expr = do

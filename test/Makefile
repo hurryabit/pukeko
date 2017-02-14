@@ -14,4 +14,4 @@ clean:
 
 .PHONEY: clean fibs93 qsort isort
 
-.PRECIOUS: %.gm
+# .PRECIOUS: %.gm

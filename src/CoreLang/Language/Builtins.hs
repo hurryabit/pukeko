@@ -1,4 +1,4 @@
-module CoreLang.Polymorphic.Builtins
+module CoreLang.Language.Builtins
   ( constructors
   , primitives
   , everything

@@ -10,13 +10,12 @@ import CoreLang.GMachine.Compiler (GProg)
 import CoreLang.Language.Syntax
 import CoreLang.Pretty
 
-import qualified CoreLang.GMachine.Compiler       as Compiler
-import qualified CoreLang.Language.LambdaLifter   as Lifter
-import qualified CoreLang.Language.Parser         as Parser
-import qualified CoreLang.Language.Type           as Type
-import qualified CoreLang.Monomorphic.Checker     as Mono
-import qualified CoreLang.Polymorphic.TypeChecker as Poly
-import qualified CoreLang.Polymorphic.Builtins    as Builtins
+import qualified CoreLang.GMachine.Compiler     as Compiler
+import qualified CoreLang.Language.Builtins     as Builtins
+import qualified CoreLang.Language.LambdaLifter as Lifter
+import qualified CoreLang.Language.Parser       as Parser
+import qualified CoreLang.Language.Type         as Type
+import qualified CoreLang.Language.TypeChecker  as Poly
 
 repl :: Pretty t => (Expr SourcePos -> Either String t) -> IO ()
 repl cmd = runInputT (defaultSettings { historyFile = Just ".history" }) loop
@@ -58,14 +57,6 @@ liftExpr expr = do
 
 data Command where
   Command :: Pretty t => String -> (Expr SourcePos -> Either String t) -> Command
-
-commands :: [Command]
-commands =
-  [ Command "parse"      pure
-  , Command "mono.check" Mono.checkExpr
-  , Command "poly.infer" Poly.inferExpr
-  , Command "lambdalift" liftExpr
-  ]
 
 debug :: (Show t, Pretty t) => (Expr SourcePos -> Either String t)
                             -> (Expr SourcePos -> Either String (Debug t))
