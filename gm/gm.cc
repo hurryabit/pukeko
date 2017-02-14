@@ -207,8 +207,8 @@ private:
   long ticks = 0;
   long allocations = 0;
   long max_stack = 0;
-  long gc_runs = 0;
-  long gc_free = 0;
+  long gc_runs = 0, gc_free = 0;
+  long heap_claims = 0, stack_claims = 0;
 
   enum Tag {
     Nix = 0, // 0
@@ -357,14 +357,19 @@ private:
     gc_free += (old_usage - new_usage) / 3;
   }
 
-  void claim(long heap, long stck) {
-    if (3*heap > hlim - hptr) {
+  void claim_heap(long cells) {
+    heap_claims += 1;
+    if (3*cells > hlim - hptr) {
       if (use_gc)
-	gc();
-      if (3*heap > hlim - hptr)
-	fail("HEAP FULL");
+        gc();
+      if (3*cells > hlim - hptr)
+        fail("HEAP FULL");
     }
-    if (sptr + stck > slim)
+  }
+
+  void claim_stack(long cells) {
+    stack_claims += 1;
+    if (sptr + cells > slim)
       fail("STACK OVERFLOW");
   }
 
@@ -391,7 +396,7 @@ private:
   }
 
   void store() {
-    claim(0, 2);
+    claim_stack(2);
     long addr = memory[sptr];
     memory[sptr] = bptr;
     push(cptr);
@@ -464,7 +469,7 @@ private:
     long addr;
     while (memory[addr = memory[sptr]] == App) {
       ticks += 1;
-      claim(0, 1);
+      claim_stack(1);
       push(memory[addr+1]);
     }
 
@@ -541,25 +546,27 @@ private:
       cptr += 1;
       break;
     case PUSH:
-      claim(0, 1);
+      claim_stack(1);
       k = memory[cptr];
       cptr += 1;
       push(memory[sptr-k]);
       break;
     case PUSHINT:
-      claim(1, 1);
+      claim_heap(1);
+      claim_stack(1);
       push(alloc(Int, memory[cptr], 0));
       cptr += 1;
       break;
     case PUSHGLOBAL:
-      claim(1, 1);
+      claim_heap(1);
+      claim_stack(1);
       addr = memory[cptr]; // addr points to the corresponding GLOBSTART
       cptr += 1;
       arity = memory[addr+2];
       if (arity == 0)
-	push(memory[addr+1]);
+        push(memory[addr+1]);
       else
-	push(alloc(Fun, arity, addr));
+        push(alloc(Fun, arity, addr));
       break;
     case GLOBSTART:
       arity = memory[cptr+1];
@@ -587,34 +594,36 @@ private:
       sptr -= 1;
       break;
     case ALLOC:
-      claim(k, k);
+      claim_heap(k);
+      claim_stack(k);
       k = memory[cptr];
       cptr += 1;
       for (t = 0; t < k; ++t)
 	push(alloc(Nix, 0, 0));
       break;
     case MKAP:
-      claim(1, 0);
+      claim_heap(1);
       adr1 = memory[sptr];
       sptr -= 1;
       adr2 = memory[sptr];
       memory[sptr] = alloc(App, adr1, adr2);
       break;
     case CONS0:
-      claim(1, 1);
+      claim_heap(1);
+      claim_stack(1);
       t = memory[cptr];
       cptr += 1;
       push(alloc(Tag(Con0+t), 0, 0));
       break;
     case CONS1:
-      claim(1, 0);
+      claim_heap(1);
       t = memory[cptr];
       cptr += 1;
       addr = memory[sptr];
       memory[sptr] = alloc(Tag(Con0+t), addr, 0);
       break;
     case CONS2:
-      claim(1, 0);
+      claim_heap(1);
       t = memory[cptr];
       cptr += 1;
       adr1 = memory[sptr];
@@ -629,7 +638,7 @@ private:
       memory[sptr] = memory[memory[sptr]+2];
       break;
     case NEG:
-      claim(1, 0);
+      claim_heap(1);
       num1 = memory[memory[sptr]+1];
       memory[sptr] = alloc(Int, -num1, 0);
       break;
@@ -638,7 +647,7 @@ private:
     case MUL:
     case DIV:
     case MOD:
-      claim(1, 0);
+      claim_heap(1);
       num1 = memory[memory[sptr]+1];
       sptr -= 1;
       num2 = memory[memory[sptr]+1];
@@ -658,7 +667,7 @@ private:
     case NEQ:
     case GEQ:
     case GTR:
-      claim(1, 0);
+      claim_heap(1);
       num1 = memory[memory[sptr]+1];
       sptr -= 1;
       num2 = memory[memory[sptr]+1];
@@ -773,8 +782,10 @@ public:
 
   void print_stats() const {
     cerr << "Reductions:  " << setw(10) << ticks << endl;
-    cerr << "Allocations: " << setw(10) << allocations << endl;
-    cerr << "Stack depth: " << setw(10) << max_stack << endl;
+    cerr << "Allocations: " << setw(10) << allocations
+         << "          (Checks: " << setw(10) << heap_claims << ")" << endl;
+    cerr << "Stack depth: " << setw(10) << max_stack
+         << "          (Checks: " << setw(10) << stack_claims << ")" << endl;
     cerr << "GC runs:     " << setw(10) << gc_runs << endl;
   }
 };

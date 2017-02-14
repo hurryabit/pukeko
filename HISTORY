@@ -9,18 +9,18 @@ STACK=8192
 
 fibs93:
 Reductions:       35297
-Allocations:       8471
-Stack depth:        879
+Allocations:       8471          (Checks:       8841)
+Stack depth:        879          (Checks:      15107)
 GC runs:              0
 
 qsort:
 Reductions:      241961
-Allocations:      66504
-Stack depth:       1077
+Allocations:      66504          (Checks:      68863)
+Stack depth:       1077          (Checks:     104189)
 GC runs:              3
 
 isort:
 Reductions:      430426
-Allocations:     109058
-Stack depth:       3575
+Allocations:     109058          (Checks:     112317)
+Stack depth:       3575          (Checks:     185098)
 GC runs:              5
