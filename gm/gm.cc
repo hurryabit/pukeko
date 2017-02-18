@@ -27,9 +27,7 @@ enum Inst {
   UPDATE,     /* long */
   ALLOC,      /* long */
   MKAP,
-  CONS0,      /* tag */
-  CONS1,      /* tag */
-  CONS2,      /* tag */
+  CONS,       /* tag arity */
   HEAD,
   TAIL,
   NEG,
@@ -52,8 +50,22 @@ enum ArgType {
   NO_ARG,
   INT_ARG,
   LABEL_ARG,
-  LABEL_INT_ARG
+  LABEL_INT_ARG,
+  INT_INT_ARG
 };
+
+long num_ints(ArgType arg_type) {
+  switch (arg_type) {
+  case NO_ARG:
+  case LABEL_ARG:
+    return 0;
+  case INT_ARG:
+  case LABEL_INT_ARG:
+    return 1;
+  case INT_INT_ARG:
+    return 2;
+  }
+}
 
 vector<pair<string, ArgType>> inst_table =
   { { "EVAL"      , NO_ARG },
@@ -72,9 +84,7 @@ vector<pair<string, ArgType>> inst_table =
     { "UPDATE"    , INT_ARG },
     { "ALLOC"     , INT_ARG },
     { "MKAP"      , NO_ARG },
-    { "CONS0"     , INT_ARG },
-    { "CONS1"     , INT_ARG },
-    { "CONS2"     , INT_ARG },
+    { "CONS"      , INT_INT_ARG },
     { "HEAD"      , NO_ARG },
     { "TAIL"      , NO_ARG },
     { "NEG"       , NO_ARG },
@@ -101,10 +111,10 @@ long code_size(Inst inst) {
   case INT_ARG:
     return 2;
   case LABEL_INT_ARG:
+  case INT_INT_ARG:
     return 3;
   }
 }
-
 
 class Parser {
 private:
@@ -138,36 +148,34 @@ public:
       if (keyword.empty()) {
       }
       else if (keyword_map.count(keyword) > 0) {
-	pair<Inst, ArgType> inst_desc = keyword_map[keyword];
-	result.push_back(inst_desc.first);
-	ArgType arg_type = inst_desc.second;
+        pair<Inst, ArgType> inst_desc = keyword_map[keyword];
+        result.push_back(inst_desc.first);
+        ArgType arg_type = inst_desc.second;
 
+        if (arg_type == LABEL_ARG || arg_type == LABEL_INT_ARG) {
+          string label;
+          input >> label;
+          if (label_map.count(label) > 0)
+            result.push_back(label_map[label]);
+          else {
+            long id = label_map.size();
+            result.push_back(id);
+            labels.push_back(label);
+            label_map[label] = id;
+          }
+        }
 
-	if (arg_type == LABEL_ARG || arg_type == LABEL_INT_ARG) {
-	  string label;
-	  input >> label;
-	  if (label_map.count(label) > 0)
-	    result.push_back(label_map[label]);
-	  else {
-	    long id = label_map.size();
-	    result.push_back(id);
-	    labels.push_back(label);
-	    label_map[label] = id;
-	  }
-	}
-
-	if (arg_type == INT_ARG || arg_type == LABEL_INT_ARG) {
-	  long offset;
-	  input >> offset;
-	  result.push_back(offset);
-	}
-
+        for (long i = num_ints(arg_type); i > 0; --i) {
+          long offset;
+          input >> offset;
+          result.push_back(offset);
+        }
       }
       else {
-	error(line);
+        error(line);
       }
       if (input.fail())
-	error(line);
+        error(line);
     }
 
     return result;
@@ -182,12 +190,12 @@ public:
       auto inst = inst_table[*it];
       cout << *it << " " << inst.first;
       if (inst.second == LABEL_ARG || inst.second == LABEL_INT_ARG) {
-	++it;
-	cout << " " << labels[*it];
+        ++it;
+        cout << " " << labels[*it];
       }
-      if (inst.second == INT_ARG || inst.second == LABEL_INT_ARG) {
-	++it;
-	cout << " " << *it;
+      for (int i = num_ints(inst.second); i > 0; --i) {
+        ++it;
+        cout << " " << *it;
       }
       cout << endl;
     }
@@ -221,7 +229,7 @@ private:
 
 public:
   GMachine(const list<long>& code, long heap_size, long stack_size, bool _use_gc,
-	   long _debug_level) :
+     long _debug_level) :
     memory(code.size() + heap_size + stack_size + 1, 0), use_gc(_use_gc),
     debug_level(_debug_level) {
     cptr = 1;
@@ -604,28 +612,19 @@ private:
       adr2 = memory[sptr];
       memory[sptr] = alloc(App, adr1, adr2);
       break;
-    case CONS0:
-      claim_heap(1);
-      claim_stack(1);
-      t = memory[cptr];
-      cptr += 1;
-      push(alloc(Tag(Con | t << 8), 0, 0));
-      break;
-    case CONS1:
+    case CONS:
       claim_heap(1);
       t = memory[cptr];
-      cptr += 1;
-      addr = memory[sptr];
-      memory[sptr] = alloc(Tag(Con | t << 8), addr, 0);
-      break;
-    case CONS2:
-      claim_heap(1);
-      t = memory[cptr];
-      cptr += 1;
-      adr1 = memory[sptr];
-      sptr -= 1;
-      adr2 = memory[sptr];
-      memory[sptr] = alloc(Tag(Con | t << 8), adr1, adr2);
+      k = memory[cptr+1];
+      cptr += 2;
+      if (k < 0 || k > 2)
+        fail("INVALID ARITY");
+      if (k == 0)
+        claim_stack(1);
+      adr1 = k >= 1 ? memory[sptr]   : 0;
+      adr2 = k >= 2 ? memory[sptr-1] : 0;
+      sptr -= k;
+      push(alloc(Tag(Con | t << 8), adr1, adr2));
       break;
     case HEAD:
       memory[sptr] = memory[memory[sptr]+1];
@@ -713,7 +712,7 @@ private:
         cerr << ")";
       }
       else
-	cerr << "(..)";
+  cerr << "(..)";
       break;
     case Int:
       cerr << memory[addr+1];

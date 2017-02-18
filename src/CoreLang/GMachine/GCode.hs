@@ -29,9 +29,7 @@ data GInst lab
   | UPDATE      Int
   | ALLOC       Int
   | MKAP
-  | CONS0       Int
-  | CONS1       Int
-  | CONS2       Int
+  | CONS        Int Int
   | HEAD
   | TAIL
   | NEG

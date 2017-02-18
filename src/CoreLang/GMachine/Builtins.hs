@@ -86,15 +86,15 @@ binops =
 
 constructors :: [Global]
 constructors =
-  [ mk "false"   0 (CONS0 0)
-  , mk "true"    0 (CONS0 1)
-  , mk "nil"     0 (CONS0 0)
-  , mk "cons"    2 (CONS2 1)
-  , mk "mk_pair" 2 (CONS2 0)
+  [ mk "false"   0 (CONS 0)
+  , mk "true"    0 (CONS 1)
+  , mk "nil"     0 (CONS 0)
+  , mk "cons"    2 (CONS 1)
+  , mk "mk_pair" 2 (CONS 0)
   ]
   where
     mk name arity inst = mkGlobal name arity
-      [ inst
+      [ inst arity
       , UPDATE 1
       , RETURN
       ]
@@ -119,10 +119,10 @@ is_nil, hd, tl :: Global
 is_nil = mkGlobal "is_nil" 1
   [ EVAL
   , JUMPZERO ".is_nil"
-  , CONS0 0
+  , CONS 0 0
   , JUMP ".lin_si"
   , LABEL ".is_nil"
-  , CONS0 1
+  , CONS 1 0
   , LABEL ".lin_si"
   , UPDATE 1
   , RETURN
