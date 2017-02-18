@@ -9,6 +9,7 @@ import System.Exit
 import CoreLang.Pretty
 
 import qualified CoreLang.GMachine.Compiler     as Compiler
+import qualified CoreLang.GMachine.NASM         as NASM
 import qualified CoreLang.Language.Builtins     as Builtins
 import qualified CoreLang.Language.LambdaLifter as Lifter
 import qualified CoreLang.Language.Parser       as Parser
@@ -23,16 +24,17 @@ compile write_ll file = do
         t <- Poly.inferExpr expr
         _ <- Type.unify mempty t (Type.int)
         let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
-        gprog <- Compiler.compile (fmap (const ()) lifted_expr)
-        return (lifted_expr, gprog)
+        program <- Compiler.compile (fmap (const ()) lifted_expr)
+        nasm <- NASM.assemble program
+        return (lifted_expr, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (lifted_expr, gprog) -> do
+    Right (lifted_expr, nasm) -> do
       when write_ll $
         writeFile (file `replaceExtension` ".ll") (prettyShow lifted_expr)
-      writeFile (file `replaceExtension` ".gm") (prettyShow gprog)
+      writeFile (file `replaceExtension` ".asm") nasm
       exitWith ExitSuccess
 
 opts :: Parser (IO ())

@@ -6,11 +6,10 @@ import Data.Set (Set)
 
 import qualified Data.Set as Set
 
-import CoreLang.Pretty
-
-newtype GProg = GProg GCode
-
-type GCode = [GInst Name]
+data Program = MkProgram
+  { _globals :: [Global]
+  , _main    :: Name
+  }
 
 data GInst lab
   = EVAL
@@ -51,10 +50,12 @@ data GInst lab
 newtype Name = Name { unName :: String }
   deriving (Eq, Ord)
 
+type Inst = GInst Name
+
 data Global = MkGlobal
   { _name  :: Name
   , _arity :: Int
-  , _code  :: GCode
+  , _code  :: [Inst]
   }
 
 dependencies :: Global -> Set Name
@@ -73,6 +74,3 @@ instance Read Name where
     case break isSpace (dropWhile isSpace input) of
       ("", _)      -> []
       (name, rest) -> [(Name name, rest)]
-
-instance Pretty GProg where
-  pPrint (GProg insts) = vcat $ map (text . show) insts

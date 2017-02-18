@@ -16,10 +16,11 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Control.Monad.Supply
-                     , CoreLang.Demo
+                     -- , CoreLang.Demo
                      , CoreLang.GMachine.Builtins
                      , CoreLang.GMachine.Compiler
                      , CoreLang.GMachine.GCode
+                     , CoreLang.GMachine.NASM
                      , CoreLang.Language.Builtins
                      , CoreLang.Language.Ident
                      , CoreLang.Language.LambdaLifter
