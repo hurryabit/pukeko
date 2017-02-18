@@ -216,9 +216,7 @@ private:
     Int,     // 2
     Fun,     // 3
     Fwd,     // 4
-    Con0,    // 5
-    Con1,    // 6
-    Con2     // 7
+    Con,     // 5
   };
 
 public:
@@ -274,7 +272,7 @@ private:
 
   void gc_handle(long qptr) {
     bool cpy1 = false, cpy2 = false;
-    switch (Tag(memory[qptr])) {
+    switch (Tag(memory[qptr] & 0xFF)) {
     case Nix:
       fail("HANDLE NIX");
       break;
@@ -288,12 +286,10 @@ private:
     case Int:
     case Fun:
       break;
-    case Con0:
-    case Con1:
-    case Con2:
+    case Con:
       cpy1 = memory[qptr+1] != 0;
       if (cpy1)
-	cpy2 = memory[qptr+2] != 0;
+        cpy2 = memory[qptr+2] != 0;
       break;
     default:
       fail("UNKNOWN TAG");
@@ -418,10 +414,10 @@ private:
       switch (Inst(memory[cptr])) {
       case LABEL:
       case GLOBSTART:
-	table[memory[cptr+1]] = cptr;
-	break;
+        table[memory[cptr+1]] = cptr;
+        break;
       default:
-	break;
+        break;
       }
     }
 
@@ -433,14 +429,14 @@ private:
       case LABEL:
       case PUSHGLOBAL:
       case GLOBSTART:
-	label = memory[cptr+1];
-	if (table.count(label) > 0)
-	  memory[cptr+1] = table[label];
-	else
-	  fail("UNKNOWN LABEL");
-	break;
+        label = memory[cptr+1];
+        if (table.count(label) > 0)
+          memory[cptr+1] = table[label];
+        else
+          fail("UNKNOWN LABEL");
+        break;
       default:
-	break;
+        break;
       }
     }
 
@@ -451,8 +447,8 @@ private:
   void alloc_cafs() {
     for (cptr = 1; cptr < hptr; cptr += code_size(Inst(memory[cptr]))) {
       if (memory[cptr] == GLOBSTART && memory[cptr+2] == 0) {
-	memory[cptr+1] = hptr;
-	alloc(Fun, 0, cptr);
+        memory[cptr+1] = hptr;
+        alloc(Fun, 0, cptr);
       }
     }
     hbeg = hptr;
@@ -479,10 +475,10 @@ private:
       break;
     case Fun:
       if (memory[addr+1] <= sptr - bptr) // all arguments are present
-	cptr = memory[addr+2];
+        cptr = memory[addr+2];
       else {
-	sptr = bptr;
-	restore();
+        sptr = bptr;
+        restore();
       }
       break;
     default:
@@ -502,8 +498,8 @@ private:
       break;
     case Fun:
       if (memory[addr+1] == 0) { // fun is a caf
-	store();
-	cptr = memory[addr+2];
+        store();
+        cptr = memory[addr+2];
       }
       break;
     default:
@@ -536,10 +532,10 @@ private:
       cptr = memory[cptr];
       break;
     case JUMPZERO:
-      if (memory[memory[sptr]] == Con0)
-	cptr = memory[cptr];
+      if ((memory[memory[sptr]] & 0xFFFF) == Con)
+        cptr = memory[cptr];
       else
-	cptr += 1;
+        cptr += 1;
       sptr -= 1;
       break;
     case LABEL:
@@ -572,7 +568,7 @@ private:
       arity = memory[cptr+1];
       cptr += 2;
       for (k = 1; k <= arity; ++k)
-	memory[sptr-(k-1)] = memory[memory[sptr-k]+2];
+        memory[sptr-(k-1)] = memory[memory[sptr-k]+2];
       break;
     case POP:
       k = memory[cptr];
@@ -599,7 +595,7 @@ private:
       k = memory[cptr];
       cptr += 1;
       for (t = 0; t < k; ++t)
-	push(alloc(Nix, 0, 0));
+        push(alloc(Nix, 0, 0));
       break;
     case MKAP:
       claim_heap(1);
@@ -613,14 +609,14 @@ private:
       claim_stack(1);
       t = memory[cptr];
       cptr += 1;
-      push(alloc(Tag(Con0+t), 0, 0));
+      push(alloc(Tag(Con | t << 8), 0, 0));
       break;
     case CONS1:
       claim_heap(1);
       t = memory[cptr];
       cptr += 1;
       addr = memory[sptr];
-      memory[sptr] = alloc(Tag(Con0+t), addr, 0);
+      memory[sptr] = alloc(Tag(Con | t << 8), addr, 0);
       break;
     case CONS2:
       claim_heap(1);
@@ -629,7 +625,7 @@ private:
       adr1 = memory[sptr];
       sptr -= 1;
       adr2 = memory[sptr];
-      memory[sptr] = alloc(Tag(Con0+t), adr1, adr2);
+      memory[sptr] = alloc(Tag(Con | t << 8), adr1, adr2);
       break;
     case HEAD:
       memory[sptr] = memory[memory[sptr]+1];
@@ -680,7 +676,7 @@ private:
       case GTR:	t = num1 >  num2; break;
       default:	fail("IMPOSSIBLE");
       }
-      memory[sptr] = alloc(Tag(Con0+t), 0, 0);
+      memory[sptr] = alloc(Tag(Con | t << 8), 0, 0);
       break;
     case PRINT:
       num1 = memory[memory[sptr]+1];
@@ -709,12 +705,12 @@ private:
       break;
     case App:
       if (level > 0) {
-	cerr << "(";
-	level -= 1;
-	follow(memory[addr+1], level);
-	cerr << " ";
-	follow(memory[addr+2], level);
-	cerr << ")";
+        cerr << "(";
+        level -= 1;
+        follow(memory[addr+1], level);
+        cerr << " ";
+        follow(memory[addr+2], level);
+        cerr << ")";
       }
       else
 	cerr << "(..)";
@@ -725,24 +721,22 @@ private:
     case Fun:
       cerr << sym_table[memory[addr+2]];
       break;
-    case Con0:
-    case Con1:
-    case Con2:
+    case Con:
       if (level > 0) {
-	level -= 1;
-	cerr << "(Con" << (memory[addr]-Con0);
-	if (memory[addr+1] != 0) {
-	  cerr << " ";
-	  follow(memory[addr+1], level);
-	  if (memory[addr+2] != 0) {
-	    cerr << " ";
-	    follow(memory[addr+2], level);
-	  }
-	}
-	cerr << ")";
+        level -= 1;
+        cerr << "(Con" << (memory[addr] >> 8);
+        if (memory[addr+1] != 0) {
+          cerr << " ";
+          follow(memory[addr+1], level);
+          if (memory[addr+2] != 0) {
+            cerr << " ";
+            follow(memory[addr+2], level);
+          }
+        }
+        cerr << ")";
       }
       else
-	cerr << "(..)";
+        cerr << "(..)";
       break;
     default:
       cerr << endl << memory[addr] << endl;
@@ -754,14 +748,14 @@ private:
     if (debug_level > 0) {
       cerr << "============================================================" << endl;
       for (long sadr = bptr; sadr <= sptr; ++sadr) {
-	cerr << setw(4) << sadr << ": ";
-	follow(memory[sadr], debug_level);
-	cerr << endl;
+        cerr << setw(4) << sadr << ": ";
+        follow(memory[sadr], debug_level);
+        cerr << endl;
       }
       Inst inst = Inst(memory[cptr]);
       cerr << endl << "INSTRUCTION: " << inst_table[inst].first;
       for (long i = 1; i < code_size(inst); ++i)
-	cerr << " " << memory[cptr+i];
+        cerr << " " << memory[cptr+i];
       cerr << endl;
       cerr << "============================================================" << endl;
     }
