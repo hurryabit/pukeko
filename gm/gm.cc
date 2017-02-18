@@ -257,9 +257,9 @@ private:
 
   // copy heap cell from scr to tgt
   void copy(long src, long tgt) {
-    memory[tgt  ] = memory[src  ];
-    memory[tgt+1] = memory[src+1];
-    memory[tgt+2] = memory[src+2];
+    memory[tgt++] = memory[src++];
+    memory[tgt++] = memory[src++];
+    memory[tgt++] = memory[src++];
   }
 
   // copy heap cell from src in from-space to to-space during gc and leave fwd pointer
@@ -409,11 +409,10 @@ private:
   }
 
   void restore() {
-    long addr = memory[sptr];
-    sptr -= 2;
-    bptr = memory[sptr];
-    cptr = memory[sptr+1];
-    memory[sptr] = addr;
+    long addr = memory[sptr--];
+    cptr = memory[sptr--];
+    bptr = memory[sptr--];
+    memory[++sptr] = addr;
   }
 
   void calc_jumps(const vector<string>& labels) {
@@ -517,8 +516,7 @@ private:
 
   void step() {
     ticks += 1;
-    Inst inst = Inst(memory[cptr]);
-    cptr += 1;
+    Inst inst = Inst(memory[cptr++]);
 
     long k = 0;
     long arity = 0, t = 0;
@@ -540,32 +538,28 @@ private:
       cptr = memory[cptr];
       break;
     case JUMPZERO:
-      if ((memory[memory[sptr]] & 0xFFFF) == Con)
+      if ((memory[memory[sptr--]] & 0xFFFF) == Con)
         cptr = memory[cptr];
       else
         cptr += 1;
-      sptr -= 1;
       break;
     case LABEL:
       cptr += 1;
       break;
     case PUSH:
       claim_stack(1);
-      k = memory[cptr];
-      cptr += 1;
+      k = memory[cptr++];
       push(memory[sptr-k]);
       break;
     case PUSHINT:
       claim_heap(1);
       claim_stack(1);
-      push(alloc(Int, memory[cptr], 0));
-      cptr += 1;
+      push(alloc(Int, memory[cptr++], 0));
       break;
     case PUSHGLOBAL:
       claim_heap(1);
       claim_stack(1);
-      addr = memory[cptr]; // addr points to the corresponding GLOBSTART
-      cptr += 1;
+      addr = memory[cptr++]; // addr points to the corresponding GLOBSTART
       arity = memory[addr+2];
       if (arity == 0)
         push(memory[addr+1]);
@@ -573,57 +567,49 @@ private:
         push(alloc(Fun, arity, addr));
       break;
     case GLOBSTART:
-      arity = memory[cptr+1];
-      cptr += 2;
+      cptr += 1; // skip address of global
+      arity = memory[cptr++];
       for (k = 1; k <= arity; ++k)
         memory[sptr-(k-1)] = memory[memory[sptr-k]+2];
       break;
     case POP:
-      k = memory[cptr];
-      cptr += 1;
+      k = memory[cptr++];
       sptr -= k;
       break;
     case SLIDE:
-      k = memory[cptr];
-      cptr += 1;
+      k = memory[cptr++];
       addr = memory[sptr];
       sptr -= k;
       memory[sptr] = addr;
       break;
     case UPDATE:
-      k = memory[cptr];
-      cptr += 1;
+      k = memory[cptr++];
       addr = memory[sptr-k];
-      copy(memory[sptr], addr);
-      sptr -= 1;
+      copy(memory[sptr--], addr);
       break;
     case ALLOC:
       claim_heap(k);
       claim_stack(k);
-      k = memory[cptr];
-      cptr += 1;
+      k = memory[cptr++];
       for (t = 0; t < k; ++t)
         push(alloc(Nix, 0, 0));
       break;
     case MKAP:
       claim_heap(1);
-      adr1 = memory[sptr];
-      sptr -= 1;
-      adr2 = memory[sptr];
-      memory[sptr] = alloc(App, adr1, adr2);
+      adr1 = memory[sptr--];
+      adr2 = memory[sptr--];
+      memory[++sptr] = alloc(App, adr1, adr2);
       break;
     case CONS:
       claim_heap(1);
-      t = memory[cptr];
-      k = memory[cptr+1];
-      cptr += 2;
+      t = memory[cptr++];
+      k = memory[cptr++];
       if (k < 0 || k > 2)
         fail("INVALID ARITY");
       if (k == 0)
         claim_stack(1);
-      adr1 = k >= 1 ? memory[sptr]   : 0;
-      adr2 = k >= 2 ? memory[sptr-1] : 0;
-      sptr -= k;
+      adr1 = k >= 1 ? memory[sptr--] : 0;
+      adr2 = k >= 2 ? memory[sptr--] : 0;
       push(alloc(Tag(Con | t << 8), adr1, adr2));
       break;
     case HEAD:
@@ -643,9 +629,8 @@ private:
     case DIV:
     case MOD:
       claim_heap(1);
-      num1 = memory[memory[sptr]+1];
-      sptr -= 1;
-      num2 = memory[memory[sptr]+1];
+      num1 = memory[memory[sptr--]+1];
+      num2 = memory[memory[sptr--]+1];
       switch (inst) {
       case ADD:	num1 += num2; break;
       case SUB:	num1 -= num2; break;
@@ -654,7 +639,7 @@ private:
       case MOD:	num1 %= num2; break;
       default:	fail("IMPOSSIBLE");
       }
-      memory[sptr] = alloc(Int, num1, 0);
+      memory[++sptr] = alloc(Int, num1, 0);
       break;
     case LES:
     case LEQ:
@@ -663,9 +648,8 @@ private:
     case GEQ:
     case GTR:
       claim_heap(1);
-      num1 = memory[memory[sptr]+1];
-      sptr -= 1;
-      num2 = memory[memory[sptr]+1];
+      num1 = memory[memory[sptr--]+1];
+      num2 = memory[memory[sptr--]+1];
       switch (inst) {
       case LES: t = num1 <  num2; break;
       case LEQ:	t = num1 <= num2; break;
@@ -675,11 +659,10 @@ private:
       case GTR:	t = num1 >  num2; break;
       default:	fail("IMPOSSIBLE");
       }
-      memory[sptr] = alloc(Tag(Con | t << 8), 0, 0);
+      memory[++sptr] = alloc(Tag(Con | t << 8), 0, 0);
       break;
     case PRINT:
-      num1 = memory[memory[sptr]+1];
-      sptr -= 1;
+      num1 = memory[memory[sptr--]+1];
       cout << num1 << endl;
       break;
     case EXIT:
