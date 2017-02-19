@@ -19,23 +19,21 @@ default rel
 %define step_ctr r13
 %define claim_ctr r14
 
-%macro INC_STEPS 1
-  add  step_ctr, %1
-%endmacro
+%define @@(n) add step_ctr, n
 
 ;; The heap pointer
 %define rhp r12
 
 ;; Auxiliary macros
 %macro g_pre_call_c 0
-  INC_STEPS 3
+  @@(3)
   mov  rbx, rsp                 ; align stack ptr
   and  rbx, 0x0F                ; (dito)
   sub  rsp, rbx                 ; (dito)
 %endmacro
 
 %macro g_post_call_c 0
-  INC_STEPS 1
+  @@(1)
   add  rsp, rbx                 ; restore stack ptr
 %endmacro
 
@@ -60,7 +58,7 @@ default rel
 
   section .text
 G_INSTALL_CAFS:
-  INC_STEPS 3*%0+1
+  @@(3*%0+1)
   %rep %0
     lea  rax, [CAF(%1)+8]
     lea  rbx, [%1]
@@ -71,18 +69,18 @@ G_INSTALL_CAFS:
 %endmacro
 
 %macro g_install_cafs 0
-  INC_STEPS 1
+  @@(1)
   call G_INSTALL_CAFS
 %endmacro
 
 %macro g_pushcaf 1
-  INC_STEPS 2
+  @@(2)
   lea  rax, [CAF(%1)]
   push rax
 %endmacro
 
 %macro g_declare_main 1
-  INC_STEPS 2
+  @@(2)
 G_INSTALL_MAIN:
   pop  rbx
   g_pushcaf %1
@@ -96,7 +94,7 @@ G_INSTALL_MAIN:
 
 ;; Heap operations
 %macro g_claim 1
-  INC_STEPS 4
+  @@(4)
   inc  claim_ctr
   lea  rax, [rhp+24*%1]
   lea  rcx, [hend]
@@ -107,7 +105,7 @@ G_INSTALL_MAIN:
 %endmacro
 
 %macro g_create 3
-  INC_STEPS 4
+  @@(4)
   mov  qword [rhp   ], %1
   mov  qword [rhp+ 8], %2
   mov  qword [rhp+16], %3
@@ -116,7 +114,7 @@ G_INSTALL_MAIN:
 
 ;; TODO: make this faster
 %macro g_alloc 1
-  INC_STEPS 1
+  @@(1)
   g_claim %1
 %rep %1
   push rhp
@@ -136,7 +134,7 @@ G_INSTALL_MAIN:
   g_fail MISSING_ARGUMENTS
 %%ok:
 %endif
-  INC_STEPS 2+3*%2
+  @@(2+3*%2)
   lea  rsi, [rsp+8]
   mov  rdi, rsp
 %rep %2
@@ -147,24 +145,24 @@ G_INSTALL_MAIN:
 %endmacro
 
 %macro g_push 1
-  INC_STEPS 1
+  @@(1)
   push qword [rsp+8*%1]
 %endmacro
 
 %macro g_pop 1
-  INC_STEPS 1
+  @@(1)
   add rsp, 8*%1
 %endmacro
 
 %macro g_slide 1
-  INC_STEPS 3
+  @@(3)
   pop  rax
   add  rsp, 8*%1
   push rax
 %endmacro
 
 %macro g_update 1
-  INC_STEPS 6
+  @@(6)
   cld
   mov  rdi, [rsp+8*%1]
   pop  rsi
@@ -176,7 +174,7 @@ G_INSTALL_MAIN:
 
 ;; Node constructors
 %macro g_pushint 1
-  INC_STEPS 1
+  @@(1)
   g_claim 1
   push rhp
   g_create TAG_INT, %1, NULL
@@ -186,7 +184,7 @@ G_INSTALL_MAIN:
   %if %2 = 0
     g_pushcaf %1
   %else
-    INC_STEPS 2
+    @@(2)
     g_claim 1
     lea  rax, [%1]
     push rhp
@@ -196,7 +194,7 @@ G_INSTALL_MAIN:
 
 ;; TODO: use rdi and stosq here
 %macro g_cons 2                 ; %1 = tag, %2 = arity
-  INC_STEPS 8+%2
+  @@(8+%2)
   g_claim 1
   mov  rbx, rhp                 ; save heap ptr for later push
   mov  qword [rhp], TAG_CON | %1 << 8
@@ -214,7 +212,7 @@ G_INSTALL_MAIN:
 %endmacro
 
 %macro g_mkap 0
-  INC_STEPS 3
+  @@(3)
   g_claim 1
   pop  rax
   pop  rbx
@@ -225,13 +223,13 @@ G_INSTALL_MAIN:
 
 ;; Selectors
 %macro g_head 0
-  INC_STEPS 2
+  @@(2)
   pop rax
   push qword [rax+8]
 %endmacro
 
 %macro g_tail 0
-  INC_STEPS 2
+  @@(2)
   pop rax
   push qword [rax+16]
 %endmacro
@@ -239,7 +237,7 @@ G_INSTALL_MAIN:
 
 ;; Arithmetic
 %macro g_neg 0
-  INC_STEPS 4
+  @@(4)
   g_claim 1
   pop rax
   mov rcx, [rax+8]
@@ -249,7 +247,7 @@ G_INSTALL_MAIN:
 %endmacro
 
 %macro g_binop 1
-  INC_STEPS 5
+  @@(5)
   g_claim 1
   pop  rax
   mov  rcx, [rax+8]
@@ -264,7 +262,7 @@ G_INSTALL_MAIN:
 %define g_mul g_binop imul
 
 %macro g_divop 1                ; %1: rax = quotient, rdx = remainder
-  INC_STEPS 7
+  @@(7)
   g_claim 1
   pop  rdx
   mov  rax, [rdx+8]
@@ -282,7 +280,7 @@ G_INSTALL_MAIN:
 
 ;; Comparison relations
 %macro g_relop 1                ; %1 is some setCC instruction
-  INC_STEPS 8
+  @@(8)
   g_claim 1
   pop  rax
   mov  rbx, [rax+8]
@@ -304,7 +302,7 @@ G_INSTALL_MAIN:
 
 ;; I/O
 %macro g_print 0
-  INC_STEPS 5
+  @@(5)
   pop  rax
   g_pre_call_c
   lea  rdi, [FORMAT_PRINT]
@@ -328,12 +326,12 @@ G_INSTALL_MAIN:
 
 ;; Jumps
 %macro g_jump 1
-  INC_STEPS 1
+  @@(1)
   jmp  %1
 %endmacro
 
 %macro g_jumpzero 1
-  INC_STEPS 3
+  @@(3)
   pop  rax
   cmp  word [rax], TAG_CON       ; assumes little endian
   je   %1
@@ -349,17 +347,17 @@ G_INSTALL_MAIN:
 %endmacro
 
 %macro g_eval 0
-  INC_STEPS 1
+  @@(1)
   call _eval
 %endmacro
 
 %macro g_unwind 0
-  INC_STEPS 1
+  @@(1)
   jmp  _unwind
 %endmacro
 
 %macro g_return 0
-  INC_STEPS 1
+  @@(1)
   jmp _unwind.partial
 %endmacro
 
@@ -394,54 +392,54 @@ _main:
 
 ;; clean up this mess
 _eval:
-  INC_STEPS 3
+  @@(3)
   mov  rax, [rsp+8]
   cmp  byte [rax], TAG_APP      ; assumes little endian
   je   .app
-  INC_STEPS 2
+  @@(2)
   cmp  word [rax], TAG_FUN      ; the lower tag word is TAG_FUN only for CAFs
   je   .caf
-  INC_STEPS 1
+  @@(1)
   ret
 .caf:
-  INC_STEPS 4
+  @@(4)
   push rbp
   push rax
   mov  rbp, rsp
   jmp  [rax+8]
 .app:
-  INC_STEPS 3
+  @@(3)
   push rbp
   push rax
   mov  rbp, rsp
   ; jmp  unwind
 
 _unwind:
-  INC_STEPS 3
+  @@(3)
   mov  rax, [rsp]
   cmp  byte [rax], TAG_APP      ; assumes little endian
   jne  .done
-  INC_STEPS 2
+  @@(2)
   push qword [rax+8]
   jmp _unwind
 .done:
-  INC_STEPS 2
+  @@(2)
   cmp  byte [rax], TAG_FUN     ; assumes little endian
   jne  .return
-  INC_STEPS 4
+  @@(4)
   ; calc where rbp would need to be for a full application
   ; if rbp is smaller, we have a partial application
   movzx rbx, byte [rax+1]
   lea   rcx, [rsp+8*rbx]        ; TODO: test that this works correctly
   cmp   rbp, rcx
   jl    .partial
-  INC_STEPS 1
+  @@(1)
   jmp   [rax+8]
 .partial:
-  INC_STEPS 1
+  @@(1)
   mov rsp, rbp
 .return:
-  INC_STEPS 3
+  @@(3)
   pop  rax
   pop  rbp
   ret
