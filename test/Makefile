@@ -2,7 +2,8 @@ COMP = stack exec corelang --
 NASM = nasm
 LINK = clang
 
-HEAP_SIZE  = 0x01000000 # 16 MB
+# HEAP_SIZE  = 0x01000000 # 16 MB
+HEAP_SIZE  = 0x00100000 #  1 MB
 STACK_SIZE = 0x00100000 #  1 MB
 
 RUNTIME = ../runtime.inc

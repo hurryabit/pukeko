@@ -1,4 +1,4 @@
 
-Steps :         95
-Allocs:          3
-Checks:          3
+Steps  :         95
+Allocs :          3          (Checks:          3)
+GC runs:          0

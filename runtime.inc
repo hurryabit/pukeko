@@ -74,6 +74,7 @@ default rel
 %endif
 %endmacro
 
+
 ;; CAF related stuff
 %define CAF(label) __caf__ %+ label
 
@@ -127,6 +128,10 @@ __install__main__:
 %macro g_claim 1
   @@(3)
   inc  claim_ctr
+  lea  rax, [rhp+24*%1]
+  cmp  rax, rhl
+  jle  %%ok
+  call _gc_collect
   lea  rax, [rhp+24*%1]
   cmp  rax, rhl
   jle  %%ok
@@ -346,17 +351,6 @@ __install__main__:
   g_post_call_c
 %endmacro
 
-%macro g_debug 0
-  g_pre_call_c
-  lea  rdi, [FORMAT_DEBUG]
-  mov  rsi, [rax]
-  mov  rdx, [rax+ 8]
-  mov  rcx, [rax+16]
-  mov  rax, 0
-  call _printf
-  g_post_call_c
-%endmacro
-
 
 ;; Jumps
 %macro g_jump 1
@@ -403,8 +397,13 @@ section .text
 _main:
   push rbx
   push rbp
-  lea  rhp, [__heap__start__]
+  lea  rhp, [__heap__middle__]
   lea  rhl, [__heap__end__]
+  ; initialize the gc stats
+  mov  qword [rhl], 0
+  sub  [rhl], rhp
+  mov  qword [rhl+8], 0
+
   g_install_cafs
   g_install_main
   mov  rbp, rsp
@@ -413,9 +412,10 @@ _main:
   g_eval
   lea  rdi, [STATS_MESSAGE]
   mov  rsi, step_ctr
-  mov  rax, rhp
-  lea  rbx, [__heap__start__]
-  sub  rax, rbx
+  lea  rax, [__heap__end__]
+  mov  r8, [rax+8]
+  mov  rax, [rax]
+  add  rax, rhp
   mov  rdx, 0
   mov  rbx, 24
   div  rbx
@@ -455,7 +455,7 @@ _eval:
   push rbp
   push rax
   mov  rbp, rsp
-  ; this fallthrough to _unwind is intended
+  ; this fall through to _unwind is intended
 
 _unwind:
   @@(3)
@@ -495,6 +495,136 @@ _fail:
   mov  rdi, 1
   call _exit
 
+;; TODO:
+;; * change _gc_copy so that we take advantage of its only use case
+%define rhs r8
+%define rhe r9
+
+;; copies a cell into the to-space
+;; expectes a pointer to the cell to copy in rax
+;; returns the pointer to the new cell also in rax
+;; modifies rax and rsi
+_gc_copy:
+  ; if rax doesn't point into the heap, we don't need to do anything
+  ; in particular, we return the null pointer unchanged
+  ; TODO: we should check for the bounds of from-space, not the entire heap
+  cmp   rax, rhs
+  jl    .return
+  cmp   rax, rhe
+  jge   .return
+  ; if rax points to a forwarding cell, we need to follow the redirection
+  cmp   byte [rax], TAG_FWD
+  je    .forward
+  ; in all other cases, we need to copy
+  mov   rsi, rax
+  mov   rax, rdi
+  movsq
+  movsq
+  movsq
+  mov   qword [rsi-24], TAG_FWD
+  mov   [rsi-16], rax
+  ret
+.forward:
+  mov rax, [rax+8]
+.return:
+  ret
+
+;; copies all cells the cell being pointed to by rax points to
+;; into the to-space
+;; modifies rbx and rsi; leaves rax unchanged
+_gc_follow:
+  g_assert_good_tag rax, MSG_BAD_TAG_GC
+  cmp  byte [rax], TAG_APP
+  je   .follow
+  CMP  byte [rax], TAG_CON
+  je   .follow
+  ret
+.follow:
+  mov  rbx, rax
+  mov  rax, [rbx+8]
+  call _gc_copy
+  mov  [rbx+8], rax
+  mov  rax, [rbx+16]
+  call _gc_copy
+  mov  [rbx+16], rax
+  mov  rax, rbx
+  ret
+
+;; assumes rcx <= rdx
+;; modifies rax, rcx and rsi
+;; leaves rdx unchanged
+_gc_stack_frame:
+  mov  rax, [rcx]
+  call _gc_copy
+  mov  [rcx], rax
+  add  rcx, 8
+  cmp  rcx, rdx
+  jle  _gc_stack_frame
+  ret
+
+
+_gc_collect:
+  lea  rhs, [__heap__start__]
+  lea  rhe, [__heap__end__]
+  add  [rhe], rhp               ; update the number of allocations
+  inc  qword [rhe+8]            ; update the number of gc runs
+
+  cmp  rhl, rhe
+  je   .move_back
+  ; we need to move from first to second half
+  lea  rhp, [__heap__middle__]
+  lea  rhl, [__heap__end__]
+  jmp  .setup_done
+.move_back:
+  ; we need to move from second to first half
+  lea  rhp, [__heap__start__]
+  lea  rhl, [__heap__middle__]
+.setup_done:
+  cld
+  mov  rdi, rhp
+
+  ; follow caf cells (we assume there is always at least one, e.g., main)
+  lea  rax, [__cafs__start__]
+  lea  rdx, [__cafs__end__]
+.cafs_loop:
+  call _gc_follow
+  add  rax, 24
+  cmp  rax, rdx
+  jl   .cafs_loop
+
+  ; copy everything immediately reachable from the current stack frame
+  mov  rcx, rsp                 ; TODO: use lea?
+  add  rcx, 8                   ; we need to skip the return address
+  mov  rdx, rbp
+  call _gc_stack_frame
+
+  ; copy everything immediately reachable from old stack frames
+.stack_loop:
+  ; TODO: check if we can move this before the loop
+  lea  rbx, [__stack_start__]
+  cmp  rdx, [rbx]
+  jge  .stack_done
+  mov  rcx, rdx
+  add  rcx, 24                  ; TODO: use lea?
+  mov  rdx, [rdx+8]
+  call _gc_stack_frame
+  jmp .stack_loop
+.stack_done:
+
+  ; close the gap between rhp and rdi
+  mov  rax, rhp
+.follow_loop:
+  cmp  rax, rdi
+  jge  .finish
+  call _gc_follow
+  add  rax, 24
+  jmp  .follow_loop
+
+.finish:
+  mov  rhp, rdi
+  sub  [rhe], rhp
+  ret
+
 
 section .data
 align 8
@@ -503,7 +633,10 @@ FORMAT_PRINT:
 FORMAT_DEBUG:
   db "TAG : 0x%016lx", 10, "ARG1: 0x%016lx", 10, "ARG2: 0x%016lx", 10, 0
 STATS_MESSAGE:
-  db 10, "Steps : %10ld", 10, "Allocs: %10ld", 10, "Checks: %10ld", 10, 0
+  db 10, \
+  "Steps  : %10ld", 10, \
+  "Allocs : %10ld          (Checks: %10ld)", 10, \
+  "GC runs: %10ld", 10, 0
 HEAP_EXHAUSTED:
   db "HEAP EXHAUSTED", 10, 0
 MISSING_ARGUMENTS:
@@ -516,6 +649,8 @@ MSG_BAD_TAG_EVAL:
   db "BAD TAG IN EVAL", 10, 0
 MSG_BAD_TAG_UNWIND:
   db "BAD TAG IN UNWIND", 10, 0
+MSG_BAD_TAG_GC:
+  db "BAD TAG IN GC", 10, 0
 MSG_EXPECTED_INT:
   db "EXPECTED INT TAG", 10, 0
 ABORT_CALLED:
@@ -531,4 +666,6 @@ __heap__start__:
 __heap__middle__:
   resq HEAP_SIZE / 16
 __heap__end__:
-  resq 1
+  ; the gc stores the number of allocations in the 1st qword and the number
+  ; of gc runs in the 2nd qword
+  resq 2
