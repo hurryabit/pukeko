@@ -35,4 +35,4 @@ clean:
 
 .PHONEY: clean $(RUNTARGETS)
 
-# .PRECIOUS: %.gm
+.PRECIOUS: %.asm

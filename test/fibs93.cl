@@ -11,7 +11,7 @@ letrec zip_with f xs ys =
   else
     cons (f (hd xs) (hd ys)) (zip_with f (tl xs) (tl ys))
 in
-let print_list = foldr print (neg 1) in
+let print_list = foldr print 0 in
 letrec fibs = cons 0 (cons 1 (zip_with (fun x y -> x+y) fibs (tl fibs))) in
 let main = print_list (take 93 fibs) in
 main

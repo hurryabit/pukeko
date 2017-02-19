@@ -45,6 +45,55 @@ default rel
 %endmacro
 
 
+;; CAF related stuff
+%define CAF(label) __caf__ %+ label
+%define G_INSTALL_CAFS __install__cafs__
+%define G_INSTALL_MAIN __install__main__
+
+%macro g_declare_cafs 1-*
+  section .data
+  align 8
+  %rep %0
+    CAF(%1): dq TAG_FUN, 0, 0
+    %rotate 1
+  %endrep
+
+  section .text
+G_INSTALL_CAFS:
+  INC_STEPS 3*%0+1
+  %rep %0
+    lea  rax, [CAF(%1)+16]
+    lea  rbx, [%1]
+    mov  [rax], rbx
+    %rotate 1
+  %endrep
+  ret
+%endmacro
+
+%macro g_install_cafs 0
+  INC_STEPS 1
+  call G_INSTALL_CAFS
+%endmacro
+
+%macro g_pushcaf 1
+  INC_STEPS 2
+  lea  rax, [CAF(%1)]
+  push rax
+%endmacro
+
+%macro g_declare_main 1
+  INC_STEPS 2
+G_INSTALL_MAIN:
+  pop  rbx
+  g_pushcaf %1
+  jmp  rbx
+%endmacro
+
+%macro g_install_main 0
+  call G_INSTALL_MAIN
+%endmacro
+
+
 ;; Heap operations
 %macro g_claim 1
   INC_STEPS 4
@@ -67,11 +116,12 @@ default rel
 
 
 ;; Stack control
-%macro g_globstart 1
-  INC_STEPS 2+3*%1
+%macro g_globstart 2            ; %1 = name, % = arity
+%1:
+  INC_STEPS 2+3*%2
   lea  rsi, [rsp+8]
   mov  rdi, rsp
-%rep %1
+%rep %2
   lodsq
   mov  rax, [rax+16]
   stosq
@@ -115,11 +165,15 @@ default rel
 %endmacro
 
 %macro g_pushglobal 2           ; %1 = label, %2 = arity
-  INC_STEPS 2
-  g_claim 1
-  lea  rax, [%1]
-  push rhp
-  g_create TAG_FUN, %2, rax
+  %if %2 = 0
+    g_pushcaf %1
+  %else
+    INC_STEPS 2
+    g_claim 1
+    lea  rax, [%1]
+    push rhp
+    g_create TAG_FUN, %2, rax
+  %endif
 %endmacro
 
 ;; TODO: use rdi and stosq here
@@ -187,6 +241,10 @@ default rel
   g_create TAG_INT, rcx, NULL
 %endmacro
 
+%define g_add g_binop add
+%define g_sub g_binop sub
+%define g_mul g_binop imul
+
 %macro g_divop 1                ; %1: rax = quotient, rdx = remainder
   INC_STEPS 7
   g_claim 1
@@ -199,6 +257,9 @@ default rel
   push rhp
   g_create TAG_INT, %1, NULL
 %endmacro
+
+%define g_div g_divop rax
+%define g_mod g_divop rdx
 
 
 ;; Comparison relations
@@ -216,14 +277,31 @@ default rel
   g_create rax, NULL, NULL
 %endmacro
 
+%define g_les g_relop setb
+%define g_leq g_relop setbe
+%define g_eqv g_relop sete
+%define g_neq g_relop setne
+%define g_geq g_relop setae
+%define g_gtr g_relop seta
 
 ;; I/O
 %macro g_print 0
   INC_STEPS 5
   pop  rax
   g_pre_call_c
-  lea  rdi, [SHORT_PRINT]
+  lea  rdi, [FORMAT_PRINT]
   mov  rsi, [rax+8]
+  mov  rax, 0
+  call _printf
+  g_post_call_c
+%endmacro
+
+%macro g_debug 0
+  g_pre_call_c
+  lea  rdi, [FORMAT_DEBUG]
+  mov  rsi, [rax]
+  mov  rdx, [rax+ 8]
+  mov  rcx, [rax+16]
   mov  rax, 0
   call _printf
   g_post_call_c
@@ -243,6 +321,9 @@ default rel
   je   %1
 %endmacro
 
+%macro g_label 1
+%1:
+%endmacro
 
 ;; Evaluation control
 %macro g_abort 0
@@ -271,9 +352,9 @@ section .text
 _main:
   push rbx
   lea  rhp, [hstart]
-  g_pushglobal main, 0
+  g_install_cafs
+  g_install_main
   g_eval
-  g_print
   lea  rdi, [STATS_MESSAGE]
   mov  rsi, step_ctr
   mov  rax, rhp
@@ -289,7 +370,8 @@ _main:
   call _printf
   g_post_call_c
   pop  rbx
-  mov  rax, 0
+  mov  rax, [rbx+8]
+  pop  rbx
   ret
 
 ;; clean up this mess
@@ -356,9 +438,9 @@ _fail:
 
 section .data
 align 8
-SHORT_PRINT:
+FORMAT_PRINT:
   db "%ld", 10, 0
-LONG_PRINT:
+FORMAT_DEBUG:
   db "TAG : 0x%016lx", 10, "ARG1: 0x%016lx", 10, "ARG2: 0x%016lx", 10, 0
 STATS_MESSAGE:
   db 10, "Steps : %10ld", 10, "Allocs: %10ld", 10, "Checks: %10ld", 10, 0

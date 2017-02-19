@@ -9,7 +9,7 @@ letrec take n xs =
   else
     cons (hd xs) (take (n-1) (tl xs))
 in
-let print_list = foldr print (neg 1) in
+let print_list = foldr print 0 in
 letrec gen f x = cons x (gen f (f x)) in
 let numbers = take 112 (gen (fun x -> (23*x) % 113) 1) in
 letrec partition p xs =

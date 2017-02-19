@@ -12,7 +12,11 @@ assemble :: MonadError String m => Program -> m String
 assemble MkProgram { _globals, _main } = do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
-      prolog = "section .text\n"
+      cafs = [ _name | MkGlobal{ _name, _arity = 0 } <- _globals ]
+      prolog = unlines
+        [ "g_declare_cafs " ++ intercalate ", " (map unName cafs)
+        , "g_declare_main " ++ unName _main
+        ]
   globals <- mapM (assembleGlobal arities) _globals
   return $ intercalate "\n" (prolog:globals)
 
@@ -26,12 +30,8 @@ assembleInst arities inst = do
         let param_str
               | null params = ""
               | otherwise   = " " ++ intercalate ", " params
-        return $ "  g_" ++ macro ++ param_str
-      binop instr = code "binop" [instr]
-      divop rgstr = code "divop" [rgstr]
-      relop instr = code "relop" [instr]
-      mark label = return $ show label ++ ":"
-      check_dot label = do
+        return $ "g_" ++ macro ++ param_str
+      check_label label = do
         let s = show label
         if "." `isPrefixOf` s
           then return ()
@@ -41,24 +41,22 @@ assembleInst arities inst = do
     UNWIND -> code "unwind" []
     RETURN -> code "return" []
     JUMP label -> do
-      check_dot label
+      check_label label
       code "jump" [show label]
     JUMPZERO label -> do
-      check_dot label
+      check_label label
       code "jumpzero" [show label]
     LABEL label -> do
-      check_dot label
-      mark label
+      check_label label
+      code "label" [show label]
     PUSH k -> code "push" [show k]
     PUSHINT num -> code "pushint" [show num]
     PUSHGLOBAL name -> do
       case Map.lookup name arities of
         Nothing -> throwError $ "Unknown global: " ++ show name
         Just arity -> code "pushglobal" [show name, show arity]
-    GLOBSTART name arity -> do
-      m <- mark name
-      c <- code "globstart" [show arity]
-      return $ m ++ "\n" ++ c
+    GLOBSTART name arity ->
+      code "globstart" [show name, show arity]
     POP k -> code "pop" [show k]
     SLIDE k -> code "slide" [show k]
     UPDATE k -> code "update" [show k]
@@ -68,17 +66,17 @@ assembleInst arities inst = do
     HEAD -> code "head" []
     TAIL -> code "tail" []
     NEG -> code "neg" []
-    ADD -> binop "add"
-    SUB -> binop "sub"
-    MUL -> binop "imul"
-    DIV -> divop "rax"
-    MOD -> divop "rdx"
-    LES -> relop "setb"
-    LEQ -> relop "setbe"
-    EQV -> relop "sete"
-    NEQ -> relop "setne"
-    GEQ -> relop "setae"
-    GTR -> relop "seta"
+    ADD -> code "add" []
+    SUB -> code "sub" []
+    MUL -> code "mul" []
+    DIV -> code "div" []
+    MOD -> code "mod" []
+    LES -> code "les" []
+    LEQ -> code "leq" []
+    EQV -> code "eqv" []
+    NEQ -> code "neq" []
+    GEQ -> code "geq" []
+    GTR -> code "gtr" []
     PRINT -> code "print" []
     ABORT -> code "abort" []
     EXIT -> throwError "EXIT not allowed"
