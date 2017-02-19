@@ -101,17 +101,16 @@ constructors =
 
 if_ :: Global
 if_ = mkGlobal "if" 3
-  [ PUSH 0
-  , EVAL
+  [ EVAL
   , JUMPZERO ".if_false"
-  , PUSH 1
+  , PUSH 0
   , JUMP ".end_if"
   , LABEL ".if_false"
-  , PUSH 2
+  , PUSH 1
   , LABEL ".end_if"
   , EVAL
-  , UPDATE 4
-  , POP 3
+  , UPDATE 3
+  , POP 2
   , UNWIND
   ]
 
