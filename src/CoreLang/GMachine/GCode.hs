@@ -14,39 +14,47 @@ data Program = MkProgram
   }
 
 data GInst lab
-  = EVAL
-  | UNWIND
-  | RETURN
-  | EXIT
-  | JUMP        lab
-  | JUMPZERO    lab
-  | LABEL       lab
+  -- Stack control
+  = GLOBSTART   lab Int
   | PUSH        Int
-  | PUSHINT     Int
-  | PUSHGLOBAL  lab
-  | GLOBSTART   lab Int
   | POP         Int
   | SLIDE       Int
   | UPDATE      Int
   | ALLOC       Int
-  | MKAP
+  -- Node constructors
+  | PUSHINT     Int
+  | PUSHGLOBAL  lab
   | CONS        Int Int
+  | MKAP
+  -- Selectors
   | HEAD
   | TAIL
+  -- Arithmetic
   | NEG
   | ADD
   | SUB
   | MUL
   | DIV
   | MOD
+  -- Comparison relations
   | LES
   | LEQ
   | EQV
   | NEQ
   | GEQ
   | GTR
+  -- I/O
   | PRINT
+  -- Jumps
+  | JUMP        lab
+  | JUMPZERO    lab
+  | LABEL       lab
+  -- Evaluation control
+  | EXIT
   | ABORT
+  | EVAL
+  | UNWIND
+  | RETURN
   deriving (Eq, Read, Show, Foldable, Functor, Traversable)
 
 newtype Name = Name { unName :: String }

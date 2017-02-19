@@ -1,3 +1,4 @@
+;; -*-NASM-*-
 ;; G-Machine runtime
 global _main
 extern _exit
@@ -14,8 +15,10 @@ default rel
 %define TAG_FWD 4
 %define TAG_CON 5
 
+;; The heap pointer
 %define rhp r12
 
+;; Auxiliary macros
 %macro g_pre_call_c 0
   push rhp                      ; store heap ptr
   mov  rbx, rsp                 ; align stack ptr
@@ -33,6 +36,8 @@ default rel
   jmp  _fail
 %endmacro
 
+
+;; Heap operations
 %macro g_claim 1
   lea  rax, [rhp+24*%1]
   lea  rcx, [hend]
@@ -42,28 +47,61 @@ default rel
 %%ok:
 %endmacro
 
-%macro g_alloc 3
+%macro g_create 3
   mov  qword [rhp   ], %1
   mov  qword [rhp+ 8], %2
   mov  qword [rhp+16], %3
   add  rhp, 24
 %endmacro
 
+
+;; Stack control
+%macro g_globstart 1
+  lea  rsi, [rsp+8]
+  mov  rdi, rsp
+%rep %1
+  lodsq
+  mov  rax, [rax+16]
+  stosq
+%endrep
+%endmacro
+
 %macro g_push 1
   push qword [rsp+8*%1]
 %endmacro
 
+%macro g_pop 1
+  add rsp, 8*%1
+%endmacro
+
+%macro g_slide 1
+  pop  rax
+  add  rsp, 8*%1
+  push rax
+%endmacro
+
+%macro g_update 1
+  cld
+  mov  rdi, [rsp+8*%1]
+  pop  rsi
+  movsq
+  movsq
+  movsq
+%endmacro
+
+
+;; Node constructors
 %macro g_pushint 1
   g_claim 1
   push rhp
-  g_alloc TAG_INT, %1, NULL
+  g_create TAG_INT, %1, NULL
 %endmacro
 
 %macro g_pushglobal 2           ; %1 = label, %2 = arity
   g_claim 1
   lea  rax, [%1]
   push rhp
-  g_alloc TAG_FUN, %2, rax
+  g_create TAG_FUN, %2, rax
 %endmacro
 
 ;; TODO: use rdi and stosq here
@@ -89,9 +127,11 @@ default rel
   pop  rax
   pop  rbx
   push rhp
-  g_alloc TAG_APP, rax, rbx
+  g_create TAG_APP, rax, rbx
 %endmacro
 
+
+;; Selectors
 %macro g_head 0
   pop rax
   push qword [rax+8]
@@ -102,32 +142,15 @@ default rel
   push qword [rax+16]
 %endmacro
 
-%macro g_update 1
-  cld
-  mov  rdi, [rsp+8*%1]
-  pop  rsi
-  movsq
-  movsq
-  movsq
-%endmacro
 
-%macro g_pop 1
-  add rsp, 8*%1
-%endmacro
-
-%macro g_slide 1
-  pop  rax
-  add  rsp, 8*%1
-  push rax
-%endmacro
-
+;; Arithmetic
 %macro g_neg 0
   g_claim 1
   pop rax
   mov rcx, [rax+8]
   neg rcx
   push rhp
-  g_alloc TAG_INT, rcx, NULL
+  g_create TAG_INT, rcx, NULL
 %endmacro
 
 %macro g_binop 1
@@ -137,10 +160,10 @@ default rel
   pop  rax
   %1   rcx, [rax+8]
   push rhp
-  g_alloc TAG_INT, rcx, NULL
+  g_create TAG_INT, rcx, NULL
 %endmacro
 
-%macro g_divop 1                ; %1 is rax for quotient and rdx for remainder
+%macro g_divop 1                ; %1: rax = quotient, rdx = remainder
   g_claim 1
   pop  rdx
   mov  rax, [rdx+8]
@@ -149,9 +172,11 @@ default rel
   cqo
   idiv rcx                      ; TODO: use [...] as argument
   push rhp
-  g_alloc TAG_INT, %1, NULL
+  g_create TAG_INT, %1, NULL
 %endmacro
 
+
+;; Comparison relations
 %macro g_relop 1                ; %1 is some setCC instruction
   g_claim 1
   pop  rax
@@ -162,9 +187,11 @@ default rel
   cmp  rbx, rcx
   %1   ah
   push rhp
-  g_alloc rax, NULL, NULL
+  g_create rax, NULL, NULL
 %endmacro
 
+
+;; I/O
 %macro g_print 0
   pop  rax
   g_pre_call_c
@@ -177,6 +204,8 @@ default rel
   g_post_call_c
 %endmacro
 
+
+;; Jumps
 %macro g_jump 1
   jmp  %1
 %endmacro
@@ -185,6 +214,12 @@ default rel
   pop  rax
   cmp  word [rax], TAG_CON       ; assumes little endian
   je   %1
+%endmacro
+
+
+;; Evaluation control
+%macro g_abort 0
+  g_fail ABORT_CALLED
 %endmacro
 
 %macro g_eval 0
@@ -199,21 +234,19 @@ default rel
   jmp _unwind.partial
 %endmacro
 
-%macro g_abort 0
-  g_fail ABORT_CALLED
-%endmacro
-
-%macro g_globstart 1
-  lea  rsi, [rsp+8]
-  mov  rdi, rsp
-%rep %1
-  lodsq
-  mov  rax, [rax+16]
-  stosq
-%endrep
-%endmacro
 
 section .text
+
+;; "Main loop" of the evaluation
+_main:
+  push rbx
+  lea  rhp, [hstart]
+  g_pushglobal main, 0
+  g_eval
+  g_print
+  pop  rbx
+  mov  rax, 0
+  ret
 
 ;; clean up this mess
 _eval:
@@ -263,15 +296,6 @@ _fail:
   mov  rdi, 1
   call _exit
 
-_main:
-  push rbx
-  lea  rhp, [hstart]
-  g_pushglobal main, 0
-  g_eval
-  g_print
-  pop  rbx
-  mov  rax, 0
-  ret
 
 section .data
 align 8
@@ -284,9 +308,10 @@ HEAP_EXHAUSTED:
 ABORT_CALLED:
   db "ABORT CALLED", 10, 0
 
+;; Heap
 section .bss
 align 8
 hstart:
-  resb 10000000
+  resb HEAP_SIZE
 hend:
   resq 1

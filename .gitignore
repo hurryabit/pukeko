@@ -1,4 +1,8 @@
 .stack-work/
 .history
 gm/gm
-test/*.gm
+test/*
+!test/
+!test/Makefile
+!test/*.cl
+!test/*.hs

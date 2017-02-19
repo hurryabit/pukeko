@@ -12,7 +12,7 @@ assemble :: MonadError String m => Program -> m String
 assemble MkProgram { _globals, _main } = do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
-      prolog = unlines ["%include 'runtime.inc'", "", "section .text"]
+      prolog = "section .text\n"
   globals <- mapM (assembleGlobal arities) _globals
   return $ intercalate "\n" (prolog:globals)
 

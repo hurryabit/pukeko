@@ -1,17 +1,38 @@
-CL=stack exec corelang --
-GM=../gm/gm
-HEAP=131072
-STACK=8192
+COMP = stack exec corelang --
+NASM = nasm
+LINK = clang
 
-%.gm: %.cl
-	$(CL) -g $<
+LIBS = -lc
 
-%: %.gm
-	$(GM) -g -h $(HEAP) -s $(STACK) $<
+HEAP_SIZE  = 0x01000000 # 16 MB
+STACK_SIZE = 0x00100000 #  1 MB
+
+RUNTIME = ../runtime.inc
+
+SOURCES     = fibs93.cl qsort.cl isort.cl minlet.cl
+GMACHINES   = $(SOURCES:.cl=.gm)
+ASSEMBLES   = $(SOURCES:.cl=.asm)
+OBJECTS     = $(SOURCES:.cl=.o)
+EXECUTABLES = $(SOURCES:.cl=)
+RUNTARGETS  = $(SOURCES:.cl=.run)
+
+all: $(EXECUTABLES)
+
+%.asm: %.cl
+	$(COMP) $<
+
+%.o: %.asm $(RUNTIME)
+	$(NASM) -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64 -o $@ $<
+
+%: $.o
+	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ $< $(LIBS)
+
+%.run: %
+	./$<
 
 clean:
-	rm -f *.gm
+	rm -f $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES)
 
-.PHONEY: clean fibs93 qsort isort minlet
+.PHONEY: clean $(RUNTARGETS)
 
-.PRECIOUS: %.gm
+# .PRECIOUS: %.gm
