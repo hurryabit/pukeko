@@ -14,9 +14,15 @@ GMACHINES   = $(SOURCES:.cl=.gm)
 ASSEMBLES   = $(SOURCES:.cl=.asm)
 OBJECTS     = $(SOURCES:.cl=.o)
 EXECUTABLES = $(SOURCES:.cl=)
-RUNTARGETS  = $(SOURCES:.cl=.run)
+OUTPUTS     = $(SOURCES:.cl=.out)
+TEMPOUTPUTS = $(SOURCES:.cl=.out.tmp)
+CHECKS      = $(SOURCES:.cl=.check)
 
 all: $(EXECUTABLES)
+
+out: $(OUTPUTS)
+
+check: $(CHECKS)
 
 %.asm: %.cl
 	$(COMP) $<
@@ -24,15 +30,18 @@ all: $(EXECUTABLES)
 %.o: %.asm $(RUNTIME)
 	$(NASM) -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64 -o $@ $<
 
-%: $.o
+%: %.o
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ $< $(LIBS)
 
-%.run: %
-	./$<
+%.out %.out.tmp: %
+	./$< > $@
+
+%.check: %.out.tmp
+	diff $(@:.check=.out) $<
 
 clean:
-	rm -f $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES)
+	rm -f $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) $(TEMPOUTPUTS)
 
-.PHONEY: clean $(RUNTARGETS)
+.PHONEY: all clean check $(CHECKS)
 
 .PRECIOUS: %.asm
