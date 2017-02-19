@@ -105,10 +105,10 @@ if_ = mkGlobal "if" 3
   , EVAL
   , JUMPZERO ".if_false"
   , PUSH 1
-  , JUMP ".fi"
+  , JUMP ".end_if"
   , LABEL ".if_false"
   , PUSH 2
-  , LABEL ".fi"
+  , LABEL ".end_if"
   , EVAL
   , UPDATE 4
   , POP 3
@@ -120,10 +120,10 @@ is_nil = mkGlobal "is_nil" 1
   [ EVAL
   , JUMPZERO ".is_nil"
   , CONS 0 0
-  , JUMP ".lin_si"
+  , JUMP ".end_is_nil"
   , LABEL ".is_nil"
   , CONS 1 0
-  , LABEL ".lin_si"
+  , LABEL ".end_is_nil"
   , UPDATE 1
   , RETURN
   ]

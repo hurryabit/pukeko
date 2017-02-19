@@ -377,7 +377,7 @@ G_INSTALL_MAIN:
 
 %macro g_return 0
   @@(1)
-  jmp _unwind.partial
+  jmp _return
 %endmacro
 
 
@@ -417,7 +417,7 @@ _eval:
   cmp  byte [rax], TAG_APP      ; assumes little endian
   je   .app
   @@(2)
-  cmp  word [rax], TAG_FUN      ; the lower tag word is TAG_FUN only for CAFs
+  cmp  word [rax], TAG_FUN      ; the tag *word* is TAG_FUN only for CAFs
   je   .caf
   @@(1)
   ret
@@ -445,20 +445,21 @@ _unwind:
 .done:
   @@(2)
   cmp  byte [rax], TAG_FUN     ; assumes little endian
-  jne  .return
+  jne  _return.no_pop
   @@(4)
   ; calc where rbp would need to be for a full application
   ; if rbp is smaller, we have a partial application
   movzx rbx, byte [rax+1]
   lea   rcx, [rsp+8*rbx]        ; TODO: test that this works correctly
   cmp   rbp, rcx
-  jl    .partial
+  jl    _return
   @@(1)
   jmp   [rax+8]
-.partial:
+
+_return:
   @@(1)
   mov rsp, rbp
-.return:
+.no_pop:
   @@(3)
   pop  rax
   pop  rbp
