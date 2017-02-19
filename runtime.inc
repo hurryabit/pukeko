@@ -114,6 +114,16 @@ G_INSTALL_MAIN:
   add  rhp, 24
 %endmacro
 
+;; TODO: make this faster
+%macro g_alloc 1
+  INC_STEPS 1
+  g_claim %1
+%rep %1
+  push rhp
+  g_create TAG_NIX, 0, 0
+%endrep
+%endmacro
+
 
 ;; Stack control
 %macro g_globstart 2            ; %1 = name, % = arity

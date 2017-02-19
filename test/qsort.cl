@@ -13,17 +13,20 @@ let print_list = foldr print 0 in
 letrec gen f x = cons x (gen f (f x)) in
 let numbers = take 112 (gen (fun x -> (23*x) % 113) 1) in
 letrec partition p xs =
-  if is_nil xs then
-    mk_pair nil nil
-  else
-    let x = hd xs in
-    let yzs = partition p (tl xs) in
-    let ys = fst yzs in
-    let zs = snd yzs in
-    if p (hd xs) then
-      mk_pair (cons x ys) zs
+  letrec part_p xs =
+    if is_nil xs then
+      mk_pair nil nil
     else
-      mk_pair ys (cons x zs)
+      let x = hd xs in
+      let yzs = part_p (tl xs) in
+      let ys = fst yzs in
+      let zs = snd yzs in
+      if p (hd xs) then
+        mk_pair (cons x ys) zs
+      else
+        mk_pair ys (cons x zs)
+  in
+  part_p xs
 in
 letrec append xs ys =
   if is_nil xs then
