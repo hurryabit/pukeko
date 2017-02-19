@@ -43,6 +43,20 @@ default rel
 %endmacro
 
 
+;; Debugging stuff
+%macro g_assert_tag 3           ; %1 = reg with ptr, %2 = tag, %3 = error msg
+%ifdef DEBUG
+  cmp  byte [%1], %2
+  je   %%ok
+  g_fail %3
+%%ok:
+%endif
+%endmacro
+
+%macro g_assert_int 1
+  g_assert_tag %1, TAG_INT, MSG_EXPECTED_INT
+%endmacro
+
 ;; CAF related stuff
 %define CAF(label) __caf__ %+ label
 %define G_INSTALL_CAFS __install__cafs__
@@ -225,6 +239,7 @@ G_INSTALL_MAIN:
 %macro g_slct 1
   @@(2)
   pop rax
+  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
   push qword [rax+8*%1]
 %endmacro
 
@@ -247,8 +262,10 @@ G_INSTALL_MAIN:
   @@(5)
   g_claim 1
   pop  rax
+  g_assert_int rax
   mov  rcx, [rax+8]
   pop  rax
+  g_assert_int rax
   %1   rcx, [rax+8]
   push rhp
   g_create TAG_INT, rcx, NULL
@@ -262,8 +279,10 @@ G_INSTALL_MAIN:
   @@(7)
   g_claim 1
   pop  rdx
+  g_assert_int rdx
   mov  rax, [rdx+8]
   pop  rdx
+  g_assert_int rdx
   mov  rcx, [rdx+8]
   cqo
   idiv rcx                      ; TODO: use [...] as argument
@@ -280,8 +299,10 @@ G_INSTALL_MAIN:
   @@(8)
   g_claim 1
   pop  rax
+  g_assert_int rax
   mov  rbx, [rax+8]
   pop  rax
+  g_assert_int rax
   mov  rcx, [rax+8]
   mov  rax, TAG_CON
   cmp  rbx, rcx
@@ -330,6 +351,7 @@ G_INSTALL_MAIN:
 %macro g_jumpzero 1
   @@(3)
   pop  rax
+  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_JUMPZERO
   cmp  word [rax], TAG_CON       ; assumes little endian
   je   %1
 %endmacro
@@ -383,6 +405,7 @@ _main:
   call _printf
   g_post_call_c
   pop  rbx
+  g_assert_int rbx
   mov  rax, [rbx+8]
   pop  rbx
   ret
@@ -460,6 +483,12 @@ HEAP_EXHAUSTED:
   db "HEAP EXHAUSTED", 10, 0
 MISSING_ARGUMENTS:
   db "MISSING ARGUMENTS", 10, 0
+MSG_BAD_TAG_SELECT:
+  db "SELECT ON NON-CONS NODE", 10, 0
+MSG_BAD_TAG_JUMPZERO:
+  db "JUMPZERO ON NON-CONS NODE", 10, 0
+MSG_EXPECTED_INT:
+  db "EXPECTED INT TAG", 10, 0
 ABORT_CALLED:
   db "ABORT CALLED", 10, 0
 
