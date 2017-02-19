@@ -75,8 +75,6 @@ default rel
 
 ;; CAF related stuff
 %define CAF(label) __caf__ %+ label
-%define G_INSTALL_CAFS __install__cafs__
-%define G_INSTALL_MAIN __install__main__
 
 %macro g_declare_cafs 1-*
   section .data
@@ -87,7 +85,7 @@ default rel
   %endrep
 
   section .text
-G_INSTALL_CAFS:
+__install__cafs__:
   @@(3*%0+1)
   %rep %0
     lea  rax, [CAF(%1)+8]
@@ -100,7 +98,7 @@ G_INSTALL_CAFS:
 
 %macro g_install_cafs 0
   @@(1)
-  call G_INSTALL_CAFS
+  call __install__cafs__
 %endmacro
 
 %macro g_pushcaf 1
@@ -111,14 +109,14 @@ G_INSTALL_CAFS:
 
 %macro g_declare_main 1
   @@(2)
-G_INSTALL_MAIN:
+__install__main__:
   pop  rbx
   g_pushcaf %1
   jmp  rbx
 %endmacro
 
 %macro g_install_main 0
-  call G_INSTALL_MAIN
+  call __install__main__
 %endmacro
 
 
