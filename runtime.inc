@@ -77,22 +77,24 @@ default rel
 %define CAF(label) __caf__ %+ label
 
 %macro g_declare_cafs 1-*
-  section .data
+section .data
   align 8
-  %rep %0
-    CAF(%1): dq TAG_FUN, 0, 0
-    %rotate 1
-  %endrep
+__cafs__start__:
+%rep %0
+  CAF(%1): dq TAG_FUN, 0, 0
+%rotate 1
+%endrep
+__cafs__end__:
 
-  section .text
+section .text
 __install__cafs__:
   @@(3*%0+1)
-  %rep %0
-    lea  rax, [CAF(%1)+8]
-    lea  rbx, [%1]
-    mov  [rax], rbx
-    %rotate 1
-  %endrep
+%rep %0
+  lea  rax, [CAF(%1)+8]
+  lea  rbx, [%1]
+  mov  [rax], rbx
+%rotate 1
+%endrep
   ret
 %endmacro
 
