@@ -2,9 +2,10 @@ module CoreLang.Language.Operator
   ( Spec (..)
   , Assoc (..)
   , table
-  , names
+  , syms
   , aprec
   , find
+  , findByName
   )
   where
 
@@ -12,36 +13,52 @@ import Data.Map (Map)
 import Data.Ratio ()
 import Text.Parsec.Expr (Assoc (..))
 
+import qualified Data.List as List
 import qualified Data.Map as Map
 
-data Spec = MkSpec { _name :: String, _prec :: Rational, _assoc :: Assoc }
+import CoreLang.Language.Ident
 
-right, none :: String -> Spec
-right _name = MkSpec { _name, _prec = undefined, _assoc = AssocRight }
-none  _name = MkSpec { _name, _prec = undefined, _assoc = AssocNone  }
+data Spec =
+  MkSpec { _sym :: String, _name :: Ident, _prec :: Rational, _assoc :: Assoc }
+
+mkSpec :: Assoc -> String -> String -> Spec
+mkSpec _assoc _sym _name =
+  MkSpec { _sym, _name = MkIdent _name, _prec = undefined, _assoc }
+
+right, none :: String -> String -> Spec
+right = mkSpec AssocRight
+none  = mkSpec AssocNone
 
 table :: [[Spec]]
 table = fixPrecs
-  [ [right "||"]
-  , [right "&&"]
-  , map none ["<", "<=", "==", "!=", ">=", ">"]
-  , [right "+", none "-"]
-  , [right "*", none "/", none "%"]
+  [ [right "||" "or" ]
+  , [right "&&" "and"]
+  , zipWith none
+    ["<" , "<=", "==", "!=", ">=", ">" ]
+    ["lt", "le", "eq", "ne", "ge", "gt"]
+  , [right "+" "add", none "-" "sub"]
+  , [right "*" "mul", none "/" "div", none "%" "mod"]
   ]
 
-names :: [String]
-names = map _name (concat table)
+syms :: [String]
+syms = map _sym (concat table)
 
 aprec :: Rational
 aprec = fromIntegral (length table + 1)
 
 dict :: Map String Spec
-dict = Map.fromList $ map (\spec -> (_name spec, spec)) (concat table)
+dict = Map.fromList $ map (\spec -> (_sym spec, spec)) (concat table)
 
 find :: String -> Spec
-find name =
-  case Map.lookup name dict of
-    Nothing  -> error ("unknown operator: " ++ name)
+find sym =
+  case Map.lookup sym dict of
+    Nothing  -> error ("unknown operator: " ++ sym)
+    Just res -> res
+
+findByName :: Ident -> Spec
+findByName name =
+  case List.find (\spec -> _name spec == name) (concat table) of
+    Nothing  -> error ("unknown operator name: " ++ show name)
     Just res -> res
 
 fixPrecs :: [[Spec]] -> [[Spec]]

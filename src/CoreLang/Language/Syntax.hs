@@ -61,15 +61,14 @@ instance Pretty (Expr a) where
         maybeParens (prec > aprec) $
           pPrintPrec lvl aprec _fun <+> pPrintPrec lvl (aprec+1) _arg
       ApOp   { _op, _arg1, _arg2 } ->
-        let MkIdent name = _op
-            MkSpec { _prec, _assoc } = Operator.find name
+        let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op
             (prec1, prec2) =
               case _assoc of
                 AssocLeft  -> (_prec  , _prec+1)
                 AssocRight -> (_prec+1, _prec  )
                 AssocNone  -> (_prec+1, _prec+1)
         in  maybeParens (prec > _prec) $
-              pPrintPrec lvl prec1 _arg1 <> pretty _op <> pPrintPrec lvl prec2 _arg2
+              pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
       Let    { _isrec, _defns, _body  } ->
         case _defns of
           [] -> pPrintPrec lvl 0 _body

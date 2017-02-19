@@ -12,7 +12,7 @@ assemble :: MonadError String m => Program -> m String
 assemble MkProgram { _globals, _main } = do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
-      prolog = unlines ["%include 'runtime.asm'", "", "section .text"]
+      prolog = unlines ["%include 'runtime.inc'", "", "section .text"]
   globals <- mapM (assembleGlobal arities) _globals
   return $ intercalate "\n" (prolog:globals)
 
@@ -28,6 +28,7 @@ assembleInst arities inst = do
               | otherwise   = " " ++ intercalate ", " params
         return $ "  g_" ++ macro ++ param_str
       binop instr = code "binop" [instr]
+      divop rgstr = code "divop" [rgstr]
       relop instr = code "relop" [instr]
       mark label = return $ show label ++ ":"
       check_dot label = do
@@ -70,8 +71,8 @@ assembleInst arities inst = do
     ADD -> binop "add"
     SUB -> binop "sub"
     MUL -> binop "imul"
-    DIV -> binop "idiv"
-    MOD -> throwError "MOD not supported yet"
+    DIV -> divop "rax"
+    MOD -> divop "rdx"
     LES -> relop "setb"
     LEQ -> relop "setbe"
     EQV -> relop "sete"
@@ -79,5 +80,5 @@ assembleInst arities inst = do
     GEQ -> relop "setae"
     GTR -> relop "seta"
     PRINT -> code "print" []
-    ABORT -> throwError "ABORT not supported yet"
+    ABORT -> code "abort" []
     EXIT -> throwError "EXIT not allowed"

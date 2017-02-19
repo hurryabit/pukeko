@@ -16,8 +16,8 @@ import qualified CoreLang.Language.Parser       as Parser
 import qualified CoreLang.Language.Type         as Type
 import qualified CoreLang.Language.TypeChecker  as Poly
 
-compile :: Bool -> String -> IO ()
-compile write_ll file = do
+compile :: Bool -> Bool -> String -> IO ()
+compile write_ll write_gm file = do
   code <- readFile file
   let gprog_or_error = do
         expr <- Parser.parseExpr file code
@@ -26,14 +26,16 @@ compile write_ll file = do
         let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
         program <- Compiler.compile (fmap (const ()) lifted_expr)
         nasm <- NASM.assemble program
-        return (lifted_expr, nasm)
+        return (lifted_expr, program, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (lifted_expr, nasm) -> do
+    Right (lifted_expr, program, nasm) -> do
       when write_ll $
         writeFile (file `replaceExtension` ".ll") (prettyShow lifted_expr)
+      when write_gm $
+        writeFile (file `replaceExtension` ".gm") (prettyShow program)
       writeFile (file `replaceExtension` ".asm") nasm
       exitWith ExitSuccess
 
@@ -41,6 +43,7 @@ opts :: Parser (IO ())
 opts =
   compile
     <$> switch (short 'l' <> long "lifted" <> help "Write result of lambda lifter")
+    <*> switch (short 'g' <> long "gcode"  <> help "Write intermediate g-machine code")
     -- <*> option auto (short 'h' <> long "heap"  <> value 1000 <> metavar "SIZE")
     <*> argument str (metavar "FILE")
 

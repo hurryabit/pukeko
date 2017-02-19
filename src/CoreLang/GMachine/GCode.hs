@@ -6,6 +6,8 @@ import Data.Set (Set)
 
 import qualified Data.Set as Set
 
+import CoreLang.Pretty
+
 data Program = MkProgram
   { _globals :: [Global]
   , _main    :: Name
@@ -74,3 +76,14 @@ instance Read Name where
     case break isSpace (dropWhile isSpace input) of
       ("", _)      -> []
       (name, rest) -> [(Name name, rest)]
+
+instance Pretty Program where
+  pPrint MkProgram { _globals, _main } =
+    vcat $ map (text . show) $
+    [ PUSHGLOBAL _main
+    , EVAL
+    , PRINT
+    , EXIT
+    ]
+    ++
+    concatMap _code _globals

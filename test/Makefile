@@ -4,7 +4,7 @@ HEAP=131072
 STACK=8192
 
 %.gm: %.cl
-	$(CL) $<
+	$(CL) -g $<
 
 %: %.gm
 	$(GM) -g -h $(HEAP) -s $(STACK) $<
@@ -12,6 +12,6 @@ STACK=8192
 clean:
 	rm -f *.gm
 
-.PHONEY: clean fibs93 qsort isort
+.PHONEY: clean fibs93 qsort isort minlet
 
-# .PRECIOUS: %.gm
+.PRECIOUS: %.gm

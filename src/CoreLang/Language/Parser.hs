@@ -38,7 +38,7 @@ coreLangDef = haskellStyle
       , "let", "letrec", "and", "in"
       , "if", "then", "else"
       ]
-  , Token.reservedOpNames = ["=", "->", ":", "."] ++ Operator.names
+  , Token.reservedOpNames = ["=", "->", ":", "."] ++ Operator.syms
   }
 
 Token.TokenParser
@@ -137,5 +137,5 @@ aexpr = choice
 
 operatorTable = map (map f) (reverse Operator.table)
   where
-    f MkSpec { _name, _assoc } =
-      Infix (ApOp <$> getPosition <*> (reservedOp _name *> pure (MkIdent _name))) _assoc
+    f MkSpec { _sym, _name, _assoc } =
+      Infix (ApOp <$> getPosition <*> (reservedOp _sym *> pure _name)) _assoc

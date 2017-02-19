@@ -10,8 +10,8 @@ import CoreLang.Language.Syntax
 uncompiled :: [Defn ()]
 uncompiled =
   [ mk_defn "not" [x]    x false true
-  , mk_defn "&&"  [x, y] x y     false
-  , mk_defn "||"  [x, y] x true  y
+  , mk_defn "and" [x, y] x y     false
+  , mk_defn "or"  [x, y] x true  y
   ]
   where
     x = MkIdent "x"
@@ -60,17 +60,17 @@ neg = mkGlobal "neg" 1
 
 binops :: [Global]
 binops =
-  [ mk "+"  ADD
-  , mk "-"  SUB
-  , mk "*"  MUL
-  , mk "/"  DIV
-  , mk "%"  MOD
-  , mk "<"  LES
-  , mk "<=" LEQ
-  , mk "==" EQV
-  , mk "!=" NEQ
-  , mk ">=" GEQ
-  , mk ">"  GTR
+  [ mk "add" ADD
+  , mk "sub" SUB
+  , mk "mul" MUL
+  , mk "div" DIV
+  , mk "mod" MOD
+  , mk "lt"  LES
+  , mk "le"  LEQ
+  , mk "eq"  EQV
+  , mk "ne"  NEQ
+  , mk "ge"  GEQ
+  , mk "gt"  GTR
   ]
   where
     mk name inst = mkGlobal name 2
