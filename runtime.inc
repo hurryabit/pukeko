@@ -152,6 +152,7 @@ __install__main__:
   @@(1)
   g_claim %1
 %rep %1
+  @@(1)
   push rhp
   g_create TAG_NIX, 0, 0
 %endrep
@@ -297,16 +298,15 @@ __install__main__:
 %define g_mul g_binop imul
 
 %macro g_divop 1                ; %1: rax = quotient, rdx = remainder
-  @@(7)
+  @@(6)
   g_claim 1
-  pop  rdx
-  g_assert_int rdx
-  mov  rax, [rdx+8]
-  pop  rdx
-  g_assert_int rdx
-  mov  rcx, [rdx+8]
+  pop  rcx
+  g_assert_int rcx
+  mov  rax, [rcx+8]
   cqo
-  idiv rcx                      ; TODO: use [...] as argument
+  pop  rcx
+  g_assert_int rcx
+  idiv qword [rcx+8]
   push rhp
   g_create TAG_INT, %1, NULL
 %endmacro
@@ -455,7 +455,7 @@ _eval:
   push rbp
   push rax
   mov  rbp, rsp
-  ; this fall through to _unwind is intended
+  ; control goes on to _unwind intensionally
 
 _unwind:
   @@(3)
@@ -482,7 +482,7 @@ _unwind:
 
 _return:
   @@(1)
-  mov rsp, rbp
+  mov  rsp, rbp
 .no_pop:
   @@(3)
   pop  rax
@@ -610,9 +610,8 @@ _gc_collect:
   jl   .cafs_loop
 
   ; copy everything immediately reachable from the current stack frame
-  @@(4)
-  mov  rcx, rsp                 ; TODO: use lea?
-  add  rcx, 8                   ; we need to skip the return address
+  @@(3)
+  lea  rcx, [rsp+8]             ; we need to skip the return address
   mov  rdx, rbp
   call _gc_stack_frame
 
@@ -623,9 +622,8 @@ _gc_collect:
   lea  rbx, [__stack_start__]
   cmp  rdx, [rbx]
   jge  .stack_done
-  @@(5)
-  mov  rcx, rdx
-  add  rcx, 24                  ; TODO: use lea?
+  @@(4)
+  lea  rcx, [rdx+24]
   mov  rdx, [rdx+8]
   call _gc_stack_frame
   jmp .stack_loop
