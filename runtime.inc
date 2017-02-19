@@ -19,13 +19,14 @@ default rel
 %define TAG_MAX_GOOD TAG_CON
 
 ;; Stats stuff
-%define step_ctr r13
-%define claim_ctr r14
+%define step_ctr r14
+%define claim_ctr r15
 
 %define @@(n) add step_ctr, n
 
-;; The heap pointer
+;; The heap pointer and the heap limit
 %define rhp r12
+%define rhl r13
 
 ;; Auxiliary macros
 %macro g_pre_call_c 0
@@ -124,11 +125,10 @@ __install__main__:
 
 ;; Heap operations
 %macro g_claim 1
-  @@(4)
+  @@(3)
   inc  claim_ctr
   lea  rax, [rhp+24*%1]
-  lea  rcx, [hend]
-  cmp  rax, rcx
+  cmp  rax, rhl
   jle  %%ok
   g_fail HEAP_EXHAUSTED
 %%ok:
@@ -402,14 +402,19 @@ section .text
 ;; "Main loop" of the evaluation
 _main:
   push rbx
-  lea  rhp, [hstart]
+  push rbp
+  lea  rhp, [__heap__start__]
+  lea  rhl, [__heap__end__]
   g_install_cafs
   g_install_main
+  mov  rbp, rsp
+  lea  rax, [__stack_start__]
+  mov  [rax], rbp
   g_eval
   lea  rdi, [STATS_MESSAGE]
   mov  rsi, step_ctr
   mov  rax, rhp
-  lea  rbx, [hstart]
+  lea  rbx, [__heap__start__]
   sub  rax, rbx
   mov  rdx, 0
   mov  rbx, 24
@@ -423,6 +428,7 @@ _main:
   pop  rbx
   g_assert_int rbx
   mov  rax, [rbx+8]
+  pop  rbp
   pop  rbx
   ret
 
@@ -518,7 +524,11 @@ ABORT_CALLED:
 ;; Heap
 section .bss
 align 8
-hstart:
-  resb HEAP_SIZE
-hend:
+__stack_start__:
+  resq 1
+__heap__start__:
+  resq HEAP_SIZE / 16
+__heap__middle__:
+  resq HEAP_SIZE / 16
+__heap__end__:
   resq 1
