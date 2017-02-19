@@ -62,7 +62,7 @@ default rel
 G_INSTALL_CAFS:
   INC_STEPS 3*%0+1
   %rep %0
-    lea  rax, [CAF(%1)+16]
+    lea  rax, [CAF(%1)+8]
     lea  rbx, [%1]
     mov  [rax], rbx
     %rotate 1
@@ -128,6 +128,14 @@ G_INSTALL_MAIN:
 ;; Stack control
 %macro g_globstart 2            ; %1 = name, % = arity
 %1:
+%ifdef DEBUG
+  mov  rax, rbp
+  sub  rax, rsp
+  cmp  rax, 8*%2
+  jge  %%ok
+  g_fail MISSING_ARGUMENTS
+%%ok:
+%endif
   INC_STEPS 2+3*%2
   lea  rsi, [rsp+8]
   mov  rdi, rsp
@@ -182,7 +190,7 @@ G_INSTALL_MAIN:
     g_claim 1
     lea  rax, [%1]
     push rhp
-    g_create TAG_FUN, %2, rax
+    g_create TAG_FUN | %2 << 8, rax, 0
   %endif
 %endmacro
 
@@ -391,19 +399,16 @@ _eval:
   cmp  byte [rax], TAG_APP      ; assumes little endian
   je   .app
   INC_STEPS 2
-  cmp  byte [rax], TAG_FUN
-  jne  .ret
-  INC_STEPS 2
-  cmp  qword [rax+8], 0
-  jne  .ret
+  cmp  word [rax], TAG_FUN      ; the lower tag word is TAG_FUN only for CAFs
+  je   .caf
+  INC_STEPS 1
+  ret
+.caf:
   INC_STEPS 4
   push rbp
   push rax
   mov  rbp, rsp
-  jmp  [rax+16]
-.ret:
-  INC_STEPS 1
-  ret
+  jmp  [rax+8]
 .app:
   INC_STEPS 3
   push rbp
@@ -421,15 +426,17 @@ _unwind:
   jmp _unwind
 .done:
   INC_STEPS 2
-  cmp  byte [rax], TAG_FUN      ; assumes little endian
-  jne .return
+  cmp  byte [rax], TAG_FUN     ; assumes little endian
+  jne  .return
   INC_STEPS 4
-  mov rbx, rbp
-  sub rbx, rsp                  ; use lea to compute this?
-  cmp rbx, [rax+8]
-  jl  .partial
+  ; calc where rbp would need to be for a full application
+  ; if rbp is smaller, we have a partial application
+  movzx rbx, byte [rax+1]
+  lea   rcx, [rsp+8*rbx]        ; TODO: test that this works correctly
+  cmp   rbp, rcx
+  jl    .partial
   INC_STEPS 1
-  jmp [rax+16]
+  jmp   [rax+8]
 .partial:
   INC_STEPS 1
   mov rsp, rbp
@@ -456,6 +463,8 @@ STATS_MESSAGE:
   db 10, "Steps : %10ld", 10, "Allocs: %10ld", 10, "Checks: %10ld", 10, 0
 HEAP_EXHAUSTED:
   db "HEAP EXHAUSTED", 10, 0
+MISSING_ARGUMENTS:
+  db "MISSING ARGUMENTS", 10, 0
 ABORT_CALLED:
   db "ABORT CALLED", 10, 0
 

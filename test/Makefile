@@ -2,12 +2,13 @@ COMP = stack exec corelang --
 NASM = nasm
 LINK = clang
 
-LIBS = -lc
-
 HEAP_SIZE  = 0x01000000 # 16 MB
 STACK_SIZE = 0x00100000 #  1 MB
 
 RUNTIME = ../runtime.inc
+LIBS = -lc
+
+NASM_FLAGS = -DDEBUG -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64
 
 SOURCES     = fibs93.cl qsort.cl isort.cl minlet.cl
 GMACHINES   = $(SOURCES:.cl=.gm)
@@ -28,7 +29,7 @@ check: $(CHECKS)
 	$(COMP) $<
 
 %.o: %.asm $(RUNTIME)
-	$(NASM) -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64 -o $@ $<
+	$(NASM) $(NASM_FLAGS) -o $@ $<
 
 %: %.o
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ $< $(LIBS)
