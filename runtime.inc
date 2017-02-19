@@ -222,17 +222,14 @@ G_INSTALL_MAIN:
 
 
 ;; Selectors
-%macro g_head 0
+%macro g_slct 1
   @@(2)
   pop rax
-  push qword [rax+8]
+  push qword [rax+8*%1]
 %endmacro
 
-%macro g_tail 0
-  @@(2)
-  pop rax
-  push qword [rax+16]
-%endmacro
+%define g_head g_slct 1
+%define g_tail g_slct 2
 
 
 ;; Arithmetic
