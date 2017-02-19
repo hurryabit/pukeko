@@ -9,11 +9,14 @@ default rel
 %define NULL 0
 
 %define TAG_NIX 0
-%define TAG_APP 1
-%define TAG_INT 2
-%define TAG_FUN 3
-%define TAG_FWD 4
+%define TAG_FWD 1
+%define TAG_APP 2
+%define TAG_INT 3
+%define TAG_FUN 4
 %define TAG_CON 5
+
+%define TAG_MIN_GOOD TAG_APP
+%define TAG_MAX_GOOD TAG_CON
 
 ;; Stats stuff
 %define step_ctr r13
@@ -55,6 +58,19 @@ default rel
 
 %macro g_assert_int 1
   g_assert_tag %1, TAG_INT, MSG_EXPECTED_INT
+%endmacro
+
+%macro g_assert_good_tag 2     ; %1 = reg with ptr, %2 = error msg
+%ifdef DEBUG
+  cmp  byte [%1], TAG_MIN_GOOD
+  jl   %%bad
+  cmp  byte [%1], TAG_MAX_GOOD
+  jg   %%bad
+  jmp  %%ok
+%%bad:
+  g_fail %2
+%%ok:
+%endif
 %endmacro
 
 ;; CAF related stuff
@@ -414,6 +430,7 @@ _main:
 _eval:
   @@(3)
   mov  rax, [rsp+8]
+  g_assert_good_tag rax, MSG_BAD_TAG_EVAL
   cmp  byte [rax], TAG_APP      ; assumes little endian
   je   .app
   @@(2)
@@ -432,11 +449,12 @@ _eval:
   push rbp
   push rax
   mov  rbp, rsp
-  ; jmp  unwind
+  ; this fallthrough to _unwind is intended
 
 _unwind:
   @@(3)
   mov  rax, [rsp]
+  g_assert_good_tag rax, MSG_BAD_TAG_UNWIND
   cmp  byte [rax], TAG_APP      ; assumes little endian
   jne  .done
   @@(2)
@@ -488,6 +506,10 @@ MSG_BAD_TAG_SELECT:
   db "SELECT ON NON-CONS NODE", 10, 0
 MSG_BAD_TAG_JUMPZERO:
   db "JUMPZERO ON NON-CONS NODE", 10, 0
+MSG_BAD_TAG_EVAL:
+  db "BAD TAG IN EVAL", 10, 0
+MSG_BAD_TAG_UNWIND:
+  db "BAD TAG IN UNWIND", 10, 0
 MSG_EXPECTED_INT:
   db "EXPECTED INT TAG", 10, 0
 ABORT_CALLED:
