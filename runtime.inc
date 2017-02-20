@@ -22,7 +22,11 @@ default rel
 %define step_ctr r14
 %define claim_ctr r15
 
+%ifndef NOATAT
 %define @@(n) add step_ctr, n
+%else
+%define @@(n)
+%endif
 
 ;; The heap pointer and the heap limit
 %define rhp r12
