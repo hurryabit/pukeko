@@ -43,7 +43,7 @@ compiled :: [Global]
 compiled = concat
   [ neg : binops
   , constructors
-  , [if_
+  , [ if_
     , is_nil, hd, tl
     , fst_, snd_
     , print_, abort
@@ -103,14 +103,13 @@ if_ :: Global
 if_ = mkGlobal "if" 3
   [ EVAL
   , JUMPZERO ".if_false"
-  , PUSH 0
+  , SLIDE 1
   , JUMP ".end_if"
   , LABEL ".if_false"
-  , PUSH 1
+  , POP 1
   , LABEL ".end_if"
   , EVAL
-  , UPDATE 3
-  , POP 2
+  , UPDATE 1
   , UNWIND
   ]
 
