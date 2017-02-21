@@ -4,6 +4,6 @@ gm/gm
 test/*
 !test/
 !test/Makefile
-!test/*.cl
 !test/*.hs
 !test/*.out
+!test/*.pu

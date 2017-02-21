@@ -1,0 +1,77 @@
+name:                pukeko
+version:             0.1.0.0
+synopsis:            Initial project template from stack
+description:         Please see README.md
+homepage:            https://github.com/githubuser/pukeko#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Martin Huschenbett
+maintainer:          martin.huschenbett@posteo.me
+copyright:           2017 Martin Huschenbett
+category:            Compilers/Interpreters
+build-type:          Simple
+extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Control.Monad.Supply
+                     -- , Pukeko.Demo
+                     , Pukeko.GMachine.Builtins
+                     , Pukeko.GMachine.Compiler
+                     , Pukeko.GMachine.GCode
+                     , Pukeko.GMachine.NASM
+                     , Pukeko.Language.Builtins
+                     , Pukeko.Language.Ident
+                     , Pukeko.Language.LambdaLifter
+                     , Pukeko.Language.Operator
+                     , Pukeko.Language.Parser
+                     , Pukeko.Language.Rewrite
+                     , Pukeko.Language.Syntax
+                     , Pukeko.Language.Term
+                     , Pukeko.Language.Type
+                     , Pukeko.Language.TypeChecker
+                     , Pukeko.Pretty
+  build-depends:       base >= 4.7 && < 5
+                     , array
+                     , containers
+                     , fclabels
+                     , haskeline
+                     , mtl
+                     , parsec
+                     , pretty
+  default-language:    Haskell2010
+  default-extensions:  DuplicateRecordFields
+                     , FlexibleContexts
+                     , FlexibleInstances
+                     , GeneralizedNewtypeDeriving
+                     , MonadFailDesugaring
+                     , NamedFieldPuns
+                     , PartialTypeSignatures
+                     , TypeFamilies
+
+  ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Wno-partial-type-signatures
+
+executable pukeko
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , pukeko
+                     , filepath
+                     , mtl
+                     , optparse-applicative
+  default-language:    Haskell2010
+
+test-suite pukeko-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , pukeko
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/pukeko

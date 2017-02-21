@@ -1,4 +1,4 @@
-COMP = stack exec corelang --
+COMP = stack exec pukeko --
 NASM = nasm
 LINK = clang
 
@@ -11,14 +11,14 @@ LIBS = -lc
 
 NASM_FLAGS = -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64
 
-SOURCES     = fibs93.cl qsort.cl isort.cl minlet.cl
-GMACHINES   = $(SOURCES:.cl=.gm)
-ASSEMBLES   = $(SOURCES:.cl=.asm)
-OBJECTS     = $(SOURCES:.cl=.o)
-EXECUTABLES = $(SOURCES:.cl=)
-OUTPUTS     = $(SOURCES:.cl=.out)
-TEMPOUTPUTS = $(SOURCES:.cl=.out.tmp)
-CHECKS      = $(SOURCES:.cl=.check)
+SOURCES     = fibs.pu qsort.pu isort.pu minlet.pu
+GMACHINES   = $(SOURCES:.pu=.gm)
+ASSEMBLES   = $(SOURCES:.pu=.asm)
+OBJECTS     = $(SOURCES:.pu=.o)
+EXECUTABLES = $(SOURCES:.pu=)
+OUTPUTS     = $(SOURCES:.pu=.out)
+TEMPOUTPUTS = $(SOURCES:.pu=.out.tmp)
+CHECKS      = $(SOURCES:.pu=.check)
 
 all: $(EXECUTABLES)
 
@@ -26,7 +26,7 @@ out: $(OUTPUTS)
 
 check: $(CHECKS)
 
-%.asm: %.cl
+%.asm: %.pu
 	$(COMP) $<
 
 %.pp.asm: %.asm

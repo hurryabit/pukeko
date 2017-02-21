@@ -6,15 +6,15 @@ import Options.Applicative
 import System.FilePath
 import System.Exit
 
-import CoreLang.Pretty
+import Pukeko.Pretty
 
-import qualified CoreLang.GMachine.Compiler     as Compiler
-import qualified CoreLang.GMachine.NASM         as NASM
-import qualified CoreLang.Language.Builtins     as Builtins
-import qualified CoreLang.Language.LambdaLifter as Lifter
-import qualified CoreLang.Language.Parser       as Parser
-import qualified CoreLang.Language.Type         as Type
-import qualified CoreLang.Language.TypeChecker  as Poly
+import qualified Pukeko.GMachine.Compiler     as Compiler
+import qualified Pukeko.GMachine.NASM         as NASM
+import qualified Pukeko.Language.Builtins     as Builtins
+import qualified Pukeko.Language.LambdaLifter as Lifter
+import qualified Pukeko.Language.Parser       as Parser
+import qualified Pukeko.Language.Type         as Type
+import qualified Pukeko.Language.TypeChecker  as Poly
 
 compile :: Bool -> Bool -> String -> IO ()
 compile write_ll write_gm file = do
