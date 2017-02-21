@@ -23,7 +23,7 @@ data Spec =
 
 mkSpec :: Assoc -> String -> String -> Spec
 mkSpec _assoc _sym _name =
-  MkSpec { _sym, _name = MkIdent _name, _prec = undefined, _assoc }
+  MkSpec { _sym, _name = MkIdent ("prefix_" ++_name), _prec = undefined, _assoc }
 
 right, none :: String -> String -> Spec
 right = mkSpec AssocRight

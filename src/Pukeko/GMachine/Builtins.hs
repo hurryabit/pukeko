@@ -1,37 +1,9 @@
 module Pukeko.GMachine.Builtins
-  ( uncompiled
-  , compiled
+  ( everything
   )
   where
 
 import Pukeko.GMachine.GCode
-import Pukeko.Language.Syntax
-
-uncompiled :: [Defn ()]
-uncompiled =
-  [ mk_defn "not" [x]    x false true
-  , mk_defn "and" [x, y] x y     false
-  , mk_defn "or"  [x, y] x true  y
-  ]
-  where
-    x = MkIdent "x"
-    y = MkIdent "y"
-    false = MkIdent "false"
-    true  = MkIdent "true"
-    mk_patn _ident = MkPatn { _annot = (), _ident, _type = Nothing }
-    mk_var _ident = Var { _annot = (), _ident }
-    mk_defn fun args cond_ then_ else_ =
-      MkDefn
-        { _patn = mk_patn (MkIdent fun)
-        , _expr = Lam { _annot = ()
-                      , _patns = map mk_patn args
-                      , _body  = If { _annot = ()
-                                    , _cond  = mk_var cond_
-                                    , _then  = mk_var then_
-                                    , _else  = mk_var else_
-                                    }
-                      }
-        }
 
 mkGlobal :: String -> Int -> [GInst String] -> Global
 mkGlobal name _arity code =
@@ -39,8 +11,8 @@ mkGlobal name _arity code =
       _code = GLOBSTART _name _arity : map (fmap Name) code
   in  MkGlobal { _name, _arity, _code }
 
-compiled :: [Global]
-compiled = concat
+everything :: [Global]
+everything = concat
   [ neg : binops
   , constructors
   , [ if_
@@ -73,7 +45,7 @@ binops =
   , mk "gt"  GTR
   ]
   where
-    mk name inst = mkGlobal name 2
+    mk name inst = mkGlobal ("prefix_" ++ name) 2
       [ PUSH 1
       , EVAL
       , PUSH 1

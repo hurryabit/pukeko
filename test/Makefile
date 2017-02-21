@@ -26,7 +26,7 @@ out: $(OUTPUTS)
 
 check: $(CHECKS)
 
-%.asm: %.pu
+%.asm: %.pu prelude.pu
 	$(COMP) $<
 
 %.pp.asm: %.asm

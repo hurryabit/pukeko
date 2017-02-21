@@ -39,8 +39,8 @@ compile expr =
   case expr of
     Let { _isrec = True, _defns, _body = Var { _ident } } -> do
       let _main = Name (unIdent _ident)
-      globals <- mapM compileDefn (Builtins.uncompiled ++ _defns)
-      let all_globals = Builtins.compiled ++ globals
+      globals <- mapM compileDefn _defns
+      let all_globals = Builtins.everything ++ globals
           name_to_global =
             Map.fromList $ map (\global -> (_name global, global)) all_globals
           deps name =

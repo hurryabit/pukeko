@@ -7,6 +7,7 @@ module Pukeko.Language.Syntax
   , unzipDefns
   , unzipDefns3
   , Annot (..)
+  , inject
   , module Pukeko.Language.Ident
   )
   where
@@ -49,6 +50,13 @@ unzipDefns3 = unzip3 .
 
 class Annot f where
   annot :: f a -> a
+
+
+inject :: Expr a -> Expr a -> Expr a
+inject expr_prel expr_user =
+  case expr_prel of
+    Let { _body } -> expr_prel { _body = inject _body expr_user }
+    _ -> expr_user
 
 
 instance Pretty (Expr a) where

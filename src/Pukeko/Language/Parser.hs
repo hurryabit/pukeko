@@ -18,7 +18,7 @@ import qualified Pukeko.Language.Operator as Operator
 
 parseExpr :: MonadError String m => String -> String -> m (Expr SourcePos)
 parseExpr file code =
-  case parse (expr <* eof) file code of
+  case parse (whiteSpace *> expr <* eof) file code of
     Left error  -> throwError (show error)
     Right expr -> return expr
 
@@ -49,6 +49,7 @@ Token.TokenParser
   , Token.parens
   , Token.braces
   , Token.commaSep
+  , Token.whiteSpace
   } =
   Token.makeTokenParser pukekoDef
 

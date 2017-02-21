@@ -1,0 +1,46 @@
+-- The Pukeko prelude.
+let not x = if x then false else true in
+let prefix_and x y = if x then y     else false in
+let prefix_or  x y = if x then true  else y     in
+letrec foldr f y0 xs =
+  if is_nil xs then
+    y0
+  else
+    f (hd xs) (foldr f y0 (tl xs))
+in
+letrec take n xs =
+  if n <= 0 || is_nil xs then
+    nil
+  else
+    cons (hd xs) (take (n-1) (tl xs))
+in
+letrec zip_with f xs ys =
+  if is_nil xs || is_nil ys then
+    nil
+  else
+    cons (f (hd xs) (hd ys)) (zip_with f (tl xs) (tl ys))
+in
+letrec partition p xs =
+  letrec part_p xs =
+    if is_nil xs then
+      mk_pair nil nil
+    else
+      let x = hd xs in
+      let yzs = part_p (tl xs) in
+      let ys = fst yzs in
+      let zs = snd yzs in
+      if p x then
+        mk_pair (cons x ys) zs
+      else
+        mk_pair ys (cons x zs)
+  in
+  part_p xs
+in
+letrec append xs ys =
+  if is_nil xs then
+    ys
+  else
+    cons (hd xs) (append (tl xs) ys)
+in
+let print_list = foldr print 0 in
+1
