@@ -336,12 +336,12 @@ __install__main__:
   g_create rax, NULL, NULL
 %endmacro
 
-%define g_les g_relop setb
-%define g_leq g_relop setbe
+%define g_les g_relop setl
+%define g_leq g_relop setle
 %define g_eqv g_relop sete
 %define g_neq g_relop setne
-%define g_geq g_relop setae
-%define g_gtr g_relop seta
+%define g_geq g_relop setge
+%define g_gtr g_relop setg
 
 ;; I/O
 %macro g_print 0
