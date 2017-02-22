@@ -347,6 +347,7 @@ __install__main__:
 %macro g_print 0
   @@(5)
   pop  rax
+  g_assert_int rax
   g_pre_call_c
   lea  rdi, [FORMAT_PRINT]
   mov  rsi, [rax+8]
