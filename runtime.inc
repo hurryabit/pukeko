@@ -513,18 +513,18 @@ _gc_copy:
   ; if rax doesn't point into the heap, we don't need to do anything
   ; in particular, we return the null pointer unchanged
   ; TODO: we should check for the bounds of from-space, not the entire heap
-  @@(2)
+  ; @@(2)
   cmp   rax, rhs
   jl    .return
-  @@(2)
+  ; @@(2)
   cmp   rax, rhe
   jge   .return
   ; if rax points to a forwarding cell, we need to follow the redirection
-  @@(2)
+  ; @@(2)
   cmp   byte [rax], TAG_FWD
   je    .forward
   ; in all other cases, we need to copy
-  @@(8)
+  ; @@(8)
   mov   rsi, rax
   mov   rax, rdi
   movsq
@@ -534,10 +534,10 @@ _gc_copy:
   mov   [rsi-16], rax
   ret
 .forward:
-  @@(1)
+  ; @@(1)
   mov rax, [rax+8]
 .return:
-  @@(1)
+  ; @@(1)
   ret
 
 ;; copies all cells the cell being pointed to by rax points to
@@ -545,16 +545,16 @@ _gc_copy:
 ;; modifies rbx and rsi; leaves rax unchanged
 _gc_follow:
   g_assert_good_tag rax, MSG_BAD_TAG_GC
-  @@(2)
+  ; @@(2)
   cmp  byte [rax], TAG_APP
   je   .follow
-  @@(2)
+  ; @@(2)
   cmp  byte [rax], TAG_CON
   je   .follow
-  @@(1)
+  ; @@(1)
   ret
 .follow:
-  @@(9)
+  ; @@(9)
   mov  rbx, rax
   mov  rax, [rbx+8]
   call _gc_copy
@@ -569,19 +569,19 @@ _gc_follow:
 ;; modifies rax, rcx and rsi
 ;; leaves rdx unchanged
 _gc_stack_frame:
-  @@(6)
+  ; @@(6)
   mov  rax, [rcx]
   call _gc_copy
   mov  [rcx], rax
   add  rcx, 8
   cmp  rcx, rdx
   jle  _gc_stack_frame
-  @@(1)
+  ; @@(1)
   ret
 
 
 _gc_collect:
-  @@(4)
+  ; @@(4)
   lea  rhs, [__heap__start__]
   lea  rhe, [__heap__end__]
   add  [rhe], rhp               ; update the number of allocations
@@ -590,17 +590,17 @@ _gc_collect:
   cmp  rhl, rhe
   je   .move_back
   ; we need to move from first to second half
-  @@(3)
+  ; @@(3)
   lea  rhp, [__heap__middle__]
   lea  rhl, [__heap__end__]
   jmp  .setup_done
 .move_back:
   ; we need to move from second to first half
-  @@(2)
+  ; @@(2)
   lea  rhp, [__heap__start__]
   lea  rhl, [__heap__middle__]
 .setup_done:
-  @@(4)
+  ; @@(4)
   cld
   mov  rdi, rhp
 
@@ -608,14 +608,14 @@ _gc_collect:
   lea  rax, [__cafs__start__]
   lea  rdx, [__cafs__end__]
 .cafs_loop:
-  @@(4)
+  ; @@(4)
   call _gc_follow
   add  rax, 24
   cmp  rax, rdx
   jl   .cafs_loop
 
   ; copy everything immediately reachable from the current stack frame
-  @@(3)
+  ; @@(3)
   lea  rcx, [rsp+8]             ; we need to skip the return address
   mov  rdx, rbp
   call _gc_stack_frame
@@ -623,11 +623,11 @@ _gc_collect:
   ; copy everything immediately reachable from old stack frames
 .stack_loop:
   ; TODO: check if we can move this before the loop
-  @@(3)
+  ; @@(3)
   lea  rbx, [__stack_start__]
   cmp  rdx, [rbx]
   jge  .stack_done
-  @@(4)
+  ; @@(4)
   lea  rcx, [rdx+24]
   mov  rdx, [rdx+8]
   call _gc_stack_frame
@@ -635,19 +635,19 @@ _gc_collect:
 .stack_done:
 
   ; close the gap between rhp and rdi
-  @@(1)
+  ; @@(1)
   mov  rax, rhp
 .follow_loop:
-  @@(2)
+  ; @@(2)
   cmp  rax, rdi
   jge  .finish
-  @@(3)
+  ; @@(3)
   call _gc_follow
   add  rax, 24
   jmp  .follow_loop
 
 .finish:
-  @@(3)
+  ; @@(3)
   mov  rhp, rdi
   sub  [rhe], rhp
   ret
