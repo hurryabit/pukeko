@@ -141,15 +141,12 @@ prefix_bind = mkGlobal "prefix_bind" 3
   , PUSH 1
   , MKAP
   , EVAL
-  , PUSH 0
-  , TAIL
-  , PUSH 1
-  , HEAD
-  , PUSH 4
+  , HDTL
+  , PUSH 3
   , MKAP
   , MKAP
-  , UPDATE 5
-  , POP 4
+  , UPDATE 4
+  , POP 3
   , UNWIND
   ]
 

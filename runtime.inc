@@ -272,6 +272,14 @@ __install__main__:
 %define g_head g_slct 1
 %define g_tail g_slct 2
 
+%macro g_hdtl 0
+  @@(3)
+  pop rax
+  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
+  push qword [rax+16]
+  push qword [rax+ 8]
+%endmacro
+
 
 ;; Arithmetic
 %macro g_neg 0

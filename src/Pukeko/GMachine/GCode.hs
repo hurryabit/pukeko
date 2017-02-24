@@ -29,6 +29,7 @@ data GInst lab
   -- Selectors
   | HEAD
   | TAIL
+  | HDTL
   -- Arithmetic
   | NEG
   | ADD

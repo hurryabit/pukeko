@@ -65,6 +65,7 @@ assembleInst arities inst = do
     CONS tag arity -> code "cons" [show tag, show arity]
     HEAD -> code "head" []
     TAIL -> code "tail" []
+    HDTL -> code "hdtl" []
     NEG -> code "neg" []
     ADD -> code "add" []
     SUB -> code "sub" []
