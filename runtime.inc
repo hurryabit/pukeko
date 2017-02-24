@@ -400,8 +400,13 @@ section .text
 
 ;; "Main loop" of the evaluation
 _main:
+  ; setup the stack
   push rbx
   push rbp
+  lea  rbp, [rsp+8]
+  lea  rax, [__stack_start__]
+  mov  [rax], rbp
+  ; setup the heap
   lea  rhp, [__heap__middle__]
   lea  rhl, [__heap__end__]
   ; initialize the gc stats
@@ -413,9 +418,6 @@ _main:
   g_cons 0, 0
   g_install_main
   g_mkap
-  mov  rbp, rsp
-  lea  rax, [__stack_start__]
-  mov  [rax], rbp
   g_eval
   pop  rax
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_EXIT
