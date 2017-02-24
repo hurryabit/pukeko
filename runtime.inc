@@ -408,13 +408,13 @@ section .text
 
 ;; "Main loop" of the evaluation
 _main:
-  ; setup the stack
+  ; set up the stack
   push rbx
   push rbp
   lea  rbp, [rsp+8]
-  lea  rax, [__stack_start__]
+  lea  rax, [__stack__start__]
   mov  [rax], rbp
-  ; setup the heap
+  ; set up the heap
   lea  rhp, [__heap__middle__]
   lea  rhl, [__heap__end__]
   ; initialize the gc stats
@@ -642,7 +642,7 @@ _gc_collect:
 .stack_loop:
   ; TODO: check if we can move this before the loop
   ; @@(3)
-  lea  rbx, [__stack_start__]
+  lea  rbx, [__stack__start__]
   cmp  rdx, [rbx]
   jge  .stack_done
   ; @@(4)
@@ -706,7 +706,7 @@ ABORT_CALLED:
 ;; Heap
 section .bss
 align 8
-__stack_start__:
+__stack__start__:
   resq 1
 __heap__start__:
   resq HEAP_SIZE / 16
