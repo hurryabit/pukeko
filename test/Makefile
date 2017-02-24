@@ -2,8 +2,7 @@ COMP = stack exec pukeko --
 NASM = nasm
 LINK = clang
 
-# HEAP_SIZE  = 0x01000000 # 16 MB
-HEAP_SIZE  = 0x00100000 #  1 MB
+HEAP_SIZE  = 0x01000000 # 16 MB
 STACK_SIZE = 0x00100000 #  1 MB
 
 RUNTIME = ../runtime.inc
@@ -14,7 +13,7 @@ NASM_FLAGS = -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64
 SOURCES     = monad_io.pu fibs.pu qsort.pu isort.pu minlet.pu
 GMACHINES   = $(SOURCES:.pu=.gm)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
-OBJECTS     = $(SOURCES:.pu=.o)
+OBJECTS     = $(SOURCES:.pu=.o) gc.o
 EXECUTABLES = $(SOURCES:.pu=)
 OUTPUTS     = $(SOURCES:.pu=.out)
 TEMPOUTPUTS = $(SOURCES:.pu=.out.tmp)
@@ -35,8 +34,11 @@ check: $(CHECKS)
 %.o: %.asm $(RUNTIME)
 	$(NASM) -DDEBUG $(NASM_FLAGS) -o $@ $<
 
-%: %.o
-	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ $< $(LIBS)
+gc.o: ../gc.c
+	clang -o $@ -c $<
+
+%: %.o gc.o
+	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 %.out %.out.tmp: %
 	./$< > $@
