@@ -18,7 +18,8 @@ everything = concat
   , [ if_
     , is_nil, hd, tl
     , fst_, snd_
-    , print_, abort
+    , print_, prefix_bind
+    , abort
     ]
   ]
 
@@ -58,11 +59,13 @@ binops =
 
 constructors :: [Global]
 constructors =
-  [ mk "false"   0 (CONS 0)
+  [ mk "unit"    0 (CONS 0)
+  , mk "false"   0 (CONS 0)
   , mk "true"    0 (CONS 1)
   , mk "nil"     0 (CONS 0)
   , mk "cons"    2 (CONS 1)
   , mk "mk_pair" 2 (CONS 0)
+  , mk "return"  2 (CONS 0)
   ]
   where
     mk name arity inst = mkGlobal name arity
@@ -124,14 +127,45 @@ fst_or_snd name inst = mkGlobal name 1
   , UNWIND
   ]
 
-print_ :: Global
+print_, prefix_bind :: Global
 print_ = mkGlobal "print" 2
   [ EVAL
   , PRINT
-  , EVAL
+  , CONS 0 0 -- unit
+  , CONS 0 2 -- pair
   , UPDATE 1
+  , RETURN
+  ]
+prefix_bind = mkGlobal "prefix_bind" 3
+  [ PUSH 2
+  , PUSH 1
+  , MKAP
+  , EVAL
+  , PUSH 0
+  , TAIL
+  , PUSH 1
+  , HEAD
+  , PUSH 4
+  , MKAP
+  , MKAP
+  , UPDATE 5
+  , POP 4
   , UNWIND
   ]
 
 abort :: Global
 abort = mkGlobal "abort" 0 [ABORT]
+
+{-
+type IO a = World -> (a, World)
+
+print :: Int -> IO ()
+print n world = {- print it -}; ((), world)
+
+return :: a -> IO a
+return x world = (x, world)
+
+bind :: IO a -> (a -> IO b) -> IO b
+bind m f world =
+  let (x, world') = m world in f x world'
+-}

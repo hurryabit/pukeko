@@ -14,7 +14,8 @@ beta  = var "B"
 
 constructors, primitives :: [(String, Type)]
 constructors =
-  [ ("false"  , bool)
+  [ ("unit"   , unit)
+  , ("false"  , bool)
   , ("true"   , bool)
   , ("nil"    , list alpha)
   , ("cons"   , alpha ~> list alpha ~> list alpha)
@@ -39,7 +40,9 @@ primitives =
   , ("tl"    , list alpha ~> list alpha)
   , ("fst"   , pair alpha beta ~> alpha)
   , ("snd"   , pair alpha beta ~> beta )
-  , ("print" , int ~> alpha ~> alpha)
+  , ("return", alpha ~> io alpha)
+  , ("print" , int ~> io unit)
+  , ("prefix_bind", io alpha ~> (alpha ~> io beta) ~> io beta)
   , ("abort" , alpha)
   ]
 

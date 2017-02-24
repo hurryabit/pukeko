@@ -27,7 +27,7 @@ compile write_ll write_gm file_user = do
         expr_prel <- Parser.parseExpr file_prel code_prel
         let expr = Syntax.inject expr_prel expr_user
         t <- Poly.inferExpr expr
-        _ <- Type.unify mempty t (Type.int)
+        _ <- Type.unify mempty t (Type.io Type.unit)
         let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
         program <- Compiler.compile (fmap (const ()) lifted_expr)
         nasm <- NASM.assemble program

@@ -38,6 +38,8 @@ pukekoDef = haskellStyle
       , "let", "letrec", "and", "in"
       , "if", "then", "else"
       ]
+  , Token.opStart  = Token.opLetter pukekoDef
+  , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
   , Token.reservedOpNames = ["=", "->", ":", "."] ++ Operator.syms
   }
 

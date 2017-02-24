@@ -5,9 +5,11 @@ module Pukeko.Language.Type
   , app
   , record
   , int
+  , unit
   , bool
   , pair
   , list
+  , io
   , unify
   , unifyMany
   , module Pukeko.Language.Ident
@@ -71,8 +73,9 @@ app name _        = perror $ pPrint name <+> text "is not a valid type construct
 record :: [(Ident, Type)] -> Type
 record = Rec
 
-int, bool :: Type
+int, unit, bool :: Type
 int  = app (MkIdent "int")  []
+unit = app (MkIdent "unit") []
 bool = app (MkIdent "bool") []
 
 pair :: Type -> Type -> Type
@@ -81,6 +84,8 @@ pair t1 t2 = app (MkIdent "pair") [t1, t2]
 list :: Type -> Type
 list t = app (MkIdent "list") [t]
 
+io :: Type -> Type
+io t = app (MkIdent "io") [t]
 
 extend :: MonadError String m => Subst Type -> Var Type -> Type -> m (Subst Type)
 extend phi v t =

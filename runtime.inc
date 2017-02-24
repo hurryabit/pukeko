@@ -410,11 +410,19 @@ _main:
   mov  qword [rhl+8], 0
 
   g_install_cafs
+  g_cons 0, 0
   g_install_main
+  g_mkap
   mov  rbp, rsp
   lea  rax, [__stack_start__]
   mov  [rax], rbp
   g_eval
+  pop  rax
+  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_EXIT
+  mov  rax, [rax+16]
+  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_EXIT
+
+  ; print stats
   lea  rdi, [STATS_MESSAGE]
   mov  rsi, step_ctr
   lea  rax, [__heap__end__]
@@ -430,9 +438,9 @@ _main:
   g_pre_call_c
   call _printf
   g_post_call_c
-  pop  rbx
-  g_assert_int rbx
-  mov  rax, [rbx+8]
+
+  ; exit
+  mov  rax, 0
   pop  rbp
   pop  rbx
   ret
@@ -672,6 +680,8 @@ MSG_BAD_TAG_SELECT:
   db "SELECT ON NON-CONS NODE", 10, 0
 MSG_BAD_TAG_JUMPZERO:
   db "JUMPZERO ON NON-CONS NODE", 10, 0
+MSG_BAD_TAG_EXIT:
+  db "BAD TAG AT EXIT", 10, 0
 MSG_BAD_TAG_EVAL:
   db "BAD TAG IN EVAL", 10, 0
 MSG_BAD_TAG_UNWIND:

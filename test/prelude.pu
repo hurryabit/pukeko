@@ -2,6 +2,7 @@
 let not x = if x then false else true in
 let prefix_and x y = if x then y     else false in
 let prefix_or  x y = if x then true  else y     in
+let prefix_semi m1 m2 = m1 >>= (fun (x : unit) -> m2) in
 letrec foldr f y0 xs =
   if is_nil xs then
     y0
@@ -42,5 +43,6 @@ letrec append xs ys =
   else
     cons (hd xs) (append (tl xs) ys)
 in
-let print_list = foldr print 0 in
+let iter_m f = foldr (fun x m -> f x; m) (return unit) in
+let print_list = iter_m print in
 1

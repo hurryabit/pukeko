@@ -111,6 +111,6 @@
 111
 112
 
-Steps  :    1505723
-Allocs :      63236          (Checks:      63236)
+Steps  :    1542520
+Allocs :      64812          (Checks:      64812)
 GC runs:          3

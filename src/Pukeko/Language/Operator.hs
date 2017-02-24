@@ -25,13 +25,15 @@ mkSpec :: Assoc -> String -> String -> Spec
 mkSpec _assoc _sym _name =
   MkSpec { _sym, _name = MkIdent ("prefix_" ++_name), _prec = undefined, _assoc }
 
-right, none :: String -> String -> Spec
+left, right, none :: String -> String -> Spec
+left  = mkSpec AssocLeft
 right = mkSpec AssocRight
 none  = mkSpec AssocNone
 
 table :: [[Spec]]
 table = fixPrecs
-  [ [right "||" "or" ]
+  [ [left ">>=" "bind", left ";" "semi"]
+  , [right "||" "or" ]
   , [right "&&" "and"]
   , zipWith none
     ["<" , "<=", "==", "!=", ">=", ">" ]
