@@ -33,7 +33,7 @@ compile write_ll write_gm no_prelude file_user = do
           else do
             expr_prel <- Parser.parseExpr file_prel code_prel
             return $ Syntax.inject expr_prel expr_user
-        TypeChecker.checkExpr (Type.io Type.unit) expr
+        TypeChecker.checkExpr (Type.io Builtins.unit) expr
         let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
         program <- Compiler.compile (fmap (const ()) lifted_expr)
         nasm <- NASM.assemble program

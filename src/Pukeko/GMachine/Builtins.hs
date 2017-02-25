@@ -4,6 +4,8 @@ module Pukeko.GMachine.Builtins
   where
 
 import Pukeko.GMachine.GCode
+import Pukeko.Language.Builtins hiding (everything)
+import Pukeko.Language.Ident
 
 mkGlobal :: String -> Int -> [GInst String] -> Global
 mkGlobal name _arity code =
@@ -14,11 +16,11 @@ mkGlobal name _arity code =
 everything :: [Global]
 everything = concat
   [ neg : binops
-  , constructors
+  , concatMap constructors adts
   , [ if_
     , is_nil, hd, tl
     , fst_, snd_
-    , print_, prefix_bind
+    , return_, print_, prefix_bind
     , abort
     ]
   ]
@@ -57,22 +59,16 @@ binops =
       , RETURN
       ]
 
-constructors :: [Global]
-constructors =
-  [ mk "unit"    0 (CONS 0)
-  , mk "false"   0 (CONS 0)
-  , mk "true"    0 (CONS 1)
-  , mk "nil"     0 (CONS 0)
-  , mk "cons"    2 (CONS 1)
-  , mk "mk_pair" 2 (CONS 0)
-  , mk "return"  2 (CONS 0)
-  ]
+constructors :: ADT -> [Global]
+constructors MkADT{ _constructors } = zipWith f [0..] _constructors
   where
-    mk name arity inst = mkGlobal name arity
-      [ inst arity
-      , UPDATE 1
-      , RETURN
-      ]
+    f tag MkConstructor{ _name, _fields } =
+      let arity = length _fields
+      in  mkGlobal (unIdent _name) arity
+          [ CONS tag arity
+          , UPDATE 1
+          , RETURN
+          ]
 
 if_ :: Global
 if_ = mkGlobal "if" 3
@@ -127,7 +123,12 @@ fst_or_snd name inst = mkGlobal name 1
   , UNWIND
   ]
 
-print_, prefix_bind :: Global
+return_, print_, prefix_bind :: Global
+return_ = mkGlobal "return" 2
+  [ CONS 0 2
+  , UPDATE 1
+  , RETURN
+  ]
 print_ = mkGlobal "print" 2
   [ EVAL
   , PRINT

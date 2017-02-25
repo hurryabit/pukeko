@@ -1,12 +1,12 @@
-letrec gen f x = cons x (gen f (f x)) in
+letrec gen f x = Cons x (gen f (f x)) in
 let numbers = take 1012 (gen (fun x -> (42*x) % 1013) 1) in
 letrec qsort xs =
   if is_nil xs then
-    nil
+    Nil
   else
     let x = hd xs in
     let yzs = partition (fun y -> y < x) (tl xs) in
-    append (qsort (fst yzs)) (cons x (qsort (snd yzs)))
+    append (qsort (fst yzs)) (Cons x (qsort (snd yzs)))
 in
 let main = print_list (qsort numbers) in
 main

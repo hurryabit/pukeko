@@ -1,33 +1,33 @@
 letrec replicate k x =
-  if k <= 0 then nil else cons x (replicate (k-1) x)
+  if k <= 0 then Nil else Cons x (replicate (k-1) x)
 in
 letrec diff xs ys =
   if is_nil xs then
-    nil
+    Nil
   else if is_nil ys then
     xs
   else
     let x = hd xs in
     let y = hd ys in
     if x < y then
-      cons x (diff (tl xs) ys)
+      Cons x (diff (tl xs) ys)
     else if x == y then
       diff (tl xs) (tl ys)
     else
       diff xs (tl ys)
 in
 let ints =
-  letrec go k = cons k (go (k+1)) in
+  letrec go k = Cons k (go (k+1)) in
   go 1
 in
 letrec solve kss =
   if is_nil kss then
-    cons nil nil
+    Cons Nil Nil
   else
     concat_map (fun k ->
-        map (cons k)
+        map (Cons k)
           (solve (zip_with (fun ls i ->
-              diff ls (cons (k-i) (cons k (cons (k+i) nil))))
+              diff ls (Cons (k-i) (Cons k (Cons (k+i) Nil))))
             (tl kss)
             ints)))
       (hd kss)

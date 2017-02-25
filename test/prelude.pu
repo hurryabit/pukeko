@@ -1,7 +1,7 @@
 -- The Pukeko prelude.
-let not x = if x then false else true in
-let prefix_and x y = if x then y     else false in
-let prefix_or  x y = if x then true  else y     in
+let not x = if x then False else True in
+let prefix_and x y = if x then y     else False in
+let prefix_or  x y = if x then True  else y     in
 let prefix_semi m1 m2 = m1 >>= (fun (x : Unit) -> m2) in
 letrec foldr f y0 xs =
   if is_nil xs then
@@ -11,29 +11,29 @@ letrec foldr f y0 xs =
 in
 letrec take n xs =
   if n <= 0 || is_nil xs then
-    nil
+    Nil
   else
-    cons (hd xs) (take (n-1) (tl xs))
+    Cons (hd xs) (take (n-1) (tl xs))
 in
 letrec zip_with f xs ys =
   if is_nil xs || is_nil ys then
-    nil
+    Nil
   else
-    cons (f (hd xs) (hd ys)) (zip_with f (tl xs) (tl ys))
+    Cons (f (hd xs) (hd ys)) (zip_with f (tl xs) (tl ys))
 in
 letrec partition p xs =
   letrec part_p xs =
     if is_nil xs then
-      mk_pair nil nil
+      Pair Nil Nil
     else
       let x = hd xs in
       let yzs = part_p (tl xs) in
       let ys = fst yzs in
       let zs = snd yzs in
       if p x then
-        mk_pair (cons x ys) zs
+        Pair (Cons x ys) zs
       else
-        mk_pair ys (cons x zs)
+        Pair ys (Cons x zs)
   in
   part_p xs
 in
@@ -41,17 +41,17 @@ letrec append xs ys =
   if is_nil xs then
     ys
   else
-    cons (hd xs) (append (tl xs) ys)
+    Cons (hd xs) (append (tl xs) ys)
 in
-let concat = foldr append nil in
+let concat = foldr append Nil in
 letrec map f xs =
   if is_nil xs then
-    nil
+    Nil
   else
-    cons (f (hd xs)) (map f (tl xs))
+    Cons (f (hd xs)) (map f (tl xs))
 in
 let concat_map f xs = concat (map f xs) in
 let length = foldr (fun x l -> 1+l) 0 in
-let iter_m f = foldr (fun x m -> f x; m) (return unit) in
+let iter_m f = foldr (fun x m -> f x; m) (return Unit) in
 let print_list = iter_m print in
 1

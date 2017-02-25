@@ -9,10 +9,6 @@ module Pukeko.Language.Type
   , (~>)
   , app
   , int
-  , unit
-  , bool
-  , pair
-  , list
   , io
   , prettyType
   )
@@ -54,16 +50,8 @@ app name@(MkIdent (start:_)) ts
   | isUpper start = TApp name ts
 app name _        = perror $ pPrint name <+> text "is not a valid type constructor name"
 
-int, unit, bool :: Type a
+int :: Type a
 int  = app (MkIdent "Int")  []
-unit = app (MkIdent "Unit") []
-bool = app (MkIdent "Bool") []
-
-pair :: Type a -> Type a -> Type a
-pair t1 t2 = app (MkIdent "Pair") [t1, t2]
-
-list :: Type a -> Type a
-list t = app (MkIdent "List") [t]
 
 io :: Type a -> Type a
 io t = app (MkIdent "IO") [t]

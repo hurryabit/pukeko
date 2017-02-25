@@ -1,4 +1,4 @@
-let when p m = if p then m else return unit in
+let when p m = if p then m else return Unit in
 letrec count_down k = when (k >= 0) (print k; count_down (k-1)) in
 letrec repeat_m k m = when (k > 0) (m; repeat_m (k-1) m) in
 let main = repeat_m 3 (count_down 2) in
