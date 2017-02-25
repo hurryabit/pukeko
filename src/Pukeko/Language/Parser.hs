@@ -12,7 +12,7 @@ import qualified Text.Parsec.Token    as Token
 
 import Pukeko.Language.Operator (Spec (..))
 import Pukeko.Language.Syntax
-import Pukeko.Language.Type (Type, var, (~>), app, record)
+import Pukeko.Language.Type (Type, var, (~>), app)
 
 import qualified Pukeko.Language.Operator as Operator
 
@@ -49,8 +49,8 @@ Token.TokenParser
   , Token.reservedOp
   , Token.natural
   , Token.parens
-  , Token.braces
-  , Token.commaSep
+  -- , Token.braces
+  -- , Token.commaSep
   , Token.whiteSpace
   } =
   Token.makeTokenParser pukekoDef
@@ -64,10 +64,10 @@ arrow   = reservedOp "->"
 
 ident, typeName  :: Parser Ident
 ident = MkIdent <$> identifier
-typeName = lookAhead lower *> ident
+typeName = lookAhead upper *> ident
 
 typeVar :: Parser Type
-typeVar = var <$> (lookAhead upper *> identifier)
+typeVar = var <$> (lookAhead lower *> identifier)
 
 type_, atype :: Parser Type
 type_ =
@@ -80,7 +80,6 @@ type_ =
 atype = choice
   [ typeVar
   , app <$> typeName <*> pure []
-  , record <$> braces (commaSep ((,) <$> ident <*> asType))
   , parens type_
   ]
 

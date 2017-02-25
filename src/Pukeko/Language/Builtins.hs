@@ -9,8 +9,8 @@ import Pukeko.Language.Syntax (Ident (..))
 import Pukeko.Language.Type
 
 alpha, beta :: Type
-alpha = var "A"
-beta  = var "B"
+alpha = var "a"
+beta  = var "b"
 
 constructors, primitives :: [(String, Type)]
 constructors =

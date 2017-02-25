@@ -3,7 +3,6 @@ module Pukeko.Language.Type
   , var
   , (~>)
   , app
-  , record
   , int
   , unit
   , bool
@@ -17,7 +16,6 @@ module Pukeko.Language.Type
   )
   where
 
-import Control.Arrow (second)
 import Control.Monad.Except
 import Data.Char (isLower, isUpper)
 import Data.Ratio () -- for precedences in pretty printer
@@ -34,7 +32,6 @@ data Type
   = Var (Var Type)
   | Fun Type Type
   | App Ident [Type]
-  | Rec [(Ident, Type)]
   deriving (Eq)
 
 instance Term Type where
@@ -42,24 +39,22 @@ instance Term Type where
     deriving (Eq, Ord)
   supply = map MkVar (tail vars)
     where
-      vars = "_":[ xs ++ [x] | xs <- vars, x <- ['A'..'Z'] ]
+      vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
   promote = Var
   freeVars t =
     case t of
       Var v     -> Set.singleton v
       Fun tx ty -> Set.union (freeVars tx) (freeVars ty)
       App _  ts -> Set.unions (map freeVars ts)
-      Rec fs    -> Set.unions (map (freeVars . snd) fs)
   subst phi t =
     case t of
       Var v     -> substVar phi v
       Fun tx ty -> Fun (subst phi tx) (subst phi ty)
       App c  ts -> App c $ map (subst phi) ts
-      Rec fs    -> Rec $ map (second $ subst phi) fs
 
 var :: String -> Type
 var name@(start:_)
-  | isUpper start = Var (MkVar name)
+  | isLower start = Var (MkVar name)
 var name          = perror $ text name <+> text "is not a valid variable name"
 
 (~>) :: Type -> Type -> Type
@@ -67,25 +62,22 @@ var name          = perror $ text name <+> text "is not a valid variable name"
 
 app :: Ident -> [Type] -> Type
 app name@(MkIdent (start:_)) ts
-  | isLower start = App name ts
+  | isUpper start = App name ts
 app name _        = perror $ pPrint name <+> text "is not a valid type constructor name"
 
-record :: [(Ident, Type)] -> Type
-record = Rec
-
 int, unit, bool :: Type
-int  = app (MkIdent "int")  []
-unit = app (MkIdent "unit") []
-bool = app (MkIdent "bool") []
+int  = app (MkIdent "Int")  []
+unit = app (MkIdent "Unit") []
+bool = app (MkIdent "Bool") []
 
 pair :: Type -> Type -> Type
-pair t1 t2 = app (MkIdent "pair") [t1, t2]
+pair t1 t2 = app (MkIdent "Pair") [t1, t2]
 
 list :: Type -> Type
-list t = app (MkIdent "list") [t]
+list t = app (MkIdent "List") [t]
 
 io :: Type -> Type
-io t = app (MkIdent "io") [t]
+io t = app (MkIdent "IO") [t]
 
 extend :: MonadError String m => Subst Type -> Var Type -> Type -> m (Subst Type)
 extend phi v t =
@@ -115,18 +107,6 @@ unify phi t1 t2 =
     (Fun tx1 ty1, Fun tx2 ty2) -> unifyMany phi [(tx1, tx2), (ty1, ty2)]
     (App c1  ts1, App c2  ts2)
       | c1 == c2               -> unifyMany phi (zip ts1 ts2)
-    (Rec ds1    , Rec ds2    ) -> do
-      let checkLabels [] [] acc = return acc
-          checkLabels ((i1, _):_) [] _ =
-            pthrow $ hsep [text "field", pretty i1, text "not present in record", pretty t2]
-          checkLabels [] ((i2, _):_) _ =
-            pthrow $ hsep [text "field", pretty i2, text "not present in record", pretty t1]
-          checkLabels ((i1, t_i1):ds1') ((i2, t_i2):ds2') acc
-            | i1 == i2  = checkLabels ds1' ds2' ((t_i1, t_i2):acc)
-            | otherwise =
-                pthrow $ hsep [text "record fields", pretty i1, text "and", pretty i2, text "do not match"]
-      eqs <- checkLabels ds1 ds2 []
-      unifyMany phi eqs
     _ -> pthrow $ hsep [text "mismatching types", pretty t1, text "and", pretty t2]
 
 -- | @unifyMany phi eqs@ finds an mgu @psi@ of @{ phi s1 = phi t1, ..., phi sn = phi tn }@,
@@ -150,9 +130,6 @@ instance Pretty Type where
       App c [] -> pretty c
       App c ts ->
         maybeParens (prec > 2) $ pretty c <+> hsep (map (pPrintPrec lvl 3) ts)
-      Rec ds   -> braces $ hsep $ punctuate comma (map field ds)
-    where
-      field (l, t) = pPrint l <> colon <+> pPrint t
 
 instance Show Type where
   show = prettyShow
