@@ -40,12 +40,11 @@ pukekoDef = haskellStyle
       ]
   , Token.opStart  = Token.opLetter pukekoDef
   , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
-  , Token.reservedOpNames = ["=", "->", ":", "."] ++ Operator.syms
+  , Token.reservedOpNames = ["=", "->", ":", ".", "|"] ++ Operator.syms
   }
 
-Token.TokenParser
-  { Token.identifier
-  , Token.reserved
+pukeko@Token.TokenParser
+  { Token.reserved
   , Token.reservedOp
   , Token.natural
   , Token.parens
@@ -62,24 +61,22 @@ equals, arrow :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
 
-ident, typeName  :: Parser Ident
-ident = MkIdent <$> identifier
-typeName = lookAhead upper *> ident
-
-typeVar :: Parser (Type Closed)
-typeVar = var <$> (lookAhead lower *> identifier)
+identifier, variable, constructor  :: Parser Ident
+identifier  = MkIdent <$> Token.identifier pukeko
+variable    = lookAhead lower *> identifier
+constructor = lookAhead upper *> identifier
 
 type_, atype :: Parser (Type Closed)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
-    ( app <$> typeName <*> many atype
+    ( app <$> constructor <*> many atype
       <|> atype
     )
   <?> "type"
 atype = choice
-  [ typeVar
-  , app <$> typeName <*> pure []
+  [ var <$> variable
+  , app <$> constructor <*> pure []
   , parens type_
   ]
 
@@ -89,11 +86,11 @@ asType = reservedOp ":" *> type_
 patn :: Bool -> Parser (Patn SourcePos)
 patn needParens =
   if needParens then
-    MkPatn <$> getPosition <*> ident <*> pure Nothing
+    MkPatn <$> getPosition <*> variable <*> pure Nothing
     <|>
-    parens (MkPatn <$> getPosition <*> ident <*> (Just <$> asType))
+    parens (MkPatn <$> getPosition <*> variable <*> (Just <$> asType))
   else
-    MkPatn <$> getPosition <*> ident <*> optionMaybe asType
+    MkPatn <$> getPosition <*> variable<*> optionMaybe asType
   <?> "declaration"
 
 defnVal :: Parser (Defn SourcePos)
@@ -102,7 +99,7 @@ defnVal = MkDefn <$> patn False <*> (equals *> expr)
 defnFun :: Parser (Defn SourcePos)
 defnFun =
   MkDefn <$> (MkPatn <$> getPosition
-                     <*> ident
+                     <*> variable
                      <*> pure Nothing)
          <*> (Lam <$> getPosition
                   <*> many1 (patn True)
@@ -132,7 +129,7 @@ expr =
     ]
   <?> "expression"
 aexpr = choice
-  [ Var <$> getPosition <*> ident
+  [ Var <$> getPosition <*> identifier
   , Num <$> getPosition <*> nat
   , parens expr
   ]

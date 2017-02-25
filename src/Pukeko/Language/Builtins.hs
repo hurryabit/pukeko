@@ -19,8 +19,8 @@ everything = map (\(i, t) -> (MkIdent i, t)) primitives ++
   concatMap constructors adts
 
 alpha, beta :: Type Closed
-alpha = var "a"
-beta  = var "b"
+alpha = var (MkIdent "a")
+beta  = var (MkIdent "b")
 
 primitives :: [(String, Type Closed)]
 primitives =

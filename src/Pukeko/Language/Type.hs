@@ -15,7 +15,6 @@ module Pukeko.Language.Type
   where
 
 import Control.Monad.ST
-import Data.Char (isLower, isUpper)
 import Data.Ratio () -- for precedences in pretty printer
 import Data.STRef
 
@@ -37,18 +36,20 @@ data Type a where
   TFun :: Type a -> Type a           -> Type a
   TApp :: Ident  -> [Type a]         -> Type a
 
-var :: String -> Type a
-var name@(start:_)
-  | isLower start = QVar (MkIdent name)
-var name          = perror $ text name <+> text "is not a valid variable name"
+var :: Ident -> Type a
+var ident
+  | isVariable ident = QVar ident
+  | otherwise        = perror $
+    pretty ident <+> text "is not a valid variable name"
 
 (~>) :: Type a -> Type a -> Type a
 (~>) = TFun
 
 app :: Ident -> [Type a] -> Type a
-app name@(MkIdent (start:_)) ts
-  | isUpper start = TApp name ts
-app name _        = perror $ pPrint name <+> text "is not a valid type constructor name"
+app ident ts
+  | isConstructor ident = TApp ident ts
+  | otherwise           = perror $
+    pPrint ident <+> text "is not a valid type constructor name"
 
 int :: Type a
 int  = app (MkIdent "Int")  []
