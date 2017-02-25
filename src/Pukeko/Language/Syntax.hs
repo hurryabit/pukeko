@@ -3,6 +3,8 @@ module Pukeko.Language.Syntax
   ( Expr (..)
   , Patn (..)
   , Defn (..)
+  , desugarApOp
+  , desugarIf
   , unzipPatns
   , unzipDefns
   , unzipDefns3
@@ -22,12 +24,12 @@ import qualified Pukeko.Language.Operator as Operator
 
 data Expr a
   = Var    { _annot :: a, _ident :: Ident }
-  | Num    { _annot :: a, _int   :: Int   }
+  | Num    { _annot :: a, _int   :: Int }
   | Pack   { _annot :: a, _tag   :: Int , _arity :: Int  }
   | Ap     { _annot :: a, _fun   :: Expr a, _arg :: Expr a }
   | ApOp   { _annot :: a, _op    :: Ident, _arg1 :: Expr a, _arg2 :: Expr a }
-  | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body  :: Expr a }
-  | Lam    { _annot :: a, _patns :: [Patn a], _body  :: Expr a }
+  | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body :: Expr a }
+  | Lam    { _annot :: a, _patns :: [Patn a], _body :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
   deriving (Show, Functor)
 
@@ -37,6 +39,31 @@ data Patn a = MkPatn { _annot :: a, _ident :: Ident, _type :: Maybe Type }
 data Defn a = MkDefn { _patn :: Patn a, _expr :: Expr a }
   deriving (Show, Functor)
 
+
+desugarApOp :: Expr a -> Expr a
+desugarApOp ApOp{ _annot, _op, _arg1, _arg2 } =
+  Ap { _annot
+     , _fun = Ap { _annot
+                 , _fun = Var { _annot, _ident = _op }
+                 , _arg = _arg1
+                 }
+     , _arg = _arg2
+     }
+desugarApOp _ = error "desugarApOp can only be applied to ApOp nodes"
+
+desugarIf :: Expr a -> Expr a
+desugarIf If{ _annot, _cond, _then, _else } =
+  Ap { _annot
+     , _fun = Ap { _annot
+                 , _fun = Ap { _annot
+                             , _fun = Var { _annot, _ident = MkIdent "if" }
+                             , _arg = _cond
+                             }
+                 , _arg = _then
+                 }
+     , _arg = _else
+     }
+desugarIf _ = error "desugarIf can only be applied to If nodes"
 
 unzipPatns :: [Patn a] -> ([Ident], [Maybe Type])
 unzipPatns = unzip . map (\MkPatn{ _ident, _type} -> (_ident, _type))

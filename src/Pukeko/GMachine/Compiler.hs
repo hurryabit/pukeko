@@ -94,12 +94,7 @@ ccExpr expr =
       ccExpr _arg
       local depth succ $ ccExpr _fun
       tell [MKAP]
-    ApOp { _annot, _op, _arg1, _arg2 } -> ccExpr $
-      Ap { _annot
-         , _fun = Ap { _annot
-                     , _fun = Var { _annot, _ident = _op }
-                     , _arg = _arg1 }
-         , _arg = _arg2 }
+    ApOp { } -> ccExpr $ desugarApOp expr
     Lam { } -> throwError "All lambdas should be lifted by now"
     Let { _isrec = False, _defns, _body } -> do
       let n = length _defns
@@ -116,14 +111,7 @@ ccExpr expr =
         ccExpr _body
       tell [SLIDE n]
     Pack { } -> throwError "Constructors are not supported yet"
-    If { _annot, _cond, _then, _else } -> ccExpr $
-      Ap { _annot
-         , _fun = Ap { _annot
-                     , _fun = Ap { _annot
-                                 , _fun = Var { _annot, _ident = MkIdent "if" }
-                                 , _arg = _cond }
-                     , _arg = _then }
-         , _arg = _else }
+    If { } -> ccExpr $ desugarIf expr
 
 localDecls :: [Ident] -> Int -> CC a -> CC a
 localDecls idents n cc = do

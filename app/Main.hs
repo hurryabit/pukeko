@@ -15,19 +15,25 @@ import qualified Pukeko.Language.LambdaLifter as Lifter
 import qualified Pukeko.Language.Parser       as Parser
 import qualified Pukeko.Language.Syntax       as Syntax
 import qualified Pukeko.Language.Type         as Type
-import qualified Pukeko.Language.TypeChecker  as Poly
+import qualified Pukeko.Language.TypeChecker  as TypeChecker
 
-compile :: Bool -> Bool -> String -> IO ()
-compile write_ll write_gm file_user = do
+compile :: Bool -> Bool -> Bool -> String -> IO ()
+compile write_ll write_gm no_prelude file_user = do
   let file_prel = replaceFileName file_user "prelude.pu"
   code_user <- readFile file_user
-  code_prel <- readFile file_prel
+  code_prel <-
+    if no_prelude
+    then return ""
+    else readFile file_prel
   let gprog_or_error = do
         expr_user <- Parser.parseExpr file_user code_user
-        expr_prel <- Parser.parseExpr file_prel code_prel
-        let expr = Syntax.inject expr_prel expr_user
-        t <- Poly.inferExpr expr
-        _ <- Type.unify mempty t (Type.io Type.unit)
+        expr <-
+          if no_prelude
+          then return expr_user
+          else do
+            expr_prel <- Parser.parseExpr file_prel code_prel
+            return $ Syntax.inject expr_prel expr_user
+        TypeChecker.checkExpr (Type.io Type.unit) expr
         let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
         program <- Compiler.compile (fmap (const ()) lifted_expr)
         nasm <- NASM.assemble program
@@ -49,6 +55,7 @@ opts =
   compile
     <$> switch (short 'l' <> long "lifted" <> help "Write result of lambda lifter")
     <*> switch (short 'g' <> long "gcode"  <> help "Write intermediate g-machine code")
+    <*> switch (short 'n' <> long "no-prelude"  <> help "Don't load the prelude")
     -- <*> option auto (short 'h' <> long "heap"  <> value 1000 <> metavar "SIZE")
     <*> argument str (metavar "FILE")
 

@@ -1,173 +1,209 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.Language.TypeChecker
-  ( inferExpr
+  ( checkExpr
   )
   where
 
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Fail
-import Control.Monad.Reader
-import Control.Monad.Supply
+import Control.Monad.Reader hiding (asks, local)
+import Control.Monad.State
+import Control.Monad.ST
+import Data.Label (mkLabels)
+import Data.Label.Monadic
 import Data.Map (Map)
-import Data.Set (Set)
+import Data.STRef
+import Text.Parsec (SourcePos)
 
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 
-import Pukeko.Pretty
+import qualified Data.Map   as Map
+
+import Pukeko.Pretty hiding (int)
 import Pukeko.Language.Syntax
-import Pukeko.Language.Term
-import Pukeko.Language.Type (Type, Var, (~>), unify, unifyMany)
+import Pukeko.Language.Type
 
 import qualified Pukeko.Language.Builtins as Builtins (everything)
-import qualified Pukeko.Language.Type as Type
 
-inferExpr :: MonadError String m => Expr a -> m Type
-inferExpr expr = do
-  let  env = map (\(i, t) -> (i, mkBoundScheme t)) Builtins.everything
-  (_, t) <- runTI (Map.fromList env) (infer expr)
-  return t
+data Environment s = MkEnvironment
+  { _binds :: Map Ident (SType s)
+  , _level :: Int
+  , _fresh :: STRef s [Ident]
+  }
+mkLabels [''Environment]
 
-
-data Scheme = MkScheme { _boundVars :: Set (Var Type), _type :: Type }
-
-mkBoundScheme, mkFreeScheme :: Type -> Scheme
-mkBoundScheme _type = MkScheme { _boundVars = freeVars _type, _type }
-mkFreeScheme  _type = MkScheme { _boundVars = Set.empty     , _type }
-
-type Environment = Map Ident Scheme
-
-
-newtype TI a =
-  TI  { unTI :: ExceptT String (ReaderT Environment (Supply (Var Type))) a }
+newtype TI s a =
+  TI { unTI :: ExceptT String (ReaderT (Environment s) (ST s)) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
-           , MonadReader Environment
-           , MonadSupply (Var Type)
+           , MonadReader (Environment s)
            )
 
-instance MonadFail TI where
+instance MonadFail (TI s) where
   fail = throwError
 
-runTI :: MonadError String m => Environment -> TI a -> m a
-runTI env ti =
-  case evalSupply (runReaderT (runExceptT (unTI ti)) env) Type.supply of
-    Left  e -> throwError e
-    Right x -> return x
+liftST :: ST s a -> TI s a
+liftST = TI . lift . lift
 
-freshVar :: TI Type
-freshVar = Type.Var <$> fresh
+checkExpr :: MonadError String m => Type -> Expr SourcePos -> m ()
+checkExpr t_want expr =
+  case checkExpr' t_want expr of
+    Left error -> throwError error
+    Right ()   -> return ()
 
-lookupAndInstantiate :: Ident -> String -> TI Type
-lookupAndInstantiate ident kind = do
-  t_ident_env <- asks (Map.lookup ident)
-  case t_ident_env of
-    Nothing -> pthrow (text "unknown" <+> text kind <> colon <+> pretty ident)
-    Just scheme -> do
-      MkScheme { _type } <- instantiateScheme scheme
-      return _type
+checkExpr' :: Type -> Expr SourcePos -> Either String ()
+checkExpr' t_want expr = runST $ do
+  let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
+  _fresh <- newSTRef (map MkIdent vars)
+  let env = MkEnvironment
+        { _binds = Map.fromList $ map (fmap toSType) Builtins.everything
+        , _level = 1
+        , _fresh
+        }
+  runReaderT (runExceptT (unTI (check t_want expr))) env
 
+freshVar :: TI s (SType s)
+freshVar = do
+  _level <- asks level
+  _fresh <- asks fresh
+  _ident:idents <- liftST $ readSTRef _fresh
+  liftST $ writeSTRef _fresh idents
+  var <- liftST $ newSTRef $ Free { _ident, _level }
+  return (TVar var)
 
-infer :: Expr a -> TI (Subst Type, Type)
-infer expr =
+occursCheck :: (STRef s (STypeVar s)) -> SType s -> TI s ()
+occursCheck tvr1 t2 =
+  case t2 of
+    TVar tvr2
+      | tvr1 == tvr2 -> throwError "occurs check"
+      | otherwise    -> do
+          tv2 <- liftST $ readSTRef tvr2
+          case tv2 of
+            Free{ _ident, _level = level2 } -> do
+              Free{ _level = level1 } <- liftST $ readSTRef tvr1
+              liftST $ writeSTRef tvr2 $
+                Free { _ident, _level = min level1 level2 }
+            Link t2' -> occursCheck tvr1 t2'
+    QVar _ -> return ()
+    TFun tx ty -> occursCheck tvr1 tx >> occursCheck tvr1 ty
+    TApp _ ts -> mapM_ (occursCheck tvr1) ts
+
+-- TODO: link compression
+unwind :: SType s -> TI s (SType s)
+unwind t =
+  case t of
+    TVar tvr -> do
+      tv <- liftST $ readSTRef tvr
+      case tv of
+        Link{ _type } -> unwind _type
+        Free{} -> return t
+    _ -> return t
+
+unify :: SType s -> SType s -> TI s ()
+unify t1 t2 = do
+  t1 <- unwind t1
+  t2 <- unwind t2
+  case (t1, t2) of
+    (TVar tvr1, TVar tvr2) | tvr1 == tvr2 -> return ()
+    (TVar tvr1, _) -> do
+      Free{ _ident } <- liftST $ readSTRef tvr1
+      occursCheck tvr1 t2 `catchError` \_ -> do
+        p2 <- liftST $ prettyType prettyNormal 0 t2
+        pthrow $ hsep [pretty _ident, text "occurs in", p2]
+      liftST $ writeSTRef tvr1 $ Link { _type = t2 }
+    (_, TVar _) -> unify t2 t1
+    (TFun tx1 ty1, TFun tx2 ty2) -> unify tx1 tx2 >> unify ty1 ty2
+    (TApp c1  ts1, TApp c2  ts2)
+      | c1 == c2 && length ts1 == length ts2 -> zipWithM_ unify ts1 ts2
+    _ -> do
+      p1 <- liftST $ prettyType prettyNormal 0 t1
+      p2 <- liftST $ prettyType prettyNormal 0 t2
+      pthrow $ hsep [text "mismatching types", p1, text "and", p2]
+
+generalize :: SType s -> TI s (SType s)
+generalize t =
+  case t of
+    TVar tvr -> do
+      tv <- liftST $ readSTRef tvr
+      case tv of
+        Free{ _ident, _level = tv_level } -> do
+          cur_level <- asks level
+          if tv_level > cur_level
+            then return $ QVar _ident
+            else return t
+        Link{ _type } -> generalize _type
+    QVar _ -> return t
+    TFun tx ty -> TFun <$> generalize tx <*> generalize ty
+    TApp c  ts -> TApp c <$> mapM generalize ts
+
+instantiate :: SType s -> TI s (SType s)
+instantiate t = evalStateT (inst t) Map.empty
+  where
+    inst :: SType s -> StateT (Map Ident (SType s)) (TI s) (SType s)
+    inst t =
+      case t of
+        TVar tvr -> do
+          tv <- lift $ liftST $ readSTRef tvr
+          case tv of
+            Free{} -> return t
+            Link{ _type } -> inst _type
+        QVar name -> do
+          subst <- get
+          case Map.lookup name subst of
+            Just t' -> return t'
+            Nothing -> do
+              t' <- lift freshVar
+              put $ Map.insert name t' subst
+              return t'
+        TFun tx ty -> TFun <$> inst tx <*> inst ty
+        TApp c  ts -> TApp c <$> mapM inst ts
+
+infer :: Expr SourcePos -> TI s (SType s)
+infer expr = do
+  let unifyHere t1 t2 =
+        unify t1 t2 `catchError` \msg -> throwError (show (annot expr) ++ ": " ++ msg)
   case expr of
-    Var { _ident } -> do
-      t_ident <- lookupAndInstantiate _ident "identifier"
-      return (mempty, t_ident)
-    Num { } -> return (mempty, Type.int)
-    Ap { _fun, _arg } -> do
-      (phi, [t_fun, t_arg]) <- inferMany [_fun, _arg]
+    Var{ _ident } -> do
+      t_opt <- Map.lookup _ident <$> asks binds
+      case t_opt of
+        Just t  -> instantiate t
+        Nothing -> pthrow $ text "unknown variable:" <+> pretty _ident
+    Num{} -> return (toSType int)
+    Pack{} -> pthrow $
+      text "Pack expressions should only be introduced after type checking!"
+    Ap{ _fun, _arg } -> do
+      t_fun <- infer _fun
+      t_arg <- infer _arg
       t_res <- freshVar
-      psi <- unify phi t_fun (t_arg ~> t_res)
-      return (psi, subst psi t_res)
-    ApOp { _op, _arg1, _arg2 } -> do
-      t_op <- lookupAndInstantiate _op "operator"
-      (phi, [t_arg1, t_arg2]) <- inferMany [_arg1, _arg2]
-      t_res <- freshVar
-      psi <- unify phi t_op (t_arg1 ~> t_arg2 ~> t_res)
-      return (psi, subst psi t_res)
-    Lam { _patns, _body } -> do
-      (phi, t_patns, t_body) <- introduceInstantiated _patns (infer _body)
-      return (phi, foldr (~>) t_body t_patns)
-    -- TODO: Remove code duplication.
-    Let { _isrec = False, _defns, _body } -> do
-      let (patns, exprs) = unzipDefns _defns
-      (phi, t_exprs) <- inferMany exprs
-      t_patns <- mapM (\(MkPatn { _type }) -> instantiateAnnot _type) patns
-      psi <- unifyMany phi (zip t_patns t_exprs)
-      local (subst' psi) $ do
-        introduceGeneralized patns (map (subst psi) t_patns) $ do
-          (rho, t_body) <- infer _body
-          return (rho <> psi, t_body)
-    Let { _isrec = True, _defns, _body } -> do
-      let (patns, exprs) = unzipDefns _defns
-      (phi, t_patns, t_exprs) <- introduceInstantiated patns (inferMany exprs)
-      psi <- unifyMany phi (zip t_patns t_exprs)
-      local (subst' psi) $ do
-        introduceGeneralized patns (map (subst psi) t_patns) $ do
-          (rho, t_body) <- infer _body
-          return (rho <> psi, t_body)
-    If { _cond, _then, _else } -> do
-      (phi, t_cond) <- infer _cond
-      psi <- unify phi Type.bool t_cond
-      local (subst' psi) $ do
-        (rho, [t_then, t_else]) <- inferMany [_then, _else]
-        chi <- unify (rho <> psi) t_then t_else
-        return (chi, subst chi t_then)
-    Pack { } ->
-      pthrow (text "Pack expressions should only be introduced after type checking!")
+      unifyHere t_fun (TFun t_arg t_res)
+      return t_res
+    ApOp{} -> infer (desugarApOp expr)
+    Lam{ _patns, _body } -> do
+      let (idents, _) = unzipPatns _patns
+      t_idents <- mapM (const freshVar) idents
+      let env = Map.fromList (zip idents t_idents)
+      t_body <- local binds (Map.union env) (infer _body)
+      return $ foldr TFun t_body t_idents
+    Let{ _isrec = False, _defns, _body } -> do
+      let (idents, _, rhss) = unzipDefns3 _defns
+      t_rhss <- local level succ $ mapM infer rhss
+      t_idents <- mapM generalize t_rhss
+      let env = Map.fromList (zip idents t_idents)
+      local binds (Map.union env) (infer _body)
+    Let{ _isrec = True, _defns, _body } -> do
+      let (idents, _, rhss) = unzipDefns3 _defns
+      t_rhss <- local level succ $ do
+        t_lhss <- mapM (const freshVar) rhss
+        let env = Map.fromList (zip idents t_lhss)
+        t_rhss <- local binds (Map.union env) (mapM infer rhss)
+        zipWithM_ unifyHere t_lhss t_rhss
+        return t_rhss
+      t_idents <- mapM generalize t_rhss
+      let env = Map.fromList (zip idents t_idents)
+      local binds (Map.union env) (infer _body)
+    If{} -> infer (desugarIf expr)
 
-inferMany :: [Expr a] -> TI (Subst Type, [Type])
-inferMany [] = return (mempty, [])
-inferMany (e:es) = do
-  (phi, t)  <- infer e
-  (psi, ts) <- local (subst' phi) (inferMany es)
-  return (psi <> phi, subst psi t : ts)
-
--- | In the result, @_boundVars@ contains the new names of the old bound variables.
-instantiateScheme :: Scheme -> TI Scheme
-instantiateScheme (MkScheme { _boundVars, _type }) = do
-  bindings <- mapM (\_ -> freshVar) (Map.fromSet id _boundVars)
-  return $ MkScheme
-    { _boundVars = Set.fromList [ v | Type.Var v <- Map.elems bindings ]
-    , _type      = subst (mkSubst bindings) _type
-    }
-
-instantiateAnnot :: Maybe Type -> TI Type
-instantiateAnnot t_annot =
-  case t_annot of
-    Nothing     -> freshVar
-    Just t_patn -> do
-      MkScheme { _type } <- instantiateScheme (mkBoundScheme t_patn)
-      return _type
-
-introduceInstantiated :: [Patn a] -> TI (Subst Type, t) -> TI (Subst Type, [Type], t)
-introduceInstantiated patns sub = do
-  let entry (MkPatn { _ident, _type }) = do
-        t_ident <- instantiateAnnot _type
-        let scheme = mkFreeScheme t_ident
-        return (t_ident, (_ident, scheme))
-  (t_idents, env_list) <- unzip <$> mapM entry patns
-  let env = Map.fromList env_list
-  (phi, t_sub) <- local (Map.union env) sub
-  return (phi, map (subst phi) t_idents, t_sub)
-
-introduceGeneralized :: [Patn a] -> [Type] -> TI t -> TI t
-introduceGeneralized patns types sub = do
-  free_vars <- asks freeVars'
-  let entry (MkPatn { _ident }) _type = do
-        scheme <- instantiateScheme $ MkScheme
-          { _boundVars = Set.difference (freeVars _type) free_vars
-          , _type
-          }
-        return (_ident, scheme)
-  env <- Map.fromList <$> zipWithM entry patns types
-  local (Map.union env) sub
-
-
-instance TermCollection Type Scheme where
-  freeVars' (MkScheme { _boundVars, _type }) =
-    Set.difference (freeVars _type) _boundVars
-  subst' phi (scheme@MkScheme { _boundVars, _type }) =
-    scheme { _type = subst (phi `exclude` _boundVars) _type }
+check :: Type -> Expr SourcePos -> TI s ()
+check t_want expr = do
+  t_expr <- infer expr
+  unify (toSType t_want) t_expr
