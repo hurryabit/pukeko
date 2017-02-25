@@ -8,11 +8,11 @@ module Pukeko.Language.Builtins
 import Pukeko.Language.Syntax (Ident (..))
 import Pukeko.Language.Type
 
-alpha, beta :: Type
+alpha, beta :: Type Closed
 alpha = var "a"
 beta  = var "b"
 
-constructors, primitives :: [(String, Type)]
+constructors, primitives :: [(String, Type Closed)]
 constructors =
   [ ("unit"   , unit)
   , ("false"  , bool)
@@ -46,5 +46,5 @@ primitives =
   , ("abort" , alpha)
   ]
 
-everything :: [(Ident, Type)]
+everything :: [(Ident, Type Closed)]
 everything = map (\(i, t) -> (MkIdent i, t)) (constructors ++ primitives)

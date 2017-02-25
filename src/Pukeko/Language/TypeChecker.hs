@@ -17,7 +17,7 @@ import Data.STRef
 import Text.Parsec (SourcePos)
 
 
-import qualified Data.Map   as Map
+import qualified Data.Map as Map
 
 import Pukeko.Pretty hiding (int)
 import Pukeko.Language.Syntax
@@ -26,7 +26,7 @@ import Pukeko.Language.Type
 import qualified Pukeko.Language.Builtins as Builtins (everything)
 
 data Environment s = MkEnvironment
-  { _binds :: Map Ident (SType s)
+  { _binds :: Map Ident (Type (Open s))
   , _level :: Int
   , _fresh :: STRef s [Ident]
   }
@@ -45,24 +45,24 @@ instance MonadFail (TI s) where
 liftST :: ST s a -> TI s a
 liftST = TI . lift . lift
 
-checkExpr :: MonadError String m => Type -> Expr SourcePos -> m ()
+checkExpr :: MonadError String m => Type Closed -> Expr SourcePos -> m ()
 checkExpr t_want expr =
   case checkExpr' t_want expr of
     Left error -> throwError error
     Right ()   -> return ()
 
-checkExpr' :: Type -> Expr SourcePos -> Either String ()
+checkExpr' :: Type Closed -> Expr SourcePos -> Either String ()
 checkExpr' t_want expr = runST $ do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
   _fresh <- newSTRef (map MkIdent vars)
   let env = MkEnvironment
-        { _binds = Map.fromList $ map (fmap toSType) Builtins.everything
+        { _binds = Map.fromList $ map (fmap open) Builtins.everything
         , _level = 1
         , _fresh
         }
   runReaderT (runExceptT (unTI (check t_want expr))) env
 
-freshVar :: TI s (SType s)
+freshVar :: TI s (Type (Open s))
 freshVar = do
   _level <- asks level
   _fresh <- asks fresh
@@ -71,7 +71,7 @@ freshVar = do
   var <- liftST $ newSTRef $ Free { _ident, _level }
   return (TVar var)
 
-occursCheck :: (STRef s (STypeVar s)) -> SType s -> TI s ()
+occursCheck :: (STRef s (TypeVar (Open s))) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
   case t2 of
     TVar tvr2
@@ -89,7 +89,7 @@ occursCheck tvr1 t2 =
     TApp _ ts -> mapM_ (occursCheck tvr1) ts
 
 -- TODO: link compression
-unwind :: SType s -> TI s (SType s)
+unwind :: Type (Open s) -> TI s (Type (Open s))
 unwind t =
   case t of
     TVar tvr -> do
@@ -99,7 +99,7 @@ unwind t =
         Free{} -> return t
     _ -> return t
 
-unify :: SType s -> SType s -> TI s ()
+unify :: Type (Open s) -> Type (Open s) -> TI s ()
 unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
@@ -120,7 +120,7 @@ unify t1 t2 = do
       p2 <- liftST $ prettyType prettyNormal 0 t2
       pthrow $ hsep [text "mismatching types", p1, text "and", p2]
 
-generalize :: SType s -> TI s (SType s)
+generalize :: Type (Open s) -> TI s (Type (Open s))
 generalize t =
   case t of
     TVar tvr -> do
@@ -136,10 +136,10 @@ generalize t =
     TFun tx ty -> TFun <$> generalize tx <*> generalize ty
     TApp c  ts -> TApp c <$> mapM generalize ts
 
-instantiate :: SType s -> TI s (SType s)
+instantiate :: Type (Open s) -> TI s (Type (Open s))
 instantiate t = evalStateT (inst t) Map.empty
   where
-    inst :: SType s -> StateT (Map Ident (SType s)) (TI s) (SType s)
+    inst :: Type (Open s) -> StateT (Map Ident (Type (Open s))) (TI s) (Type (Open s))
     inst t =
       case t of
         TVar tvr -> do
@@ -158,7 +158,13 @@ instantiate t = evalStateT (inst t) Map.empty
         TFun tx ty -> TFun <$> inst tx <*> inst ty
         TApp c  ts -> TApp c <$> mapM inst ts
 
-infer :: Expr SourcePos -> TI s (SType s)
+instantiateAnnots :: [Maybe (Type Closed)] -> TI s [Type (Open s)]
+instantiateAnnots = mapM $ \t_opt ->
+  case t_opt of
+    Nothing -> freshVar
+    Just t  -> instantiate (open t)
+
+infer :: Expr SourcePos -> TI s (Type (Open s))
 infer expr = do
   let unifyHere t1 t2 =
         unify t1 t2 `catchError` \msg -> throwError (show (annot expr) ++ ": " ++ msg)
@@ -168,7 +174,7 @@ infer expr = do
       case t_opt of
         Just t  -> instantiate t
         Nothing -> pthrow $ text "unknown variable:" <+> pretty _ident
-    Num{} -> return (toSType int)
+    Num{} -> return int
     Pack{} -> pthrow $
       text "Pack expressions should only be introduced after type checking!"
     Ap{ _fun, _arg } -> do
@@ -179,21 +185,25 @@ infer expr = do
       return t_res
     ApOp{} -> infer (desugarApOp expr)
     Lam{ _patns, _body } -> do
-      let (idents, _) = unzipPatns _patns
-      t_idents <- mapM (const freshVar) idents
+      let (idents, t_annots) = unzipPatns _patns
+      t_idents <- instantiateAnnots t_annots
       let env = Map.fromList (zip idents t_idents)
       t_body <- local binds (Map.union env) (infer _body)
       return $ foldr TFun t_body t_idents
     Let{ _isrec = False, _defns, _body } -> do
-      let (idents, _, rhss) = unzipDefns3 _defns
-      t_rhss <- local level succ $ mapM infer rhss
+      let (idents, t_annots, rhss) = unzipDefns3 _defns
+      t_rhss <- local level succ $ do
+        t_lhss <- instantiateAnnots t_annots
+        t_rhss <- mapM infer rhss
+        zipWithM_ unifyHere t_lhss t_rhss
+        return t_rhss
       t_idents <- mapM generalize t_rhss
       let env = Map.fromList (zip idents t_idents)
       local binds (Map.union env) (infer _body)
     Let{ _isrec = True, _defns, _body } -> do
-      let (idents, _, rhss) = unzipDefns3 _defns
+      let (idents, t_annots, rhss) = unzipDefns3 _defns
       t_rhss <- local level succ $ do
-        t_lhss <- mapM (const freshVar) rhss
+        t_lhss <- instantiateAnnots t_annots
         let env = Map.fromList (zip idents t_lhss)
         t_rhss <- local binds (Map.union env) (mapM infer rhss)
         zipWithM_ unifyHere t_lhss t_rhss
@@ -203,7 +213,7 @@ infer expr = do
       local binds (Map.union env) (infer _body)
     If{} -> infer (desugarIf expr)
 
-check :: Type -> Expr SourcePos -> TI s ()
+check :: Type Closed -> Expr SourcePos -> TI s ()
 check t_want expr = do
   t_expr <- infer expr
-  unify (toSType t_want) t_expr
+  unify (open t_want) t_expr

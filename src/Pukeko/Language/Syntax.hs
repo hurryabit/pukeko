@@ -17,7 +17,7 @@ module Pukeko.Language.Syntax
 import Pukeko.Language.Ident
 import Pukeko.Language.Operator (Spec (..), Assoc (..), aprec)
 import Pukeko.Language.Term
-import Pukeko.Language.Type (Type)
+import Pukeko.Language.Type (Type, Closed)
 import Pukeko.Pretty
 
 import qualified Pukeko.Language.Operator as Operator
@@ -33,7 +33,8 @@ data Expr a
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
   deriving (Show, Functor)
 
-data Patn a = MkPatn { _annot :: a, _ident :: Ident, _type :: Maybe Type }
+data Patn a =
+  MkPatn { _annot :: a, _ident :: Ident, _type :: Maybe (Type Closed) }
   deriving (Show, Functor)
 
 data Defn a = MkDefn { _patn :: Patn a, _expr :: Expr a }
@@ -65,13 +66,13 @@ desugarIf If{ _annot, _cond, _then, _else } =
      }
 desugarIf _ = error "desugarIf can only be applied to If nodes"
 
-unzipPatns :: [Patn a] -> ([Ident], [Maybe Type])
+unzipPatns :: [Patn a] -> ([Ident], [Maybe (Type Closed)])
 unzipPatns = unzip . map (\MkPatn{ _ident, _type} -> (_ident, _type))
 
 unzipDefns :: [Defn a] -> ([Patn a], [Expr a])
 unzipDefns = unzip . map (\MkDefn{ _patn, _expr} -> (_patn, _expr))
 
-unzipDefns3 :: [Defn a] -> ([Ident], [Maybe Type], [Expr a])
+unzipDefns3 :: [Defn a] -> ([Ident], [Maybe (Type Closed)], [Expr a])
 unzipDefns3 = unzip3 .
   map (\MkDefn{ _patn = MkPatn{ _ident, _type }, _expr } -> (_ident, _type, _expr))
 

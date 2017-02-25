@@ -12,7 +12,7 @@ import qualified Text.Parsec.Token    as Token
 
 import Pukeko.Language.Operator (Spec (..))
 import Pukeko.Language.Syntax
-import Pukeko.Language.Type (Type, var, (~>), app)
+import Pukeko.Language.Type (Type, Closed, var, (~>), app)
 
 import qualified Pukeko.Language.Operator as Operator
 
@@ -22,7 +22,7 @@ parseExpr file code =
     Left error  -> throwError (show error)
     Right expr -> return expr
 
-parseType :: MonadError String m => String -> m Type
+parseType :: MonadError String m => String -> m (Type Closed)
 parseType code =
   case parse (type_ <* eof) "<input>" code of
     Left error -> throwError (show error)
@@ -66,10 +66,10 @@ ident, typeName  :: Parser Ident
 ident = MkIdent <$> identifier
 typeName = lookAhead upper *> ident
 
-typeVar :: Parser Type
+typeVar :: Parser (Type Closed)
 typeVar = var <$> (lookAhead lower *> identifier)
 
-type_, atype :: Parser Type
+type_, atype :: Parser (Type Closed)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
@@ -83,7 +83,7 @@ atype = choice
   , parens type_
   ]
 
-asType :: Parser Type
+asType :: Parser (Type Closed)
 asType = reservedOp ":" *> type_
 
 patn :: Bool -> Parser (Patn SourcePos)

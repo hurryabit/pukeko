@@ -1,6 +1,10 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE GADTs #-}
 module Pukeko.Language.Type
-  ( Type
+  ( Type (..)
+  , TypeVar (..)
+  , Open
+  , Closed
+  , open
   , var
   , (~>)
   , app
@@ -10,9 +14,6 @@ module Pukeko.Language.Type
   , pair
   , list
   , io
-  , SType (..)
-  , STypeVar (..)
-  , toSType
   , prettyType
   )
   where
@@ -27,53 +28,60 @@ import Pukeko.Pretty hiding (int)
 
 infixr 1 ~>
 
-data STypeVar s
+data Open s
+data Closed
+
+data TypeVar s
   = Free { _ident :: Ident, _level :: Int }
-  | Link { _type  :: SType s }
+  | Link { _type  :: Type s }
 
-data SType s
-  = TVar (STRef s (STypeVar s))
-  | QVar Ident
-  | TFun (SType s) (SType s)
-  | TApp Ident [(SType s)]
-  deriving (Eq)
+data Type a where
+  TVar :: STRef s (TypeVar (Open s)) -> Type (Open s)
+  QVar :: Ident                      -> Type a
+  TFun :: Type a -> Type a           -> Type a
+  TApp :: Ident  -> [Type a]         -> Type a
 
-newtype Type = MkType { toSType :: forall s. SType s }
-
-var :: String -> Type
+var :: String -> Type a
 var name@(start:_)
-  | isLower start = MkType (QVar (MkIdent name))
+  | isLower start = QVar (MkIdent name)
 var name          = perror $ text name <+> text "is not a valid variable name"
 
-(~>) :: Type -> Type -> Type
-(~>) (MkType tx) (MkType ty) = MkType (TFun tx ty)
+(~>) :: Type a -> Type a -> Type a
+(~>) = TFun
 
-app :: Ident -> [Type] -> Type
+app :: Ident -> [Type a] -> Type a
 app name@(MkIdent (start:_)) ts
-  | isUpper start = MkType (TApp name $ map toSType ts)
+  | isUpper start = TApp name ts
 app name _        = perror $ pPrint name <+> text "is not a valid type constructor name"
 
-int, unit, bool :: Type
+int, unit, bool :: Type a
 int  = app (MkIdent "Int")  []
 unit = app (MkIdent "Unit") []
 bool = app (MkIdent "Bool") []
 
-pair :: Type -> Type -> Type
+pair :: Type a -> Type a -> Type a
 pair t1 t2 = app (MkIdent "Pair") [t1, t2]
 
-list :: Type -> Type
+list :: Type a -> Type a
 list t = app (MkIdent "List") [t]
 
-io :: Type -> Type
+io :: Type a -> Type a
 io t = app (MkIdent "IO") [t]
 
-prettyTypeVar :: PrettyLevel -> Rational -> STypeVar s -> ST s Doc
+open :: Type Closed -> Type (Open s)
+open t =
+  case t of
+    QVar name  -> QVar name
+    TFun tx ty -> TFun (open tx) (open ty)
+    TApp c  ts -> TApp c (map open ts)
+
+prettyTypeVar :: PrettyLevel -> Rational -> TypeVar (Open s) -> ST s Doc
 prettyTypeVar lvl prec tv =
   case tv of
     Free { _ident } -> return $ pretty _ident
     Link { _type }  -> brackets <$> prettyType lvl prec _type
 
-prettyType :: PrettyLevel -> Rational -> SType s -> ST s Doc
+prettyType :: PrettyLevel -> Rational -> Type (Open s) -> ST s Doc
 prettyType lvl prec t =
   case t of
     TVar tvr -> do
@@ -89,9 +97,8 @@ prettyType lvl prec t =
       ps <- mapM (prettyType lvl 3) ts
       return $ maybeParens (prec > 2) $ pretty c <+> hsep ps
 
-instance Pretty Type where
-  pPrintPrec lvl prec (MkType t) =
-    runST $ prettyType lvl prec t
+instance Pretty (Type Closed) where
+  pPrintPrec lvl prec t = runST $ prettyType lvl prec (open t)
 
-instance Show Type where
+instance Show (Type Closed) where
   show = prettyShow
