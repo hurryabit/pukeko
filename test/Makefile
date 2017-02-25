@@ -10,7 +10,7 @@ LIBS = -lc
 
 NASM_FLAGS = -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64
 
-SOURCES     = monad_io.pu fibs.pu qsort.pu isort.pu minlet.pu
+SOURCES     = monad_io.pu fibs.pu qsort.pu isort.pu queens.pu minlet.pu
 GMACHINES   = $(SOURCES:.pu=.gm)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o

@@ -43,6 +43,15 @@ letrec append xs ys =
   else
     cons (hd xs) (append (tl xs) ys)
 in
+let concat = foldr append nil in
+letrec map f xs =
+  if is_nil xs then
+    nil
+  else
+    cons (f (hd xs)) (map f (tl xs))
+in
+let concat_map f xs = concat (map f xs) in
+let length = foldr (fun x l -> 1+l) 0 in
 let iter_m f = foldr (fun x m -> f x; m) (return unit) in
 let print_list = iter_m print in
 1
