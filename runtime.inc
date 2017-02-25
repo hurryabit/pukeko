@@ -230,30 +230,30 @@ __install__main__:
 %endmacro
 
 %macro g_cons 2                 ; %1 = tag, %2 = arity
-  @@(5+%2*6+(2-%2)*4+3)
+  @@(3+%2*3+(2-%2)*3+4)
   g_claim 1
-  mov  rbx, rhp                 ; save heap ptr for later push
   mov  qword [rhp], TAG_CON | %1 << 8
-  add  rhp, 8
+%assign idx 0
 %rep %2
-  pop  rax
-  mov  [rhp], rax
-  add  rhp, 8
+%assign idx idx+1
+  pop  qword [rhp+8*idx]
 %endrep
 %rep 2 - %2
-  mov  qword [rhp], 0
-  add  rhp, 8
+%assign idx idx+1
+  mov  qword [rhp+8*idx], 0
 %endrep
-  push rbx
+  push rhp
+  add  rhp, 24
 %endmacro
 
 %macro g_mkap 0
-  @@(7)
+  @@(13)
   g_claim 1
-  pop  rax
-  pop  rbx
+  mov  qword [rhp], TAG_APP
+  pop  qword [rhp+ 8]
+  pop  qword [rhp+16]
   push rhp
-  g_create TAG_APP, rax, rbx
+  add  rhp, 24
 %endmacro
 
 
