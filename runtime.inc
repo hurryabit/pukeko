@@ -37,14 +37,12 @@ default rel
 
 ;; Auxiliary macros
 %macro g_pre_call_c 0
-  @@(3)
   mov  rbx, rsp                 ; align stack ptr
   and  rbx, 0x0F                ; (dito)
   sub  rsp, rbx                 ; (dito)
 %endmacro
 
 %macro g_post_call_c 0
-  @@(1)
   add  rsp, rbx                 ; restore stack ptr
 %endmacro
 
@@ -98,7 +96,6 @@ __cafs__end__:
 
 section .text
 __install__cafs__:
-  @@(3*%0+1)
 %rep %0
   lea  rax, [CAF(%1)+8]
   lea  rbx, [%1]
@@ -109,18 +106,16 @@ __install__cafs__:
 %endmacro
 
 %macro g_install_cafs 0
-  @@(1)
   call __install__cafs__
 %endmacro
 
 %macro g_pushcaf 1
-  @@(2)
+  @@(4)
   lea  rax, [CAF(%1)]
   push rax
 %endmacro
 
 %macro g_declare_main 1
-  @@(2)
 __install__main__:
   pop  rbx
   g_pushcaf %1
@@ -134,6 +129,7 @@ __install__main__:
 
 ;; Heap operations
 %macro g_claim 1
+  @@(4)
   inc  claim_ctr
   lea  rax, [rhp+24*%1]
   cmp  rax, rhl
@@ -144,7 +140,7 @@ __install__main__:
 %endmacro
 
 %macro g_create 3
-  @@(4)
+  @@(10)
   mov  qword [rhp   ], %1
   mov  qword [rhp+ 8], %2
   mov  qword [rhp+16], %3
@@ -153,10 +149,9 @@ __install__main__:
 
 ;; TODO: make this faster
 %macro g_alloc 1
-  @@(1)
   g_claim %1
 %rep %1
-  @@(1)
+  @@(3)
   push rhp
   g_create TAG_NIX, 0, 0
 %endrep
@@ -174,18 +169,18 @@ __install__main__:
   g_fail MISSING_ARGUMENTS
 %%ok:
 %endif
-  @@(2+3*%2)
-  lea  rsi, [rsp+8]
-  mov  rdi, rsp
+  @@(%2*7)
+%assign idx 0
 %rep %2
-  lodsq
+  mov  rax, [rsp+8+8*idx]
   mov  rax, [rax+16]
-  stosq
+  mov  [rsp+8*idx], rax
+%assign idx idx+1
 %endrep
 %endmacro
 
 %macro g_push 1
-  @@(1)
+  @@(3)
   push qword [rsp+8*%1]
 %endmacro
 
@@ -195,26 +190,28 @@ __install__main__:
 %endmacro
 
 %macro g_slide 1
-  @@(3)
+  @@(6)
   pop  rax
   add  rsp, 8*%1
   push rax
 %endmacro
 
 %macro g_update 1
-  @@(6)
-  cld
+  @@(4+3*5)
   mov  rdi, [rsp+8*%1]
   pop  rsi
-  movsq
-  movsq
-  movsq
+%assign idx 0
+%rep 3
+  mov  rax, [rsi+8*idx]
+  mov  [rdi+8*idx], rax
+%assign idx idx+1
+%endrep
 %endmacro
 
 
 ;; Node constructors
 %macro g_pushint 1
-  @@(1)
+  @@(3)
   g_claim 1
   push rhp
   g_create TAG_INT, %1, NULL
@@ -224,7 +221,7 @@ __install__main__:
   %if %2 = 0
     g_pushcaf %1
   %else
-    @@(2)
+    @@(4)
     g_claim 1
     lea  rax, [%1]
     push rhp
@@ -232,9 +229,8 @@ __install__main__:
   %endif
 %endmacro
 
-;; TODO: use rdi and stosq here
 %macro g_cons 2                 ; %1 = tag, %2 = arity
-  @@(8+%2)
+  @@(5+%2*6+(2-%2)*4+3)
   g_claim 1
   mov  rbx, rhp                 ; save heap ptr for later push
   mov  qword [rhp], TAG_CON | %1 << 8
@@ -252,7 +248,7 @@ __install__main__:
 %endmacro
 
 %macro g_mkap 0
-  @@(3)
+  @@(7)
   g_claim 1
   pop  rax
   pop  rbx
@@ -263,7 +259,7 @@ __install__main__:
 
 ;; Selectors
 %macro g_slct 1
-  @@(2)
+  @@(5)
   pop rax
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
   push qword [rax+8*%1]
@@ -273,7 +269,7 @@ __install__main__:
 %define g_tail g_slct 2
 
 %macro g_hdtl 0
-  @@(3)
+  @@(8)
   pop rax
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
   push qword [rax+16]
@@ -283,7 +279,7 @@ __install__main__:
 
 ;; Arithmetic
 %macro g_neg 0
-  @@(4)
+  @@(8)
   g_claim 1
   pop rax
   mov rcx, [rax+8]
@@ -293,7 +289,7 @@ __install__main__:
 %endmacro
 
 %macro g_binop 1
-  @@(5)
+  @@(11)
   g_claim 1
   pop  rax
   g_assert_int rax
@@ -310,7 +306,7 @@ __install__main__:
 %define g_mul g_binop imul
 
 %macro g_divop 1                ; %1: rax = quotient, rdx = remainder
-  @@(6)
+  @@(12)
   g_claim 1
   pop  rcx
   g_assert_int rcx
@@ -329,7 +325,7 @@ __install__main__:
 
 ;; Comparison relations
 %macro g_relop 1                ; %1 is some setCC instruction
-  @@(8)
+  @@(14)
   g_claim 1
   pop  rax
   g_assert_int rax
@@ -372,7 +368,7 @@ __install__main__:
 %endmacro
 
 %macro g_jumpzero 1
-  @@(3)
+  @@(4)
   pop  rax
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_JUMPZERO
   cmp  word [rax], TAG_CON       ; assumes little endian
@@ -389,7 +385,7 @@ __install__main__:
 %endmacro
 
 %macro g_eval 0
-  @@(1)
+  @@(3)
   call _eval
 %endmacro
 
@@ -457,7 +453,7 @@ _main:
 
 ;; clean up this mess
 _eval:
-  @@(3)
+  @@(4)
   mov  rax, [rsp+8]
   g_assert_good_tag rax, MSG_BAD_TAG_EVAL
   cmp  byte [rax], TAG_APP      ; assumes little endian
@@ -465,49 +461,49 @@ _eval:
   @@(2)
   cmp  word [rax], TAG_FUN      ; the tag *word* is TAG_FUN only for CAFs
   je   .caf
-  @@(1)
+  @@(2)
   ret
 .caf:
-  @@(4)
+  @@(9)
   push rbp
   push rax
   mov  rbp, rsp
   jmp  [rax+8]
 .app:
-  @@(3)
+  @@(7)
   push rbp
   push rax
   mov  rbp, rsp
   ; control goes on to _unwind intensionally
 
 _unwind:
-  @@(3)
+  @@(4)
   mov  rax, [rsp]
   g_assert_good_tag rax, MSG_BAD_TAG_UNWIND
   cmp  byte [rax], TAG_APP      ; assumes little endian
   jne  .done
-  @@(2)
+  @@(4)
   push qword [rax+8]
   jmp _unwind
 .done:
   @@(2)
   cmp  byte [rax], TAG_FUN     ; assumes little endian
   jne  _return.no_pop
-  @@(4)
+  @@(6)
   ; calc where rbp would need to be for a full application
   ; if rbp is smaller, we have a partial application
   movzx rbx, byte [rax+1]
   lea   rcx, [rsp+8*rbx]        ; TODO: test that this works correctly
   cmp   rbp, rcx
   jl    _return
-  @@(1)
+  @@(2)
   jmp   [rax+8]
 
 _return:
   @@(1)
   mov  rsp, rbp
 .no_pop:
-  @@(3)
+  @@(6)
   pop  rax
   pop  rbp
   ret
