@@ -8,6 +8,8 @@ let add_mod_prime x y =
   let z = x+y in
   if z < prime then z else z - prime
 in
-letrec fibs = Cons 0 (Cons 1 (zip_with add_mod_prime fibs (tail fibs))) in
-let main = print (nth fibs 1500000) in
+letrec fibs0 = Cons 0 fibs1
+and    fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
+in
+let main = print (nth fibs0 1500000) in
 main

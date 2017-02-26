@@ -1,4 +1,4 @@
-g_declare_cafs Nil, abort, prime, fibs, main
+g_declare_cafs Nil, abort, prime, fibs0, fibs1, main
 g_declare_main main
 
 g_globstart prefix_add, 2
@@ -168,23 +168,6 @@ g_update 1
 g_pop 0
 g_unwind
 
-g_globstart tail, 1
-g_push 0
-g_eval
-g_jumpzero .0
-g_hdtl
-g_push 1
-g_slide 2
-g_jump .1
-g_label .0
-g_pop 1
-g_pushglobal abort, 0
-g_slide 0
-g_label .1
-g_update 2
-g_pop 1
-g_unwind
-
 g_globstart add_mod_prime, 2
 g_push 1
 g_push 1
@@ -216,11 +199,19 @@ g_update 3
 g_pop 2
 g_unwind
 
-g_globstart fibs, 0
-g_pushglobal fibs, 0
-g_pushglobal tail, 1
+g_globstart fibs0, 0
+g_pushglobal fibs1, 0
+g_pushint 0
+g_pushglobal Cons, 2
 g_mkap
-g_pushglobal fibs, 0
+g_mkap
+g_update 1
+g_pop 0
+g_unwind
+
+g_globstart fibs1, 0
+g_pushglobal fibs1, 0
+g_pushglobal fibs0, 0
 g_pushglobal add_mod_prime, 2
 g_pushglobal zip_with, 3
 g_mkap
@@ -230,17 +221,13 @@ g_pushint 1
 g_pushglobal Cons, 2
 g_mkap
 g_mkap
-g_pushint 0
-g_pushglobal Cons, 2
-g_mkap
-g_mkap
 g_update 1
 g_pop 0
 g_unwind
 
 g_globstart main, 0
 g_pushint 1500000
-g_pushglobal fibs, 0
+g_pushglobal fibs0, 0
 g_pushglobal nth, 2
 g_mkap
 g_mkap
