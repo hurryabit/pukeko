@@ -4,6 +4,7 @@ gm/gm
 test/*
 !test/
 !test/Makefile
+!test/*.asm
 !test/*.hs
 !test/*.out
 !test/*.pu
