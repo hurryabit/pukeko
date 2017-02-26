@@ -17,8 +17,7 @@ everything :: [Global]
 everything = concat
   [ neg : binops
   , concatMap constructors adts
-  , [ if_
-    , return_, print_, prefix_bind
+  , [ return_, print_, prefix_bind
     , abort
     ]
   ]
@@ -67,20 +66,6 @@ constructors MkADT{ _constructors } = zipWith f [0..] _constructors
           , UPDATE 1
           , RETURN
           ]
-
-if_ :: Global
-if_ = mkGlobal "if" 3
-  [ EVAL
-  , JUMPZERO ".if_false"
-  , SLIDE 1
-  , JUMP ".end_if"
-  , LABEL ".if_false"
-  , POP 1
-  , LABEL ".end_if"
-  , EVAL
-  , UPDATE 1
-  , UNWIND
-  ]
 
 return_, print_, prefix_bind :: Global
 return_ = mkGlobal "return" 2

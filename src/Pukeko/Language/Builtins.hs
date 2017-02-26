@@ -41,7 +41,6 @@ primitives =
   , ("prefix_ne" , int  ~> int  ~> bool)
   , ("prefix_ge" , int  ~> int  ~> bool)
   , ("prefix_gt" , int  ~> int  ~> bool)
-  , ("if" , bool ~> alpha ~> alpha ~> alpha)
   , ("return", alpha ~> io alpha)
   , ("print" , int ~> io unit)
   , ("prefix_bind", io alpha ~> (alpha ~> io beta) ~> io beta)

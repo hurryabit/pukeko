@@ -59,18 +59,21 @@ desugarApOp _ = error "desugarApOp can only be applied to ApOp nodes"
 
 desugarIf :: Expr a -> Expr a
 desugarIf If{ _annot, _cond, _then, _else } =
-  Ap { _annot
-     , _fun = Ap { _annot
-                 , _fun = Ap { _annot
-                             , _fun = Var { _annot
-                                          , _ident = MkIdent "if"
-                                          }
-                             , _arg = _cond
-                             }
-                 , _arg = _then
-                 }
-     , _arg = _else
-     }
+  Match { _annot = _annot
+        , _expr  = _cond
+        , _altns =
+          [ MkAltn { _annot = annot _then
+                   , _cons  = MkIdent "True"
+                   , _patns = []
+                   , _rhs   = _then
+                   }
+          , MkAltn { _annot = annot _else
+                   , _cons  = MkIdent "False"
+                   , _patns = []
+                   , _rhs   = _else
+                   }
+          ]
+        }
 desugarIf _ = error "desugarIf can only be applied to If nodes"
 
 unzipPatns :: [Patn a] -> ([Ident], [Maybe (Type Closed)])

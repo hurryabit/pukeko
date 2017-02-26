@@ -369,7 +369,7 @@ __install__main__:
 
 %macro g_jumpzero 1
   @@(4)
-  pop  rax
+  mov  rax, [rsp]
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_JUMPZERO
   cmp  word [rax], TAG_CON       ; assumes little endian
   je   %1

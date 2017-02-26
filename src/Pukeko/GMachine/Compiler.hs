@@ -127,7 +127,7 @@ ccExpr expr =
         [c0, c1] -> do
           zero <- freshLabel
           done <- freshLabel
-          tell [PUSH 0, JUMPZERO zero]
+          tell [JUMPZERO zero]
           ccAltn _altns c1
           tell [JUMP done, LABEL zero]
           ccAltn _altns c0
