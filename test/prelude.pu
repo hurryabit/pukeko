@@ -8,6 +8,11 @@ letrec foldr f y0 xs =
   | Nil       -> y0
   | Cons x xs -> f x (foldr f y0 xs)
 in
+letrec foldl f y0 xs =
+  match xs with
+  | Nil -> y0
+  | Cons x xs -> foldl f (f y0 x) xs
+in
 letrec take n xs =
   if n <= 0 then
     Nil

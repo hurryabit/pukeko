@@ -16,7 +16,8 @@ SOURCES     = monad_io.pu \
 							qsort.pu \
 							isort.pu \
 							queens.pu \
-							minlet.pu
+							minlet.pu \
+							catalan.pu
 GMACHINES   = $(SOURCES:.pu=.gm)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
