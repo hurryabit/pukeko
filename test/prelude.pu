@@ -4,51 +4,50 @@ let prefix_and x y = if x then y     else False in
 let prefix_or  x y = if x then True  else y     in
 let prefix_semi m1 m2 = m1 >>= (fun (x : Unit) -> m2) in
 letrec foldr f y0 xs =
-  if is_nil xs then
-    y0
-  else
-    f (hd xs) (foldr f y0 (tl xs))
+  match xs with
+  | Nil       -> y0
+  | Cons x xs -> f x (foldr f y0 xs)
 in
 letrec take n xs =
-  if n <= 0 || is_nil xs then
+  if n <= 0 then
     Nil
   else
-    Cons (hd xs) (take (n-1) (tl xs))
+    match xs with
+    | Nil       -> Nil
+    | Cons x xs -> Cons x (take (n-1) xs)
 in
 letrec zip_with f xs ys =
-  if is_nil xs || is_nil ys then
-    Nil
-  else
-    Cons (f (hd xs) (hd ys)) (zip_with f (tl xs) (tl ys))
+  match xs with
+  | Nil -> Nil
+  | Cons x xs ->
+    match ys with
+    | Nil -> Nil
+    | Cons y ys -> Cons (f x y) (zip_with f xs ys)
 in
 letrec partition p xs =
   letrec part_p xs =
-    if is_nil xs then
-      Pair Nil Nil
-    else
-      let x = hd xs in
-      let yzs = part_p (tl xs) in
-      let ys = fst yzs in
-      let zs = snd yzs in
-      if p x then
-        Pair (Cons x ys) zs
-      else
-        Pair ys (Cons x zs)
+    match xs with
+    | Nil -> Pair Nil Nil
+    | Cons x xs ->
+      match part_p xs with
+      | Pair ys zs ->
+        if p x then
+          Pair (Cons x ys) zs
+        else
+          Pair ys (Cons x zs)
   in
   part_p xs
 in
 letrec append xs ys =
-  if is_nil xs then
-    ys
-  else
-    Cons (hd xs) (append (tl xs) ys)
+  match xs with
+  | Nil -> ys
+  | Cons x xs -> Cons x (append xs ys)
 in
 let concat = foldr append Nil in
 letrec map f xs =
-  if is_nil xs then
-    Nil
-  else
-    Cons (f (hd xs)) (map f (tl xs))
+  match xs with
+  | Nil -> Nil
+  | Cons x xs -> Cons (f x) (map f xs)
 in
 let concat_map f xs = concat (map f xs) in
 let length = foldr (fun x l -> 1+l) 0 in

@@ -20,10 +20,11 @@ import Text.Parsec (SourcePos)
 import qualified Data.Map as Map
 
 import Pukeko.Pretty hiding (int)
+import Pukeko.Language.Builtins
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type
 
-import qualified Pukeko.Language.Builtins as Builtins (everything)
+import qualified Pukeko.Language.Builtins as Builtins
 
 data Environment s = MkEnvironment
   { _binds :: Map Ident (Type (Open s))
@@ -136,10 +137,11 @@ generalize t =
     TFun tx ty -> TFun <$> generalize tx <*> generalize ty
     TApp c  ts -> TApp c <$> mapM generalize ts
 
-instantiate :: Type (Open s) -> TI s (Type (Open s))
-instantiate t = evalStateT (inst t) Map.empty
+instantiateMany :: [Type (Open s)] -> TI s [Type (Open s)]
+instantiateMany ts = evalStateT (mapM inst ts) Map.empty
   where
-    inst :: Type (Open s) -> StateT (Map Ident (Type (Open s))) (TI s) (Type (Open s))
+    inst :: Type (Open s)
+         -> StateT (Map Ident (Type (Open s))) (TI s) (Type (Open s))
     inst t =
       case t of
         TVar tvr -> do
@@ -157,6 +159,9 @@ instantiate t = evalStateT (inst t) Map.empty
               return t'
         TFun tx ty -> TFun <$> inst tx <*> inst ty
         TApp c  ts -> TApp c <$> mapM inst ts
+
+instantiate :: Type (Open s) -> TI s (Type (Open s))
+instantiate t = head <$> instantiateMany [t]
 
 instantiateAnnots :: [Maybe (Type Closed)] -> TI s [Type (Open s)]
 instantiateAnnots = mapM $ \t_opt ->
@@ -212,6 +217,25 @@ infer expr = do
       let env = Map.fromList (zip idents t_idents)
       local binds (Map.union env) (infer _body)
     If{} -> infer (desugarIf expr)
+    Match{ _expr, _altns } -> do
+      t_expr <- infer _expr
+      t_res <- freshVar
+      forM_ _altns $ \MkAltn{ _annot, _cons, _patns, _rhs } -> do
+        (MkConstructor{ _fields }, MkADT{ _name, _params }) <-
+          findConstructor _cons
+        if length _patns /= length _fields
+          then throwError $ show _annot
+               ++ ": wrong number of arguments for constructor " ++ show _cons
+          else do
+          let (idents, _) = unzipPatns _patns
+          (t_params, t_fields) <-
+            splitAt (length _params) <$>
+            instantiateMany (map open $ _params ++ _fields)
+          unify t_expr (app _name t_params)
+          let env = Map.fromList (zip idents t_fields)
+          t_rhs <- local binds (Map.union env) (infer _rhs)
+          unify t_res t_rhs
+      return t_res
 
 check :: Type Closed -> Expr SourcePos -> TI s ()
 check t_want expr = do

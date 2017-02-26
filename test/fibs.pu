@@ -1,3 +1,8 @@
-letrec fibs = Cons 0 (Cons 1 (zip_with (fun x y -> x+y) fibs (tl fibs))) in
+let tail xs =
+  match xs with
+  | Nil -> abort
+  | Cons x xs -> xs
+in
+letrec fibs = Cons 0 (Cons 1 (zip_with (fun x y -> x+y) fibs (tail fibs))) in
 let main = print_list (take 93 fibs) in
 main

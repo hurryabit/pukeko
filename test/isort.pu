@@ -1,16 +1,18 @@
 letrec gen f x = Cons x (gen f (f x)) in
 let numbers = take 1012 (gen (fun x -> (42*x) % 1013) 1) in
-letrec insert x xs =
-  if is_nil xs || x <= hd xs then
-    Cons x xs
-  else
-    Cons (hd xs) (insert x (tl xs))
+letrec insert y xs =
+  match xs with
+  | Nil -> Cons y Nil
+  | Cons x xs' ->
+    if y <= x then
+      Cons y xs
+    else
+      Cons x (insert y xs')
 in
 letrec isort xs =
-  if is_nil xs then
-    Nil
-  else
-    insert (hd xs) (isort (tl xs))
+  match xs with
+  | Nil -> Nil
+  | Cons x xs -> insert x (isort xs)
 in
 let main = print_list (isort numbers) in
 main

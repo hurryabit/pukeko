@@ -20,7 +20,7 @@ liftExpr globals_list expr =
   let globals = Set.fromList globals_list
       fv_expr = fvExpr globals expr
       (_body, _defns) = runLL (llExpr fv_expr) globals
-  in  fvAdjust $ Let { _annot = undefined, _isrec = True, _defns, _body }
+  in  fvAdjustExpr $ Let { _annot = undefined, _isrec = True, _defns, _body }
 
 data Scope = Local | Global
   deriving (Show)
@@ -34,10 +34,11 @@ mkVar scope _ident =
 type FvExpr = Expr (Set Ident)
 type FvDefn = Defn (Set Ident)
 type FvPatn = Patn (Set Ident)
+type FvAltn = Altn (Set Ident)
 
 fvExpr :: Set Ident -> Expr a -> FvExpr
 fvExpr globals expr =
-  let rewrite = emptyRewrite { rewrite_expr, rewrite_patn }
+  let rewrite = emptyRewrite { rewrite_expr, rewrite_patn, rewrite_altn }
       fv_expr = fmap (const undefined) expr
   in  runReader (runRewrite rewrite fv_expr) globals
   where
@@ -67,36 +68,47 @@ fvExpr globals expr =
           Ap   {} -> descend old_expr
           ApOp {} -> descend old_expr
           If   {} -> descend old_expr
-      return $ fvAdjust post_expr
+          Match{} -> descend old_expr
+      return $ fvAdjustExpr post_expr
     rewrite_patn _ patn@MkPatn{ _ident } =
       return (patn { _annot = Set.singleton _ident } :: FvPatn)
+    rewrite_altn descend old_altn@MkAltn{ _patns, _rhs } = do
+      let (bound_idents, _) = unzipPatns _patns
+      fvAdjustAltn <$> localize bound_idents (descend old_altn)
 
-fvAdjust :: FvExpr -> FvExpr
-fvAdjust expr =
-  case expr of
-    Var { } -> expr
-    Num  { } -> expr { _annot = Set.empty }
-    Pack { } -> expr { _annot = Set.empty }
-    Ap { _fun, _arg } -> expr { _annot = annot _fun `Set.union` annot _arg }
-    ApOp { _op, _arg1, _arg2 } ->
-      let _annot = Set.unions [annot _arg1, annot _arg2]
-      in  expr { _annot }
-    Let { _isrec, _defns, _body } ->
-      let (patns, rhss) = unzipDefns _defns
-          fv_patns = Set.unions (map annot patns)
-          fv_rhss  = Set.unions (map annot rhss )
-          fv_body  = annot _body
-          _annot
-            | _isrec    = (fv_rhss `Set.union`  fv_body) `Set.difference` fv_patns
-            | otherwise =  fv_rhss `Set.union` (fv_body  `Set.difference` fv_patns)
-      in  expr { _annot }
-    Lam { _patns, _body } ->
-      expr { _annot = annot _body `Set.difference` Set.unions (map annot _patns) }
-    If { _cond, _then, _else } ->
-      expr { _annot = annot _cond `Set.union` annot _then `Set.union` annot _else }
+
+fvAdjustExpr :: FvExpr -> FvExpr
+fvAdjustExpr expr =
+  let _annot =
+        case expr of
+          Var{ _annot } -> _annot
+          Num{}  -> Set.empty
+          Pack{} -> Set.empty
+          Ap{ _fun, _arg }     -> annot _fun `Set.union` annot _arg
+          ApOp{ _arg1, _arg2 } -> annot _arg1 `Set.union` annot _arg2
+          Let{ _isrec, _defns, _body } ->
+            let (patns, rhss) = unzipDefns _defns
+                fv_patns = Set.unions (map annot patns)
+                fv_rhss  = Set.unions (map annot rhss )
+                fv_body  = annot _body
+            in  if _isrec
+                then (fv_rhss `Set.union`  fv_body) `Set.difference` fv_patns
+                else fv_rhss `Set.union` (fv_body  `Set.difference` fv_patns)
+          Lam{ _patns, _body } ->
+            annot _body `Set.difference` Set.unions (map annot _patns)
+          If{ _cond, _then, _else } ->
+            Set.unions [annot _cond, annot _then, annot _else]
+          Match{ _expr, _altns } ->
+            Set.unions (annot _expr : map annot _altns)
+  in  expr { _annot }
 
 fvPatn :: Patn a -> FvPatn
 fvPatn patn@MkPatn { _ident } = patn { _annot = Set.singleton _ident }
+
+fvAdjustAltn :: FvAltn -> FvAltn
+fvAdjustAltn altn@MkAltn{ _patns, _rhs } =
+  let _annot = annot _rhs `Set.difference` Set.unions (map annot _patns)
+  in  altn { _annot }
 
 data State = MkState { _used :: Map Ident Int }
 
@@ -141,11 +153,11 @@ llLamAs global_ident old_annot old_patns old_body = do
   new_body <- llExpr old_body
   let fv_lambda = Set.toList old_annot
       new_patns = map mkPatn fv_lambda ++ old_patns
-      lifted_lambda = fvAdjust $
+      lifted_lambda = fvAdjustExpr $
         Lam { _annot = undefined, _patns = new_patns, _body = new_body }
   tell [mkDefn global_ident lifted_lambda]
   let ap _fun ident =
-        fvAdjust $ Ap { _annot = undefined, _fun, _arg = mkVar Local ident }
+        fvAdjustExpr $ Ap { _annot = undefined, _fun, _arg = mkVar Local ident }
   return $ foldl ap (mkVar Global global_ident) fv_lambda
 
 llExprAs :: Ident -> FvExpr -> LL ()
@@ -184,6 +196,7 @@ llExpr old_expr = do
                 global_ident <- fresh Nice
                 llExprAs global_ident _expr
                 return (local_ident, global_ident)
+          -- TODO: inline this function
           let renameAndLiftLazy expr = llExpr (rename renaming expr)
           new_defns <- forM keep_defns $
             \defn@MkDefn{ _patn = MkPatn{ _ident }, _expr = old_rhs } ->
@@ -213,7 +226,13 @@ llExpr old_expr = do
         _then <- llExpr _then
         _else <- llExpr _else
         return $ old_expr { _cond, _then, _else }
-  return $ fvAdjust new_expr
+      Match { _expr, _altns } -> do
+        _expr <- llExpr _expr
+        _altns <- forM _altns $ \old_altn@MkAltn{ _rhs } -> do
+          _rhs <- llExpr _rhs
+          return $ fvAdjustAltn $ old_altn { _rhs }
+        return $ old_expr { _expr, _altns }
+  return $ fvAdjustExpr new_expr
 
 fvRecDefns :: [FvDefn] -> Set Ident
 fvRecDefns defns =
@@ -223,7 +242,8 @@ fvRecDefns defns =
 
 rename :: [(Ident, Ident)] -> FvExpr -> FvExpr
 rename table expr =
-  runReader (runRewrite (emptyRewrite { rewrite_expr }) expr) (Map.fromList table)
+  let rewrite = emptyRewrite { rewrite_expr, rewrite_altn }
+  in  runReader (runRewrite rewrite expr) (Map.fromList table)
   where
     -- TODO: Stop when everything to rename gets bound.
     localize idents = local (\env -> foldr Map.delete env idents)
@@ -253,4 +273,8 @@ rename table expr =
           Ap   {} -> descend old_expr
           ApOp {} -> descend old_expr
           If   {} -> descend old_expr
-      return $ fvAdjust post_expr
+          Match{} -> descend old_expr
+      return $ fvAdjustExpr post_expr
+    rewrite_altn descend old_altn@MkAltn{ _patns, _rhs } = do
+      let (bound_idents, _) = unzipPatns _patns
+      fvAdjustAltn <$> localize bound_idents (descend old_altn)

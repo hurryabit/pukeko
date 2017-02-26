@@ -8,9 +8,14 @@ module Pukeko.Language.Builtins
   , ADT (..)
   , Constructor (..)
   , adts
+  , findConstructor
   )
   where
 
+import Control.Monad.Except
+import Data.Map (Map)
+
+import qualified Data.Map as Map
 import Pukeko.Language.Syntax (Ident (..))
 import Pukeko.Language.Type
 
@@ -37,11 +42,6 @@ primitives =
   , ("prefix_ge" , int  ~> int  ~> bool)
   , ("prefix_gt" , int  ~> int  ~> bool)
   , ("if" , bool ~> alpha ~> alpha ~> alpha)
-  , ("is_nil", list alpha ~> bool )
-  , ("hd"    , list alpha ~> alpha)
-  , ("tl"    , list alpha ~> list alpha)
-  , ("fst"   , pair alpha beta ~> alpha)
-  , ("snd"   , pair alpha beta ~> beta )
   , ("return", alpha ~> io alpha)
   , ("print" , int ~> io unit)
   , ("prefix_bind", io alpha ~> (alpha ~> io beta) ~> io beta)
@@ -108,3 +108,15 @@ constructors t@MkADT{ _params, _constructors } = map f _constructors
   where
     f MkConstructor{ _name, _fields } =
       (_name, foldr (~>) (adt t _params) _fields)
+
+dictConstructors :: Map Ident (Constructor, ADT)
+dictConstructors = Map.fromList $ do
+  t@MkADT{ _constructors } <- adts
+  c@MkConstructor{ _name } <- _constructors
+  return (_name, (c, t))
+
+findConstructor :: MonadError String m => Ident -> m (Constructor, ADT)
+findConstructor name =
+  case Map.lookup name dictConstructors of
+    Nothing  -> throwError $ "unknown constructor: " ++ show name
+    Just res -> return res

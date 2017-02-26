@@ -6,20 +6,22 @@ module Pukeko.GMachine.Compiler
   where
 
 import Control.Monad.Except
-import Control.Monad.Reader hiding (asks, local)
-import Control.Monad.Writer
+import Control.Monad.RWS hiding (asks, local)
 import Data.Label.Derive
 import Data.Label.Monadic
 import Data.Map (Map)
 import Data.Set (Set)
 
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import qualified Data.List as List
+import qualified Data.Map  as Map
+import qualified Data.Set  as Set
 
 import Pukeko.GMachine.GCode
+import Pukeko.Language.Builtins
 import Pukeko.Language.Syntax
 
-import qualified  Pukeko.GMachine.Builtins as Builtins
+import qualified Pukeko.GMachine.GCode    as GCode
+import qualified Pukeko.GMachine.Builtins as Builtins
 
 data Context = MkContext
   { _offsets :: Map Ident Int
@@ -27,12 +29,15 @@ data Context = MkContext
   }
 mkLabels [''Context]
 
-newtype CC a = CC { unCC :: ExceptT String (ReaderT Context (Writer [Inst])) a }
+newtype CC a = CC { unCC :: ExceptT String (RWS Context [Inst] Int) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader Context
            , MonadWriter [Inst]
            )
+
+freshLabel :: CC Name
+freshLabel = CC $ state $ \n -> (Name ('.':show n), n+1)
 
 compile :: MonadError String m => Expr () -> m Program
 compile expr =
@@ -42,14 +47,14 @@ compile expr =
       globals <- mapM compileDefn _defns
       let all_globals = Builtins.everything ++ globals
           name_to_global =
-            Map.fromList $ map (\global -> (_name global, global)) all_globals
+            Map.fromList $ map (\global -> (GCode._name global, global)) all_globals
           deps name =
             case Map.lookup name name_to_global of
               Nothing     -> throwError $ "Unknown global: " ++ unName name
               Just global -> return $ dependencies global
       reachable_names <- saturate deps _main
       let _globals =
-            filter (\global -> _name global `Set.member` reachable_names) all_globals
+            filter (\global -> GCode._name global `Set.member` reachable_names) all_globals
       return $ MkProgram { _globals, _main }
           -- [ PUSHGLOBAL main
           -- , EVAL
@@ -71,7 +76,7 @@ compileDefn MkDefn{ _patn = MkPatn{ _ident }, _expr } = do
         { _offsets = Map.fromList (zip idents [n, n-1 ..])
         , _depth   = n
         }
-      (res, code) = runWriter (runReaderT (runExceptT (unCC $ ccExpr body)) context)
+      (res, code) = evalRWS (runExceptT (unCC $ ccExpr body)) context 0
   case res of
     Left error -> throwError error
     Right ()   -> do
@@ -100,21 +105,53 @@ ccExpr expr =
       let n = length _defns
           (idents, _, rhss) = unzipDefns3 _defns
       zipWithM_ (\rhs k -> local depth (+k) $ ccExpr rhs) rhss [0 ..]
-      localDecls idents n $ ccExpr _body
+      localDecls idents $ ccExpr _body
       tell [SLIDE n]
     Let { _isrec = True, _defns, _body } -> do
       let n = length _defns
           (idents, _, rhss) = unzipDefns3 _defns
       tell [ALLOC n]
-      localDecls idents n $ do
+      localDecls idents $ do
         zipWithM_ (\rhs k -> ccExpr rhs >> tell [UPDATE (n-k)]) rhss [0 ..]
         ccExpr _body
       tell [SLIDE n]
     Pack { } -> throwError "Constructors are not supported yet"
     If { } -> ccExpr $ desugarIf expr
+    Match{ _expr, _altns } -> do
+      ccExpr _expr
+      tell [EVAL]
+      let MkAltn{ _cons }:_ = _altns
+      (_, MkADT{ _constructors }) <- findConstructor _cons
+      case _constructors of
+        [c] -> ccAltn _altns c
+        [c0, c1] -> do
+          zero <- freshLabel
+          done <- freshLabel
+          tell [PUSH 0, JUMPZERO zero]
+          ccAltn _altns c1
+          tell [JUMP done, LABEL zero]
+          ccAltn _altns c0
+          tell [LABEL done]
+        _ -> throwError "Only ADTs with 1 or 2 constructors are supported."
 
-localDecls :: [Ident] -> Int -> CC a -> CC a
-localDecls idents n cc = do
+ccAltn :: [Altn a] -> Constructor -> CC ()
+ccAltn altns MkConstructor{ _name } =
+  case List.find (\MkAltn{ _cons } -> _cons == _name) altns of
+    Nothing -> throwError $ "match statement does not mention " ++ show _name
+    Just MkAltn{ _patns, _rhs } -> do
+      let expl = case _patns of
+                   []    -> POP 1
+                   [_]   -> HEAD
+                   [_,_] -> HDTL
+                   _     -> error "Constructors of arity > 2 are not supported yet."
+      tell [expl]
+      localDecls (reverse (map (_ident :: Patn _ -> Ident) _patns)) (ccExpr _rhs)
+      tell [SLIDE (length _patns)]
+
+
+localDecls :: [Ident] -> CC a -> CC a
+localDecls idents cc = do
+  let n = length idents
   d <- asks depth
   let offs = Map.fromList (zip idents [d+1 ..])
   local offsets (Map.union offs) $ local depth (+n) $ cc

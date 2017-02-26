@@ -37,6 +37,7 @@ pukekoDef = haskellStyle
       [ "fun"
       , "let", "letrec", "and", "in"
       , "if", "then", "else"
+      , "match", "with"
       ]
   , Token.opStart  = Token.opLetter pukekoDef
   , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
@@ -57,9 +58,10 @@ pukeko@Token.TokenParser
 nat :: Parser Int
 nat = fromInteger <$> natural
 
-equals, arrow :: Parser ()
+equals, arrow, bar :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
+bar     = reservedOp "|"
 
 identifier, variable, constructor  :: Parser Ident
 identifier  = MkIdent <$> Token.identifier pukeko
@@ -108,6 +110,13 @@ defnFun =
 defn :: Parser (Defn SourcePos)
 defn = try defnVal <|> defnFun <?> "definition"
 
+altn :: Parser (Altn SourcePos)
+altn =
+  MkAltn <$> getPosition
+         <*> (bar *> constructor)
+         <*> many (patn True)
+         <*> (arrow *> expr)
+
 expr, aexpr :: Parser (Expr SourcePos)
 expr =
   choice
@@ -122,6 +131,9 @@ expr =
           <*> (reserved "if"   *> expr)
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
+    , Match <$> getPosition
+            <*> (reserved "match" *> expr)
+            <*> (reserved "with"  *> many1 altn)
     , let partialAp = do
             pos <- getPosition
             foldl1 (Ap pos) <$> many1 aexpr

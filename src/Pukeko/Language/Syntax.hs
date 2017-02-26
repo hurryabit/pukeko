@@ -3,6 +3,7 @@ module Pukeko.Language.Syntax
   ( Expr (..)
   , Patn (..)
   , Defn (..)
+  , Altn (..)
   , desugarApOp
   , desugarIf
   , unzipPatns
@@ -31,6 +32,7 @@ data Expr a
   | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body :: Expr a }
   | Lam    { _annot :: a, _patns :: [Patn a], _body :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
+  | Match  { _annot :: a, _expr  :: Expr a, _altns :: [Altn a] }
   deriving (Show, Functor)
 
 data Patn a =
@@ -40,6 +42,9 @@ data Patn a =
 data Defn a = MkDefn { _patn :: Patn a, _expr :: Expr a }
   deriving (Show, Functor)
 
+data Altn a =
+  MkAltn { _annot :: a, _cons :: Ident, _patns :: [Patn a], _rhs :: Expr a }
+  deriving (Show, Functor)
 
 desugarApOp :: Expr a -> Expr a
 desugarApOp ApOp{ _annot, _op, _arg1, _arg2 } =
@@ -57,7 +62,9 @@ desugarIf If{ _annot, _cond, _then, _else } =
   Ap { _annot
      , _fun = Ap { _annot
                  , _fun = Ap { _annot
-                             , _fun = Var { _annot, _ident = MkIdent "if" }
+                             , _fun = Var { _annot
+                                          , _ident = MkIdent "if"
+                                          }
                              , _arg = _cond
                              }
                  , _arg = _then
@@ -124,7 +131,10 @@ instance Pretty (Expr a) where
           , text "then", pPrintPrec lvl 0 _then
           , text "else", pPrintPrec lvl 0 _else
           ]
-    where
+      Match { _expr, _altns } ->
+        maybeParens (prec > 0) $ vcat $
+        (text "match" <+> pPrintPrec lvl 0 _expr <+> text "with") :
+        map (pPrintPrec lvl 0) _altns
 
 instance Pretty (Defn a) where
   pPrintPrec lvl _ MkDefn{ _patn, _expr } =
@@ -140,9 +150,17 @@ instance Pretty (Patn a) where
       Nothing -> pretty _ident
       Just t  -> maybeParens (prec > 0) $ pretty _ident <> colon <+> pretty t
 
+instance Pretty (Altn a) where
+  pPrintPrec lvl _ MkAltn{ _cons, _patns, _rhs } = hsep
+    [ text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _patns)
+    , text "->" , pPrintPrec lvl 0 _rhs
+    ]
 
 instance Annot Expr where
   annot = _annot :: Expr _ -> _
 
 instance Annot Patn where
   annot = _annot :: Patn _ -> _
+
+instance Annot Altn where
+  annot = _annot :: Altn _ -> _

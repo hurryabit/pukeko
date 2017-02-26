@@ -1011,6 +1011,6 @@
 1011
 1012
 
-Steps  :   37565767
-Allocs :     856044          (Checks:     856044)
-GC runs:          2
+Steps  :   19061379
+Allocs :     438911          (Checks:     438911)
+GC runs:          1
