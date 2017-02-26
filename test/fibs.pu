@@ -1,8 +1,13 @@
+let prime = 1000000*1000000+39 in
 let tail xs =
   match xs with
   | Nil -> abort
   | Cons x xs -> xs
 in
-letrec fibs = Cons 0 (Cons 1 (zip_with (fun x y -> x+y) fibs (tail fibs))) in
-let main = print_list (take 93 fibs) in
+let add_mod_prime x y =
+  let z = x+y in
+  if z < prime then z else z - prime
+in
+letrec fibs = Cons 0 (Cons 1 (zip_with add_mod_prime fibs (tail fibs))) in
+let main = print (nth fibs 1500000) in
 main

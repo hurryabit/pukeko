@@ -32,5 +32,5 @@ letrec solve kss =
       ks
 in
 let solve n = solve (replicate n (take n ints)) in
-let main = print (length (solve 8)) in
+let main = print (length (solve 12)) in
 main

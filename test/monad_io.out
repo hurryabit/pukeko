@@ -8,6 +8,7 @@
 1
 0
 
-Steps  :      15753
-Allocs :        397          (Checks:        397)
-GC runs:          0
+Steps  :        15753
+Allocs :          397          (Checks:          397)
+GC runs:            0
+        0.00 real         0.00 user         0.00 sys

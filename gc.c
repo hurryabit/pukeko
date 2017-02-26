@@ -148,8 +148,8 @@ void gc_stats(gc_info* info, uint64_t steps, uint64_t checks) {
   info->num_allocs += (uint64_t) info->heap_ptr;
 
   printf("\n");
-  printf("Steps  : %10llu\n", steps);
-  printf("Allocs : %10llu          (Checks: %10llu)\n",
+  printf("Steps  : %12llu\n", steps);
+  printf("Allocs : %12llu          (Checks: %12llu)\n",
          info->num_allocs / 24, checks);
-  printf("GC runs: %10llu\n", info->num_gc_runs);
+  printf("GC runs: %12llu\n", info->num_gc_runs);
 }

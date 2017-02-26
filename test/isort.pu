@@ -1,5 +1,15 @@
+let prime = 1000000*1000000+39 in
+let double_mod_prime x =
+  let y = 2*x in
+  if y < prime then y else y-prime
+in
 letrec gen f x = Cons x (gen f (f x)) in
-let numbers = take 1012 (gen (fun x -> (42*x) % 1013) 1) in
+let powers = gen double_mod_prime 1 in
+let sum = foldr prefix_add 0 in
+let mul_mod_prime x y = (x*y) % prime in
+let sum_prod xs ys = sum (zip_with mul_mod_prime xs ys) in
+let hash xs = sum_prod xs powers % prime in
+let numbers = take 10006 (gen (fun x -> (42*x) % 10007) 1) in
 letrec insert y xs =
   match xs with
   | Nil -> Cons y Nil
@@ -14,5 +24,5 @@ letrec isort xs =
   | Nil -> Nil
   | Cons x xs -> insert x (isort xs)
 in
-let main = print_list (isort numbers) in
+let main = print (hash (isort numbers)) in
 main

@@ -1,9 +1,10 @@
 COMP = stack exec pukeko --
 NASM = nasm
 LINK = clang
+TIME = /usr/bin/time
 
-HEAP_SIZE  = 0x01000000 # 16 MB
-STACK_SIZE = 0x00100000 #  1 MB
+HEAP_SIZE  = 0x30000000 # 768 MB
+STACK_SIZE = 0x10000000 # 256 MB
 
 RUNTIME = ../runtime.inc
 LIBS = -lc
@@ -46,10 +47,10 @@ gc.o: ../gc.c
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 %.out %.out.tmp: %
-	./$< > $@
+	($(TIME) ./$< >&2) 2> $@
 
 %.check: %.out.tmp
-	diff $(@:.check=.out) $<
+	diff --ignore-matching-lines='.*real.*user.*sys.*' $(@:.check=.out) $<
 
 clean:
 	rm -f $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) $(TEMPOUTPUTS)
