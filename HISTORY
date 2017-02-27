@@ -1,26 +1,48 @@
-v0.1: 2017-02-12
+v0.0.1: 2017-02-26
 
-* Type inference. Lambda lifting. Compilation to G-code. Dead code elimination
-* G-code interpreter in C++. CAF sharing. Basic stop-and-copy GC. No CAF collection.
+Compiles from Pukeko source code to a native OSX binary!
 
-test/Makefile:
-HEAP=131072
-STACK=8192
+Language features:
+* lazy evaluation
+* garbage collection
+* parametric polymorphism & type inference
+* simple monad for output
+* lambdas/closures
+* integer arithmetic
+* built-in algebraic data types (incl. booleans, pairs and lists)
+* simple pattern matching on algebraic data types
+* small prelude containing some useful functions
 
-fibs93:
-Reductions:       35297
-Allocations:       8471          (Checks:       8841)
-Stack depth:        879          (Checks:      15107)
-GC runs:              0
+Compiler components:
+* lexer & parser (using parsec)
+* type checker (using Hindley-Milner type inference)
+* lambda lifter
+* compiler from Pukeko to G-code (code for the G-machine)
+* reachability analyzer for G-code (eliminates dead code)
+* compiler from G-code to NASM
+* runtime system (written in NASM)
+* stop-and-copy garbage collector (written in C)
+* no optimizers at all
 
-qsort:
-Reductions:      241961
-Allocations:      66504          (Checks:      68863)
-Stack depth:       1077          (Checks:     104189)
-GC runs:              3
+Examples:
+* quick sort
+* insertion sort
+* 8-queens puzzle
+* Fibonacci numbers
+* Catalan numbers
+* regression tests
 
-isort:
-Reductions:      430426
-Allocations:     109058          (Checks:     112317)
-Stack depth:       3575          (Checks:     185098)
-GC runs:              5
+Missing features:
+* user defined algebraic data types
+* proper pattern matching
+* nice monad syntax & more monads/effect system
+* I/O functionality beyond printing numbers
+* ...
+
+Possible optimizations:
+* strictness analysis
+* inlining of "small" functions
+* static stack analysis
+* peephole optimization of G-code
+* batching of allocation checks
+* ...
