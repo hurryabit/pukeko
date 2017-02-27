@@ -85,16 +85,18 @@ g_mkap 2
 g_push 4
 g_pushglobal foldl, 3
 g_mkap 3
-g_slide 2
+g_update 6
+g_pop 5
+g_unwind
 g_jump .1
 g_label .0
 g_uncons 0
 g_push 1
-g_slide 0
-g_label .1
+g_eval
 g_update 4
 g_pop 3
 g_unwind
+g_label .1
 
 g_globstart nth, 2
 g_push 0
@@ -109,7 +111,10 @@ g_eval
 g_jumpzero .2
 g_uncons 0
 g_push 0
-g_slide 0
+g_eval
+g_update 5
+g_pop 4
+g_unwind
 g_jump .3
 g_label .2
 g_uncons 0
@@ -120,18 +125,19 @@ g_mkap 2
 g_push 2
 g_pushglobal nth, 2
 g_mkap 2
-g_slide 0
+g_update 5
+g_pop 4
+g_unwind
 g_label .3
-g_slide 2
 g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal abort, 0
-g_slide 0
-g_label .1
+g_eval
 g_update 3
 g_pop 2
 g_unwind
+g_label .1
 
 g_globstart zip_with, 3
 g_push 1
@@ -153,23 +159,27 @@ g_push 7
 g_mkap 2
 g_pushglobal Cons, 2
 g_mkap 2
-g_slide 2
+g_update 8
+g_pop 7
+g_unwind
 g_jump .3
 g_label .2
 g_uncons 0
 g_pushglobal Nil, 0
-g_slide 0
+g_eval
+g_update 6
+g_pop 5
+g_unwind
 g_label .3
-g_slide 2
 g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
-g_slide 0
-g_label .1
+g_eval
 g_update 4
 g_pop 3
 g_unwind
+g_label .1
 
 g_globstart map, 2
 g_push 1
@@ -185,22 +195,24 @@ g_push 4
 g_mkap 1
 g_pushglobal Cons, 2
 g_mkap 2
-g_slide 2
+g_update 5
+g_pop 4
+g_unwind
 g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
-g_slide 0
-g_label .1
+g_eval
 g_update 3
 g_pop 2
 g_unwind
+g_label .1
 
 g_globstart p, 0
 g_pushint 100000007
 g_update 1
 g_pop 0
-g_unwind
+g_return
 
 g_globstart mul_p, 2
 g_pushglobal p, 0
@@ -251,17 +263,18 @@ g_mkap 2
 g_push 1
 g_pushglobal Cons, 2
 g_mkap 2
-g_slide 1
-g_slide 2
+g_update 8
+g_pop 7
+g_unwind
 g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
-g_slide 0
-g_label .1
+g_eval
 g_update 5
 g_pop 4
 g_unwind
+g_label .1
 
 g_globstart scanl, 1
 g_alloc 1
@@ -271,9 +284,9 @@ g_pushglobal scanl_f$0, 4
 g_mkap 2
 g_update 1
 g_push 0
-g_slide 1
-g_update 2
-g_pop 1
+g_eval
+g_update 3
+g_pop 2
 g_unwind
 
 g_globstart sols$1, 1

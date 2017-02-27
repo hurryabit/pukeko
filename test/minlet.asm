@@ -12,9 +12,9 @@ g_return
 g_globstart id, 1
 g_push 0
 g_push 0
-g_slide 1
-g_update 2
-g_pop 1
+g_eval
+g_update 3
+g_pop 2
 g_unwind
 
 g_globstart main, 0

@@ -63,6 +63,7 @@ g_unwind
 
 g_globstart prefix_semi$1, 2
 g_push 0
+g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -84,18 +85,20 @@ g_eval
 g_jumpzero .0
 g_uncons 0
 g_push 1
-g_slide 0
+g_eval
+g_update 3
+g_pop 2
+g_unwind
 g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal Unit, 0
 g_pushglobal return, 2
 g_mkap 1
-g_slide 0
-g_label .1
 g_update 3
 g_pop 2
 g_unwind
+g_label .1
 
 g_globstart count_down, 1
 g_pushint 1
