@@ -24,7 +24,7 @@ data GInst lab
   -- Node constructors
   | PUSHINT     Int
   | PUSHGLOBAL  lab
-  | MKAP
+  | MKAP        Int
   | CONS        Int Int
   | UNCONS      Int
   -- Arithmetic

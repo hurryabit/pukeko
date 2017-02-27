@@ -61,7 +61,7 @@ assembleInst arities inst = do
     SLIDE k -> code "slide" [show k]
     UPDATE k -> code "update" [show k]
     ALLOC k -> code "alloc" [show k]
-    MKAP -> code "mkap" []
+    MKAP k -> code "mkap" [show k]
     CONS tag arity -> code "cons" [show tag, show arity]
     UNCONS arity -> code "uncons" [show arity]
     NEG -> code "neg" []

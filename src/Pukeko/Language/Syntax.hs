@@ -4,6 +4,7 @@ module Pukeko.Language.Syntax
   , Patn (..)
   , Defn (..)
   , Altn (..)
+  , mkAp
   , desugarApOp
   , desugarIf
   , unzipPatns
@@ -26,8 +27,8 @@ import qualified Pukeko.Language.Operator as Operator
 data Expr a
   = Var    { _annot :: a, _ident :: Ident }
   | Num    { _annot :: a, _int   :: Int }
-  | Pack   { _annot :: a, _tag   :: Int , _arity :: Int  }
-  | Ap     { _annot :: a, _fun   :: Expr a, _arg :: Expr a }
+  | Pack   { _annot :: a, _tag   :: Int , _arity :: Int }
+  | Ap     { _annot :: a, _fun   :: Expr a, _args :: [Expr a] }
   | ApOp   { _annot :: a, _op    :: Ident, _arg1 :: Expr a, _arg2 :: Expr a }
   | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body :: Expr a }
   | Lam    { _annot :: a, _patns :: [Patn a], _body :: Expr a }
@@ -46,14 +47,16 @@ data Altn a =
   MkAltn { _annot :: a, _cons :: Ident, _patns :: [Patn a], _rhs :: Expr a }
   deriving (Show, Functor)
 
+mkAp :: a -> Expr a -> [Expr a] -> Expr a
+mkAp _annot _fun _args
+  | null _args = _fun
+  | otherwise  = Ap { _annot, _fun, _args }
+
 desugarApOp :: Expr a -> Expr a
 desugarApOp ApOp{ _annot, _op, _arg1, _arg2 } =
   Ap { _annot
-     , _fun = Ap { _annot
-                 , _fun = Var { _annot, _ident = _op }
-                 , _arg = _arg1
-                 }
-     , _arg = _arg2
+     , _fun  = Var { _annot, _ident = _op }
+     , _args = [_arg1, _arg2]
      }
 desugarApOp _ = error "desugarApOp can only be applied to ApOp nodes"
 
@@ -103,9 +106,9 @@ instance Pretty (Expr a) where
       Var  { _ident } -> pretty _ident
       Num  { _int   } -> int _int
       Pack { _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
-      Ap   { _fun, _arg   } ->
-        maybeParens (prec > aprec) $
-          pPrintPrec lvl aprec _fun <+> pPrintPrec lvl (aprec+1) _arg
+      Ap   { _fun, _args } ->
+        maybeParens (prec > aprec) $ hsep $
+          pPrintPrec lvl aprec _fun : map (pPrintPrec lvl (aprec+1)) _args
       ApOp   { _op, _arg1, _arg2 } ->
         let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op
             (prec1, prec2) =
@@ -156,7 +159,7 @@ instance Pretty (Patn a) where
 instance Pretty (Altn a) where
   pPrintPrec lvl _ MkAltn{ _cons, _patns, _rhs } = hsep
     [ text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _patns)
-    , text "->" , pPrintPrec lvl 0 _rhs
+    , text "->", pPrintPrec lvl 0 _rhs
     ]
 
 instance Annot Expr where

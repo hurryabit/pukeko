@@ -84,12 +84,11 @@ print_ = mkGlobal "print" 2
 prefix_bind = mkGlobal "prefix_bind" 3
   [ PUSH 2
   , PUSH 1
-  , MKAP
+  , MKAP 1
   , EVAL
   , UNCONS 2
   , PUSH 3
-  , MKAP
-  , MKAP
+  , MKAP 2
   , UPDATE 4
   , POP 3
   , UNWIND

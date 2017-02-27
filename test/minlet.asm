@@ -20,9 +20,9 @@ g_unwind
 g_globstart main, 0
 g_pushint 0
 g_pushglobal id, 1
-g_mkap
+g_mkap 1
 g_pushglobal print, 2
-g_mkap
+g_mkap 1
 g_update 1
 g_pop 0
 g_unwind

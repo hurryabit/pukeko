@@ -84,7 +84,7 @@ fvAdjustExpr expr =
           Var{ _annot } -> _annot
           Num{}  -> Set.empty
           Pack{} -> Set.empty
-          Ap{ _fun, _arg }     -> annot _fun `Set.union` annot _arg
+          Ap{ _fun, _args } -> Set.unions $ map annot (_fun : _args)
           ApOp{ _arg1, _arg2 } -> annot _arg1 `Set.union` annot _arg2
           Let{ _isrec, _defns, _body } ->
             let (patns, rhss) = unzipDefns _defns
@@ -156,9 +156,9 @@ llLamAs global_ident old_annot old_patns old_body = do
       lifted_lambda = fvAdjustExpr $
         Lam { _annot = undefined, _patns = new_patns, _body = new_body }
   tell [mkDefn global_ident lifted_lambda]
-  let ap _fun ident =
-        fvAdjustExpr $ Ap { _annot = undefined, _fun, _arg = mkVar Local ident }
-  return $ foldl ap (mkVar Global global_ident) fv_lambda
+  let fun  = mkVar Global global_ident
+      args = map (mkVar Local) fv_lambda
+  return $ fvAdjustExpr $ mkAp undefined fun args
 
 llExprAs :: Ident -> FvExpr -> LL ()
 llExprAs global_ident expr =
@@ -213,10 +213,10 @@ llExpr old_expr = do
       Var { }  -> return old_expr
       Num { }  -> return old_expr
       Pack { } -> return old_expr
-      Ap { _fun, _arg } -> do
-        _fun <- llExpr _fun
-        _arg <- llExpr _arg
-        return $ old_expr { _fun, _arg }
+      Ap { _fun, _args } -> do
+        _fun  <- llExpr _fun
+        _args <- mapM llExpr _args
+        return $ old_expr { _fun, _args }
       ApOp { _arg1, _arg2 } -> do
         _arg1 <- llExpr _arg1
         _arg2 <- llExpr _arg2

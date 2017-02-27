@@ -7,6 +7,7 @@ module Pukeko.Language.Type
   , open
   , var
   , (~>)
+  , (*~>)
   , app
   , int
   , io
@@ -21,7 +22,7 @@ import Data.STRef
 import Pukeko.Language.Ident
 import Pukeko.Pretty hiding (int)
 
-infixr 1 ~>
+infixr 1 ~>, *~>
 
 data Open s
 data Closed
@@ -44,6 +45,9 @@ var ident
 
 (~>) :: Type a -> Type a -> Type a
 (~>) = TFun
+
+(*~>) :: [Type a] -> Type a -> Type a
+t_args *~> t_res = foldr (~>) t_res t_args
 
 app :: Ident -> [Type a] -> Type a
 app ident ts

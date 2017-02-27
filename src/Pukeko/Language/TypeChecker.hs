@@ -182,11 +182,11 @@ infer expr = do
     Num{} -> return int
     Pack{} -> pthrow $
       text "Pack expressions should only be introduced after type checking!"
-    Ap{ _fun, _arg } -> do
+    Ap{ _fun, _args } -> do
       t_fun <- infer _fun
-      t_arg <- infer _arg
+      t_args <- mapM infer _args
       t_res <- freshVar
-      unifyHere t_fun (TFun t_arg t_res)
+      unifyHere t_fun (t_args *~> t_res)
       return t_res
     ApOp{} -> infer (desugarApOp expr)
     Lam{ _patns, _body } -> do
@@ -194,7 +194,7 @@ infer expr = do
       t_idents <- instantiateAnnots t_annots
       let env = Map.fromList (zip idents t_idents)
       t_body <- local binds (Map.union env) (infer _body)
-      return $ foldr TFun t_body t_idents
+      return $ t_idents *~> t_body
     Let{ _isrec = False, _defns, _body } -> do
       let (idents, t_annots, rhss) = unzipDefns3 _defns
       t_rhss <- local level succ $ do

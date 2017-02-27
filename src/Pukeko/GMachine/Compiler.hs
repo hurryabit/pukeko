@@ -95,10 +95,10 @@ ccExpr expr =
         Nothing     -> tell [PUSHGLOBAL (name _ident)]
         Just offset -> tell [PUSH (_depth - offset)]
     Num { _int } -> tell [PUSHINT _int]
-    Ap { _fun, _arg } -> do
-      ccExpr _arg
-      local depth succ $ ccExpr _fun
-      tell [MKAP]
+    Ap { _fun, _args } -> do
+      let ccExprAt i expr = local depth (+i) $ ccExpr expr
+      zipWithM_ ccExprAt [0..] (reverse (_fun:_args))
+      tell [MKAP (length _args)]
     ApOp { } -> ccExpr $ desugarApOp expr
     Lam { } -> throwError "All lambdas should be lifted by now"
     Let { _isrec = False, _defns, _body } -> do

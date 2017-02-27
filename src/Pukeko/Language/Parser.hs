@@ -134,10 +134,8 @@ expr =
     , Match <$> getPosition
             <*> (reserved "match" *> expr)
             <*> (reserved "with"  *> many1 altn)
-    , let partialAp = do
-            pos <- getPosition
-            foldl1 (Ap pos) <$> many1 aexpr
-      in  buildExpressionParser operatorTable partialAp
+    , buildExpressionParser operatorTable $
+        mkAp <$> getPosition <*> aexpr <*> many aexpr
     ]
   <?> "expression"
 aexpr = choice

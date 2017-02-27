@@ -91,10 +91,10 @@ runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_patn, rewrite_altn } =
         Var { }  -> return expr
         Num { }  -> return expr
         Pack { } -> return expr
-        Ap { _fun, _arg } -> do
-          _fun <- whole_expr _fun
-          _arg <- whole_expr _arg
-          return $ expr { _fun, _arg }
+        Ap { _fun, _args } -> do
+          _fun  <- whole_expr _fun
+          _args <- mapM whole_expr _args
+          return $ expr { _fun, _args }
         ApOp { _arg1, _arg2 } -> do
           _arg1 <- whole_expr _arg1
           _arg2 <- whole_expr _arg2

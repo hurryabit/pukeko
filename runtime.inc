@@ -229,12 +229,18 @@ __install__main__:
   %endif
 %endmacro
 
-%macro g_mkap 0
-  @@(13)
-  g_claim 1
+%macro g_mkap 1
+  @@(10*%1+3)
+  g_claim %1
   mov  qword [rhp], TAG_APP
   pop  qword [rhp+ 8]
   pop  qword [rhp+16]
+%rep %1 - 1
+  mov  qword [rhp+24], TAG_APP
+  mov  qword [rhp+32], rhp
+  pop  qword [rhp+40]
+  add  rhp, 24
+%endrep
   push rhp
   add  rhp, 24
 %endmacro
@@ -426,7 +432,7 @@ _main:
   g_install_cafs
   g_cons 0, 0
   g_install_main
-  g_mkap
+  g_mkap 1
   g_eval
   pop  rax
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_EXIT
