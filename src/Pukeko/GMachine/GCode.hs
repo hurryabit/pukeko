@@ -24,12 +24,9 @@ data GInst lab
   -- Node constructors
   | PUSHINT     Int
   | PUSHGLOBAL  lab
-  | CONS        Int Int
   | MKAP
-  -- Selectors
-  | HEAD
-  | TAIL
-  | HDTL
+  | CONS        Int Int
+  | UNCONS      Int
   -- Arithmetic
   | NEG
   | ADD

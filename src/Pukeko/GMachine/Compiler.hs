@@ -139,14 +139,10 @@ ccAltn altns MkConstructor{ _name } =
   case List.find (\MkAltn{ _cons } -> _cons == _name) altns of
     Nothing -> throwError $ "match statement does not mention " ++ show _name
     Just MkAltn{ _patns, _rhs } -> do
-      let expl = case _patns of
-                   []    -> POP 1
-                   [_]   -> HEAD
-                   [_,_] -> HDTL
-                   _     -> error "Constructors of arity > 2 are not supported yet."
-      tell [expl]
+      let arity = length _patns
+      tell [UNCONS arity]
       localDecls (reverse (map (_ident :: Patn _ -> Ident) _patns)) (ccExpr _rhs)
-      tell [SLIDE (length _patns)]
+      tell [SLIDE arity]
 
 
 localDecls :: [Ident] -> CC a -> CC a

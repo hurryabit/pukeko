@@ -76,7 +76,7 @@ g_globstart nth, 2
 g_push 0
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_pushint 0
 g_push 4
 g_pushglobal prefix_le, 2
@@ -84,12 +84,12 @@ g_mkap
 g_mkap
 g_eval
 g_jumpzero .2
-g_pop 1
+g_uncons 0
 g_push 0
 g_slide 0
 g_jump .3
 g_label .2
-g_pop 1
+g_uncons 0
 g_pushint 1
 g_push 4
 g_pushglobal prefix_sub, 2
@@ -104,7 +104,7 @@ g_label .3
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal abort, 0
 g_slide 0
 g_label .1
@@ -116,11 +116,11 @@ g_globstart zip_with, 3
 g_push 1
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 4
 g_eval
 g_jumpzero .2
-g_hdtl
+g_uncons 2
 g_push 1
 g_push 4
 g_push 6
@@ -139,14 +139,14 @@ g_mkap
 g_slide 2
 g_jump .3
 g_label .2
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .3
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .1
@@ -181,12 +181,12 @@ g_mkap
 g_mkap
 g_eval
 g_jumpzero .0
-g_pop 1
+g_uncons 0
 g_push 0
 g_slide 0
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal prime, 0
 g_push 1
 g_pushglobal prefix_sub, 2

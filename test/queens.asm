@@ -73,7 +73,7 @@ g_globstart foldr, 3
 g_push 2
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 1
 g_push 4
 g_push 4
@@ -88,7 +88,7 @@ g_mkap
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_push 1
 g_slide 0
 g_label .1
@@ -104,16 +104,16 @@ g_mkap
 g_mkap
 g_eval
 g_jumpzero .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_push 1
 g_eval
 g_jumpzero .2
-g_hdtl
+g_uncons 2
 g_push 1
 g_pushint 1
 g_push 4
@@ -130,7 +130,7 @@ g_mkap
 g_slide 2
 g_jump .3
 g_label .2
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .3
@@ -144,11 +144,11 @@ g_globstart zip_with, 3
 g_push 1
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 4
 g_eval
 g_jumpzero .2
-g_hdtl
+g_uncons 2
 g_push 1
 g_push 4
 g_push 6
@@ -167,14 +167,14 @@ g_mkap
 g_slide 2
 g_jump .3
 g_label .2
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .3
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .1
@@ -186,7 +186,7 @@ g_globstart append, 2
 g_push 0
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 3
 g_push 2
 g_pushglobal append, 2
@@ -199,7 +199,7 @@ g_mkap
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_push 1
 g_slide 0
 g_label .1
@@ -221,7 +221,7 @@ g_globstart map, 2
 g_push 1
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 1
 g_push 3
 g_pushglobal map, 2
@@ -236,7 +236,7 @@ g_mkap
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .1
@@ -284,12 +284,12 @@ g_mkap
 g_mkap
 g_eval
 g_jumpzero .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_push 1
 g_pushint 1
 g_push 2
@@ -313,11 +313,11 @@ g_globstart diff, 2
 g_push 0
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 3
 g_eval
 g_jumpzero .2
-g_hdtl
+g_uncons 2
 g_push 0
 g_push 3
 g_pushglobal prefix_lt, 2
@@ -325,7 +325,7 @@ g_mkap
 g_mkap
 g_eval
 g_jumpzero .4
-g_pop 1
+g_uncons 0
 g_push 5
 g_push 4
 g_pushglobal diff, 2
@@ -338,7 +338,7 @@ g_mkap
 g_slide 0
 g_jump .5
 g_label .4
-g_pop 1
+g_uncons 0
 g_push 0
 g_push 3
 g_pushglobal prefix_eq, 2
@@ -346,7 +346,7 @@ g_mkap
 g_mkap
 g_eval
 g_jumpzero .6
-g_pop 1
+g_uncons 0
 g_push 1
 g_push 4
 g_pushglobal diff, 2
@@ -355,7 +355,7 @@ g_mkap
 g_slide 0
 g_jump .7
 g_label .6
-g_pop 1
+g_uncons 0
 g_push 1
 g_push 5
 g_pushglobal diff, 2
@@ -368,14 +368,14 @@ g_label .5
 g_slide 2
 g_jump .3
 g_label .2
-g_pop 1
+g_uncons 0
 g_push 2
 g_slide 0
 g_label .3
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_slide 0
 g_label .1
@@ -463,7 +463,7 @@ g_globstart solve, 1
 g_push 0
 g_eval
 g_jumpzero .0
-g_hdtl
+g_uncons 2
 g_push 0
 g_push 2
 g_pushglobal solve$1, 2
@@ -474,7 +474,7 @@ g_mkap
 g_slide 2
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal Nil, 0
 g_pushglobal Nil, 0
 g_pushglobal Cons, 2

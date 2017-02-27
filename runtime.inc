@@ -229,6 +229,16 @@ __install__main__:
   %endif
 %endmacro
 
+%macro g_mkap 0
+  @@(13)
+  g_claim 1
+  mov  qword [rhp], TAG_APP
+  pop  qword [rhp+ 8]
+  pop  qword [rhp+16]
+  push rhp
+  add  rhp, 24
+%endmacro
+
 %macro g_cons 2                 ; %1 = tag, %2 = arity
   @@(3+%2*3+(2-%2)*3+4)
   g_claim 1
@@ -246,34 +256,19 @@ __install__main__:
   add  rhp, 24
 %endmacro
 
-%macro g_mkap 0
-  @@(13)
-  g_claim 1
-  mov  qword [rhp], TAG_APP
-  pop  qword [rhp+ 8]
-  pop  qword [rhp+16]
-  push rhp
-  add  rhp, 24
-%endmacro
-
-
-;; Selectors
-%macro g_slct 1
-  @@(5)
+%macro g_uncons 1
+%if %1 = 0
+  g_pop 1
+%else
+  @@(2+3*%1)
   pop rax
   g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
-  push qword [rax+8*%1]
-%endmacro
-
-%define g_head g_slct 1
-%define g_tail g_slct 2
-
-%macro g_hdtl 0
-  @@(8)
-  pop rax
-  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
-  push qword [rax+16]
-  push qword [rax+ 8]
+%assign idx 2
+%rep %1
+  push qword [rax+8*idx]
+%assign idx idx - 1
+%endrep
+%endif
 %endmacro
 
 

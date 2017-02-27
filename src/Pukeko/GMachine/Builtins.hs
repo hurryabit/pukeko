@@ -86,7 +86,7 @@ prefix_bind = mkGlobal "prefix_bind" 3
   , PUSH 1
   , MKAP
   , EVAL
-  , HDTL
+  , UNCONS 2
   , PUSH 3
   , MKAP
   , MKAP

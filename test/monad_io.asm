@@ -54,7 +54,7 @@ g_push 2
 g_push 1
 g_mkap
 g_eval
-g_hdtl
+g_uncons 2
 g_push 3
 g_mkap
 g_mkap
@@ -84,12 +84,12 @@ g_globstart when, 2
 g_push 0
 g_eval
 g_jumpzero .0
-g_pop 1
+g_uncons 0
 g_push 1
 g_slide 0
 g_jump .1
 g_label .0
-g_pop 1
+g_uncons 0
 g_pushglobal Unit, 0
 g_pushglobal return, 2
 g_mkap
