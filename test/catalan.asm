@@ -56,11 +56,6 @@ g_cons 0, 0
 g_update 1
 g_return
 
-g_globstart Cons, 2
-g_cons 1, 2
-g_update 1
-g_return
-
 g_globstart print, 2
 g_eval
 g_print
@@ -157,11 +152,10 @@ g_push 1
 g_push 4
 g_push 7
 g_mkap 2
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 8
 g_pop 7
-g_unwind
+g_return
 g_jump .3
 g_label .2
 g_uncons 0
@@ -193,11 +187,10 @@ g_mkap 2
 g_push 1
 g_push 4
 g_mkap 1
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 5
 g_pop 4
-g_unwind
+g_return
 g_jump .1
 g_label .0
 g_uncons 0
@@ -216,27 +209,29 @@ g_return
 
 g_globstart mul_p, 2
 g_pushglobal p, 0
+g_eval
 g_push 2
 g_push 2
 g_pushglobal prefix_mul, 2
 g_mkap 2
-g_pushglobal prefix_mod, 2
-g_mkap 2
+g_eval
+g_mod
 g_update 3
 g_pop 2
-g_unwind
+g_return
 
 g_globstart add_p, 2
 g_pushglobal p, 0
+g_eval
 g_push 2
 g_push 2
 g_pushglobal prefix_add, 2
 g_mkap 2
-g_pushglobal prefix_mod, 2
-g_mkap 2
+g_eval
+g_mod
 g_update 3
 g_pop 2
-g_unwind
+g_return
 
 g_globstart sum_p, 0
 g_pushint 0
@@ -261,11 +256,10 @@ g_push 1
 g_push 6
 g_mkap 2
 g_push 1
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 8
 g_pop 7
-g_unwind
+g_return
 g_jump .1
 g_label .0
 g_uncons 0
@@ -304,11 +298,10 @@ g_unwind
 g_globstart sols$2, 2
 g_push 0
 g_push 2
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 3
 g_pop 2
-g_unwind
+g_return
 
 g_globstart sols, 0
 g_pushglobal sols, 0
@@ -320,11 +313,10 @@ g_pushglobal sols$1, 1
 g_pushglobal map, 2
 g_mkap 2
 g_pushint 1
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 1
 g_pop 0
-g_unwind
+g_return
 
 g_globstart main, 0
 g_pushglobal p, 0

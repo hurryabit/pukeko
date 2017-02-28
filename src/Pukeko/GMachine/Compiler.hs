@@ -108,12 +108,41 @@ ccExpr mode expr =
     Num { _int } -> do
       tell [PUSHINT _int]
       whenRedex mode $ continueRedex RETURN
-    Ap { _fun, _args } -> do
+    Ap{ _fun, _args } -> do
+      let n = length _args
+      constr_tag <-
+        case _fun of
+          Var{ _ident }
+            | isConstructor _ident -> do
+                (MkConstructor{ _tag, _fields }, _) <- findConstructor _ident
+                case length _fields `compare` n of
+                  LT -> throwError $
+                    "constructor " ++ show _ident ++ " has too many arguments"
+                  EQ | n > 0 -> return (Just _tag)
+                  _          -> return Nothing
+          _ -> return Nothing
       let ccExprAt i expr = local depth (+i) $ ccExpr Stack expr
-      zipWithM_ ccExprAt [0..] (reverse (_fun:_args))
-      tell [MKAP (length _args)]
-      whenRedex mode $ continueRedex UNWIND
-    ApOp { } -> ccExpr mode $ desugarApOp expr
+      zipWithM_ ccExprAt [0..] (reverse _args)
+      case constr_tag of
+        Just tag -> do
+          tell [CONS tag n]
+          whenRedex mode $ continueRedex RETURN
+        Nothing -> do
+          ccExprAt n _fun
+          tell [MKAP n]
+          whenRedex mode $ continueRedex UNWIND
+    ApOp{ _op, _arg1, _arg2 } ->
+      case mode of
+        Stack -> ccExpr mode $ desugarApOp expr
+        Redex -> do
+          case lookup _op Builtins.binops of
+            Nothing -> ccExpr mode $ desugarApOp expr
+            Just (inst, _) -> do
+              ccExpr Stack _arg2
+              tell [EVAL]
+              local depth succ $ ccExpr Stack _arg1
+              tell [EVAL, inst]
+              continueRedex RETURN
     Lam { } -> throwError "All lambdas should be lifted by now"
     Let { _isrec = False, _defns, _body } -> do
       let n = length _defns

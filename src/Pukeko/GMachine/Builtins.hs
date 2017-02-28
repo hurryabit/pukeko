@@ -1,5 +1,6 @@
 module Pukeko.GMachine.Builtins
   ( everything
+  , binops
   )
   where
 
@@ -15,13 +16,14 @@ mkGlobal name _arity code =
 
 everything :: [Global]
 everything = concat
-  [ neg : binops
+  [ neg : map (snd . snd) binops
   , concatMap constructors adts
   , [ return_, print_, prefix_bind
     , abort
     ]
   ]
 
+-- TODO: Produce more efficient code in Redex mode.
 neg :: Global
 neg = mkGlobal "neg" 1
   [ EVAL
@@ -30,7 +32,7 @@ neg = mkGlobal "neg" 1
   , RETURN
   ]
 
-binops :: [Global]
+binops :: [(Ident, (Inst, Global))]
 binops =
   [ mk "add" ADD
   , mk "sub" SUB
@@ -45,24 +47,27 @@ binops =
   , mk "gt"  GTR
   ]
   where
-    mk name inst = mkGlobal ("prefix_" ++ name) 2
-      [ PUSH 1
-      , EVAL
-      , PUSH 1
-      , EVAL
-      , inst
-      , UPDATE 3
-      , POP 2
-      , RETURN
-      ]
+    mk name inst = (MkIdent prefix_name, (fmap Name inst, global))
+      where
+        prefix_name = "prefix_" ++ name
+        global = mkGlobal prefix_name 2
+          [ PUSH 1
+          , EVAL
+          , PUSH 1
+          , EVAL
+          , inst
+          , UPDATE 3
+          , POP 2
+          , RETURN
+          ]
 
 constructors :: ADT -> [Global]
-constructors MkADT{ _constructors } = zipWith f [0..] _constructors
+constructors MkADT{ _constructors } = map f _constructors
   where
-    f tag MkConstructor{ _name, _fields } =
+    f MkConstructor{ _name, _tag, _fields } =
       let arity = length _fields
       in  mkGlobal (unIdent _name) arity
-          [ CONS tag arity
+          [ CONS _tag arity
           , UPDATE 1
           , RETURN
           ]

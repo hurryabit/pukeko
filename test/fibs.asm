@@ -56,11 +56,6 @@ g_cons 0, 0
 g_update 1
 g_return
 
-g_globstart Cons, 2
-g_cons 1, 2
-g_update 1
-g_return
-
 g_globstart print, 2
 g_eval
 g_print
@@ -131,11 +126,10 @@ g_push 1
 g_push 4
 g_push 7
 g_mkap 2
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 8
 g_pop 7
-g_unwind
+g_return
 g_jump .3
 g_label .2
 g_uncons 0
@@ -157,15 +151,16 @@ g_label .1
 
 g_globstart prime, 0
 g_pushint 39
+g_eval
 g_pushint 1000000
 g_pushint 1000000
 g_pushglobal prefix_mul, 2
 g_mkap 2
-g_pushglobal prefix_add, 2
-g_mkap 2
+g_eval
+g_add
 g_update 1
 g_pop 0
-g_unwind
+g_return
 
 g_globstart add_mod_prime, 2
 g_push 1
@@ -188,22 +183,22 @@ g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal prime, 0
+g_eval
 g_push 1
-g_pushglobal prefix_sub, 2
-g_mkap 2
+g_eval
+g_sub
 g_update 4
 g_pop 3
-g_unwind
+g_return
 g_label .1
 
 g_globstart fibs0, 0
 g_pushglobal fibs1, 0
 g_pushint 0
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 1
 g_pop 0
-g_unwind
+g_return
 
 g_globstart fibs1, 0
 g_pushglobal fibs1, 0
@@ -212,11 +207,10 @@ g_pushglobal add_mod_prime, 2
 g_pushglobal zip_with, 3
 g_mkap 3
 g_pushint 1
-g_pushglobal Cons, 2
-g_mkap 2
+g_cons 1, 2
 g_update 1
 g_pop 0
-g_unwind
+g_return
 
 g_globstart main, 0
 g_pushint 1500000

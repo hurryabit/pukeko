@@ -87,17 +87,22 @@ data ADT = MkADT
   }
 
 mkADT :: String -> [Type Closed] -> [Constructor] -> ADT
-mkADT name _params _constructors =
-  MkADT { _name = MkIdent name, _params, _constructors }
+mkADT name _params constructors =
+  MkADT { _name = MkIdent name
+        , _params
+        , _constructors =
+          zipWith (\_tag constr -> constr { _tag }) [0..] constructors
+        }
 
 data Constructor = MkConstructor
   { _name   :: Ident
+  , _tag    :: Int
   , _fields :: [Type Closed]
   }
 
 mkConstructor :: String -> [Type Closed] -> Constructor
 mkConstructor name _fields =
-  MkConstructor { _name = MkIdent name, _fields }
+  MkConstructor { _name = MkIdent name, _tag = undefined, _fields }
 
 adt :: ADT -> [Type Closed] -> Type Closed
 adt MkADT{ _name } = app _name
