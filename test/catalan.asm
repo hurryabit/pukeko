@@ -1,16 +1,6 @@
 g_declare_cafs Nil, abort, p, sum_p, sols, main
 g_declare_main main
 
-g_globstart prefix_add, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_add
-g_update 3
-g_pop 2
-g_return
-
 g_globstart prefix_sub, 2
 g_push 1
 g_eval
@@ -21,32 +11,12 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_mul, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_mul
-g_update 3
-g_pop 2
-g_return
-
 g_globstart prefix_mod, 2
 g_push 1
 g_eval
 g_push 1
 g_eval
 g_mod
-g_update 3
-g_pop 2
-g_return
-
-g_globstart prefix_le, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_leq
 g_update 3
 g_pop 2
 g_return
@@ -100,9 +70,8 @@ g_jumpzero .0
 g_uncons 2
 g_pushint 0
 g_push 4
-g_pushglobal prefix_le, 2
-g_mkap 2
 g_eval
+g_leq
 g_jumpzero .2
 g_uncons 0
 g_push 0
@@ -211,10 +180,10 @@ g_globstart mul_p, 2
 g_pushglobal p, 0
 g_eval
 g_push 2
-g_push 2
-g_pushglobal prefix_mul, 2
-g_mkap 2
 g_eval
+g_push 2
+g_eval
+g_mul
 g_mod
 g_update 3
 g_pop 2
@@ -224,10 +193,10 @@ g_globstart add_p, 2
 g_pushglobal p, 0
 g_eval
 g_push 2
-g_push 2
-g_pushglobal prefix_add, 2
-g_mkap 2
 g_eval
+g_push 2
+g_eval
+g_add
 g_mod
 g_update 3
 g_pop 2

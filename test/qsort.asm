@@ -31,26 +31,6 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_lt, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_les
-g_update 3
-g_pop 2
-g_return
-
-g_globstart prefix_le, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_leq
-g_update 3
-g_pop 2
-g_return
-
 g_globstart Nil, 0
 g_cons 0, 0
 g_update 1
@@ -93,9 +73,8 @@ g_label .1
 g_globstart take, 2
 g_pushint 0
 g_push 1
-g_pushglobal prefix_le, 2
-g_mkap 2
 g_eval
+g_leq
 g_jumpzero .0
 g_uncons 0
 g_pushglobal Nil, 0
@@ -261,12 +240,9 @@ g_label .1
 
 g_globstart prime, 0
 g_pushint 39
-g_eval
 g_pushint 1000000
 g_pushint 1000000
-g_pushglobal prefix_mul, 2
-g_mkap 2
-g_eval
+g_mul
 g_add
 g_update 1
 g_pop 0
@@ -278,10 +254,10 @@ g_pushint 2
 g_pushglobal prefix_mul, 2
 g_mkap 2
 g_pushglobal prime, 0
-g_push 1
-g_pushglobal prefix_lt, 2
-g_mkap 2
 g_eval
+g_push 1
+g_eval
+g_les
 g_jumpzero .0
 g_uncons 0
 g_push 0
@@ -337,10 +313,10 @@ g_globstart mul_mod_prime, 2
 g_pushglobal prime, 0
 g_eval
 g_push 2
-g_push 2
-g_pushglobal prefix_mul, 2
-g_mkap 2
 g_eval
+g_push 2
+g_eval
+g_mul
 g_mod
 g_update 3
 g_pop 2
@@ -373,12 +349,10 @@ g_return
 
 g_globstart numbers$1, 1
 g_pushint 200003
-g_eval
 g_push 1
-g_pushint 2
-g_pushglobal prefix_mul, 2
-g_mkap 2
 g_eval
+g_pushint 2
+g_mul
 g_mod
 g_update 2
 g_pop 1

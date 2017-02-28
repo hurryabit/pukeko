@@ -21,36 +21,6 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_lt, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_les
-g_update 3
-g_pop 2
-g_return
-
-g_globstart prefix_le, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_leq
-g_update 3
-g_pop 2
-g_return
-
-g_globstart prefix_eq, 2
-g_push 1
-g_eval
-g_push 1
-g_eval
-g_eqv
-g_update 3
-g_pop 2
-g_return
-
 g_globstart Nil, 0
 g_cons 0, 0
 g_update 1
@@ -98,9 +68,8 @@ g_label .1
 g_globstart take, 2
 g_pushint 0
 g_push 1
-g_pushglobal prefix_le, 2
-g_mkap 2
 g_eval
+g_leq
 g_jumpzero .0
 g_uncons 0
 g_pushglobal Nil, 0
@@ -253,7 +222,6 @@ g_globstart length$1, 2
 g_push 1
 g_eval
 g_pushint 1
-g_eval
 g_add
 g_update 3
 g_pop 2
@@ -271,9 +239,8 @@ g_unwind
 g_globstart replicate, 2
 g_pushint 0
 g_push 1
-g_pushglobal prefix_le, 2
-g_mkap 2
 g_eval
+g_leq
 g_jumpzero .0
 g_uncons 0
 g_pushglobal Nil, 0
@@ -308,10 +275,10 @@ g_eval
 g_jumpzero .2
 g_uncons 2
 g_push 0
-g_push 3
-g_pushglobal prefix_lt, 2
-g_mkap 2
 g_eval
+g_push 3
+g_eval
+g_les
 g_jumpzero .4
 g_uncons 0
 g_push 5
@@ -327,10 +294,10 @@ g_jump .5
 g_label .4
 g_uncons 0
 g_push 0
-g_push 3
-g_pushglobal prefix_eq, 2
-g_mkap 2
 g_eval
+g_push 3
+g_eval
+g_eqv
 g_jumpzero .6
 g_uncons 0
 g_push 1

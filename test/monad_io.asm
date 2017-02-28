@@ -78,6 +78,9 @@ g_mkap 2
 g_update 3
 g_pop 2
 g_unwind
+g_update 3
+g_pop 2
+g_return
 
 g_globstart when, 2
 g_push 0

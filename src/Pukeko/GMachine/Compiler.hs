@@ -80,13 +80,19 @@ compileDefn MkDefn{ _patn = MkPatn{ _ident }, _expr } = do
           _code  = GLOBSTART _name _arity : code
       return $ MkGlobal { _name, _arity, _code }
 
-data Mode = Stack | Redex
+data Mode = Stack | Eval | Redex
 
-whenStack, whenRedex :: Mode -> CC () -> CC ()
-whenStack Stack cc = cc
-whenStack _     _  = return ()
-whenRedex Redex cc = cc
-whenRedex _     _  = return ()
+whenStackOrEval, whenRedex :: Mode -> CC () -> CC ()
+whenStackOrEval mode cc =
+  case mode of
+    Stack -> cc
+    Eval  -> cc
+    Redex -> return ()
+whenRedex mode cc =
+  case mode of
+    Stack -> return ()
+    Eval  -> return ()
+    Redex -> cc
 
 continueRedex :: Inst -> CC ()
 continueRedex inst = do
@@ -101,10 +107,13 @@ ccExpr mode expr =
       case Map.lookup _ident _offsets of
         Nothing     -> tell [PUSHGLOBAL (name _ident)]
         Just offset -> tell [PUSH (_depth - offset)]
-      whenRedex mode $ do
-        -- TODO: This is not necessary if we've just pushed a non-CAF global
-        tell [EVAL]
-        continueRedex UNWIND
+      case mode of
+        Stack -> return ()
+        Eval  -> tell [EVAL]
+        Redex -> do
+          -- TODO: This is not necessary if we've just pushed a non-CAF global
+          tell [EVAL]
+          continueRedex UNWIND
     Num { _int } -> do
       tell [PUSHINT _int]
       whenRedex mode $ continueRedex RETURN
@@ -126,30 +135,38 @@ ccExpr mode expr =
       case constr_tag of
         Just tag -> do
           tell [CONS tag n]
-          whenRedex mode $ continueRedex RETURN
+          case mode of
+            Stack -> return ()
+            Eval  -> return ()
+            Redex -> continueRedex RETURN
         Nothing -> do
           ccExprAt n _fun
           tell [MKAP n]
-          whenRedex mode $ continueRedex UNWIND
-    ApOp{ _op, _arg1, _arg2 } ->
+          case mode of
+            Stack -> return ()
+            Eval  -> tell [EVAL]
+            Redex -> continueRedex UNWIND
+    ApOp{ _op, _arg1, _arg2 } -> do
+      let eval = do
+            case lookup _op Builtins.binops of
+              Nothing -> ccExpr mode $ desugarApOp expr
+              Just (inst, _) -> do
+                ccExpr Eval _arg2
+                local depth succ $ ccExpr Eval _arg1
+                tell [inst]
       case mode of
         Stack -> ccExpr mode $ desugarApOp expr
+        Eval  -> eval
         Redex -> do
-          case lookup _op Builtins.binops of
-            Nothing -> ccExpr mode $ desugarApOp expr
-            Just (inst, _) -> do
-              ccExpr Stack _arg2
-              tell [EVAL]
-              local depth succ $ ccExpr Stack _arg1
-              tell [EVAL, inst]
-              continueRedex RETURN
+          eval
+          continueRedex RETURN
     Lam { } -> throwError "All lambdas should be lifted by now"
     Let { _isrec = False, _defns, _body } -> do
       let n = length _defns
           (idents, _, rhss) = unzipDefns3 _defns
       zipWithM_ (\rhs k -> local depth (+k) $ ccExpr Stack rhs) rhss [0 ..]
       localDecls idents $ ccExpr mode _body
-      whenStack mode $ tell [SLIDE n]
+      whenStackOrEval mode $ tell [SLIDE n]
     Let { _isrec = True, _defns, _body } -> do
       let n = length _defns
           (idents, _, rhss) = unzipDefns3 _defns
@@ -157,12 +174,11 @@ ccExpr mode expr =
       localDecls idents $ do
         zipWithM_ (\rhs k -> ccExpr Stack rhs >> tell [UPDATE (n-k)]) rhss [0 ..]
         ccExpr mode _body
-      whenStack mode $ tell [SLIDE n]
+      whenStackOrEval mode $ tell [SLIDE n]
     Pack { } -> throwError "Constructors are not supported yet"
     If { } -> ccExpr mode $ desugarIf expr
     Match{ _expr, _altns } -> do
-      ccExpr Stack _expr
-      tell [EVAL]
+      ccExpr Eval _expr
       let MkAltn{ _cons }:_ = _altns
       (_, MkADT{ _constructors }) <- findConstructor _cons
       case _constructors of
@@ -186,7 +202,7 @@ ccAltn mode altns MkConstructor{ _name } =
           (idents, _) = unzipPatns _patns
       tell [UNCONS arity]
       localDecls (reverse idents) (ccExpr mode _rhs)
-      whenStack mode $ tell [SLIDE arity]
+      whenStackOrEval mode $ tell [SLIDE arity]
 
 
 localDecls :: [Ident] -> CC a -> CC a
