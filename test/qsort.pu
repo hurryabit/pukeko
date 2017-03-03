@@ -1,21 +1,28 @@
-let prime = 1000000*1000000+39 in
+let prime = 1000000*1000000+39
+
 let double_mod_prime x =
   let y = 2*x in
   if y < prime then y else y-prime
-in
-letrec gen f x = Cons x (gen f (f x)) in
-let powers = gen double_mod_prime 1 in
-let sum = foldr prefix_add 0 in
-let mul_mod_prime x y = (x*y) % prime in
-let sum_prod xs ys = sum (zip_with mul_mod_prime xs ys) in
-let hash xs = sum_prod xs powers % prime in
-let numbers = take 200002 (gen (fun x -> (2*x) % 200003) 1) in
-letrec qsort xs =
+
+let rec gen f x = Cons x (gen f (f x))
+
+let powers = gen double_mod_prime 1
+
+let sum = foldr prefix_add 0
+
+let mul_mod_prime x y = (x*y) % prime
+
+let sum_prod xs ys = sum (zip_with mul_mod_prime xs ys)
+
+let hash xs = sum_prod xs powers % prime
+
+let numbers = take 200002 (gen (fun x -> (2*x) % 200003) 1)
+
+let rec qsort xs =
   match xs with
   | Nil -> Nil
   | Cons x xs ->
     match partition (fun y -> y < x) xs with
     | Pair ys zs -> append (qsort ys) (Cons x (qsort zs))
-in
-let main = print (hash (qsort numbers)) in
-main
+
+let main = print (hash (qsort numbers))

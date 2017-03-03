@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 module Pukeko.Language.Syntax
-  ( Expr (..)
+  ( Module
+  , TopLevel (..)
+  , Expr (..)
   , Patn (..)
   , Defn (..)
   , Altn (..)
@@ -10,8 +12,8 @@ module Pukeko.Language.Syntax
   , unzipPatns
   , unzipDefns
   , unzipDefns3
+  , moduleToExpr
   , Annot (..)
-  , inject
   , module Pukeko.Language.Ident
   )
   where
@@ -23,6 +25,18 @@ import Pukeko.Language.Type (Type, Closed)
 import Pukeko.Pretty
 
 import qualified Pukeko.Language.Operator as Operator
+
+type Module a = [TopLevel a]
+
+data TopLevel a =
+  TopLet { _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
+
+moduleToExpr :: Module a -> Ident -> Expr a
+moduleToExpr tops main =
+  let _annot = annot (last tops)
+      f TopLet{ _annot, _isrec, _defns } _body =
+        Let{ _annot, _isrec, _defns, _body }
+  in  foldr f Var{ _annot, _ident = main } tops
 
 data Expr a
   = Var    { _annot :: a, _ident :: Ident }
@@ -93,13 +107,6 @@ class Annot f where
   annot :: f a -> a
 
 
-inject :: Expr a -> Expr a -> Expr a
-inject expr_prel expr_user =
-  case expr_prel of
-    Let { _body } -> expr_prel { _body = inject _body expr_user }
-    _ -> expr_user
-
-
 instance Pretty (Expr a) where
   pPrintPrec lvl prec expr =
     case expr of
@@ -161,6 +168,9 @@ instance Pretty (Altn a) where
     [ text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _patns)
     , text "->", pPrintPrec lvl 0 _rhs
     ]
+
+instance Annot TopLevel where
+  annot = _annot :: TopLevel _ -> _
 
 instance Annot Expr where
   annot = _annot :: Expr _ -> _

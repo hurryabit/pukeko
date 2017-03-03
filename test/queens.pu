@@ -1,7 +1,7 @@
-letrec replicate k x =
+let rec replicate k x =
   if k <= 0 then Nil else Cons x (replicate (k-1) x)
-in
-letrec diff xs ys =
+
+let rec diff xs ys =
   match xs with
   | Nil -> Nil
   | Cons x xs' ->
@@ -14,12 +14,12 @@ letrec diff xs ys =
         diff xs' ys'
       else
         diff xs ys'
-in
+
 let ints =
-  letrec go k = Cons k (go (k+1)) in
+  let rec go k = Cons k (go (k+1)) in
   go 1
-in
-letrec solve kss =
+
+let rec solve kss =
   match kss with
   | Nil -> Cons Nil Nil
   | Cons ks kss ->
@@ -30,7 +30,7 @@ letrec solve kss =
             kss
             ints)))
       ks
-in
-let solve n = solve (replicate n (take n ints)) in
-let main = print (length (solve 12)) in
-main
+
+let solve n = solve (replicate n (take n ints))
+
+let main = print (length (solve 12))

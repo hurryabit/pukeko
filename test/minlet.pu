@@ -1,3 +1,3 @@
-let id x = let y = x in y in
-let main = print (id 0) in
-main
+let id x = let y = x in y
+
+let main = print (id 0)

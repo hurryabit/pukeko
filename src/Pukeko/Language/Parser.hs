@@ -1,6 +1,5 @@
 module Pukeko.Language.Parser
-  ( parseExpr
-  , parseType
+  ( parseModule
   )
   where
 
@@ -16,18 +15,11 @@ import Pukeko.Language.Type (Type, Closed, var, (~>), app)
 
 import qualified Pukeko.Language.Operator as Operator
 
-parseExpr :: MonadError String m => String -> String -> m (Expr SourcePos)
-parseExpr file code =
-  case parse (whiteSpace *> expr <* eof) file code of
+parseModule :: MonadError String m => String -> String -> m (Module SourcePos)
+parseModule file code =
+  case parse (whiteSpace *> module_ <* eof) file code of
     Left error  -> throwError (show error)
     Right expr -> return expr
-
-parseType :: MonadError String m => String -> m (Type Closed)
-parseType code =
-  case parse (type_ <* eof) "<input>" code of
-    Left error -> throwError (show error)
-    Right expr -> return expr
-
 
 type Parser = Parsec String ()
 
@@ -35,13 +27,13 @@ pukekoDef :: LanguageDef st
 pukekoDef = haskellStyle
   { Token.reservedNames =
       [ "fun"
-      , "let", "letrec", "and", "in"
+      , "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
       ]
   , Token.opStart  = Token.opLetter pukekoDef
   , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
-  , Token.reservedOpNames = ["=", "->", ":", ".", "|"] ++ Operator.syms
+  , Token.reservedOpNames = ["=", "->", ":", ".", "|", ";;"] ++ Operator.syms
   }
 
 pukeko@Token.TokenParser
@@ -85,6 +77,13 @@ atype = choice
 asType :: Parser (Type Closed)
 asType = reservedOp ":" *> type_
 
+
+module_ :: Parser (Module SourcePos)
+module_ = many1 $ choice
+  [ let_ TopLet <* optional (reservedOp ";;")
+  ]
+
+
 patn :: Bool -> Parser (Patn SourcePos)
 patn needParens =
   if needParens then
@@ -117,13 +116,16 @@ altn =
          <*> many (patn True)
          <*> (arrow *> expr)
 
+let_ :: (SourcePos -> Bool -> [Defn SourcePos] -> a) -> Parser a
+let_ f =
+  f <$> getPosition
+    <*> (reserved "let" *> (reserved "rec" *> pure True <|> pure False))
+    <*> sepBy1 defn (reserved "and")
+
 expr, aexpr :: Parser (Expr SourcePos)
 expr =
   choice
-    [ Let <$> getPosition
-          <*> (reserved "let" *> pure False <|> reserved "letrec" *> pure True )
-          <*> sepBy1 defn (reserved "and")
-          <*> (reserved "in" *> expr)
+    [ let_ Let <*> (reserved "in" *> expr)
     , Lam <$> getPosition
           <*> (reserved "fun" *> many1 (patn True))
           <*> (arrow *> expr)

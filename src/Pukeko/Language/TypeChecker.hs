@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Pukeko.Language.TypeChecker
-  ( checkExpr
+  ( checkModule
   )
   where
 
@@ -15,7 +15,6 @@ import Data.Label.Monadic
 import Data.Map (Map)
 import Data.STRef
 import Text.Parsec (SourcePos)
-
 
 import qualified Data.Map as Map
 
@@ -46,14 +45,14 @@ instance MonadFail (TI s) where
 liftST :: ST s a -> TI s a
 liftST = TI . lift . lift
 
-checkExpr :: MonadError String m => Type Closed -> Expr SourcePos -> m ()
-checkExpr t_want expr =
-  case checkExpr' t_want expr of
+checkModule :: MonadError String m => Ident -> Type Closed -> Module SourcePos -> m ()
+checkModule main t_main tops = do
+  case checkExpr t_main (moduleToExpr tops main) of
     Left error -> throwError error
     Right ()   -> return ()
 
-checkExpr' :: Type Closed -> Expr SourcePos -> Either String ()
-checkExpr' t_want expr = runST $ do
+checkExpr :: Type Closed -> Expr SourcePos -> Either String ()
+checkExpr t_want expr = runST $ do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
   _fresh <- newSTRef (map MkIdent vars)
   let env = MkEnvironment

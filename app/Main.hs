@@ -26,15 +26,16 @@ compile write_ll write_gm no_prelude file_user = do
     then return ""
     else readFile file_prel
   let gprog_or_error = do
-        expr_user <- Parser.parseExpr file_user code_user
-        expr <-
+        mod_user <- Parser.parseModule file_user code_user
+        mod_prel <-
           if no_prelude
-          then return expr_user
-          else do
-            expr_prel <- Parser.parseExpr file_prel code_prel
-            return $ Syntax.inject expr_prel expr_user
-        TypeChecker.checkExpr (Type.io Builtins.unit) expr
-        let lifted_expr = Lifter.liftExpr (map fst Builtins.everything) expr
+          then return []
+          else Parser.parseModule file_prel code_prel
+        let module_ = mod_prel ++ mod_user
+            main = Syntax.MkIdent "main"
+        TypeChecker.checkModule main (Type.io Builtins.unit) module_
+        let lifted_expr =
+              Lifter.liftExpr (map fst Builtins.everything) (Syntax.moduleToExpr module_ main)
         program <- Compiler.compile (fmap (const ()) lifted_expr)
         nasm <- NASM.assemble program
         return (lifted_expr, program, nasm)

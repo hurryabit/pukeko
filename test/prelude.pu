@@ -1,41 +1,44 @@
 -- The Pukeko prelude.
-let not x = if x then False else True in
-let prefix_and x y = if x then y     else False in
-let prefix_or  x y = if x then True  else y     in
-let prefix_semi m1 m2 = m1 >>= (fun (x : Unit) -> m2) in
-letrec foldr f y0 xs =
+let not x = if x then False else True
+
+let prefix_and x y = if x then y     else False
+let prefix_or  x y = if x then True  else y
+
+let prefix_semi m1 m2 = m1 >>= (fun (x : Unit) -> m2)
+
+let rec foldr f y0 xs =
   match xs with
   | Nil       -> y0
   | Cons x xs -> f x (foldr f y0 xs)
-in
-letrec foldl f y0 xs =
+
+let rec foldl f y0 xs =
   match xs with
   | Nil -> y0
   | Cons x xs -> foldl f (f y0 x) xs
-in
-letrec take n xs =
+
+let rec take n xs =
   if n <= 0 then
     Nil
   else
     match xs with
     | Nil       -> Nil
     | Cons x xs -> Cons x (take (n-1) xs)
-in
-letrec nth xs n =
+
+let rec nth xs n =
   match xs with
   | Nil -> abort
   | Cons x xs -> if n <= 0 then x else nth xs (n-1)
-in
-letrec zip_with f xs ys =
+
+let rec zip_with f xs ys =
   match xs with
   | Nil -> Nil
   | Cons x xs ->
     match ys with
     | Nil -> Nil
     | Cons y ys -> Cons (f x y) (zip_with f xs ys)
-in
-letrec partition p xs =
-  letrec part_p xs =
+
+let rec partition p xs =
+  let rec part_p xs =
     match xs with
     | Nil -> Pair Nil Nil
     | Cons x xs ->
@@ -47,20 +50,23 @@ letrec partition p xs =
           Pair ys (Cons x zs)
   in
   part_p xs
-in
-letrec append xs ys =
+
+let rec append xs ys =
   match xs with
   | Nil -> ys
   | Cons x xs -> Cons x (append xs ys)
-in
-let concat = foldr append Nil in
-letrec map f xs =
+
+let concat = foldr append Nil
+
+let rec map f xs =
   match xs with
   | Nil -> Nil
   | Cons x xs -> Cons (f x) (map f xs)
-in
-let concat_map f xs = concat (map f xs) in
-let length = foldr (fun x l -> 1+l) 0 in
-let iter_m f = foldr (fun x m -> f x; m) (return Unit) in
-let print_list = iter_m print in
-1
+
+let concat_map f xs = concat (map f xs)
+
+let length = foldr (fun x l -> 1+l) 0
+
+let iter_m f = foldr (fun x m -> f x; m) (return Unit)
+
+let print_list = iter_m print

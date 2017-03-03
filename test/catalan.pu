@@ -1,9 +1,13 @@
-let p = 100000007 in
-let mul_p x y = (x*y) % p in
-let add_p x y = (x+y) % p in
-let sum_p = foldl add_p 0 in
+let p = 100000007
+
+let mul_p x y = (x*y) % p
+
+let add_p x y = (x+y) % p
+
+let sum_p = foldl add_p 0
+
 let scanl f =
-  letrec scanl_f y0 xs =
+  let rec scanl_f y0 xs =
     match xs with
     | Nil -> Nil
     | Cons x xs ->
@@ -11,11 +15,10 @@ let scanl f =
       Cons y0 (scanl_f y0 xs)
   in
   scanl_f
-in
-letrec sols =
+
+let rec sols =
   Cons 1
     (map (fun xs -> sum_p (zip_with mul_p sols xs))
       (scanl (fun xs x -> Cons x xs) Nil sols))
-in
-let main = print (nth sols 2000 % p) in
-main
+
+let main = print (nth sols 2000 % p)

@@ -1,15 +1,15 @@
-let prime = 1000000*1000000+39 in
+let prime = 1000000*1000000+39
+
 let tail xs =
   match xs with
   | Nil -> abort
   | Cons x xs -> xs
-in
+
 let add_mod_prime x y =
   let z = x+y in
   if z < prime then z else z - prime
-in
-letrec fibs0 = Cons 0 fibs1
-and    fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
-in
-let main = print (nth fibs0 1500000) in
-main
+
+let rec fibs0 = Cons 0 fibs1
+and     fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
+
+let main = print (nth fibs0 1500000)

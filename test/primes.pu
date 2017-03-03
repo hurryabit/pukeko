@@ -1,9 +1,9 @@
 let repeat xs =
-  letrec ys = append xs ys in
+  let rec ys = append xs ys in
   ys
-in
+
 let psums =
-  letrec psums0 n xs =
+  let rec psums0 n xs =
     match xs with
     | Nil -> Nil
     | Cons x xs ->
@@ -11,9 +11,9 @@ let psums =
       Cons y (psums0 y xs)
   in
   psums0 0
-in
+
 let filter p =
-  letrec filter_p xs =
+  let rec filter_p xs =
     match xs with
     | Nil -> Nil
     | Cons x xs ->
@@ -21,12 +21,12 @@ let filter p =
       if p x then Cons x ys else ys
   in
   filter_p
-in
-letrec sieve ks =
+
+let rec sieve ks =
   match ks with
   | Nil -> abort
   | Cons p ks -> Cons p (sieve (filter (fun k -> k % p != 0) ks))
-in
-let primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil))))))) in
-let main = print (nth primes 5999) in
-main
+
+let primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
+
+let main = print (nth primes 5999)
