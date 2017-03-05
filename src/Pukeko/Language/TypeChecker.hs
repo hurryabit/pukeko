@@ -8,7 +8,7 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Fail
 import Control.Monad.Reader hiding (asks, local)
-import Control.Monad.State
+import Control.Monad.State  hiding (State, gets, modify)
 import Control.Monad.ST
 import Data.Label (mkLabels)
 import Data.Label.Monadic
@@ -26,50 +26,103 @@ import Pukeko.Language.Type
 import qualified Pukeko.Language.Builtins as Builtins
 
 data Environment s = MkEnvironment
-  { _binds :: Map Ident (Type (Open s))
-  , _level :: Int
-  , _fresh :: STRef s [Ident]
+  { _locals :: Map Ident (Type (Open s))
+  , _level  :: Int
   }
-mkLabels [''Environment]
+
+data GlobalStatus = Imported | Declared | Defined
+data State = MkState
+  { _globals :: Map Ident (Type Closed, GlobalStatus)
+  , _fresh   :: [Ident]
+  }
+mkLabels [''Environment, ''State]
 
 newtype TI s a =
-  TI { unTI :: ExceptT String (ReaderT (Environment s) (ST s)) a }
+  TI { unTI :: ExceptT String (ReaderT (Environment s) (StateT State (ST s))) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment s)
+           , MonadState State
            )
 
 instance MonadFail (TI s) where
   fail = throwError
 
 liftST :: ST s a -> TI s a
-liftST = TI . lift . lift
+liftST = TI . lift . lift . lift
 
-checkModule :: MonadError String m => Ident -> Type Closed -> Module SourcePos -> m ()
-checkModule main t_main tops = do
-  case checkExpr t_main (moduleToExpr tops main) of
+checkModule :: MonadError String m => Module SourcePos -> m ()
+checkModule tops = do
+  let env = MkEnvironment
+        { _locals = Map.empty
+        , _level  = 0
+        }
+      st = MkState
+        { _globals = Map.fromList [ (_ident, (_type, Imported))
+                                  | (_ident, _type) <- Builtins.everything
+                                  ]
+        , _fresh   = []
+        }
+      (res, _) = runST (runStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
+  case res of
     Left error -> throwError error
     Right ()   -> return ()
 
-checkExpr :: Type Closed -> Expr SourcePos -> Either String ()
-checkExpr t_want expr = runST $ do
+checkTopLevel :: TopLevel SourcePos -> TI s ()
+checkTopLevel top = case top of
+  Val{ _annot, _ident, _type } -> do
+    look <- modifyAndGet globals $
+      Map.insertLookupWithKey (\_ -> const) _ident (_type, Declared)
+    let throw verb = throwHere _annot $
+          "the symbol " ++ show _ident ++ " cannot be declared, it " ++ verb
+    case look of
+      Nothing -> return ()
+      Just (_, Imported) -> throw "has been imported"
+      Just (_, Declared) -> throw "has already been declared"
+      Just (_, Defined)  -> throw "has already beed defined"
+  Def{ _annot, _isrec, _defns } -> do
+    resetFresh
+    env <- inferLet _isrec _defns
+    forM_ env $ \(ident, t_infer) -> do
+      look <- Map.lookup ident <$> gets globals
+      let throw verb = throwHere _annot $
+            "the symbol " ++ show ident ++ " cannot be defined, it " ++ verb
+      case look of
+        Nothing            -> throw "has not been declared"
+        Just (_, Imported) -> throw "has been imported"
+        Just (_, Defined)  -> throw "has already been defined"
+        Just (t_decl, Declared) -> do
+          t_infer <- instantiate t_infer
+          unify (open t_decl) t_infer `catchError` throwHere _annot
+          modify globals $ Map.insert ident (t_decl, Defined)
+
+
+resetFresh :: TI s ()
+resetFresh = do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
-  _fresh <- newSTRef (map MkIdent vars)
-  let env = MkEnvironment
-        { _binds = Map.fromList $ map (fmap open) Builtins.everything
-        , _level = 1
-        , _fresh
-        }
-  runReaderT (runExceptT (unTI (check t_want expr))) env
+  puts fresh (map MkIdent vars)
 
 freshVar :: TI s (Type (Open s))
 freshVar = do
   _level <- asks level
-  _fresh <- asks fresh
-  _ident:idents <- liftST $ readSTRef _fresh
-  liftST $ writeSTRef _fresh idents
+  _ident <- modifyAndGet fresh (\(x:xs) -> (x,xs))
   var <- liftST $ newSTRef $ Free { _ident, _level }
   return (TVar var)
+
+lookupType :: SourcePos -> Ident -> TI s (Type (Open s))
+lookupType annot ident = do
+  t_local <- Map.lookup ident <$> asks locals
+  case t_local of
+    Just t -> return t
+    Nothing -> do
+      t_global <- Map.lookup ident <$> gets globals
+      case t_global of
+        Just (t, Imported) -> return (open t)
+        Just (t, Defined)  -> return (open t)
+        Just (_, Declared) ->
+          throwHere annot $ "symbol " ++ show ident ++ " has not been defined yet"
+        Nothing ->
+          throwHere annot $ "symbol " ++ show ident ++ " is unknown"
 
 occursCheck :: (STRef s (TypeVar (Open s))) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
@@ -112,6 +165,8 @@ unify t1 t2 = do
         pthrow $ hsep [pretty _ident, text "occurs in", p2]
       liftST $ writeSTRef tvr1 $ Link { _type = t2 }
     (_, TVar _) -> unify t2 t1
+    (QVar name1, QVar name2)
+      | name1 == name2 -> return ()
     (TFun tx1 ty1, TFun tx2 ty2) -> unify tx1 tx2 >> unify ty1 ty2
     (TApp c1  ts1, TApp c2  ts2)
       | c1 == c2 && length ts1 == length ts2 -> zipWithM_ unify ts1 ts2
@@ -168,16 +223,29 @@ instantiateAnnots = mapM $ \t_opt ->
     Nothing -> freshVar
     Just t  -> instantiate (open t)
 
+throwHere :: SourcePos -> String -> TI s a
+throwHere annot msg = throwError $ show annot ++ ": " ++ msg
+
+inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident, Type (Open s))]
+inferLet isrec defns = do
+  let (idents, t_annots, rhss) = unzipDefns3 defns
+  t_rhss <- local level succ $ do
+    t_lhss <- instantiateAnnots t_annots
+    let env | isrec     = Map.fromList (zip idents t_lhss)
+            | otherwise = Map.empty
+    t_rhss <- local locals (Map.union env) (mapM infer rhss)
+    zipWithM_ unify t_lhss t_rhss
+    return t_rhss
+  t_idents <- mapM generalize t_rhss
+  return $ zip idents t_idents
+
 infer :: Expr SourcePos -> TI s (Type (Open s))
 infer expr = do
-  let unifyHere t1 t2 =
-        unify t1 t2 `catchError` \msg -> throwError (show (annot expr) ++ ": " ++ msg)
+  let unifyHere t1 t2 = unify t1 t2 `catchError` throwHere (annot expr)
   case expr of
-    Var{ _ident } -> do
-      t_opt <- Map.lookup _ident <$> asks binds
-      case t_opt of
-        Just t  -> instantiate t
-        Nothing -> pthrow $ text "unknown variable:" <+> pretty _ident
+    Var{ _annot, _ident } -> do
+      t <- lookupType _annot _ident
+      instantiate t
     Num{} -> return int
     Pack{} -> pthrow $
       text "Pack expressions should only be introduced after type checking!"
@@ -192,29 +260,11 @@ infer expr = do
       let (idents, t_annots) = unzipPatns _patns
       t_idents <- instantiateAnnots t_annots
       let env = Map.fromList (zip idents t_idents)
-      t_body <- local binds (Map.union env) (infer _body)
+      t_body <- local locals (Map.union env) (infer _body)
       return $ t_idents *~> t_body
-    Let{ _isrec = False, _defns, _body } -> do
-      let (idents, t_annots, rhss) = unzipDefns3 _defns
-      t_rhss <- local level succ $ do
-        t_lhss <- instantiateAnnots t_annots
-        t_rhss <- mapM infer rhss
-        zipWithM_ unifyHere t_lhss t_rhss
-        return t_rhss
-      t_idents <- mapM generalize t_rhss
-      let env = Map.fromList (zip idents t_idents)
-      local binds (Map.union env) (infer _body)
-    Let{ _isrec = True, _defns, _body } -> do
-      let (idents, t_annots, rhss) = unzipDefns3 _defns
-      t_rhss <- local level succ $ do
-        t_lhss <- instantiateAnnots t_annots
-        let env = Map.fromList (zip idents t_lhss)
-        t_rhss <- local binds (Map.union env) (mapM infer rhss)
-        zipWithM_ unifyHere t_lhss t_rhss
-        return t_rhss
-      t_idents <- mapM generalize t_rhss
-      let env = Map.fromList (zip idents t_idents)
-      local binds (Map.union env) (infer _body)
+    Let{ _annot, _isrec, _defns, _body } -> do
+      env <- Map.fromList <$> inferLet _isrec _defns `catchError` throwHere _annot
+      local locals (Map.union env) (infer _body)
     If{} -> infer (desugarIf expr)
     Match{ _expr, _altns } -> do
       t_expr <- infer _expr
@@ -223,20 +273,15 @@ infer expr = do
         (MkConstructor{ _fields }, MkADT{ _name, _params }) <-
           findConstructor _cons
         if length _patns /= length _fields
-          then throwError $ show _annot
-               ++ ": wrong number of arguments for constructor " ++ show _cons
+          then throwHere _annot $
+               "wrong number of arguments for constructor " ++ show _cons
           else do
           let (idents, _) = unzipPatns _patns
           (t_params, t_fields) <-
             splitAt (length _params) <$>
             instantiateMany (map open $ _params ++ _fields)
-          unify t_expr (app _name t_params)
+          unifyHere t_expr (app _name t_params)
           let env = Map.fromList (zip idents t_fields)
-          t_rhs <- local binds (Map.union env) (infer _rhs)
-          unify t_res t_rhs
+          t_rhs <- local locals (Map.union env) (infer _rhs)
+          unifyHere t_res t_rhs
       return t_res
-
-check :: Type Closed -> Expr SourcePos -> TI s ()
-check t_want expr = do
-  t_expr <- infer expr
-  unify (open t_want) t_expr

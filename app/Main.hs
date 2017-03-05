@@ -14,7 +14,7 @@ import qualified Pukeko.Language.Builtins     as Builtins
 import qualified Pukeko.Language.LambdaLifter as Lifter
 import qualified Pukeko.Language.Parser       as Parser
 import qualified Pukeko.Language.Syntax       as Syntax
-import qualified Pukeko.Language.Type         as Type
+-- import qualified Pukeko.Language.Type         as Type
 import qualified Pukeko.Language.TypeChecker  as TypeChecker
 
 compile :: Bool -> Bool -> Bool -> String -> IO ()
@@ -33,7 +33,7 @@ compile write_ll write_gm no_prelude file_user = do
           else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
             main = Syntax.MkIdent "main"
-        TypeChecker.checkModule main (Type.io Builtins.unit) module_
+        TypeChecker.checkModule module_
         let lifted_expr =
               Lifter.liftExpr (map fst Builtins.everything) (Syntax.moduleToExpr module_ main)
         program <- Compiler.compile (fmap (const ()) lifted_expr)

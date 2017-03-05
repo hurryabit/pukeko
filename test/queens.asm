@@ -359,7 +359,7 @@ g_update 1
 g_pop 0
 g_unwind
 
-g_globstart solve$2, 3
+g_globstart solve_aux$2, 3
 g_pushglobal Nil, 0
 g_push 3
 g_push 2
@@ -380,15 +380,15 @@ g_update 4
 g_pop 3
 g_unwind
 
-g_globstart solve$1, 2
+g_globstart solve_aux$1, 2
 g_pushglobal ints, 0
 g_push 1
 g_push 3
-g_pushglobal solve$2, 3
+g_pushglobal solve_aux$2, 3
 g_mkap 1
 g_pushglobal zip_with, 3
 g_mkap 3
-g_pushglobal solve, 1
+g_pushglobal solve_aux, 1
 g_mkap 1
 g_push 2
 g_pushglobal Cons, 2
@@ -399,14 +399,14 @@ g_update 3
 g_pop 2
 g_unwind
 
-g_globstart solve, 1
+g_globstart solve_aux, 1
 g_push 0
 g_eval
 g_jumpzero .0
 g_uncons 2
 g_push 0
 g_push 2
-g_pushglobal solve$1, 2
+g_pushglobal solve_aux$1, 2
 g_mkap 1
 g_pushglobal concat_map, 2
 g_mkap 2
@@ -424,7 +424,7 @@ g_pop 1
 g_return
 g_label .1
 
-g_globstart solve$3, 1
+g_globstart solve, 1
 g_pushglobal ints, 0
 g_push 1
 g_pushglobal take, 2
@@ -432,7 +432,7 @@ g_mkap 2
 g_push 1
 g_pushglobal replicate, 2
 g_mkap 2
-g_pushglobal solve, 1
+g_pushglobal solve_aux, 1
 g_mkap 1
 g_update 2
 g_pop 1
@@ -440,7 +440,7 @@ g_unwind
 
 g_globstart main, 0
 g_pushint 12
-g_pushglobal solve$3, 1
+g_pushglobal solve, 1
 g_mkap 1
 g_pushglobal length, 0
 g_mkap 1

@@ -1,21 +1,29 @@
 -- The Pukeko prelude.
+val not : Bool -> Bool
 let not x = if x then False else True
 
+val prefix_and : Bool -> Bool -> Bool
 let prefix_and x y = if x then y     else False
+
+val prefix_or  : Bool -> Bool -> Bool
 let prefix_or  x y = if x then True  else y
 
-let prefix_semi m1 m2 = m1 >>= (fun (x : Unit) -> m2)
+val prefix_semi : IO Unit -> IO a -> IO a
+let prefix_semi m1 m2 = m1 >>= (fun x -> m2)
 
+val foldr : (a -> b -> b) -> b -> List a -> b
 let rec foldr f y0 xs =
   match xs with
   | Nil       -> y0
   | Cons x xs -> f x (foldr f y0 xs)
 
+val foldl : (b -> a -> b) -> b -> List a -> b
 let rec foldl f y0 xs =
   match xs with
   | Nil -> y0
   | Cons x xs -> foldl f (f y0 x) xs
 
+val take : Int -> List a -> List a
 let rec take n xs =
   if n <= 0 then
     Nil
@@ -24,11 +32,13 @@ let rec take n xs =
     | Nil       -> Nil
     | Cons x xs -> Cons x (take (n-1) xs)
 
+val nth : List a -> Int -> a
 let rec nth xs n =
   match xs with
   | Nil -> abort
   | Cons x xs -> if n <= 0 then x else nth xs (n-1)
 
+val zip_with : (a -> b -> c) -> List a -> List b -> List c
 let rec zip_with f xs ys =
   match xs with
   | Nil -> Nil
@@ -37,6 +47,7 @@ let rec zip_with f xs ys =
     | Nil -> Nil
     | Cons y ys -> Cons (f x y) (zip_with f xs ys)
 
+val partition : (a -> Bool) -> List a -> Pair (List a) (List a)
 let rec partition p xs =
   let rec part_p xs =
     match xs with
@@ -51,22 +62,29 @@ let rec partition p xs =
   in
   part_p xs
 
+val append : List a -> List a -> List a
 let rec append xs ys =
   match xs with
   | Nil -> ys
   | Cons x xs -> Cons x (append xs ys)
 
+val concat : List (List a) -> List a
 let concat = foldr append Nil
 
+val map : (a -> b) -> List a -> List b
 let rec map f xs =
   match xs with
   | Nil -> Nil
   | Cons x xs -> Cons (f x) (map f xs)
 
+val concat_map : (a -> List b) -> List a -> List b
 let concat_map f xs = concat (map f xs)
 
+val length : List a -> Int
 let length = foldr (fun x l -> 1+l) 0
 
+val iter_m : (a -> IO Unit) -> List a -> IO Unit
 let iter_m f = foldr (fun x m -> f x; m) (return Unit)
 
+val print_list : List Int -> IO Unit
 let print_list = iter_m print

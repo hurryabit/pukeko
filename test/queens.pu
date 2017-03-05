@@ -1,6 +1,8 @@
+val replicate : Int -> a -> List a
 let rec replicate k x =
   if k <= 0 then Nil else Cons x (replicate (k-1) x)
 
+val diff : List Int -> List Int -> List Int
 let rec diff xs ys =
   match xs with
   | Nil -> Nil
@@ -15,22 +17,26 @@ let rec diff xs ys =
       else
         diff xs ys'
 
+val ints : List Int
 let ints =
   let rec go k = Cons k (go (k+1)) in
   go 1
 
-let rec solve kss =
+val solve_aux : List (List Int) -> List (List Int)
+let rec solve_aux kss =
   match kss with
   | Nil -> Cons Nil Nil
   | Cons ks kss ->
     concat_map (fun k ->
         map (Cons k)
-          (solve (zip_with (fun ls i ->
+          (solve_aux (zip_with (fun ls i ->
               diff ls (Cons (k-i) (Cons k (Cons (k+i) Nil))))
             kss
             ints)))
       ks
 
-let solve n = solve (replicate n (take n ints))
+val solve : Int -> List (List Int)
+let solve n = solve_aux (replicate n (take n ints))
 
+val main : IO Unit
 let main = print (length (solve 12))

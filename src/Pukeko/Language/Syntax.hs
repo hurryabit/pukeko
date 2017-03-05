@@ -28,13 +28,15 @@ import qualified Pukeko.Language.Operator as Operator
 
 type Module a = [TopLevel a]
 
-data TopLevel a =
-  TopLet { _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
+data TopLevel a
+  = Val{ _annot :: a, _ident :: Ident, _type :: Type Closed }
+  | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
 
 moduleToExpr :: Module a -> Ident -> Expr a
 moduleToExpr tops main =
   let _annot = annot (last tops)
-      f TopLet{ _annot, _isrec, _defns } _body =
+      f Val{} _body = _body
+      f Def{ _annot, _isrec, _defns } _body =
         Let{ _annot, _isrec, _defns, _body }
   in  foldr f Var{ _annot, _ident = main } tops
 

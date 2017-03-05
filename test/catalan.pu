@@ -1,11 +1,16 @@
+val p : Int
 let p = 100000007
 
+val mul_p : Int -> Int -> Int
 let mul_p x y = (x*y) % p
 
+val add_p : Int -> Int -> Int
 let add_p x y = (x+y) % p
 
+val sum_p : List Int -> Int
 let sum_p = foldl add_p 0
 
+val scanl : (b -> a -> b) -> b -> List a -> List b
 let scanl f =
   let rec scanl_f y0 xs =
     match xs with
@@ -16,9 +21,11 @@ let scanl f =
   in
   scanl_f
 
+val sols : List Int
 let rec sols =
   Cons 1
     (map (fun xs -> sum_p (zip_with mul_p sols xs))
       (scanl (fun xs x -> Cons x xs) Nil sols))
 
+val main : IO Unit
 let main = print (nth sols 2000 % p)

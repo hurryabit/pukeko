@@ -27,7 +27,7 @@ pukekoDef :: LanguageDef st
 pukekoDef = haskellStyle
   { Token.reservedNames =
       [ "fun"
-      , "let", "rec", "and", "in"
+      , "val", "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
       ]
@@ -80,7 +80,10 @@ asType = reservedOp ":" *> type_
 
 module_ :: Parser (Module SourcePos)
 module_ = many1 $ choice
-  [ let_ TopLet <* optional (reservedOp ";;")
+  [ let_ Def <* optional (reservedOp ";;")
+  , Val <$> getPosition
+        <*> (reserved "val" *> variable)
+        <*> asType
   ]
 
 

@@ -80,7 +80,7 @@ prettyType lvl prec t =
     TVar tvr -> do
       tv <- readSTRef tvr
       prettyTypeVar lvl prec tv
-    QVar v -> return $ pretty v
+    QVar v -> return $ braces $ pretty v
     TFun tx ty -> do
       px <- prettyType lvl 2 tx
       py <- prettyType lvl 1 ty

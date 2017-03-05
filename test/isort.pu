@@ -1,23 +1,33 @@
+val prime : Int
 let prime = 1000000*1000000+39
 
+val double_mod_prime : Int -> Int
 let double_mod_prime x =
   let y = 2*x in
   if y < prime then y else y-prime
 
+val gen : (a -> a) -> a -> List a
 let rec gen f x = Cons x (gen f (f x))
 
+val powers : List Int
 let powers = gen double_mod_prime 1
 
+val sum : List Int -> Int
 let sum = foldr prefix_add 0
 
+val mul_mod_prime : Int -> Int -> Int
 let mul_mod_prime x y = (x*y) % prime
 
+val sum_prod : List Int -> List Int -> Int
 let sum_prod xs ys = sum (zip_with mul_mod_prime xs ys)
 
+val hash : List Int -> Int
 let hash xs = sum_prod xs powers % prime
 
+val numbers : List Int
 let numbers = take 10006 (gen (fun x -> (42*x) % 10007) 1)
 
+val insert : Int -> List Int -> List Int
 let rec insert y xs =
   match xs with
   | Nil -> Cons y Nil
@@ -27,9 +37,11 @@ let rec insert y xs =
     else
       Cons x (insert y xs')
 
+val isort : List Int -> List Int
 let rec isort xs =
   match xs with
   | Nil -> Nil
   | Cons x xs -> insert x (isort xs)
 
+val main : IO Unit
 let main = print (hash (isort numbers))
