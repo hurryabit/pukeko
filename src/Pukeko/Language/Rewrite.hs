@@ -90,7 +90,6 @@ runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_patn, rewrite_altn } =
       case expr of
         Var { }  -> return expr
         Num { }  -> return expr
-        Pack { } -> return expr
         Ap { _fun, _args } -> do
           _fun  <- whole_expr _fun
           _args <- mapM whole_expr _args

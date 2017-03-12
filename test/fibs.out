@@ -3,4 +3,4 @@
 Steps  :   1511272168
 Allocs :     33750640          (Checks:     24750641)
 GC runs:            2
-        1.29 real         0.95 user         0.33 sys
+        1.35 real         0.96 user         0.38 sys

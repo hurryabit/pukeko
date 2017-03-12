@@ -247,8 +247,6 @@ infer expr = do
       t <- lookupType _annot _ident
       instantiate t
     Num{} -> return int
-    Pack{} -> pthrow $
-      text "Pack expressions should only be introduced after type checking!"
     Ap{ _fun, _args } -> do
       t_fun <- infer _fun
       t_args <- mapM infer _args

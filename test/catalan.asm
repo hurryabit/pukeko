@@ -211,7 +211,7 @@ g_update 1
 g_pop 0
 g_unwind
 
-g_globstart scanl_f$0, 4
+g_globstart scanl$1, 4
 g_push 3
 g_eval
 g_jumpzero .0
@@ -243,7 +243,7 @@ g_globstart scanl, 1
 g_alloc 1
 g_push 0
 g_push 2
-g_pushglobal scanl_f$0, 4
+g_pushglobal scanl$1, 4
 g_mkap 2
 g_update 1
 g_push 0
@@ -276,9 +276,11 @@ g_globstart sols, 0
 g_pushglobal sols, 0
 g_pushglobal Nil, 0
 g_pushglobal sols$2, 2
+g_mkap 0
 g_pushglobal scanl, 1
 g_mkap 3
 g_pushglobal sols$1, 1
+g_mkap 0
 g_pushglobal map, 2
 g_mkap 2
 g_pushint 1

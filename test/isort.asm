@@ -276,6 +276,7 @@ g_return
 g_globstart numbers, 0
 g_pushint 1
 g_pushglobal numbers$1, 1
+g_mkap 0
 g_pushglobal gen, 2
 g_mkap 2
 g_pushint 10006

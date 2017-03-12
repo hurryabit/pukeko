@@ -153,7 +153,7 @@ g_pop 3
 g_unwind
 g_label .1
 
-g_globstart part_p$0, 3
+g_globstart partition$1, 3
 g_push 2
 g_eval
 g_jumpzero .0
@@ -204,7 +204,7 @@ g_globstart partition, 2
 g_alloc 1
 g_push 0
 g_push 2
-g_pushglobal part_p$0, 3
+g_pushglobal partition$1, 3
 g_mkap 2
 g_update 1
 g_push 2
@@ -361,6 +361,7 @@ g_return
 g_globstart numbers, 0
 g_pushint 1
 g_pushglobal numbers$1, 1
+g_mkap 0
 g_pushglobal gen, 2
 g_mkap 2
 g_pushint 200002

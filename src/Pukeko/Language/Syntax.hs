@@ -12,7 +12,6 @@ module Pukeko.Language.Syntax
   , unzipPatns
   , unzipDefns
   , unzipDefns3
-  , moduleToExpr
   , Annot (..)
   , module Pukeko.Language.Ident
   )
@@ -32,18 +31,9 @@ data TopLevel a
   = Val{ _annot :: a, _ident :: Ident, _type :: Type Closed }
   | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
 
-moduleToExpr :: Module a -> Ident -> Expr a
-moduleToExpr tops main =
-  let _annot = annot (last tops)
-      f Val{} _body = _body
-      f Def{ _annot, _isrec, _defns } _body =
-        Let{ _annot, _isrec, _defns, _body }
-  in  foldr f Var{ _annot, _ident = main } tops
-
 data Expr a
   = Var    { _annot :: a, _ident :: Ident }
   | Num    { _annot :: a, _int   :: Int }
-  | Pack   { _annot :: a, _tag   :: Int , _arity :: Int }
   | Ap     { _annot :: a, _fun   :: Expr a, _args :: [Expr a] }
   | ApOp   { _annot :: a, _op    :: Ident, _arg1 :: Expr a, _arg2 :: Expr a }
   | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body :: Expr a }
@@ -114,7 +104,6 @@ instance Pretty (Expr a) where
     case expr of
       Var  { _ident } -> pretty _ident
       Num  { _int   } -> int _int
-      Pack { _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
       Ap   { _fun, _args } ->
         maybeParens (prec > aprec) $ hsep $
           pPrintPrec lvl aprec _fun : map (pPrintPrec lvl (aprec+1)) _args

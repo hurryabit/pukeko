@@ -114,43 +114,48 @@ g_update 3
 g_pop 2
 g_unwind
 
-g_globstart psums0, 2
-g_push 1
+g_globstart psums$1, 3
+g_push 2
 g_eval
 g_jumpzero .0
 g_uncons 2
-g_push 2
+g_push 3
 g_push 1
 g_pushglobal prefix_add, 2
 g_mkap 2
 g_push 2
 g_push 1
-g_pushglobal psums0, 2
+g_push 5
 g_mkap 2
 g_push 1
 g_cons 1, 2
-g_update 6
-g_pop 5
+g_update 7
+g_pop 6
 g_return
 g_jump .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
 g_eval
-g_update 3
-g_pop 2
+g_update 4
+g_pop 3
 g_unwind
 g_label .1
 
 g_globstart psums, 0
-g_pushint 0
-g_pushglobal psums0, 2
+g_alloc 1
+g_push 0
+g_pushglobal psums$1, 3
 g_mkap 1
 g_update 1
-g_pop 0
+g_pushint 0
+g_push 1
+g_mkap 1
+g_update 2
+g_pop 1
 g_unwind
 
-g_globstart filter_p$0, 3
+g_globstart filter$1, 3
 g_push 2
 g_eval
 g_jumpzero .0
@@ -193,7 +198,7 @@ g_globstart filter, 1
 g_alloc 1
 g_push 1
 g_push 1
-g_pushglobal filter_p$0, 3
+g_pushglobal filter$1, 3
 g_mkap 2
 g_update 1
 g_push 0

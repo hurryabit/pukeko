@@ -230,6 +230,7 @@ __install__main__:
 %endmacro
 
 %macro g_mkap 1
+%if %1 > 0                      ; TODO: get rid of this check
   @@(10*%1+3)
   g_claim %1
   mov  qword [rhp], TAG_APP
@@ -243,6 +244,7 @@ __install__main__:
 %endrep
   push rhp
   add  rhp, 24
+%endif
 %endmacro
 
 %macro g_cons 2                 ; %1 = tag, %2 = arity
@@ -494,7 +496,7 @@ _unwind:
   ; calc where rbp would need to be for a full application
   ; if rbp is smaller, we have a partial application
   movzx rbx, byte [rax+1]
-  lea   rcx, [rsp+8*rbx]        ; TODO: test that this works correctly
+  lea   rcx, [rsp+8*rbx]
   cmp   rbp, rcx
   jl    _return
   @@(2)

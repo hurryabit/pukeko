@@ -6,5 +6,6 @@ test/*
 !test/Makefile
 !test/*.asm
 !test/*.hs
+!test/*.ll
 !test/*.out
 !test/*.pu

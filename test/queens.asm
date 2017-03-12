@@ -230,6 +230,7 @@ g_return
 g_globstart length, 0
 g_pushint 0
 g_pushglobal length$1, 2
+g_mkap 0
 g_pushglobal foldr, 3
 g_mkap 2
 g_update 1
@@ -338,25 +339,30 @@ g_pop 2
 g_unwind
 g_label .1
 
-g_globstart go, 1
+g_globstart ints$1, 2
 g_pushint 1
-g_push 1
+g_push 2
 g_pushglobal prefix_add, 2
 g_mkap 2
-g_pushglobal go, 1
-g_mkap 1
 g_push 1
+g_mkap 1
+g_push 2
 g_cons 1, 2
-g_update 2
-g_pop 1
+g_update 3
+g_pop 2
 g_return
 
 g_globstart ints, 0
-g_pushint 1
-g_pushglobal go, 1
+g_alloc 1
+g_push 0
+g_pushglobal ints$1, 2
 g_mkap 1
 g_update 1
-g_pop 0
+g_pushint 1
+g_push 1
+g_mkap 1
+g_update 2
+g_pop 1
 g_unwind
 
 g_globstart solve_aux$2, 3

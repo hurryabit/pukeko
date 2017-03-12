@@ -1,4 +1,4 @@
-COMP = stack exec pukeko --
+COMP = stack exec pukeko -- -l
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
@@ -19,6 +19,7 @@ SOURCES     = monad_io.pu \
 							minlet.pu \
 							primes.pu \
 							catalan.pu
+LAMBDAS     = $(SOURCES:.pu=.ll)
 GMACHINES   = $(SOURCES:.pu=.gm)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
@@ -55,8 +56,8 @@ gc.o: ../gc.c
 	diff --ignore-matching-lines='.*real.*user.*sys.*' $(@:.check=.out) $<
 
 clean:
-	rm -f $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) $(TEMPOUTPUTS)
+	rm -f $(LAMBDAS) $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) $(TEMPOUTPUTS)
 
 .PHONEY: all clean check $(CHECKS)
 
-.PRECIOUS: %.asm
+.PRECIOUS: %.asm %.ll

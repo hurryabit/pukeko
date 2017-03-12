@@ -10,10 +10,8 @@ import Pukeko.Pretty
 
 import qualified Pukeko.GMachine.Compiler     as Compiler
 import qualified Pukeko.GMachine.NASM         as NASM
-import qualified Pukeko.Language.Builtins     as Builtins
 import qualified Pukeko.Language.LambdaLifter as Lifter
 import qualified Pukeko.Language.Parser       as Parser
-import qualified Pukeko.Language.Syntax       as Syntax
 -- import qualified Pukeko.Language.Type         as Type
 import qualified Pukeko.Language.TypeChecker  as TypeChecker
 
@@ -32,20 +30,19 @@ compile write_ll write_gm no_prelude file_user = do
           then return []
           else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
-            main = Syntax.MkIdent "main"
         TypeChecker.checkModule module_
-        let lifted_expr =
-              Lifter.liftExpr (map fst Builtins.everything) (Syntax.moduleToExpr module_ main)
-        program <- Compiler.compile (fmap (const ()) lifted_expr)
+        let lifted_defns = Lifter.liftModule module_
+        program <- Compiler.compile (map (fmap (const ())) lifted_defns)
         nasm <- NASM.assemble program
-        return (lifted_expr, program, nasm)
+        return (lifted_defns, program, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (lifted_expr, program, nasm) -> do
+    Right (lifted_defns, program, nasm) -> do
       when write_ll $
-        writeFile (file_user `replaceExtension` ".ll") (prettyShow lifted_expr)
+        writeFile (file_user `replaceExtension` ".ll") $
+        render $ vcat $ map pretty lifted_defns
       when write_gm $
         writeFile (file_user `replaceExtension` ".gm") (prettyShow program)
       writeFile (file_user `replaceExtension` ".asm") nasm
