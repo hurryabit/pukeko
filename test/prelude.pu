@@ -1,4 +1,30 @@
 -- The Pukeko prelude.
+type Unit =
+  | Unit
+
+type Bool =
+  | False
+  | True
+
+type Pair a b =
+  | Pair a b
+
+type List a =
+  | Nil
+  | Cons a (List a)
+
+type Option a =
+  | None
+  | Some a
+
+type Choice a b =
+  | First  a
+  | Second b
+
+type Tree a =
+  | Leaf
+  | Node (Tree a) a (Tree a)
+
 val not : Bool -> Bool
 let not x = if x then False else True
 

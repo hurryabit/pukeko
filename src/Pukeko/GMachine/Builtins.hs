@@ -5,7 +5,7 @@ module Pukeko.GMachine.Builtins
   where
 
 import Pukeko.GMachine.GCode
-import Pukeko.Language.Builtins hiding (everything)
+import Pukeko.Language.ADT (Constructor (..))
 import Pukeko.Language.Ident
 
 mkGlobal :: String -> Int -> [GInst String] -> Global
@@ -14,10 +14,10 @@ mkGlobal name _arity code =
       _code = GLOBSTART _name _arity : map (fmap Name) code
   in  MkGlobal { _name, _arity, _code }
 
-everything :: [Global]
-everything = concat
+everything :: [Constructor] -> [Global]
+everything constrs = concat
   [ neg : map (snd . snd) binops
-  , concatMap constructors adts
+  , map mkConstr constrs
   , [ return_, print_, prefix_bind
     , abort
     ]
@@ -61,16 +61,14 @@ binops =
           , RETURN
           ]
 
-constructors :: ADT -> [Global]
-constructors MkADT{ _constructors } = map f _constructors
-  where
-    f MkConstructor{ _name, _tag, _fields } =
-      let arity = length _fields
-      in  mkGlobal (unIdent _name) arity
-          [ CONS _tag arity
-          , UPDATE 1
-          , RETURN
-          ]
+mkConstr :: Constructor -> Global
+mkConstr MkConstructor{ _name, _tag, _fields } =
+  let arity = length _fields
+  in  mkGlobal (unIdent _name) arity
+      [ CONS _tag arity
+      , UPDATE 1
+      , RETURN
+      ]
 
 return_, print_, prefix_bind :: Global
 return_ = mkGlobal "return" 2

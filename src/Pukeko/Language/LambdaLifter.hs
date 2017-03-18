@@ -33,6 +33,7 @@ freshIdent = state $ \(ident:idents) -> (ident, idents)
 
 liftModule :: Module a -> [FvDefn]
 liftModule = concatMap $ \top -> case top of
+  Type{} -> []
   Val{} -> []
   Def{ _defns } -> concatMap liftTopDefn _defns
 

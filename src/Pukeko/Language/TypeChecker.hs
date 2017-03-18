@@ -17,9 +17,10 @@ import Data.STRef
 import Text.Parsec (SourcePos)
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Pukeko.Pretty hiding (int)
-import Pukeko.Language.Builtins
+import Pukeko.Language.ADT
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type
 
@@ -31,8 +32,11 @@ data Environment s = MkEnvironment
   }
 
 data GlobalStatus = Imported | Declared | Defined
+
 data State = MkState
   { _globals :: Map Ident (Type Closed, GlobalStatus)
+  , _types   :: Map Ident ADT
+  , _constrs :: Map Ident Constructor
   , _fresh   :: [Ident]
   }
 mkLabels [''Environment, ''State]
@@ -51,7 +55,7 @@ instance MonadFail (TI s) where
 liftST :: ST s a -> TI s a
 liftST = TI . lift . lift . lift
 
-checkModule :: MonadError String m => Module SourcePos -> m ()
+checkModule :: MonadError String m => Module SourcePos -> m (Map Ident Constructor)
 checkModule tops = do
   let env = MkEnvironment
         { _locals = Map.empty
@@ -61,20 +65,29 @@ checkModule tops = do
         { _globals = Map.fromList [ (_ident, (_type, Imported))
                                   | (_ident, _type) <- Builtins.everything
                                   ]
+        , _types   = Map.fromList [ (_name, adt)
+                                  | adt@MkADT{ _name } <- Builtins.types
+                                  ]
+        , _constrs = Map.empty
         , _fresh   = []
         }
-      (res, _) = runST (runStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
+      (res,st') = runST (runStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
   case res of
     Left error -> throwError error
-    Right ()   -> return ()
+    Right ()   -> return $ _constrs st'
 
 checkTopLevel :: TopLevel SourcePos -> TI s ()
 checkTopLevel top = case top of
+  Type{ _annot, _adts } -> do
+    forM_ _adts (addType _annot)
+    forM_ _adts $ \MkADT{ _constructors } ->
+      forM_ _constructors (addConstructor _annot)
   Val{ _annot, _ident, _type } -> do
+    checkKinds _annot _type
     look <- modifyAndGet globals $
       Map.insertLookupWithKey (\_ -> const) _ident (_type, Declared)
     let throw verb = throwHere _annot $
-          "the symbol " ++ show _ident ++ " cannot be declared, it " ++ verb
+          "the function " ++ show _ident ++ " cannot be declared, it " ++ verb
     case look of
       Nothing -> return ()
       Just (_, Imported) -> throw "has been imported"
@@ -86,7 +99,7 @@ checkTopLevel top = case top of
     forM_ env $ \(ident, t_infer) -> do
       look <- Map.lookup ident <$> gets globals
       let throw verb = throwHere _annot $
-            "the symbol " ++ show ident ++ " cannot be defined, it " ++ verb
+            "the function " ++ show ident ++ " cannot be defined, it " ++ verb
       case look of
         Nothing            -> throw "has not been declared"
         Just (_, Imported) -> throw "has been imported"
@@ -95,6 +108,39 @@ checkTopLevel top = case top of
           t_infer <- instantiate t_infer
           unify (open t_decl) t_infer `catchError` throwHere _annot
           modify globals $ Map.insert ident (t_decl, Defined)
+
+addType :: SourcePos -> ADT -> TI s ()
+addType _annot adt@MkADT{ _name } = do
+  _types <- gets types
+  when (_name `Map.member` _types) $
+    throwHere _annot $ "Type " ++ show _name ++ " has already been defined"
+  modify types (Map.insert _name adt)
+
+findType :: SourcePos -> Ident -> TI s ADT
+findType annot ident = do
+  _types <- gets types
+  case Map.lookup ident _types of
+    Nothing -> throwHere annot $ "Type constructor " ++ show ident ++ " unknown"
+    Just t -> return t
+
+addConstructor :: SourcePos -> Constructor -> TI s ()
+addConstructor annot constr@MkConstructor{ _adt = MkADT{ _params }, _name, _fields } = do
+  _constrs <- gets constrs
+  when (_name `Map.member` _constrs) $
+    throwHere annot $ "Constructor " ++ show _name ++ " has already been defined"
+  let unbound = Set.unions (map qvars _fields) `Set.difference` Set.fromList _params
+  unless (Set.null unbound) $
+    throwHere annot $ "Unbound type variables in constructor " ++ show _name ++ ": "
+      ++ unwords (map show $ Set.toList unbound)
+  mapM_ (checkKinds annot) _fields
+  modify constrs (Map.insert _name constr)
+
+findConstructor :: SourcePos -> Ident -> TI s Constructor
+findConstructor annot ident = do
+  _constrs <- gets constrs
+  case Map.lookup ident _constrs of
+    Nothing -> throwHere annot $ "Constructor " ++ show ident ++ " unknown"
+    Just constr -> return constr
 
 
 resetFresh :: TI s ()
@@ -110,19 +156,24 @@ freshVar = do
   return (TVar var)
 
 lookupType :: SourcePos -> Ident -> TI s (Type (Open s))
-lookupType annot ident = do
-  t_local <- Map.lookup ident <$> asks locals
-  case t_local of
-    Just t -> return t
-    Nothing -> do
-      t_global <- Map.lookup ident <$> gets globals
-      case t_global of
-        Just (t, Imported) -> return (open t)
-        Just (t, Defined)  -> return (open t)
-        Just (_, Declared) ->
-          throwHere annot $ "symbol " ++ show ident ++ " has not been defined yet"
-        Nothing ->
-          throwHere annot $ "symbol " ++ show ident ++ " is unknown"
+lookupType annot ident
+  | isVariable ident = do
+      t_local <- Map.lookup ident <$> asks locals
+      case t_local of
+        Just t -> return t
+        Nothing -> do
+          t_global <- Map.lookup ident <$> gets globals
+          case t_global of
+            Just (t, Imported) -> return (open t)
+            Just (t, Defined)  -> return (open t)
+            Just (_, Declared) ->
+              throwHere annot $ "function " ++ show ident ++ " has not been defined yet"
+            Nothing ->
+              throwHere annot $ "function " ++ show ident ++ " is unknown"
+  | isConstructor ident = do
+      constr <- findConstructor annot ident
+      return $ open (typeOf constr)
+  | otherwise = throwHere annot $ "invalid symbol: " ++ show ident
 
 occursCheck :: (STRef s (TypeVar (Open s))) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
@@ -217,27 +268,30 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
 instantiate :: Type (Open s) -> TI s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateAnnots :: [Maybe (Type Closed)] -> TI s [Type (Open s)]
-instantiateAnnots = mapM $ \t_opt ->
-  case t_opt of
+instantiateAnnots :: [Patn SourcePos] -> TI s [(Ident, Type (Open s))]
+instantiateAnnots patns = forM patns $ \MkPatn{ _annot, _ident, _type } -> do
+  t <- case _type of
     Nothing -> freshVar
-    Just t  -> instantiate (open t)
+    Just t  -> do
+      checkKinds _annot t
+      instantiate (open t)
+  return (_ident, t)
 
 throwHere :: SourcePos -> String -> TI s a
 throwHere annot msg = throwError $ show annot ++ ": " ++ msg
 
 inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident, Type (Open s))]
 inferLet isrec defns = do
-  let (idents, t_annots, rhss) = unzipDefns3 defns
+  let (patns, rhss) = unzipDefns defns
   t_rhss <- local level succ $ do
-    t_lhss <- instantiateAnnots t_annots
-    let env | isrec     = Map.fromList (zip idents t_lhss)
+    inst_patns <- instantiateAnnots patns
+    let env | isrec     = Map.fromList inst_patns
             | otherwise = Map.empty
     t_rhss <- local locals (Map.union env) (mapM infer rhss)
-    zipWithM_ unify t_lhss t_rhss
+    zipWithM_ unify (map snd inst_patns) t_rhss
     return t_rhss
   t_idents <- mapM generalize t_rhss
-  return $ zip idents t_idents
+  return $ zipWith (\MkPatn{ _ident } t -> (_ident, t)) patns t_idents
 
 infer :: Expr SourcePos -> TI s (Type (Open s))
 infer expr = do
@@ -246,7 +300,7 @@ infer expr = do
     Var{ _annot, _ident } -> do
       t <- lookupType _annot _ident
       instantiate t
-    Num{} -> return int
+    Num{} -> return (open int)
     Ap{ _fun, _args } -> do
       t_fun <- infer _fun
       t_args <- mapM infer _args
@@ -255,11 +309,10 @@ infer expr = do
       return t_res
     ApOp{} -> infer (desugarApOp expr)
     Lam{ _patns, _body } -> do
-      let (idents, t_annots) = unzipPatns _patns
-      t_idents <- instantiateAnnots t_annots
-      let env = Map.fromList (zip idents t_idents)
+      inst_patns <- instantiateAnnots _patns
+      let env = Map.fromList inst_patns
       t_body <- local locals (Map.union env) (infer _body)
-      return $ t_idents *~> t_body
+      return $ map snd inst_patns *~> t_body
     Let{ _annot, _isrec, _defns, _body } -> do
       env <- Map.fromList <$> inferLet _isrec _defns `catchError` throwHere _annot
       local locals (Map.union env) (infer _body)
@@ -268,8 +321,7 @@ infer expr = do
       t_expr <- infer _expr
       t_res <- freshVar
       forM_ _altns $ \MkAltn{ _annot, _cons, _patns, _rhs } -> do
-        (MkConstructor{ _fields }, MkADT{ _name, _params }) <-
-          findConstructor _cons
+        MkConstructor{ _adt = MkADT{ _name, _params }, _fields } <- findConstructor _annot _cons
         if length _patns /= length _fields
           then throwHere _annot $
                "wrong number of arguments for constructor " ++ show _cons
@@ -277,9 +329,22 @@ infer expr = do
           let (idents, _) = unzipPatns _patns
           (t_params, t_fields) <-
             splitAt (length _params) <$>
-            instantiateMany (map open $ _params ++ _fields)
+            instantiateMany (map open $ map var _params ++ _fields)
           unifyHere t_expr (app _name t_params)
           let env = Map.fromList (zip idents t_fields)
           t_rhs <- local locals (Map.union env) (infer _rhs)
           unifyHere t_res t_rhs
       return t_res
+
+checkKinds :: SourcePos -> Type _ -> TI s ()
+checkKinds annot t = case t of
+  QVar _ -> return ()
+  TVar _ -> return ()
+  TFun t_arg t_res -> do
+    checkKinds annot t_arg
+    checkKinds annot t_res
+  TApp ident t_params -> do
+    MkADT{ _params } <- findType annot ident
+    let arity = length _params
+    when (length t_params /= arity) $
+      throwHere annot $ "Type constructor " ++ show ident ++ " expects " ++ show arity ++ " parameters"

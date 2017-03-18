@@ -17,7 +17,7 @@ import qualified Data.Map  as Map
 import qualified Data.Set  as Set
 
 import Pukeko.GMachine.GCode
-import Pukeko.Language.Builtins
+import Pukeko.Language.ADT
 import Pukeko.Language.Syntax
 
 import qualified Pukeko.GMachine.GCode    as GCode
@@ -26,6 +26,7 @@ import qualified Pukeko.GMachine.Builtins as Builtins
 data Context = MkContext
   { _offsets :: Map Ident Int
   , _depth   :: Int
+  , _constrs :: Map Ident Constructor
   }
 mkLabels [''Context]
 
@@ -39,10 +40,10 @@ newtype CC a = CC { unCC :: ExceptT String (RWS Context [Inst] Int) a }
 freshLabel :: CC Name
 freshLabel = CC $ state $ \n -> (Name ('.':show n), n+1)
 
-compile :: MonadError String m => [Defn ()] -> m Program
-compile defns = do
-  globals <- mapM compileDefn defns
-  let all_globals = Builtins.everything ++ globals
+compile :: MonadError String m => Map Ident Constructor -> [Defn ()] -> m Program
+compile constrs defns = do
+  globals <- mapM (compileDefn constrs) defns
+  let all_globals = Builtins.everything (Map.elems constrs)++ globals
       name_to_global =
         Map.fromList $ map (\global -> (GCode._name global, global)) all_globals
       deps name =
@@ -55,9 +56,15 @@ compile defns = do
         filter (\global -> GCode._name global `Set.member` reachable_names) all_globals
   return $ MkProgram { _globals, _main }
 
+findConstructor :: Ident -> CC Constructor
+findConstructor ident = do
+  _constrs <- asks constrs
+  case Map.lookup ident _constrs of
+    Nothing -> throwError $ "unknown constructor: " ++ show ident
+    Just constr -> return constr
 
-compileDefn :: MonadError String m => Defn a -> m Global
-compileDefn MkDefn{ _patn = MkPatn{ _ident }, _expr } = do
+compileDefn :: MonadError String m => Map Ident Constructor -> Defn a -> m Global
+compileDefn _constrs MkDefn{ _patn = MkPatn{ _ident }, _expr } = do
   let (patns, body) =
         case _expr of
           Lam { _patns, _body } -> (_patns, _body)
@@ -67,6 +74,7 @@ compileDefn MkDefn{ _patn = MkPatn{ _ident }, _expr } = do
       context = MkContext
         { _offsets = Map.fromList (zip idents [n, n-1 ..])
         , _depth   = n
+        , _constrs
         }
       (res, code) = evalRWS (runExceptT (unCC $ ccExpr Redex body)) context 0
   case res of
@@ -120,7 +128,7 @@ ccExpr mode expr =
         case _fun of
           Var{ _ident }
             | isConstructor _ident -> do
-                (MkConstructor{ _tag, _fields }, _) <- findConstructor _ident
+                MkConstructor{ _tag, _fields } <- findConstructor _ident
                 case length _fields `compare` n of
                   LT -> throwError $
                     "constructor " ++ show _ident ++ " has too many arguments"
@@ -176,7 +184,7 @@ ccExpr mode expr =
     Match{ _expr, _altns } -> do
       ccExpr Eval _expr
       let MkAltn{ _cons }:_ = _altns
-      (_, MkADT{ _constructors }) <- findConstructor _cons
+      MkConstructor{ _adt = MkADT{ _constructors } } <- findConstructor _cons
       case _constructors of
         [c] -> ccAltn mode _altns c
         [c0, c1] -> do

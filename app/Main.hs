@@ -30,9 +30,9 @@ compile write_ll write_gm no_prelude file_user = do
           then return []
           else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
-        TypeChecker.checkModule module_
+        constrs <- TypeChecker.checkModule module_
         let lifted_defns = Lifter.liftModule module_
-        program <- Compiler.compile (map (fmap (const ())) lifted_defns)
+        program <- Compiler.compile constrs (map (fmap (const ())) lifted_defns)
         nasm <- NASM.assemble program
         return (lifted_defns, program, nasm)
   case gprog_or_error of

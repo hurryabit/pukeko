@@ -21,13 +21,13 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart Nil, 0
-g_cons 0, 0
+g_globstart Cons, 2
+g_cons 1, 2
 g_update 1
 g_return
 
-g_globstart Cons, 2
-g_cons 1, 2
+g_globstart Nil, 0
+g_cons 0, 0
 g_update 1
 g_return
 

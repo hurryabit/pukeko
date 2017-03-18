@@ -9,6 +9,7 @@ import Text.Parsec.Expr
 import Text.Parsec.Language
 import qualified Text.Parsec.Token    as Token
 
+import Pukeko.Language.ADT (ADT, Constructor, mkADT, mkConstructor)
 import Pukeko.Language.Operator (Spec (..))
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type (Type, Closed, var, (~>), app)
@@ -30,6 +31,7 @@ pukekoDef = haskellStyle
       , "val", "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
+      , "type"
       ]
   , Token.opStart  = Token.opLetter pukekoDef
   , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
@@ -84,6 +86,8 @@ module_ = many1 $ choice
   , Val <$> getPosition
         <*> (reserved "val" *> variable)
         <*> asType
+  , Type <$> getPosition
+         <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
 
@@ -94,7 +98,7 @@ patn needParens =
     <|>
     parens (MkPatn <$> getPosition <*> variable <*> (Just <$> asType))
   else
-    MkPatn <$> getPosition <*> variable<*> optionMaybe asType
+    MkPatn <$> getPosition <*> variable <*> optionMaybe asType
   <?> "declaration"
 
 defnVal :: Parser (Defn SourcePos)
@@ -153,3 +157,9 @@ operatorTable = map (map f) (reverse Operator.table)
   where
     f MkSpec { _sym, _name, _assoc } =
       Infix (ApOp <$> getPosition <*> (reservedOp _sym *> pure _name)) _assoc
+
+adt :: Parser ADT
+adt = mkADT <$> constructor <*> many variable <*> (reservedOp "=" *> many1 adtConstructor)
+
+adtConstructor :: Parser Constructor
+adtConstructor = mkConstructor <$> (reservedOp "|" *> constructor) <*> many atype

@@ -17,6 +17,7 @@ module Pukeko.Language.Syntax
   )
   where
 
+import Pukeko.Language.ADT
 import Pukeko.Language.Ident
 import Pukeko.Language.Operator (Spec (..), Assoc (..), aprec)
 import Pukeko.Language.Term
@@ -28,7 +29,8 @@ import qualified Pukeko.Language.Operator as Operator
 type Module a = [TopLevel a]
 
 data TopLevel a
-  = Val{ _annot :: a, _ident :: Ident, _type :: Type Closed }
+  = Type{ _annot :: a, _adts :: [ADT] }
+  | Val{ _annot :: a, _ident :: Ident, _type :: Type Closed }
   | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
 
 data Expr a

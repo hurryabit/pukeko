@@ -10,14 +10,22 @@ module Pukeko.Language.Type
   , (*~>)
   , app
   , int
+  , unit
+  , bool
   , io
+  , alpha
+  , beta
+  , qvars
   , prettyType
   )
   where
 
 import Control.Monad.ST
 import Data.Ratio () -- for precedences in pretty printer
+import Data.Set (Set)
 import Data.STRef
+
+import qualified Data.Set as Set
 
 import Pukeko.Language.Ident
 import Pukeko.Pretty hiding (int)
@@ -55,11 +63,23 @@ app ident ts
   | otherwise           = perror $
     pPrint ident <+> text "is not a valid type constructor name"
 
-int :: Type a
+int :: Type Closed
 int  = app (MkIdent "Int")  []
 
-io :: Type a -> Type a
+bool :: Type Closed
+bool = app (MkIdent "Bool") []
+
+unit :: Type Closed
+unit = app (MkIdent "Unit") []
+
+io :: Type Closed -> Type Closed
 io t = app (MkIdent "IO") [t]
+
+alpha :: Type Closed
+alpha = var (MkIdent "a")
+
+beta :: Type Closed
+beta = var (MkIdent "b")
 
 open :: Type Closed -> Type (Open s)
 open t =
@@ -67,6 +87,12 @@ open t =
     QVar name  -> QVar name
     TFun tx ty -> TFun (open tx) (open ty)
     TApp c  ts -> TApp c (map open ts)
+
+qvars :: Type Closed -> Set Ident
+qvars t = case t of
+  QVar _ident -> Set.singleton _ident
+  TFun t_arg t_res -> qvars t_arg `Set.union` qvars t_res
+  TApp _ t_params -> Set.unions (map qvars t_params)
 
 prettyTypeVar :: PrettyLevel -> Rational -> TypeVar (Open s) -> ST s Doc
 prettyTypeVar lvl prec tv =

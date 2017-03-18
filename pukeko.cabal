@@ -21,6 +21,7 @@ library
                      , Pukeko.GMachine.Compiler
                      , Pukeko.GMachine.GCode
                      , Pukeko.GMachine.NASM
+                     , Pukeko.Language.ADT
                      , Pukeko.Language.Builtins
                      , Pukeko.Language.Ident
                      , Pukeko.Language.LambdaLifter
