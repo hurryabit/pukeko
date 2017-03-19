@@ -24,8 +24,6 @@ import Pukeko.Language.ADT
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type
 
-import qualified Pukeko.Language.Builtins as Builtins
-
 data Environment s = MkEnvironment
   { _locals :: Map Ident (Type (Open s))
   , _level  :: Int
@@ -62,12 +60,8 @@ checkModule tops = do
         , _level  = 0
         }
       st = MkState
-        { _globals = Map.fromList [ (_ident, (_type, Imported))
-                                  | (_ident, _type) <- Builtins.everything
-                                  ]
-        , _types   = Map.fromList [ (_name, adt)
-                                  | adt@MkADT{ _name } <- Builtins.types
-                                  ]
+        { _globals = Map.empty
+        , _types   = Map.empty
         , _constrs = Map.empty
         , _fresh   = []
         }
@@ -108,6 +102,18 @@ checkTopLevel top = case top of
           t_infer <- instantiate t_infer
           unify (open t_decl) t_infer `catchError` throwHere _annot
           modify globals $ Map.insert ident (t_decl, Defined)
+  Asm{ _annot, _ident } -> do
+    look <- Map.lookup _ident <$> gets globals
+    let throw verb = throwHere _annot $
+          "the function " ++ show _ident ++
+          " cannot be defined as assembly, it " ++ verb
+    case look of
+      Nothing            -> throw "has not been declared"
+      Just (_, Imported) -> throw "has been imported"
+      Just (_, Defined)  -> throw "has already been defined"
+      Just (t_decl, Declared) ->
+        modify globals $ Map.insert _ident (t_decl, Defined)
+
 
 addType :: SourcePos -> ADT -> TI s ()
 addType _annot adt@MkADT{ _name } = do

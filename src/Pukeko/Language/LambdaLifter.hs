@@ -35,6 +35,7 @@ liftModule :: Module a -> [FvDefn]
 liftModule = concatMap $ \top -> case top of
   Type{} -> []
   Val{} -> []
+  Asm{} -> []
   Def{ _defns } -> concatMap liftTopDefn _defns
 
 -- TODO: Fix the awful hack for the right naming of non-CAFs.

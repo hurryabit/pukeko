@@ -1,29 +1,17 @@
 -- The Pukeko prelude.
+
+-- Fundamental functions
+val abort : a
+asm abort
+
+-- Unit
 type Unit =
   | Unit
 
+-- Booleans
 type Bool =
   | False
   | True
-
-type Pair a b =
-  | Pair a b
-
-type List a =
-  | Nil
-  | Cons a (List a)
-
-type Option a =
-  | None
-  | Some a
-
-type Choice a b =
-  | First  a
-  | Second b
-
-type Tree a =
-  | Leaf
-  | Node (Tree a) a (Tree a)
 
 val not : Bool -> Bool
 let not x = if x then False else True
@@ -34,8 +22,61 @@ let prefix_and x y = if x then y     else False
 val prefix_or  : Bool -> Bool -> Bool
 let prefix_or  x y = if x then True  else y
 
-val prefix_semi : IO Unit -> IO a -> IO a
-let prefix_semi m1 m2 = m1 >>= (fun x -> m2)
+-- Integers
+type Int
+
+val neg : Int -> Int
+asm neg
+
+val prefix_add : Int -> Int -> Int
+asm prefix_add
+
+val prefix_sub : Int -> Int -> Int
+asm prefix_sub
+
+val prefix_mul : Int -> Int -> Int
+asm prefix_mul
+
+val prefix_div : Int -> Int -> Int
+asm prefix_div
+
+val prefix_mod : Int -> Int -> Int
+asm prefix_mod
+
+val prefix_eq : Int -> Int -> Bool
+asm prefix_eq
+
+val prefix_ne : Int -> Int -> Bool
+asm prefix_ne
+
+val prefix_lt : Int -> Int -> Bool
+asm prefix_lt
+
+val prefix_le : Int -> Int -> Bool
+asm prefix_le
+
+val prefix_ge : Int -> Int -> Bool
+asm prefix_ge
+
+val prefix_gt : Int -> Int -> Bool
+asm prefix_gt
+
+-- Some fundamental types
+type Pair a b =
+  | Pair a b
+
+type Option a =
+  | None
+  | Some a
+
+type Choice a b =
+  | First  a
+  | Second b
+
+-- Lists
+type List a =
+  | Nil
+  | Cons a (List a)
 
 val foldr : (a -> b -> b) -> b -> List a -> b
 let rec foldr f y0 xs =
@@ -109,8 +150,23 @@ let concat_map f xs = concat (map f xs)
 val length : List a -> Int
 let length = foldr (fun x l -> 1+l) 0
 
-val iter_m : (a -> IO Unit) -> List a -> IO Unit
-let iter_m f = foldr (fun x m -> f x; m) (return Unit)
+-- IO
+type IO a
+
+val return : a -> IO a
+asm return
+
+val print : Int -> IO Unit
+asm print
+
+val prefix_bind : IO a -> (a -> IO b) -> IO b
+asm prefix_bind
+
+val prefix_semi : IO Unit -> IO a -> IO a
+let prefix_semi m1 m2 = m1 >>= (fun x -> m2)
+
+val iter_io : (a -> IO Unit) -> List a -> IO Unit
+let iter_io f = foldr (fun x m -> f x; m) (return Unit)
 
 val print_list : List Int -> IO Unit
-let print_list = iter_m print
+let print_list = iter_io print

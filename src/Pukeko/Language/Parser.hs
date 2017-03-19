@@ -32,6 +32,7 @@ pukekoDef = haskellStyle
       , "if", "then", "else"
       , "match", "with"
       , "type"
+      , "asm"
       ]
   , Token.opStart  = Token.opLetter pukekoDef
   , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
@@ -83,6 +84,8 @@ asType = reservedOp ":" *> type_
 module_ :: Parser (Module SourcePos)
 module_ = many1 $ choice
   [ let_ Def <* optional (reservedOp ";;")
+  , Asm <$> getPosition
+        <*> (reserved "asm" *> variable)
   , Val <$> getPosition
         <*> (reserved "val" *> variable)
         <*> asType
@@ -159,7 +162,9 @@ operatorTable = map (map f) (reverse Operator.table)
       Infix (ApOp <$> getPosition <*> (reservedOp _sym *> pure _name)) _assoc
 
 adt :: Parser ADT
-adt = mkADT <$> constructor <*> many variable <*> (reservedOp "=" *> many1 adtConstructor)
+adt = mkADT <$> constructor
+            <*> many variable
+            <*> option [] (reservedOp "=" *> many1 adtConstructor)
 
 adtConstructor :: Parser Constructor
 adtConstructor = mkConstructor <$> (reservedOp "|" *> constructor) <*> many atype

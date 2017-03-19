@@ -1,8 +1,6 @@
 not x = if x then False else True
 prefix_and x y = if x then y else False
 prefix_or x y = if x then True else y
-prefix_semi$1 m2 x = m2
-prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
 foldr f y0 xs =
   match xs with
   | Nil -> y0
@@ -45,9 +43,11 @@ map f xs =
 concat_map f xs = concat (map f xs)
 length$1 x l = 1+l
 length = foldr (length$1) 0
-iter_m$1 f x m = f x;m
-iter_m f = foldr (iter_m$1 f) (return Unit)
-print_list = iter_m print
+prefix_semi$1 m2 x = m2
+prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
+iter_io$1 f x m = f x;m
+iter_io f = foldr (iter_io$1 f) (return Unit)
+print_list = iter_io print
 when p m = if p then m else return Unit
 count_down k = when (k>=0) (print k;count_down (k-1))
 repeat_m k m = when (k>0) (m;repeat_m (k-1) m)

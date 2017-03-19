@@ -10,11 +10,6 @@ module Pukeko.Language.Type
   , (*~>)
   , app
   , int
-  , unit
-  , bool
-  , io
-  , alpha
-  , beta
   , qvars
   , prettyType
   )
@@ -65,21 +60,6 @@ app ident ts
 
 int :: Type Closed
 int  = app (MkIdent "Int")  []
-
-bool :: Type Closed
-bool = app (MkIdent "Bool") []
-
-unit :: Type Closed
-unit = app (MkIdent "Unit") []
-
-io :: Type Closed -> Type Closed
-io t = app (MkIdent "IO") [t]
-
-alpha :: Type Closed
-alpha = var (MkIdent "a")
-
-beta :: Type Closed
-beta = var (MkIdent "b")
 
 open :: Type Closed -> Type (Open s)
 open t =

@@ -32,6 +32,7 @@ data TopLevel a
   = Type{ _annot :: a, _adts :: [ADT] }
   | Val{ _annot :: a, _ident :: Ident, _type :: Type Closed }
   | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
+  | Asm{ _annot :: a, _ident :: Ident }
 
 data Expr a
   = Var    { _annot :: a, _ident :: Ident }
