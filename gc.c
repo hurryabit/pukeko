@@ -7,10 +7,10 @@
 #define TAG_APP 2
 #define TAG_INT 3
 #define TAG_FUN 4
-#define TAG_CON 5
+#define TAG_CON 128
 
 #define TAG_MIN_GOOD TAG_APP
-#define TAG_MAX_GOOD TAG_CON
+#define TAG_MAX_GOOD TAG_FUN
 
 typedef struct heap_cell {
   uint8_t tag;
@@ -55,8 +55,9 @@ void gc_print_cell(heap_cell* ptr) {
 }
 
 void gc_assert_good_tag(heap_cell* ptr, char* caller) {
-  if (ptr->tag == TAG_NIX ||
-      (TAG_MIN_GOOD <= ptr->tag && ptr->tag <= TAG_MAX_GOOD))
+  if (ptr->tag == TAG_NIX
+      || (TAG_MIN_GOOD <= ptr->tag && ptr->tag <= TAG_MAX_GOOD)
+      || ptr->tag >= TAG_CON)
     return;
 
   printf("Found bad cell in %s: ", caller);
@@ -93,7 +94,7 @@ heap_cell* gc_copy(gc_info* info, heap_cell* ptr) {
 void gc_follow(gc_info* info, heap_cell*  ptr) {
   gc_assert_good_tag(ptr, "gc_follow");
 
-  if (ptr->tag == TAG_APP || ptr->tag == TAG_CON) {
+  if (ptr->tag == TAG_APP || ptr->tag >= TAG_CON) {
     ptr->dat1 = gc_copy(info, ptr->dat1);
     ptr->dat2 = gc_copy(info, ptr->dat2);
   }

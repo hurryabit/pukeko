@@ -16,10 +16,10 @@ default rel
 %define TAG_APP 2
 %define TAG_INT 3
 %define TAG_FUN 4
-%define TAG_CON 5
+%define TAG_CON 128
 
 %define TAG_MIN_GOOD TAG_APP
-%define TAG_MAX_GOOD TAG_CON
+%define TAG_MAX_GOOD TAG_FUN
 
 ;; Stats stuff
 %define step_ctr r14
@@ -67,14 +67,27 @@ default rel
   g_assert_tag %1, TAG_INT, MSG_EXPECTED_INT
 %endmacro
 
+%macro g_assert_con 2           ; %1 reg with ptr, %2 = error msg
+%ifdef DEBUG
+  cmp  byte [%1], TAG_CON
+  jae  %%ok
+  mov  rsi, [%1]
+  g_fail %2
+%%ok:
+%endif
+%endmacro
+
 %macro g_assert_good_tag 2     ; %1 = reg with ptr, %2 = error msg
 %ifdef DEBUG
+  cmp  byte [%1], TAG_CON
+  jae  %%ok
   cmp  byte [%1], TAG_MIN_GOOD
-  jl   %%bad
+  jb   %%bad
   cmp  byte [%1], TAG_MAX_GOOD
-  jg   %%bad
+  ja   %%bad
   jmp  %%ok
 %%bad:
+  mov  rsi, [%1]
   g_fail %2
 %%ok:
 %endif
@@ -133,7 +146,7 @@ __install__main__:
   inc  claim_ctr
   lea  rax, [rhp+24*%1]
   cmp  rax, rhl
-  jle  %%ok
+  jbe  %%ok
   mov  rsi, %1
   call _gc
 %%ok:
@@ -165,7 +178,7 @@ __install__main__:
   mov  rax, rbp
   sub  rax, rsp
   cmp  rax, 8*%2
-  jge  %%ok
+  jae  %%ok
   g_fail MISSING_ARGUMENTS
 %%ok:
 %endif
@@ -250,7 +263,7 @@ __install__main__:
 %macro g_cons 2                 ; %1 = tag, %2 = arity
   @@(3+%2*3+(2-%2)*3+4)
   g_claim 1
-  mov  qword [rhp], TAG_CON | %1 << 8
+  mov  qword [rhp], TAG_CON + %1
 %assign idx 0
 %rep %2
 %assign idx idx+1
@@ -270,7 +283,7 @@ __install__main__:
 %else
   @@(2+3*%1)
   pop rax
-  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_SELECT
+  g_assert_con rax, MSG_BAD_TAG_UNCONS
 %assign idx 2
 %rep %1
   push qword [rax+8*idx]
@@ -328,7 +341,7 @@ __install__main__:
 
 ;; Comparison relations
 %macro g_relop 1                ; %1 is some setCC instruction
-  @@(14)
+  @@(15)
   g_claim 1
   pop  rax
   g_assert_int rax
@@ -336,9 +349,10 @@ __install__main__:
   pop  rax
   g_assert_int rax
   mov  rcx, [rax+8]
-  mov  rax, TAG_CON
+  mov  rax, 0
   cmp  rbx, rcx
-  %1   ah
+  %1   al
+  add  al, TAG_CON
   push rhp
   g_create rax, NULL, NULL
 %endmacro
@@ -373,8 +387,8 @@ __install__main__:
 %macro g_jumpzero 1
   @@(4)
   mov  rax, [rsp]
-  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_JUMPZERO
-  cmp  word [rax], TAG_CON       ; assumes little endian
+  g_assert_con rax, MSG_BAD_TAG_JUMPZERO
+  cmp  byte [rax], TAG_CON
   je   %1
 %endmacro
 
@@ -437,9 +451,9 @@ _main:
   g_mkap 1
   g_eval
   pop  rax
-  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_EXIT
+  g_assert_con rax, MSG_BAD_TAG_EXIT
   mov  rax, [rax+16]
-  g_assert_tag rax, TAG_CON, MSG_BAD_TAG_EXIT
+  g_assert_con rax, MSG_BAD_TAG_EXIT
 
   ; set up the gc info for the final stats
   lea  rdi, [__gc_info__]
@@ -498,7 +512,7 @@ _unwind:
   movzx rbx, byte [rax+1]
   lea   rcx, [rsp+8*rbx]
   cmp   rbp, rcx
-  jl    _return
+  jb    _return
   @@(2)
   jmp   [rax+8]
 
@@ -544,14 +558,14 @@ FORMAT_DEBUG:
   db "TAG : 0x%016lx", 10, "ARG1: 0x%016lx", 10, "ARG2: 0x%016lx", 10, 0
 MISSING_ARGUMENTS:
   db "MISSING ARGUMENTS", 10, 0
-MSG_BAD_TAG_SELECT:
-  db "SELECT ON NON-CONS NODE", 10, 0
+MSG_BAD_TAG_UNCONS:
+  db "UNCONS ON NON-CONS NODE", 10, 0
 MSG_BAD_TAG_JUMPZERO:
   db "JUMPZERO ON NON-CONS NODE", 10, 0
 MSG_BAD_TAG_EXIT:
   db "BAD TAG AT EXIT", 10, 0
 MSG_BAD_TAG_EVAL:
-  db "BAD TAG IN EVAL", 10, 0
+  db "BAD TAG IN EVAL: 0x%016lx", 10, 0
 MSG_BAD_TAG_UNWIND:
   db "BAD TAG IN UNWIND", 10, 0
 MSG_BAD_TAG_GC:
