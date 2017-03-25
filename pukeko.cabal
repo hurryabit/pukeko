@@ -14,10 +14,8 @@ extra-source-files:
 cabal-version:       >=1.10
 
 library
-  hs-source-dirs:      src
-  exposed-modules:     Control.Monad.Supply
-                     -- , Pukeko.Demo
-                     , Pukeko.GMachine.Builtins
+  hs-source-dirs:    src
+  exposed-modules:     Pukeko.GMachine.Builtins
                      , Pukeko.GMachine.Compiler
                      , Pukeko.GMachine.GCode
                      , Pukeko.GMachine.NASM
@@ -28,7 +26,6 @@ library
                      , Pukeko.Language.Parser
                      , Pukeko.Language.Rewrite
                      , Pukeko.Language.Syntax
-                     , Pukeko.Language.Term
                      , Pukeko.Language.Type
                      , Pukeko.Language.TypeChecker
                      , Pukeko.Pretty

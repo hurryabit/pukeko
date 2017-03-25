@@ -20,7 +20,6 @@ module Pukeko.Language.Syntax
 import Pukeko.Language.ADT
 import Pukeko.Language.Ident
 import Pukeko.Language.Operator (Spec (..), Assoc (..), aprec)
-import Pukeko.Language.Term
 import Pukeko.Language.Type (Type, Closed)
 import Pukeko.Pretty
 
