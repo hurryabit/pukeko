@@ -2,7 +2,7 @@
 
 ## What is it?
 
-A (soon to be partially verified) toy compiler based on SPJ's "The Implementation of Functional Programming Languages".
+A toy compiler based on SPJ's "The Implementation of Functional Programming Languages".
 
 ## What does *pukeko* stand for?
 
@@ -14,7 +14,7 @@ A (soon to be partially verified) toy compiler based on SPJ's "The Implementatio
 
 ## What's up next?
 
-Changing the **pu**orly into **pu**rtially!
+Try very hard to change the **pu**orly into **pu**rtially!
 
 ---
 
