@@ -520,9 +520,10 @@ _return:
   @@(1)
   mov  rsp, rbp
 .no_pop:
-  @@(6)
+  @@(9)
   pop  rax
   pop  rbp
+  mov  [rsp+8], rax
   ret
 
 _fail:
