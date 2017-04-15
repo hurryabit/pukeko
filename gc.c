@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +10,7 @@
 #define TAG_FUN 4
 #define TAG_CON 128
 
-#define TAG_MIN_GOOD TAG_APP
+#define TAG_MIN_GOOD TAG_FWD
 #define TAG_MAX_GOOD TAG_FUN
 
 typedef struct heap_cell {
@@ -54,9 +55,10 @@ void gc_print_cell(heap_cell* ptr) {
          *raw_ptr, ptr->tag, *(raw_ptr+1), *(raw_ptr+2), (uint64_t) raw_ptr);
 }
 
-void gc_assert_good_tag(heap_cell* ptr, char* caller) {
+void gc_assert_good_tag(heap_cell* ptr, char* caller, bool fwd_ok) {
   if (ptr->tag == TAG_NIX
-      || (TAG_MIN_GOOD <= ptr->tag && ptr->tag <= TAG_MAX_GOOD)
+      || (fwd_ok && ptr->tag == TAG_FWD)
+      || (ptr->tag != TAG_FWD && TAG_MIN_GOOD <= ptr->tag && ptr->tag <= TAG_MAX_GOOD)
       || ptr->tag >= TAG_CON)
     return;
 
@@ -66,16 +68,26 @@ void gc_assert_good_tag(heap_cell* ptr, char* caller) {
   exit(1);
 }
 
-// If ptr doesn't point into the heap, we return it unchanged.
-// In particular, we return NULL unchanged.
+// If ptr doesn't point into the heap, we return it unchanged. In particular, we
+// return NULL unchanged.
 heap_cell* gc_copy(gc_info* info, heap_cell* ptr) {
-  if (ptr < info->heap_start || ptr >= info->heap_end)
+  if (ptr < info->heap_start || ptr >= info->heap_end) {
     return ptr;
+  }
 
-  if (ptr->tag == TAG_FWD)
-    return ptr->dat1;
+  gc_assert_good_tag(ptr, "gc_copy", true);
 
-  gc_assert_good_tag(ptr, "gc_copy");
+  // Return pointer unchanged if it is already in to-space. This happens when
+  // following indirections.
+  if ((info->heap_limit == info->heap_middle && ptr <  info->heap_middle)
+      || (info->heap_limit == info->heap_end && ptr >= info->heap_middle)) {
+    return ptr;
+  }
+
+  // TODO: Think about tail call optimization.
+  if (ptr->tag == TAG_FWD) {
+    return gc_copy(info, ptr->dat1);
+  }
 
   heap_cell* copy_ptr = info->heap_ptr;
   info->heap_ptr += 1;
@@ -92,7 +104,11 @@ heap_cell* gc_copy(gc_info* info, heap_cell* ptr) {
 }
 
 void gc_follow(gc_info* info, heap_cell*  ptr) {
-  gc_assert_good_tag(ptr, "gc_follow");
+  gc_assert_good_tag(ptr, "gc_follow", true);
+
+  if (ptr->tag == TAG_FWD) {
+    ptr->dat1 = gc_copy(info, ptr->dat1);
+  }
 
   if (ptr->tag == TAG_APP || ptr->tag >= TAG_CON) {
     ptr->dat1 = gc_copy(info, ptr->dat1);
@@ -133,6 +149,7 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
   }
 
   while (follow_ptr < info->heap_ptr) {
+    gc_assert_good_tag(follow_ptr, "gc_follow@finish", false);
     gc_follow(info, follow_ptr);
     ++follow_ptr;
   }

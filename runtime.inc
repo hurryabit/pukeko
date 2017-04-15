@@ -18,7 +18,7 @@ default rel
 %define TAG_FUN 4
 %define TAG_CON 128
 
-%define TAG_MIN_GOOD TAG_APP
+%define TAG_MIN_GOOD TAG_FWD
 %define TAG_MAX_GOOD TAG_FUN
 
 ;; Stats stuff
@@ -210,15 +210,12 @@ __install__main__:
 %endmacro
 
 %macro g_update 1
-  @@(4+3*5)
-  mov  rdi, [rsp+8*%1]
-  pop  rsi
-%assign idx 0
-%rep 3
-  mov  rax, [rsi+8*idx]
-  mov  [rdi+8*idx], rax
-%assign idx idx+1
-%endrep
+  @@(13)
+  pop  rax
+  mov  rbx, [rsp+8*(%1-1)]
+  mov  [rsp+8*(%1-1)], rax
+  mov  qword [rbx], TAG_FWD
+  mov  [rbx+8], rax
 %endmacro
 
 
@@ -473,13 +470,21 @@ _eval:
   @@(4)
   mov  rax, [rsp+8]
   g_assert_good_tag rax, MSG_BAD_TAG_EVAL
-  cmp  byte [rax], TAG_APP      ; assumes little endian
+  cmp  byte [rax], TAG_FWD      ; assumes little endian
+  je   .fwd
+  @@(2)
+  cmp  byte [rax], TAG_APP
   je   .app
   @@(2)
   cmp  word [rax], TAG_FUN      ; the tag *word* is TAG_FUN only for CAFs
   je   .caf
   @@(2)
   ret
+.fwd:                           ; TODO: make handling of forwading efficient
+  @@(5)
+  mov  rbx, [rax+8]
+  mov  [rsp+8], rbx
+  jmp  _eval
 .caf:
   @@(9)
   push rbp
@@ -497,14 +502,22 @@ _unwind:
   @@(4)
   mov  rax, [rsp]
   g_assert_good_tag rax, MSG_BAD_TAG_UNWIND
-  cmp  byte [rax], TAG_APP      ; assumes little endian
+  cmp  byte [rax], TAG_FWD      ; assumes little endian
+  je   .fwd
+  @@(2)
+  cmp  byte [rax], TAG_APP
   jne  .done
   @@(4)
   push qword [rax+8]
-  jmp _unwind
+  jmp  _unwind
+.fwd:                           ; TODO: make handling of forwarding efficient
+  @@(5)
+  mov  rbx, [rax+8]
+  mov  [rsp], rbx
+  jmp  _unwind
 .done:
   @@(2)
-  cmp  byte [rax], TAG_FUN     ; assumes little endian
+  cmp  byte [rax], TAG_FUN      ; assumes little endian
   jne  _return.no_pop
   @@(6)
   ; calc where rbp would need to be for a full application
