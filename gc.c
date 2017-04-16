@@ -39,9 +39,12 @@ typedef struct {
   uint64_t    num_gc_runs;
 } gc_info;
 
+heap_cell* from_start;
+heap_cell* from_end;
+
 void gc_init(gc_info* info) {
   uint64_t half_heap_cells = info->heap_size / 48;
-  info->heap_size   = 48 * info->heap_size;
+  info->heap_size   = 48 * half_heap_cells;
   info->heap_middle = info->heap_start  + half_heap_cells;
   info->heap_end    = info->heap_middle + half_heap_cells;
   info->heap_ptr    = info->heap_start;
@@ -81,18 +84,6 @@ heap_cell* gc_copy(gc_info* info, heap_cell* ptr) {
     ptr = ptr->dat1;
   }
   gc_assert_good_tag(ptr, "gc_copy", false);
-
-  // TODO: Cache these values.
-  heap_cell* from_start;
-  heap_cell* from_end;
-  if (info->heap_limit == info->heap_end) {
-    from_start = info->heap_start;
-    from_end   = info->heap_middle;
-  }
-  else {
-    from_start = info->heap_middle;
-    from_end   = info->heap_end;
-  }
 
   if (from_start <= ptr && ptr < from_end) {
     heap_cell* copy_ptr = info->heap_ptr;
@@ -138,10 +129,14 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
   if (info->heap_ptr <= info->heap_middle) {
     info->heap_ptr   = info->heap_middle;
     info->heap_limit = info->heap_end;
+    from_start = info->heap_start;
+    from_end   = info->heap_middle;
   }
   else {
     info->heap_ptr   = info->heap_start;
     info->heap_limit = info->heap_middle;
+    from_start = info->heap_middle;
+    from_end   = info->heap_end;
   }
   heap_cell* follow_ptr = info->heap_ptr;
 
