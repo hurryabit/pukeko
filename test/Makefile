@@ -15,6 +15,7 @@ SOURCES     = monad_io.pu \
 							fibs.pu \
 							qsort.pu \
 							isort.pu \
+							tsort.pu \
 							queens.pu \
 							minlet.pu \
 							primes.pu \

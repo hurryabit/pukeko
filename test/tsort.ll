@@ -56,19 +56,18 @@ prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
 iter_io$1 f x m = f x;m
 iter_io f = foldr (iter_io$1 f) (return Unit)
 print_list = iter_io print
-p = 100000007
-mul_p x y = (x*y)%p
-add_p x y = (x+y)%p
-sum_p = foldl add_p 0
-scanl$1 f scanl_f y0 xs =
-  match xs with
-  | Nil -> Nil
-  | Cons x xs -> let y0 = f y0 x
-                 in Cons y0 (scanl_f y0 xs)
-scanl f =
-  letrec scanl_f = scanl$1 f scanl_f
-  in scanl_f
-sols$1 xs = sum_p (zip_with mul_p sols xs)
-sols$2 xs x = Cons x xs
-sols = Cons 1 (map (sols$1) (scanl (sols$2) Nil sols))
-main = print (nth sols 2000%p)
+prime = 1000000*1000000+39
+double_mod_prime x =
+  let y = 2*x
+  in if y<prime then y else y-prime
+gen f x = Cons x (gen f (f x))
+powers = gen double_mod_prime 1
+sum = foldr prefix_add 0
+mul_mod_prime x y = (x*y)%prime
+sum_prod xs ys = sum (zip_with mul_mod_prime xs ys)
+hash xs = sum_prod xs powers%prime
+numbers$1 x = (2*x)%200003
+numbers = take 200002 (gen (numbers$1) 1)
+tsort$1 t x = insert_tree x t
+tsort xs = in_order (foldl (tsort$1) Leaf xs)
+main = print (hash (tsort numbers))

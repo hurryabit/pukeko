@@ -43,6 +43,14 @@ map f xs =
 concat_map f xs = concat (map f xs)
 length$1 x l = 1+l
 length = foldr (length$1) 0
+insert_tree x t =
+  match t with
+  | Leaf -> Branch Leaf x Leaf
+  | Branch l y r -> if x<=y then Branch (insert_tree x l) y r else Branch l y (insert_tree x r)
+in_order t =
+  match t with
+  | Leaf -> Nil
+  | Branch l x r -> append (in_order l) (Cons x (in_order r))
 prefix_semi$1 m2 x = m2
 prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
 iter_io$1 f x m = f x;m
