@@ -385,6 +385,7 @@ __install__main__:
 %endmacro
 
 %macro g_input 0
+  @@(5)
   g_claim 2
   g_pre_call_c
   lea  rdi, [FORMAT_INPUT]
@@ -396,6 +397,7 @@ __install__main__:
   je   %%ok
   g_fail MSG_BAD_INPUT
 %%ok:
+  @@(6)
   push rhp
   mov  qword [rhp], TAG_ARITY_SIZE(TAG_INT, 0, 2)
   add  rhp, 16
