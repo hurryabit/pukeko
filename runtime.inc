@@ -21,6 +21,8 @@ default rel
 %define TAG_MIN_GOOD TAG_APP
 %define TAG_MAX_GOOD TAG_FUN
 
+%define LIM_CON 4
+
 ;; Stats stuff
 %define step_ctr r14
 %define claim_ctr r15
@@ -70,21 +72,9 @@ default rel
 %macro g_assert_con 2           ; %1 reg with ptr, %2 = error msg
 %ifdef DEBUG
   cmp  byte [%1], TAG_CON
-  jae  %%ok
-  mov  rsi, [%1]
-  g_fail %2
-%%ok:
-%endif
-%endmacro
-
-%macro g_assert_good_tag 2     ; %1 = reg with ptr, %2 = error msg
-%ifdef DEBUG
-  cmp  byte [%1], TAG_CON
-  jae  %%ok
-  cmp  byte [%1], TAG_MIN_GOOD
   jb   %%bad
-  cmp  byte [%1], TAG_MAX_GOOD
-  ja   %%bad
+  cmp  byte [%1], TAG_CON + LIM_CON
+  jae  %%bad
   jmp  %%ok
 %%bad:
   mov  rsi, [%1]
@@ -93,6 +83,57 @@ default rel
 %endif
 %endmacro
 
+%macro g_assert_good_tag 2     ; %1 = reg with ptr, %2 = error msg
+%ifdef DEBUG
+  cmp  byte [%1], TAG_MIN_GOOD
+  jb   %%bad
+  cmp  byte [%1], TAG_MAX_GOOD
+  ja   %%bad
+  jmp  %%ok
+%%bad:
+  g_assert_con %1, %2
+%%ok:
+%endif
+%endmacro
+
+;; Heap operations
+%define TAG_ARITY_SIZE(tag, arity, size) tag | (arity << 8) | (size << 16)
+
+%macro g_claim 1
+  @@(4)
+  inc  claim_ctr
+  lea  rax, [rhp+8*%1]
+  cmp  rax, rhl
+  jbe  %%ok
+  mov  rsi, %1
+  call _gc
+  %%ok:
+%endmacro
+
+%macro g_create 1-*
+  @@(3*%0+1)
+%assign idx 0
+%rep %0
+  mov  qword [rhp+8*idx], %1
+%assign idx idx+1
+%rotate 1
+%endrep
+  add  rhp, 8*%0
+%endmacro
+
+%macro g_create_int 1
+  g_create TAG_ARITY_SIZE(TAG_INT, 0, 2), %1
+%endmacro
+
+;; TODO: make this faster
+%macro g_alloc 1
+  @@(3*%1)
+  g_claim 2*%1
+%rep %1
+  push rhp
+  g_create TAG_ARITY_SIZE(TAG_NIX, 0, 2), 0
+%endrep
+%endmacro
 
 ;; CAF related stuff
 %define CAF(label) __caf__ %+ label
@@ -102,7 +143,7 @@ section .data
   align 8
 __cafs__start__:
 %rep %0
-  CAF(%1): dq TAG_FUN, 0, 0
+  CAF(%1): dq TAG_ARITY_SIZE(TAG_FUN, 0, 2), 0
 %rotate 1
 %endrep
 __cafs__end__:
@@ -137,37 +178,6 @@ __install__main__:
 
 %macro g_install_main 0
   call __install__main__
-%endmacro
-
-
-;; Heap operations
-%macro g_claim 1
-  @@(4)
-  inc  claim_ctr
-  lea  rax, [rhp+24*%1]
-  cmp  rax, rhl
-  jbe  %%ok
-  mov  rsi, %1
-  call _gc
-%%ok:
-%endmacro
-
-%macro g_create 3
-  @@(10)
-  mov  qword [rhp   ], %1
-  mov  qword [rhp+ 8], %2
-  mov  qword [rhp+16], %3
-  add  rhp, 24
-%endmacro
-
-;; TODO: make this faster
-%macro g_alloc 1
-  g_claim %1
-%rep %1
-  @@(3)
-  push rhp
-  g_create TAG_NIX, 0, 0
-%endrep
 %endmacro
 
 
@@ -216,7 +226,7 @@ __install__main__:
   g_assert_good_tag rax, MSG_BAD_TAG_UPDATE
   mov  rbx, [rsp+8*(%1-1)]
   mov  [rsp+8*(%1-1)], rax
-  mov  qword [rbx], TAG_FWD
+  mov  byte [rbx], TAG_FWD
   mov  [rbx+8], rax
 %endmacro
 
@@ -224,9 +234,9 @@ __install__main__:
 ;; Node constructors
 %macro g_pushint 1
   @@(3)
-  g_claim 1
+  g_claim 2
   push rhp
-  g_create TAG_INT, %1, NULL
+  g_create_int %1
 %endmacro
 
 %macro g_pushglobal 2           ; %1 = label, %2 = arity
@@ -234,22 +244,22 @@ __install__main__:
     g_pushcaf %1
   %else
     @@(4)
-    g_claim 1
+    g_claim 2
     lea  rax, [%1]
     push rhp
-    g_create TAG_FUN | %2 << 8, rax, 0
+    g_create TAG_ARITY_SIZE(TAG_FUN, %2, 2), rax
   %endif
 %endmacro
 
 %macro g_mkap 1
 %if %1 > 0                      ; TODO: get rid of this check
   @@(10*%1+3)
-  g_claim %1
-  mov  qword [rhp], TAG_APP
+  g_claim 3*%1
+  mov  qword [rhp], TAG_ARITY_SIZE(TAG_APP, 0, 3)
   pop  qword [rhp+ 8]
   pop  qword [rhp+16]
 %rep %1 - 1
-  mov  qword [rhp+24], TAG_APP
+  mov  qword [rhp+24], TAG_ARITY_SIZE(TAG_APP, 0, 3)
   mov  qword [rhp+32], rhp
   pop  qword [rhp+40]
   add  rhp, 24
@@ -260,52 +270,49 @@ __install__main__:
 %endmacro
 
 %macro g_cons 2                 ; %1 = tag, %2 = arity
-  @@(3+%2*3+(2-%2)*3+4)
-  g_claim 1
-  mov  qword [rhp], TAG_CON + %1
+  @@(3+%2*3+4)
+%assign size 1+%2
+%if size < 2
+%assign size 2
+%endif
+  g_claim size
+  mov  qword [rhp], TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
 %assign idx 0
 %rep %2
 %assign idx idx+1
   pop  qword [rhp+8*idx]
 %endrep
-%rep 2 - %2
-%assign idx idx+1
-  mov  qword [rhp+8*idx], 0
-%endrep
   push rhp
-  add  rhp, 24
+  add  rhp, 8*size
 %endmacro
 
+;; TODO: Specialize case %1 = 0 if speed matters.
 %macro g_uncons 1
-%if %1 = 0
-  g_pop 1
-%else
   @@(2+3*%1)
   pop rax
   g_assert_con rax, MSG_BAD_TAG_UNCONS
-%assign idx 2
+%assign idx %1
 %rep %1
   push qword [rax+8*idx]
 %assign idx idx - 1
 %endrep
-%endif
 %endmacro
 
 
 ;; Arithmetic
 %macro g_neg 0
   @@(8)
-  g_claim 1
+  g_claim 2
   pop rax
   mov rcx, [rax+8]
   neg rcx
   push rhp
-  g_create TAG_INT, rcx, NULL
+  g_create_int rcx
 %endmacro
 
 %macro g_binop 1
   @@(11)
-  g_claim 1
+  g_claim 2
   pop  rax
   g_assert_int rax
   mov  rcx, [rax+8]
@@ -313,7 +320,7 @@ __install__main__:
   g_assert_int rax
   %1   rcx, [rax+8]
   push rhp
-  g_create TAG_INT, rcx, NULL
+  g_create_int rcx
 %endmacro
 
 %define g_add g_binop add
@@ -322,7 +329,7 @@ __install__main__:
 
 %macro g_divop 1                ; %1: rax = quotient, rdx = remainder
   @@(12)
-  g_claim 1
+  g_claim 2
   pop  rcx
   g_assert_int rcx
   mov  rax, [rcx+8]
@@ -331,7 +338,7 @@ __install__main__:
   g_assert_int rcx
   idiv qword [rcx+8]
   push rhp
-  g_create TAG_INT, %1, NULL
+  g_create_int %1
 %endmacro
 
 %define g_div g_divop rax
@@ -340,8 +347,8 @@ __install__main__:
 
 ;; Comparison relations
 %macro g_relop 1                ; %1 is some setCC instruction
-  @@(15)
-  g_claim 1
+  @@(19)
+  g_claim 2
   pop  rax
   g_assert_int rax
   mov  rbx, [rax+8]
@@ -351,9 +358,10 @@ __install__main__:
   mov  rax, 0
   cmp  rbx, rcx
   %1   al
-  add  al, TAG_CON
+  add  rax, TAG_ARITY_SIZE(TAG_CON, 0, 2)
   push rhp
-  g_create rax, NULL, NULL
+  mov  [rhp], rax
+  add  rhp, 16
 %endmacro
 
 %define g_les g_relop setl

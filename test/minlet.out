@@ -1,6 +1,6 @@
 0
 
-Steps  :          385
-Allocs :            9          (Checks:            9)
-GC runs:            0
+Steps      :          364
+Alloc bytes:          176          (Checks:            9)
+GC runs    :            0
         0.00 real         0.00 user         0.00 sys

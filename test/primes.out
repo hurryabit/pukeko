@@ -1,6 +1,6 @@
 59359
 
-Steps  :   7510202361
-Allocs :    108735539          (Checks:    108671970)
-GC runs:            6
-        3.02 real         2.60 user         0.37 sys
+Steps      :   7330572532
+Alloc bytes:   2174893056          (Checks:    108671970)
+GC runs    :            5
+        3.15 real         2.72 user         0.38 sys
