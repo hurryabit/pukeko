@@ -10,7 +10,7 @@
 #define TAG_FUN 4
 #define TAG_CON 128
 
-#define TAG_MIN_GOOD TAG_FWD
+#define TAG_MIN_GOOD TAG_APP
 #define TAG_MAX_GOOD TAG_FUN
 
 typedef struct heap_cell {
@@ -58,7 +58,7 @@ void gc_print_cell(heap_cell* ptr) {
 void gc_assert_good_tag(heap_cell* ptr, char* caller, bool fwd_ok) {
   if (ptr->tag == TAG_NIX
       || (fwd_ok && ptr->tag == TAG_FWD)
-      || (ptr->tag != TAG_FWD && TAG_MIN_GOOD <= ptr->tag && ptr->tag <= TAG_MAX_GOOD)
+      || (TAG_MIN_GOOD <= ptr->tag && ptr->tag <= TAG_MAX_GOOD)
       || ptr->tag >= TAG_CON)
     return;
 
@@ -71,41 +71,51 @@ void gc_assert_good_tag(heap_cell* ptr, char* caller, bool fwd_ok) {
 // If ptr doesn't point into the heap, we return it unchanged. In particular, we
 // return NULL unchanged.
 heap_cell* gc_copy(gc_info* info, heap_cell* ptr) {
-  if (ptr < info->heap_start || ptr >= info->heap_end) {
-    return ptr;
+  if (ptr == NULL) {
+    return NULL;
   }
 
-  gc_assert_good_tag(ptr, "gc_copy", true);
+  heap_cell* ptr0 = ptr;
+  uint64_t fwd_chain = 0;
+  while (ptr->tag == TAG_FWD) {
+    ptr = ptr->dat1;
+  }
+  gc_assert_good_tag(ptr, "gc_copy", false);
 
-  // Return pointer unchanged if it is already in to-space. This happens when
-  // following indirections.
-  if ((info->heap_limit == info->heap_middle && ptr <  info->heap_middle)
-      || (info->heap_limit == info->heap_end && ptr >= info->heap_middle)) {
-    return ptr;
+  // TODO: Cache these values.
+  heap_cell* from_start;
+  heap_cell* from_end;
+  if (info->heap_limit == info->heap_end) {
+    from_start = info->heap_start;
+    from_end   = info->heap_middle;
+  }
+  else {
+    from_start = info->heap_middle;
+    from_end   = info->heap_end;
   }
 
-  // TODO: Think about tail call optimization.
-  if (ptr->tag == TAG_FWD) {
-    return gc_copy(info, ptr->dat1);
+  if (from_start <= ptr && ptr < from_end) {
+    heap_cell* copy_ptr = info->heap_ptr;
+    info->heap_ptr += 1;
+
+    *copy_ptr = *ptr;
+    ptr->tag = TAG_FWD;
+    ptr->extra_tag = 0;
+    ptr->dat1 = copy_ptr;
+    ptr->dat2 = NULL;
+    ptr = copy_ptr;
   }
 
-  heap_cell* copy_ptr = info->heap_ptr;
-  info->heap_ptr += 1;
-  /* printf("copy "); */
-  /* gc_print_cell(ptr); */
-  /* printf(" -> %lld\n", (uint64_t) heap_ptr); */
+  while (ptr0->tag == TAG_FWD) {
+    heap_cell* ptr1 = ptr0->dat1;
+    ptr0->dat1 = ptr;
+    ptr0 = ptr1;
+  }
 
-  *copy_ptr = *ptr;
-  ptr->tag = TAG_FWD;
-  ptr->extra_tag = 0;
-  ptr->dat1 = copy_ptr;
-  ptr->dat2 = NULL;
-  return copy_ptr;
+  return ptr;
 }
 
 void gc_follow(gc_info* info, heap_cell*  ptr) {
-  gc_assert_good_tag(ptr, "gc_follow", true);
-
   if (ptr->tag == TAG_FWD) {
     ptr->dat1 = gc_copy(info, ptr->dat1);
   }
@@ -135,8 +145,10 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
   }
   heap_cell* follow_ptr = info->heap_ptr;
 
-  for (heap_cell* caf_ptr = info->cafs_start; caf_ptr < info->cafs_end; ++caf_ptr)
+  for (heap_cell* caf_ptr = info->cafs_start; caf_ptr < info->cafs_end; ++caf_ptr) {
+    gc_assert_good_tag(caf_ptr, "gc_follow@cafs", true);
     gc_follow(info, caf_ptr);
+  }
 
   stack_cell* stack_ptr = info->stack_ptr;
   stack_cell* base_ptr  = info->base_ptr;

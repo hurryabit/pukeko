@@ -1,6 +1,6 @@
 161875183867
 
-Steps  :   3872884459
+Steps  :   3969057401
 Allocs :     57420200          (Checks:     52521171)
 GC runs:            3
-        2.03 real         1.65 user         0.35 sys
+        1.99 real         1.59 user         0.37 sys

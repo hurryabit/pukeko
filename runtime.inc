@@ -18,7 +18,7 @@ default rel
 %define TAG_FUN 4
 %define TAG_CON 128
 
-%define TAG_MIN_GOOD TAG_FWD
+%define TAG_MIN_GOOD TAG_APP
 %define TAG_MAX_GOOD TAG_FUN
 
 ;; Stats stuff
@@ -209,9 +209,11 @@ __install__main__:
   push rax
 %endmacro
 
+;; TODO: Update inplace if space is sufficient.
 %macro g_update 1
   @@(13)
   pop  rax
+  g_assert_good_tag rax, MSG_BAD_TAG_UPDATE
   mov  rbx, [rsp+8*(%1-1)]
   mov  [rsp+8*(%1-1)], rax
   mov  qword [rbx], TAG_FWD
@@ -465,13 +467,32 @@ _main:
   mov  rax, 0
   ret
 
-;; clean up this mess
-_eval:
+%macro g_fwd_compress 1
+  @@(5)
+  mov  rax, %1
+  mov  rbx, rax
+  cmp  byte [rax], TAG_FWD
+  jne  %%done
+%%follow_loop:
   @@(4)
-  mov  rax, [rsp+8]
+  mov  rax, [rax+8]
+  cmp  byte [rax], TAG_FWD
+  je   %%follow_loop
+%%update_loop:
+  @@(8)
+  mov  rcx, [rbx+8]
+  mov  [rbx+8], rax
+  mov  rbx, rcx
+  cmp  byte [rbx], TAG_FWD
+  je   %%update_loop
+  @@(3)
+  mov  %1, rax
+%%done:
+%endmacro
+
+_eval:
+  g_fwd_compress [rsp+8]
   g_assert_good_tag rax, MSG_BAD_TAG_EVAL
-  cmp  byte [rax], TAG_FWD      ; assumes little endian
-  je   .fwd
   @@(2)
   cmp  byte [rax], TAG_APP
   je   .app
@@ -480,11 +501,6 @@ _eval:
   je   .caf
   @@(2)
   ret
-.fwd:                           ; TODO: make handling of forwading efficient
-  @@(5)
-  mov  rbx, [rax+8]
-  mov  [rsp+8], rbx
-  jmp  _eval
 .caf:
   @@(9)
   push rbp
@@ -496,24 +512,17 @@ _eval:
   push rbp
   push rax
   mov  rbp, rsp
-  ; control goes on to _unwind intensionally
+  jmp  _unwind.no_fwd_compress
 
 _unwind:
-  @@(4)
-  mov  rax, [rsp]
+  g_fwd_compress [rsp]
   g_assert_good_tag rax, MSG_BAD_TAG_UNWIND
-  cmp  byte [rax], TAG_FWD      ; assumes little endian
-  je   .fwd
+.no_fwd_compress:
   @@(2)
   cmp  byte [rax], TAG_APP
   jne  .done
   @@(4)
   push qword [rax+8]
-  jmp  _unwind
-.fwd:                           ; TODO: make handling of forwarding efficient
-  @@(5)
-  mov  rbx, [rax+8]
-  mov  [rsp], rbx
   jmp  _unwind
 .done:
   @@(2)
@@ -535,6 +544,7 @@ _return:
 .no_pop:
   @@(9)
   pop  rax
+  g_assert_good_tag rax, MSG_BAD_TAG_RETURN
   pop  rbp
   mov  [rsp+8], rax
   ret
@@ -569,7 +579,7 @@ align 8
 FORMAT_PRINT:
   db "%ld", 10, 0
 FORMAT_DEBUG:
-  db "TAG : 0x%016lx", 10, "ARG1: 0x%016lx", 10, "ARG2: 0x%016lx", 10, 0
+  db "TAG : 0x%016llx", 10, "ARG1: 0x%016llx", 10, "ARG2: 0x%016llx", 10, 0
 MISSING_ARGUMENTS:
   db "MISSING ARGUMENTS", 10, 0
 MSG_BAD_TAG_UNCONS:
@@ -578,12 +588,14 @@ MSG_BAD_TAG_JUMPZERO:
   db "JUMPZERO ON NON-CONS NODE", 10, 0
 MSG_BAD_TAG_EXIT:
   db "BAD TAG AT EXIT", 10, 0
+MSG_BAD_TAG_UPDATE:
+  db "BAD TAG IN UPDATE: #%016llx", 10, 0
 MSG_BAD_TAG_EVAL:
-  db "BAD TAG IN EVAL: 0x%016lx", 10, 0
+  db "BAD TAG IN EVAL: #%016llx", 10, 0
 MSG_BAD_TAG_UNWIND:
-  db "BAD TAG IN UNWIND", 10, 0
-MSG_BAD_TAG_GC:
-  db "BAD TAG IN GC: %ld", 10, 0
+  db "BAD TAG IN UNWIND: #%016llx", 10, 0
+MSG_BAD_TAG_RETURN:
+  db "BAD TAG IN RETURN: #%016llx", 10, 0
 MSG_EXPECTED_INT:
   db "EXPECTED INT TAG", 10, 0
 ABORT_CALLED:
