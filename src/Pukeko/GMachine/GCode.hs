@@ -43,6 +43,7 @@ data GInst lab
   | GTR
   -- I/O
   | PRINT
+  | INPUT
   -- Jumps
   | JUMP        lab
   | JUMPZERO    lab

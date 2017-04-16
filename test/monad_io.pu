@@ -8,4 +8,9 @@ val repeat_m : Int -> IO Unit -> IO Unit
 let rec repeat_m k m = when (k > 0) (m; repeat_m (k-1) m)
 
 val main : IO Unit
-let main = repeat_m 3 (count_down 2)
+let main =
+  input
+  >>= (fun k ->
+  input
+  >>= (fun n ->
+  repeat_m k (count_down n)))

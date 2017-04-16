@@ -180,6 +180,9 @@ asm return
 val print : Int -> IO Unit
 asm print
 
+val input : IO Int
+asm input
+
 val prefix_bind : IO a -> (a -> IO b) -> IO b
 asm prefix_bind
 

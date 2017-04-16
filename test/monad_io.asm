@@ -49,6 +49,12 @@ g_cons 0, 2
 g_update 1
 g_return
 
+g_globstart input, 1
+g_input
+g_cons 0, 2
+g_update 1
+g_return
+
 g_globstart prefix_bind, 3
 g_push 2
 g_push 1
@@ -146,13 +152,40 @@ g_update 3
 g_pop 2
 g_unwind
 
-g_globstart main, 0
-g_pushint 2
+g_globstart main$2, 2
+g_push 1
 g_pushglobal count_down, 1
 g_mkap 1
-g_pushint 3
+g_push 1
 g_pushglobal repeat_m, 2
+g_mkap 2
+g_update 3
+g_pop 2
+g_unwind
+
+g_globstart main$1, 1
+g_push 0
+g_pushglobal main$2, 2
+g_mkap 1
+g_pushglobal input, 1
+g_pushglobal prefix_bind, 3
+g_mkap 2
+g_update 2
+g_pop 1
+g_unwind
+g_update 2
+g_pop 1
+g_return
+
+g_globstart main, 0
+g_pushglobal main$1, 1
+g_mkap 0
+g_pushglobal input, 1
+g_pushglobal prefix_bind, 3
 g_mkap 2
 g_update 1
 g_pop 0
 g_unwind
+g_update 1
+g_pop 0
+g_return

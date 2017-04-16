@@ -50,6 +50,9 @@ gc.o: ../gc.c
 %: %.o gc.o
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
+monad_io.out monad_io.out.tmp: monad_io
+	echo "  3  \n2  \n" | ./$< > $@
+
 %.out %.out.tmp: %
 	($(TIME) ./$< >&2) 2> $@
 

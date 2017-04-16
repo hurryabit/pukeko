@@ -59,4 +59,6 @@ print_list = iter_io print
 when p m = if p then m else return Unit
 count_down k = when (k>=0) (print k;count_down (k-1))
 repeat_m k m = when (k>0) (m;repeat_m (k-1) m)
-main = repeat_m 3 (count_down 2)
+main$2 k n = repeat_m k (count_down n)
+main$1 k = input>>=main$2 k
+main = input>>=main$1

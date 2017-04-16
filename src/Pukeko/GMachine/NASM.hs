@@ -77,5 +77,6 @@ assembleInst arities inst = do
     GEQ -> code "geq" []
     GTR -> code "gtr" []
     PRINT -> code "print" []
+    INPUT -> code "input" []
     ABORT -> code "abort" []
     EXIT -> throwError "EXIT not allowed"

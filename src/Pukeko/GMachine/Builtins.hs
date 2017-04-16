@@ -18,7 +18,7 @@ everything :: [Constructor] -> [Global]
 everything constrs = concat
   [ neg : map (snd . snd) binops
   , map mkConstr constrs
-  , [ return_, print_, prefix_bind
+  , [ return_, print_, input, prefix_bind
     , abort
     ]
   ]
@@ -70,7 +70,7 @@ mkConstr MkConstructor{ _name, _tag, _fields } =
       , RETURN
       ]
 
-return_, print_, prefix_bind :: Global
+return_, print_, input, prefix_bind :: Global
 return_ = mkGlobal "return" 2
   [ CONS 0 2
   , UPDATE 1
@@ -80,6 +80,12 @@ print_ = mkGlobal "print" 2
   [ EVAL
   , PRINT
   , CONS 0 0 -- unit
+  , CONS 0 2 -- pair
+  , UPDATE 1
+  , RETURN
+  ]
+input = mkGlobal "input" 1
+  [ INPUT
   , CONS 0 2 -- pair
   , UPDATE 1
   , RETURN

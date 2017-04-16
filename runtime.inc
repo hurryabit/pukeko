@@ -3,7 +3,7 @@
 global _main
 extern _exit
 extern _printf
-extern _puts
+extern _scanf
 extern _gc_init
 extern _gc_collect
 extern _gc_stats
@@ -384,6 +384,22 @@ __install__main__:
   g_post_call_c
 %endmacro
 
+%macro g_input 0
+  g_claim 2
+  g_pre_call_c
+  lea  rdi, [FORMAT_INPUT]
+  lea  rsi, [rhp+8]
+  mov  rax, 0
+  call _scanf
+  g_post_call_c
+  cmp  rax, 1
+  je   %%ok
+  g_fail MSG_BAD_INPUT
+%%ok:
+  push rhp
+  mov  qword [rhp], TAG_ARITY_SIZE(TAG_INT, 0, 2)
+  add  rhp, 16
+%endmacro
 
 ;; Jumps
 %macro g_jump 1
@@ -585,11 +601,15 @@ _gc:
 section .data
 align 8
 FORMAT_PRINT:
-  db "%ld", 10, 0
+  db "%lld", 10, 0
+FORMAT_INPUT:
+  db "%lld", 0
 FORMAT_DEBUG:
   db "TAG : 0x%016llx", 10, "ARG1: 0x%016llx", 10, "ARG2: 0x%016llx", 10, 0
 MISSING_ARGUMENTS:
   db "MISSING ARGUMENTS", 10, 0
+MSG_BAD_INPUT:
+  db "INVALID INPUT", 10, 0
 MSG_BAD_TAG_UNCONS:
   db "UNCONS ON NON-CONS NODE", 10, 0
 MSG_BAD_TAG_JUMPZERO:
