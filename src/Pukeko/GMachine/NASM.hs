@@ -46,6 +46,9 @@ assembleInst arities inst = do
     JUMPZERO label -> do
       check_label label
       code "jumpzero" [show label]
+    JUMPCASE labels -> do
+      mapM_ check_label labels
+      code "jumpcase" (map show labels)
     LABEL label -> do
       check_label label
       code "label" [show label]

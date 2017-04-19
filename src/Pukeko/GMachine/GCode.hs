@@ -47,6 +47,7 @@ data GInst lab
   -- Jumps
   | JUMP        lab
   | JUMPZERO    lab
+  | JUMPCASE    [lab]
   | LABEL       lab
   -- Evaluation control
   | EXIT

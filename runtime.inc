@@ -21,7 +21,7 @@ default rel
 %define TAG_MIN_GOOD TAG_APP
 %define TAG_MAX_GOOD TAG_FUN
 
-%define LIM_CON 4
+%define MAX_CON 32
 
 ;; Stats stuff
 %define step_ctr r14
@@ -69,16 +69,16 @@ default rel
   g_assert_tag %1, TAG_INT, MSG_EXPECTED_INT
 %endmacro
 
-%macro g_assert_con 2           ; %1 reg with ptr, %2 = error msg
+%macro g_assert_con 3           ; %1 = reg with ptr, %2 = num of constructors, %3 = error msg
 %ifdef DEBUG
   cmp  byte [%1], TAG_CON
   jb   %%bad
-  cmp  byte [%1], TAG_CON + LIM_CON
+  cmp  byte [%1], TAG_CON + %2
   jae  %%bad
   jmp  %%ok
 %%bad:
   mov  rsi, [%1]
-  g_fail %2
+  g_fail %3
 %%ok:
 %endif
 %endmacro
@@ -91,7 +91,7 @@ default rel
   ja   %%bad
   jmp  %%ok
 %%bad:
-  g_assert_con %1, %2
+  g_assert_con %1, MAX_CON, %2
 %%ok:
 %endif
 %endmacro
@@ -290,7 +290,7 @@ __install__main__:
 %macro g_uncons 1
   @@(2+3*%1)
   pop rax
-  g_assert_con rax, MSG_BAD_TAG_UNCONS
+  g_assert_con rax, MAX_CON, MSG_BAD_TAG_UNCONS
 %assign idx %1
 %rep %1
   push qword [rax+8*idx]
@@ -409,12 +409,30 @@ __install__main__:
   jmp  %1
 %endmacro
 
-%macro g_jumpzero 1
-  @@(4)
-  mov  rax, [rsp]
-  g_assert_con rax, MSG_BAD_TAG_JUMPZERO
-  cmp  byte [rax], TAG_CON
-  je   %1
+; %macro g_jumpzero 1
+;   @@(4)
+;   mov  rax, [rsp]
+;   g_assert_con rax, 2, MSG_BAD_TAG_JUMPZERO
+;   cmp  byte [rax], TAG_CON
+;   je   %1
+; %endmacro
+
+;; TODO: Be more efficient for small numbers of cases
+%macro g_jumpcase 2-MAX_CON
+  @@(8)
+  mov   rax, [rsp]
+  g_assert_con rax, %0, MSG_BAD_TAG_JUMPCASE
+  movzx rax, byte [rax]
+  lea   rbx, [%%jump_table]
+  jmp   [rbx+8*(rax-TAG_CON)]
+section .data
+align 8
+%%jump_table:
+%rep %0
+  dq   %1
+%rotate 1
+%endrep
+section .text
 %endmacro
 
 %macro g_label 1
@@ -476,9 +494,9 @@ _main:
   g_mkap 1
   g_eval
   pop  rax
-  g_assert_con rax, MSG_BAD_TAG_EXIT
+  g_assert_con rax, 1, MSG_BAD_TAG_EXIT
   mov  rax, [rax+16]
-  g_assert_con rax, MSG_BAD_TAG_EXIT
+  g_assert_con rax, 1, MSG_BAD_TAG_EXIT
 
   ; set up the gc info for the final stats
   lea  rdi, [__gc_info__]
@@ -613,11 +631,11 @@ MISSING_ARGUMENTS:
 MSG_BAD_INPUT:
   db "INVALID INPUT", 10, 0
 MSG_BAD_TAG_UNCONS:
-  db "UNCONS ON NON-CONS NODE", 10, 0
-MSG_BAD_TAG_JUMPZERO:
-  db "JUMPZERO ON NON-CONS NODE", 10, 0
+  db "BAD TAG IN UNCONS: #%016llx", 10, 0
+MSG_BAD_TAG_JUMPCASE:
+  db "BAD TAG IN JUMPCASE: #%016llx", 10, 0
 MSG_BAD_TAG_EXIT:
-  db "BAD TAG AT EXIT", 10, 0
+  db "BAD TAG AT EXIT: #%016llx", 10, 0
 MSG_BAD_TAG_UPDATE:
   db "BAD TAG IN UPDATE: #%016llx", 10, 0
 MSG_BAD_TAG_EVAL:

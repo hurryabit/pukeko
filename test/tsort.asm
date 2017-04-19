@@ -52,7 +52,16 @@ g_return
 g_globstart foldr, 3
 g_push 2
 g_eval
-g_jumpzero .0
+g_jumpcase .0, .1
+g_label .0
+g_uncons 0
+g_push 1
+g_eval
+g_update 4
+g_pop 3
+g_unwind
+g_jump .2
+g_label .1
 g_uncons 2
 g_push 1
 g_push 4
@@ -65,7 +74,13 @@ g_mkap 2
 g_update 6
 g_pop 5
 g_unwind
-g_jump .1
+g_jump .2
+g_label .2
+
+g_globstart foldl, 3
+g_push 2
+g_eval
+g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_push 1
@@ -73,12 +88,8 @@ g_eval
 g_update 4
 g_pop 3
 g_unwind
+g_jump .2
 g_label .1
-
-g_globstart foldl, 3
-g_push 2
-g_eval
-g_jumpzero .0
 g_uncons 2
 g_push 1
 g_push 1
@@ -91,34 +102,29 @@ g_mkap 3
 g_update 6
 g_pop 5
 g_unwind
-g_jump .1
-g_label .0
-g_uncons 0
-g_push 1
-g_eval
-g_update 4
-g_pop 3
-g_unwind
-g_label .1
+g_jump .2
+g_label .2
 
 g_globstart take, 2
 g_pushint 0
 g_push 1
 g_eval
 g_leq
-g_jumpzero .0
+g_jumpcase .0, .1
+g_label .0
+g_uncons 0
+g_push 1
+g_eval
+g_jumpcase .3, .4
+g_label .3
 g_uncons 0
 g_pushglobal Nil, 0
 g_eval
 g_update 3
 g_pop 2
 g_unwind
-g_jump .1
-g_label .0
-g_uncons 0
-g_push 1
-g_eval
-g_jumpzero .2
+g_jump .5
+g_label .4
 g_uncons 2
 g_push 1
 g_pushint 1
@@ -132,25 +138,45 @@ g_cons 1, 2
 g_update 5
 g_pop 4
 g_return
-g_jump .3
-g_label .2
+g_jump .5
+g_label .5
+g_jump .2
+g_label .1
 g_uncons 0
 g_pushglobal Nil, 0
 g_eval
 g_update 3
 g_pop 2
 g_unwind
-g_label .3
-g_label .1
+g_jump .2
+g_label .2
 
 g_globstart zip_with, 3
 g_push 1
 g_eval
-g_jumpzero .0
+g_jumpcase .0, .1
+g_label .0
+g_uncons 0
+g_pushglobal Nil, 0
+g_eval
+g_update 4
+g_pop 3
+g_unwind
+g_jump .2
+g_label .1
 g_uncons 2
 g_push 4
 g_eval
-g_jumpzero .2
+g_jumpcase .3, .4
+g_label .3
+g_uncons 0
+g_pushglobal Nil, 0
+g_eval
+g_update 6
+g_pop 5
+g_unwind
+g_jump .5
+g_label .4
 g_uncons 2
 g_push 1
 g_push 4
@@ -165,29 +191,24 @@ g_cons 1, 2
 g_update 8
 g_pop 7
 g_return
-g_jump .3
+g_jump .5
+g_label .5
+g_jump .2
 g_label .2
-g_uncons 0
-g_pushglobal Nil, 0
-g_eval
-g_update 6
-g_pop 5
-g_unwind
-g_label .3
-g_jump .1
-g_label .0
-g_uncons 0
-g_pushglobal Nil, 0
-g_eval
-g_update 4
-g_pop 3
-g_unwind
-g_label .1
 
 g_globstart append, 2
 g_push 0
 g_eval
-g_jumpzero .0
+g_jumpcase .0, .1
+g_label .0
+g_uncons 0
+g_push 1
+g_eval
+g_update 3
+g_pop 2
+g_unwind
+g_jump .2
+g_label .1
 g_uncons 2
 g_push 3
 g_push 2
@@ -198,27 +219,45 @@ g_cons 1, 2
 g_update 5
 g_pop 4
 g_return
-g_jump .1
-g_label .0
-g_uncons 0
-g_push 1
-g_eval
-g_update 3
-g_pop 2
-g_unwind
-g_label .1
+g_jump .2
+g_label .2
 
 g_globstart insert_tree, 2
 g_push 1
 g_eval
-g_jumpzero .0
+g_jumpcase .0, .1
+g_label .0
+g_uncons 0
+g_pushglobal Leaf, 0
+g_push 1
+g_pushglobal Leaf, 0
+g_cons 1, 3
+g_update 3
+g_pop 2
+g_return
+g_jump .2
+g_label .1
 g_uncons 3
 g_push 1
 g_eval
 g_push 4
 g_eval
 g_leq
-g_jumpzero .2
+g_jumpcase .3, .4
+g_label .3
+g_uncons 0
+g_push 2
+g_push 4
+g_pushglobal insert_tree, 2
+g_mkap 2
+g_push 2
+g_push 2
+g_cons 1, 3
+g_update 6
+g_pop 5
+g_return
+g_jump .5
+g_label .4
 g_uncons 0
 g_push 2
 g_push 2
@@ -230,36 +269,24 @@ g_cons 1, 3
 g_update 6
 g_pop 5
 g_return
-g_jump .3
+g_jump .5
+g_label .5
+g_jump .2
 g_label .2
-g_uncons 0
-g_push 2
-g_push 4
-g_pushglobal insert_tree, 2
-g_mkap 2
-g_push 2
-g_push 2
-g_cons 1, 3
-g_update 6
-g_pop 5
-g_return
-g_label .3
-g_jump .1
-g_label .0
-g_uncons 0
-g_pushglobal Leaf, 0
-g_push 1
-g_pushglobal Leaf, 0
-g_cons 1, 3
-g_update 3
-g_pop 2
-g_return
-g_label .1
 
 g_globstart in_order, 1
 g_push 0
 g_eval
-g_jumpzero .0
+g_jumpcase .0, .1
+g_label .0
+g_uncons 0
+g_pushglobal Nil, 0
+g_eval
+g_update 2
+g_pop 1
+g_unwind
+g_jump .2
+g_label .1
 g_uncons 3
 g_push 2
 g_pushglobal in_order, 1
@@ -274,15 +301,8 @@ g_mkap 2
 g_update 5
 g_pop 4
 g_unwind
-g_jump .1
-g_label .0
-g_uncons 0
-g_pushglobal Nil, 0
-g_eval
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
+g_jump .2
+g_label .2
 
 g_globstart prime, 0
 g_pushint 39
@@ -304,14 +324,7 @@ g_eval
 g_push 1
 g_eval
 g_les
-g_jumpzero .0
-g_uncons 0
-g_push 0
-g_eval
-g_update 3
-g_pop 2
-g_unwind
-g_jump .1
+g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_pushglobal prime, 0
@@ -322,7 +335,16 @@ g_sub
 g_update 3
 g_pop 2
 g_return
+g_jump .2
 g_label .1
+g_uncons 0
+g_push 0
+g_eval
+g_update 3
+g_pop 2
+g_unwind
+g_jump .2
+g_label .2
 
 g_globstart gen, 2
 g_push 1

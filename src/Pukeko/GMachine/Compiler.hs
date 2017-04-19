@@ -187,15 +187,15 @@ ccExpr mode expr =
       MkConstructor{ _adt = MkADT{ _constructors } } <- findConstructor _cons
       case _constructors of
         [c] -> ccAltn mode _altns c
-        [c0, c1] -> do
-          zero <- freshLabel
+        cs -> do
+          ls <- mapM (\_ -> freshLabel) cs
           done <- freshLabel
-          tell [JUMPZERO zero]
-          ccAltn mode _altns c1
-          tell [JUMP done, LABEL zero]
-          ccAltn mode _altns c0
+          tell [JUMPCASE ls]
+          forM_ (zip ls cs) $ \(l, c) -> do
+            tell [LABEL l]
+            ccAltn mode _altns c
+            tell [JUMP done]
           tell [LABEL done]
-        _ -> throwError "Only ADTs with 1 or 2 constructors are supported."
 
 ccAltn :: Mode -> [Altn a] -> Constructor -> CC ()
 ccAltn mode altns MkConstructor{ _name } =
