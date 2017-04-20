@@ -10,7 +10,7 @@ let rec repeat_m k m = when (k > 0) (m; repeat_m (k-1) m)
 val main : IO Unit
 let main =
   input
-  >>= (fun k ->
+  >>= fun k ->
   input
-  >>= (fun n ->
-  repeat_m k (count_down n)))
+  >>= fun n ->
+  repeat_m k (count_down n)

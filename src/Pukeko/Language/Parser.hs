@@ -134,21 +134,20 @@ let_ f =
 
 expr, aexpr :: Parser (Expr SourcePos)
 expr =
-  choice
-    [ let_ Let <*> (reserved "in" *> expr)
-    , Lam <$> getPosition
-          <*> (reserved "fun" *> many1 (patn True))
-          <*> (arrow *> expr)
-    , If  <$> getPosition
-          <*> (reserved "if"   *> expr)
-          <*> (reserved "then" *> expr)
-          <*> (reserved "else" *> expr)
-    , Match <$> getPosition
-            <*> (reserved "match" *> expr)
-            <*> (reserved "with"  *> many1 altn)
-    , buildExpressionParser operatorTable $
-        mkAp <$> getPosition <*> aexpr <*> many aexpr
-    ]
+  buildExpressionParser operatorTable (choice
+  [ mkAp <$> getPosition <*> aexpr <*> many aexpr
+  , let_ Let <*> (reserved "in" *> expr)
+  , Lam <$> getPosition
+        <*> (reserved "fun" *> many1 (patn True))
+        <*> (arrow *> expr)
+  , If  <$> getPosition
+        <*> (reserved "if"   *> expr)
+        <*> (reserved "then" *> expr)
+        <*> (reserved "else" *> expr)
+  , Match <$> getPosition
+          <*> (reserved "match" *> expr)
+          <*> (reserved "with"  *> many1 altn)
+  ])
   <?> "expression"
 aexpr = choice
   [ Var <$> getPosition <*> identifier
