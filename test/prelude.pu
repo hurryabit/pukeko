@@ -150,6 +150,10 @@ let concat_map f xs = concat (map f xs)
 val length : List a -> Int
 let length = foldr (fun x l -> 1+l) 0
 
+val replicate : Int -> a -> List a
+let rec replicate n x =
+  if n <= 0 then Nil else Cons x (replicate (n-1) x)
+
 -- Binary trees
 type Tree a =
   | Leaf
@@ -188,6 +192,17 @@ asm prefix_bind
 
 val prefix_semi : IO Unit -> IO a -> IO a
 let prefix_semi m1 m2 = m1 >>= fun x -> m2
+
+val sequence_io : List (IO a) -> IO (List a)
+let rec sequence_io ms =
+  match ms with
+  | Nil -> return Nil
+  | Cons m ms ->
+    m
+    >>= fun x ->
+    sequence_io ms
+    >>= fun xs ->
+    return (Cons x xs)
 
 val iter_io : (a -> IO Unit) -> List a -> IO Unit
 let iter_io f = foldr (fun x m -> f x; m) (return Unit)

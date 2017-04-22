@@ -3,8 +3,8 @@ NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
 
-HEAP_SIZE  = 0x30000000 # 768 MB
-STACK_SIZE = 0x10000000 # 256 MB
+HEAP_SIZE  = 0x08000000 # 128 MB
+STACK_SIZE = 0x02000000 #  32 MB
 
 RUNTIME = ../runtime.inc
 LIBS = -lc

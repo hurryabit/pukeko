@@ -49,6 +49,8 @@ and map f xs =
 and concat_map f xs = concat (map f xs)
 and length$1 x l = 1+l
 and length = foldr (length$1) 0
+and replicate n x =
+      if n<=0 then Nil else Cons x (replicate (n-1) x)
 and insert_tree x t =
       match t with
       | Leaf -> Branch Leaf x Leaf
@@ -63,11 +65,15 @@ and in_order t =
       | Branch l x r -> append (in_order l) (Cons x (in_order r))
 and prefix_semi$1 m2 x = m2
 and prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
+and sequence_io$2 x xs = return (Cons x xs)
+and sequence_io$1 ms x = sequence_io ms>>=sequence_io$2 x
+and sequence_io ms =
+      match ms with
+      | Nil -> return Nil
+      | Cons m ms -> m>>=sequence_io$1 ms
 and iter_io$1 f x m = f x;m
 and iter_io f = foldr (iter_io$1 f) (return Unit)
 and print_list = iter_io print
-and replicate k x =
-      if k<=0 then Nil else Cons x (replicate (k-1) x)
 and diff xs ys =
       match xs with
       | Nil -> Nil
@@ -92,6 +98,7 @@ and solve_aux kss =
       | Nil -> Cons Nil Nil
       | Cons ks kss -> concat_map (solve_aux$1 kss) ks
 and solve n = solve_aux (replicate n (take n ints))
-and main = print (length (solve 12))
+and main$1 n = print (length (solve n))
+and main = input>>=main$1
 in
 main

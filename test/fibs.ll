@@ -49,6 +49,8 @@ and map f xs =
 and concat_map f xs = concat (map f xs)
 and length$1 x l = 1+l
 and length = foldr (length$1) 0
+and replicate n x =
+      if n<=0 then Nil else Cons x (replicate (n-1) x)
 and insert_tree x t =
       match t with
       | Leaf -> Branch Leaf x Leaf
@@ -63,19 +65,22 @@ and in_order t =
       | Branch l x r -> append (in_order l) (Cons x (in_order r))
 and prefix_semi$1 m2 x = m2
 and prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
+and sequence_io$2 x xs = return (Cons x xs)
+and sequence_io$1 ms x = sequence_io ms>>=sequence_io$2 x
+and sequence_io ms =
+      match ms with
+      | Nil -> return Nil
+      | Cons m ms -> m>>=sequence_io$1 ms
 and iter_io$1 f x m = f x;m
 and iter_io f = foldr (iter_io$1 f) (return Unit)
 and print_list = iter_io print
 and prime = 1000000*1000000+39
-and tail xs =
-      match xs with
-      | Nil -> abort
-      | Cons x xs -> xs
 and add_mod_prime x y =
       let z = x+y in
       if z<prime then z else z-prime
 and fibs0 = Cons 0 fibs1
 and fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
-and main = print (nth fibs0 1500000)
+and main$1 n = print (nth fibs0 n)
+and main = input>>=main$1
 in
 main

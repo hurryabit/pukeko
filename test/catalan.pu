@@ -28,4 +28,7 @@ let rec sols =
       (scanl (fun xs x -> Cons x xs) Nil sols))
 
 val main : IO Unit
-let main = print (nth sols 2000 % p)
+let main =
+  input
+  >>= fun n ->
+  print (nth sols n)

@@ -35,4 +35,7 @@ val primes : List Int
 let primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
 
 val main : IO Unit
-let main = print (nth primes 5999)
+let main =
+  input
+  >>= fun n ->
+  print (nth primes n)

@@ -49,6 +49,8 @@ and map f xs =
 and concat_map f xs = concat (map f xs)
 and length$1 x l = 1+l
 and length = foldr (length$1) 0
+and replicate n x =
+      if n<=0 then Nil else Cons x (replicate (n-1) x)
 and insert_tree x t =
       match t with
       | Leaf -> Branch Leaf x Leaf
@@ -63,21 +65,15 @@ and in_order t =
       | Branch l x r -> append (in_order l) (Cons x (in_order r))
 and prefix_semi$1 m2 x = m2
 and prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
+and sequence_io$2 x xs = return (Cons x xs)
+and sequence_io$1 ms x = sequence_io ms>>=sequence_io$2 x
+and sequence_io ms =
+      match ms with
+      | Nil -> return Nil
+      | Cons m ms -> m>>=sequence_io$1 ms
 and iter_io$1 f x m = f x;m
 and iter_io f = foldr (iter_io$1 f) (return Unit)
 and print_list = iter_io print
-and prime = 1000000*1000000+39
-and double_mod_prime x =
-      let y = 2*x in
-      if y<prime then y else y-prime
-and gen f x = Cons x (gen f (f x))
-and powers = gen double_mod_prime 1
-and sum = foldr prefix_add 0
-and mul_mod_prime x y = (x*y)%prime
-and sum_prod xs ys = sum (zip_with mul_mod_prime xs ys)
-and hash xs = sum_prod xs powers%prime
-and numbers$1 x = (42*x)%10007
-and numbers = take 10006 (gen (numbers$1) 1)
 and insert y xs =
       match xs with
       | Nil -> Cons y Nil
@@ -86,6 +82,8 @@ and isort xs =
       match xs with
       | Nil -> Nil
       | Cons x xs -> insert x (isort xs)
-and main = print (hash (isort numbers))
+and main$2 xs = iter_io print (isort xs)
+and main$1 n = sequence_io (replicate n input)>>=main$2
+and main = input>>=main$1
 in
 main

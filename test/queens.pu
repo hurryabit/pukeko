@@ -1,7 +1,3 @@
-val replicate : Int -> a -> List a
-let rec replicate k x =
-  if k <= 0 then Nil else Cons x (replicate (k-1) x)
-
 val diff : List Int -> List Int -> List Int
 let rec diff xs ys =
   match xs with
@@ -39,4 +35,7 @@ val solve : Int -> List (List Int)
 let solve n = solve_aux (replicate n (take n ints))
 
 val main : IO Unit
-let main = print (length (solve 12))
+let main =
+  input
+  >>= fun n ->
+  print (length (solve n))
