@@ -54,10 +54,10 @@ monad_io.out monad_io.out.tmp: monad_io
 	echo "  3  \n2  \n" | ./$< > $@
 
 %.out %.out.tmp: %
-	($(TIME) ./$< >&2) 2> $@
+	./$< > $@
 
 %.check: %.out.tmp
-	diff --ignore-matching-lines='.*real.*user.*sys.*' $(@:.check=.out) $<
+	diff $(@:.check=.out) $<
 
 clean:
 	rm -f $(LAMBDAS) $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) $(TEMPOUTPUTS)

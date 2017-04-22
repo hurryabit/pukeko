@@ -187,9 +187,8 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
 void gc_stats(gc_info* info, uint64_t steps, uint64_t checks) {
   info->alloc_bytes += (uint64_t) info->heap_ptr;
 
-  printf("\n");
-  printf("Steps      : %12llu\n", steps);
-  printf("Alloc bytes: %12llu          (Checks: %12llu)\n",
+  fprintf(stderr, "Steps      : %12llu\n", steps);
+  fprintf(stderr, "Alloc bytes: %12llu          (Checks: %12llu)\n",
          info->alloc_bytes, checks);
-  printf("GC runs    : %12llu\n", info->num_gc_runs);
+  fprintf(stderr, "GC runs    : %12llu\n", info->num_gc_runs);
 }

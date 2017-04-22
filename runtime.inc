@@ -481,7 +481,9 @@ _main:
   mov  [rdi+48], rax
   mov  qword [rdi+88], 0
   mov  qword [rdi+96], 0
+  g_pre_call_c
   call _gc_init
+  g_post_call_c
 
   ; set up the heap ptr
   lea  rdi, [__gc_info__]
@@ -499,11 +501,13 @@ _main:
   g_assert_con rax, 1, MSG_BAD_TAG_EXIT
 
   ; set up the gc info for the final stats
+  g_pre_call_c
   lea  rdi, [__gc_info__]
   mov  [rdi+72], rhp
   mov  rsi, step_ctr
   mov  rdx, claim_ctr
   call _gc_stats
+  g_post_call_c
 
   ; exit
   pop  rbp
