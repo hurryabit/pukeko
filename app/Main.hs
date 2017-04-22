@@ -31,18 +31,18 @@ compile write_ll write_gm no_prelude file_user = do
           else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
         constrs <- TypeChecker.checkModule module_
-        let lifted_defns = Lifter.liftModule module_
-        program <- Compiler.compile constrs (map (fmap (const ())) lifted_defns)
+        let lifted_expr = Lifter.liftModule module_
+        program <- Compiler.compile constrs (fmap (const ()) lifted_expr)
         nasm <- NASM.assemble program
-        return (lifted_defns, program, nasm)
+        return (lifted_expr, program, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (lifted_defns, program, nasm) -> do
+    Right (lifted_expr, program, nasm) -> do
       when write_ll $
         writeFile (file_user `replaceExtension` ".ll") $
-        render $ vcat $ map pretty lifted_defns
+          (render $ pretty lifted_expr) ++ "\n"
       when write_gm $
         writeFile (file_user `replaceExtension` ".gm") (prettyShow program)
       writeFile (file_user `replaceExtension` ".asm") nasm

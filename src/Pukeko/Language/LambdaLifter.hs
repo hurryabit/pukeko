@@ -31,12 +31,17 @@ newtype LL a = MkLL { unLL :: RWS Env [FvDefn] [Ident] a }
 freshIdent :: LL Ident
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-liftModule :: Module a -> [FvDefn]
-liftModule = concatMap $ \top -> case top of
-  Type{} -> []
-  Val{} -> []
-  Asm{} -> []
-  Def{ _defns } -> concatMap liftTopDefn _defns
+liftModule :: Module a -> FvExpr
+liftModule module_ =
+  let _defns = do
+        Def{ _defns } <- module_
+        defn <- _defns
+        liftTopDefn defn
+  in Let{ _annot = Set.empty
+        , _isrec = True
+        , _defns
+        , _body  = mkVar True (MkIdent "main")
+        }
 
 -- TODO: Fix the awful hack for the right naming of non-CAFs.
 liftTopDefn :: Defn a -> [FvDefn]

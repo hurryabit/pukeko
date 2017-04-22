@@ -40,21 +40,22 @@ newtype CC a = CC { unCC :: ExceptT String (RWS Context [Inst] Int) a }
 freshLabel :: CC Name
 freshLabel = CC $ state $ \n -> (Name ('.':show n), n+1)
 
-compile :: MonadError String m => Map Ident Constructor -> [Defn ()] -> m Program
-compile constrs defns = do
-  globals <- mapM (compileDefn constrs) defns
-  let all_globals = Builtins.everything (Map.elems constrs)++ globals
+compile :: MonadError String m => Map Ident Constructor -> Expr () -> m Program
+compile constrs Let{ _isrec = True, _defns, _body = Var{ _ident }} = do
+  globals <- mapM (compileDefn constrs) _defns
+  let all_globals = Builtins.everything (Map.elems constrs) ++ globals
       name_to_global =
         Map.fromList $ map (\global -> (GCode._name global, global)) all_globals
       deps name =
         case Map.lookup name name_to_global of
           Nothing     -> throwError $ "Unknown global: " ++ unName name
           Just global -> return $ dependencies global
-  let _main = Name "main"
+  let _main = name _ident
   reachable_names <- saturate deps _main
   let _globals =
         filter (\global -> GCode._name global `Set.member` reachable_names) all_globals
   return $ MkProgram { _globals, _main }
+compile _ _ = throwError "compile expects output of lambda lifter"
 
 findConstructor :: Ident -> CC Constructor
 findConstructor ident = do

@@ -122,9 +122,13 @@ instance Pretty (Expr a) where
         case _defns of
           [] -> pPrintPrec lvl 0 _body
           defn0:defns -> vcat
-            [ text (if _isrec then "letrec" else "let") <+> pPrintPrec lvl 0 defn0
-            , vcat $ map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
-            , text "in" <+> pPrintPrec lvl 0 _body
+            [ sep
+              [ vcat $
+                (text (if _isrec then "let rec" else "let") <+> pPrintPrec lvl 0 defn0) :
+                map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
+              , text "in"
+              ]
+            , pPrintPrec lvl 0 _body
             ]
       Lam    { _patns, _body  } ->
         maybeParens (prec > 0) $ hsep
@@ -132,10 +136,11 @@ instance Pretty (Expr a) where
           , text "->" , pPrintPrec lvl 0 _body
           ]
       If { _cond, _then, _else } ->
-        maybeParens (prec > 0) $ hsep
-          [ text "if"  , pPrintPrec lvl 0 _cond
-          , text "then", pPrintPrec lvl 0 _then
-          , text "else", pPrintPrec lvl 0 _else
+        maybeParens (prec > 0) $ sep
+          [ text "if"  <+> pPrintPrec lvl 0 _cond <+> text "then"
+          , nest 2 (pPrintPrec lvl 0 _then)
+          , text "else"
+          , nest 2 (pPrintPrec lvl 0 _else)
           ]
       Match { _expr, _altns } ->
         maybeParens (prec > 0) $ vcat $
@@ -157,10 +162,9 @@ instance Pretty (Patn a) where
       Just t  -> maybeParens (prec > 0) $ pretty _ident <> colon <+> pretty t
 
 instance Pretty (Altn a) where
-  pPrintPrec lvl _ MkAltn{ _cons, _patns, _rhs } = hsep
-    [ text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _patns)
-    , text "->", pPrintPrec lvl 0 _rhs
-    ]
+  pPrintPrec lvl _ MkAltn{ _cons, _patns, _rhs } = hang
+    (hsep [text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _patns), text "->"]) 2
+    (pPrintPrec lvl 0 _rhs)
 
 instance Annot TopLevel where
   annot = _annot :: TopLevel _ -> _
