@@ -76,7 +76,7 @@ void gc_assert_good_tag(heap_cell* ptr, char* caller, bool fwd_ok) {
 
 heap_cell* gc_copy(gc_info* info, heap_cell* ptr) {
   if (ptr == NULL) {
-    puts("NULL POINTER EXCEPTION");
+    fputs("NULL POINTER EXCEPTION", stderr);
     exit(1);
   }
 
@@ -134,7 +134,7 @@ void gc_stack_frame(gc_info* info, stack_cell* frame_top, stack_cell* frame_base
 void gc_collect(gc_info* info, uint64_t heap_claim) {
   /* puts("entering gc"); */
   if (info->heap_ptr > info->heap_limit) {
-    puts("OVERFILLED HEAP:");
+    fputs("OVERFILLED HEAP", stderr);
     exit(1);
   }
   info->num_gc_runs += 1;
@@ -176,7 +176,7 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
   }
 
   if (info->heap_ptr + heap_claim > info->heap_limit) {
-    puts("HEAP EXHAUSTED");
+    fputs("HEAP EXHAUSTED", stderr);
     exit(1);
   }
 

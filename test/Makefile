@@ -3,8 +3,8 @@ NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
 
-HEAP_SIZE  = 0x08000000 # 128 MB
-STACK_SIZE = 0x02000000 #  32 MB
+HEAP_SIZE  = 0x10000000 # 256 MB
+STACK_SIZE = 0x04000000 #  64 MB
 
 RUNTIME = ../runtime.inc
 LIBS = -lc
@@ -19,21 +19,19 @@ SOURCES     = monad_io.pu \
 							queens.pu \
 							minlet.pu \
 							primes.pu \
-							catalan.pu
+							catalan.pu \
+							sort_gen.pu
 LAMBDAS     = $(SOURCES:.pu=.ll)
-GMACHINES   = $(SOURCES:.pu=.gm)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
 EXECUTABLES = $(SOURCES:.pu=)
-OUTPUTS     = $(SOURCES:.pu=.out)
-TEMPOUTPUTS = $(SOURCES:.pu=.out.tmp)
-CHECKS      = $(SOURCES:.pu=.check)
+BENCHMARKS  = qsort.bench \
+							tsort.bench \
+							isort.bench \
+							queens.bench \
+							catalan.bench
 
 all: $(EXECUTABLES)
-
-out: $(OUTPUTS)
-
-check: $(CHECKS)
 
 %.asm: %.pu prelude.pu
 	$(COMP) $<
@@ -50,18 +48,40 @@ gc.o: ../gc.c
 %: %.o gc.o
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
-monad_io.out monad_io.out.tmp: monad_io
-	echo "  3  \n2  \n" | ./$< > $@
-
-%.out %.out.tmp: %
-	./$< > $@
-
-%.check: %.out.tmp
-	diff $(@:.check=.out) $<
-
 clean:
-	rm -f $(LAMBDAS) $(GMACHINES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) $(TEMPOUTPUTS)
+	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES)
 
-.PHONEY: all clean check $(CHECKS)
+.PHONEY: all clean bench clean.bench
 
 .PRECIOUS: %.asm %.ll
+
+bench: $(BENCHMARKS)
+
+sort400.in: sort_gen
+	echo 400000 | ./sort_gen > $@
+
+sort20.in: sort_gen
+	echo 20000 | ./sort_gen > $@
+
+qsort.bench: qsort sort400.in
+	bench "./$< < sort400.in > /dev/null" > $@
+	./$< < sort400.in > /dev/null 2>> $@
+
+tsort.bench: tsort sort400.in
+	bench "./$< < sort400.in > /dev/null" > $@
+	./$< < sort400.in > /dev/null 2>> $@
+
+isort.bench: isort sort20.in
+	bench "./$< < sort20.in > /dev/null" > $@
+	./$< < sort20.in > /dev/null 2>> $@
+
+queens.bench: queens
+	bench "echo 13 | ./$< > /dev/null" > $@
+	echo 13 | ./$< > /dev/null 2>> $@
+
+catalan.bench: catalan
+	bench "echo 1666 | ./$< > /dev/null" > $@
+	echo 1666 | ./$< > /dev/null 2>> $@
+
+clean.bench:
+	rm -f $(BENCHMARKS)

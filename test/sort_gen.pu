@@ -1,0 +1,9 @@
+val gen : (a -> a) -> a -> List a
+let rec gen f x = Cons x (gen f (f x))
+
+val main : IO Unit
+let main =
+  input
+  >>= fun n ->
+  print n;
+  iter_io print (take n (gen (fun x -> (91*x) % 1000000007) 1))
