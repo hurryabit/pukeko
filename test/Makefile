@@ -49,7 +49,7 @@ gc.o: ../gc.c
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 clean:
-	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES)
+	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) sort*.in
 
 .PHONEY: all clean bench clean.bench
 

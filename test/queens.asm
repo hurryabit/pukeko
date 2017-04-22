@@ -509,6 +509,3 @@ g_mkap 2
 g_update 1
 g_pop 0
 g_unwind
-g_update 1
-g_pop 0
-g_return

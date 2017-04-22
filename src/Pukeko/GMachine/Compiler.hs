@@ -153,19 +153,18 @@ ccExpr mode expr =
             Eval  -> tell [EVAL]
             Redex -> continueRedex UNWIND
     ApOp{ _op, _arg1, _arg2 } -> do
-      let eval = do
+      let eval continue = do
             case lookup _op Builtins.binops of
               Nothing -> ccExpr mode $ desugarApOp expr
               Just (inst, _) -> do
                 ccExpr Eval _arg2
                 local depth succ $ ccExpr Eval _arg1
                 tell [inst]
+                continue
       case mode of
         Stack -> ccExpr mode $ desugarApOp expr
-        Eval  -> eval
-        Redex -> do
-          eval
-          continueRedex RETURN
+        Eval  -> eval $ return ()
+        Redex -> eval $ continueRedex RETURN
     Lam { } -> throwError "All lambdas should be lifted by now"
     Let { _isrec = False, _defns, _body } -> do
       let n = length _defns

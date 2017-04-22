@@ -219,9 +219,6 @@ g_mkap 2
 g_update 3
 g_pop 2
 g_unwind
-g_update 3
-g_pop 2
-g_return
 
 g_globstart sequence_io$2, 2
 g_push 1
@@ -245,9 +242,6 @@ g_mkap 2
 g_update 3
 g_pop 2
 g_unwind
-g_update 3
-g_pop 2
-g_return
 
 g_globstart sequence_io, 1
 g_push 0
@@ -273,9 +267,6 @@ g_mkap 2
 g_update 4
 g_pop 3
 g_unwind
-g_update 4
-g_pop 3
-g_return
 g_jump .2
 g_label .2
 
@@ -289,9 +280,6 @@ g_mkap 2
 g_update 4
 g_pop 3
 g_unwind
-g_update 4
-g_pop 3
-g_return
 
 g_globstart iter_io, 1
 g_pushglobal Unit, 0
@@ -379,9 +367,6 @@ g_mkap 2
 g_update 2
 g_pop 1
 g_unwind
-g_update 2
-g_pop 1
-g_return
 
 g_globstart main, 0
 g_pushglobal main$1, 1
@@ -392,6 +377,3 @@ g_mkap 2
 g_update 1
 g_pop 0
 g_unwind
-g_update 1
-g_pop 0
-g_return
