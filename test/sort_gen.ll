@@ -63,7 +63,7 @@ and in_order t =
       match t with
       | Leaf -> Nil
       | Branch l x r -> append (in_order l) (Cons x (in_order r))
-and prefix_semi$1 m2 x = m2
+and prefix_semi$1 m2 _ = m2
 and prefix_semi m1 m2 = m1>>=prefix_semi$1 m2
 and sequence_io$2 x xs = return (Cons x xs)
 and sequence_io$1 ms x = sequence_io ms>>=sequence_io$2 x

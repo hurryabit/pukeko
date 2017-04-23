@@ -115,10 +115,9 @@ runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_bind, rewrite_altn } =
           _expr  <- whole_expr _expr
           _altns <- mapM whole_altn _altns
           return $ expr { _expr, _altns }
-    sub_defn defn@MkDefn{ _bind , _expr } = do
-      _bind <- whole_bind _bind
+    sub_defn defn@MkDefn{ _expr } = do
       _expr <- whole_expr _expr
-      return $ defn { _bind, _expr }
+      return (defn { _expr } :: Defn _)
     sub_bind bind =
       return $ bind
     sub_altn altn@MkAltn{ _binds, _rhs } = do

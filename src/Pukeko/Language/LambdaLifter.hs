@@ -7,6 +7,7 @@ module Pukeko.Language.LambdaLifter
 import Control.Monad.RWS hiding (asks, local, gets)
 import Data.Label (mkLabels)
 import Data.Label.Monadic
+import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 
 import qualified Data.Set as Set
@@ -45,7 +46,7 @@ liftModule module_ =
 
 -- TODO: Fix the awful hack for the right naming of non-CAFs.
 liftTopDefn :: Defn a -> [FvDefn]
-liftTopDefn defn@MkDefn{ _bind = MkBind{ _ident }, _expr } =
+liftTopDefn defn@MkDefn{ _ident, _expr } =
   let env = MkEnv{ _bound = Set.empty }
       st0 = map (\n -> MkIdent $ unIdent _ident ++ '$':show n) [1 :: Int ..]
       is_lambda = case _expr of
@@ -58,19 +59,19 @@ liftTopDefn defn@MkDefn{ _bind = MkBind{ _ident }, _expr } =
 
 liftBind :: Bind a -> LL FvBind
 liftBind MkBind{ _ident, _type } = do
-  let _annot = Set.singleton _ident
+  let _annot = maybe Set.empty Set.singleton _ident
   return MkBind{ _annot, _ident, _type }
 
 liftDefn :: Defn a -> LL FvDefn
-liftDefn MkDefn{ _bind, _expr } = do
-  _bind <- liftBind _bind
+liftDefn MkDefn{ _ident, _type, _expr } = do
+  let _annot = Set.singleton _ident
   _expr <- liftExpr _expr
-  return MkDefn{ _bind, _expr }
+  return MkDefn{ _annot, _ident, _type, _expr }
 
 liftAltn :: Altn a -> LL FvAltn
 liftAltn MkAltn{ _cons, _binds, _rhs } = do
   _binds <- mapM liftBind _binds
-  _rhs  <- localize _binds (liftExpr _rhs)
+  _rhs  <- localize (mapMaybe (\MkBind{ _ident } -> _ident) _binds) (liftExpr _rhs)
   let _annot = annot _rhs `Set.difference` Set.unions (map annot _binds)
   return MkAltn{ _annot, _cons, _binds, _rhs }
 
@@ -93,11 +94,11 @@ liftExpr expr = case expr of
     let _annot = annot _arg1 `Set.union` annot _arg2
     return ApOp{ _annot, _op, _arg1, _arg2 }
   Let{ _isrec, _defns, _body } -> do
-    let binds = map _bind _defns
-    _defns <- localize (if _isrec then binds else []) (mapM liftDefn _defns)
-    _body  <- localize binds (liftExpr _body)
-    let (binds, rhss) = unzipDefns _defns
-        fv_binds = Set.unions (map annot binds)
+    let idents = map (\MkDefn{ _ident } -> _ident) _defns
+    _defns <- localize (if _isrec then idents else []) (mapM liftDefn _defns)
+    _body  <- localize idents (liftExpr _body)
+    let (annots, _, _, rhss) = unzipDefns _defns
+        fv_binds = Set.unions annots
         fv_rhss  = Set.unions (map annot rhss)
         fv_body  = annot _body
         _annot
@@ -106,12 +107,12 @@ liftExpr expr = case expr of
     return Let{ _annot, _isrec, _defns, _body }
   Lam{ _binds, _body } -> do
     _ident <- freshIdent
-    _body <- localize _binds (liftExpr _body)
+    _body <- localize (mapMaybe (\MkBind{ _ident } -> _ident) _binds) (liftExpr _body)
     _binds <- mapM liftBind _binds
     let _annot = annot _body `Set.difference` Set.unions (map annot _binds)
         frees = Set.toList _annot
     let rhs = Lam{ _annot = Set.empty, _binds = map mkBind frees ++ _binds, _body }
-    tell [MkDefn{ _bind = mkBind _ident, _expr = rhs }]
+    tell [MkDefn{ _annot = Set.singleton _ident, _ident, _type = Nothing, _expr = rhs }]
     return Ap{ _annot, _fun = mkVar False _ident, _args = map (mkVar True) frees }
   If{ _cond, _then, _else } -> do
     _cond <- liftExpr _cond
@@ -126,14 +127,12 @@ liftExpr expr = case expr of
     return Match{ _annot, _expr, _altns }
 
 mkBind :: Ident -> FvBind
-mkBind _ident = MkBind{ _annot = Set.singleton _ident, _ident, _type = Nothing }
+mkBind ident = MkBind{ _annot = Set.singleton ident, _ident = Just ident, _type = Nothing }
 
 mkVar :: Bool -> Ident -> FvExpr
 mkVar is_local _ident =
   let _annot = if is_local then Set.singleton _ident else Set.empty
   in  Var{ _annot, _ident }
 
-localize :: [Bind a] -> LL b -> LL b
-localize binds ll = do
-  let (idents, _) = unzipBinds binds
-  local bound (Set.fromList idents `Set.union`) ll
+localize :: [Ident] -> LL b -> LL b
+localize idents = local bound (Set.fromList idents `Set.union`)

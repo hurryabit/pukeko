@@ -1,0 +1,19 @@
+val fst : Pair a b -> a
+let fst p =
+  match p with
+  | Pair x _ -> x
+
+val snd : Pair a b -> b
+let snd p =
+  match p with
+  | Pair _ y -> y
+
+val main : IO Unit
+let main =
+  input
+  >>= fun x ->
+  input
+  >>= fun y ->
+  let p = Pair x y in
+  print (fst p);
+  print (snd p)

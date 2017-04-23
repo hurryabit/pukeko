@@ -74,23 +74,16 @@ and sequence_io ms =
 and iter_io$1 f x m = f x;m
 and iter_io f = foldr (iter_io$1 f) (return Unit)
 and print_list = iter_io print
-and p = 100000007
-and mul_p x y = (x*y)%p
-and add_p x y = (x+y)%p
-and sum_p = foldl add_p 0
-and scanl$1 f scanl_f y0 xs =
-      match xs with
-      | Nil -> Nil
-      | Cons x xs ->
-        let y0 = f y0 x in
-        Cons y0 (scanl_f y0 xs)
-and scanl f =
-      let rec scanl_f = scanl$1 f scanl_f in
-      scanl_f
-and sols$1 xs = sum_p (zip_with mul_p sols xs)
-and sols$2 xs x = Cons x xs
-and sols = Cons 1 (map (sols$1) (scanl (sols$2) Nil sols))
-and main$1 n = print (nth sols n)
+and fst p =
+      match p with
+      | Pair x _ -> x
+and snd p =
+      match p with
+      | Pair _ y -> y
+and main$2 x y =
+      let p = Pair x y in
+      print (fst p);print (snd p)
+and main$1 x = input>>=main$2 x
 and main = input>>=main$1
 in
 main

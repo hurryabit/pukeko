@@ -274,30 +274,30 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
 instantiate :: Type (Open s) -> TI s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateAnnots :: [Bind SourcePos] -> TI s [(Ident, Type (Open s))]
-instantiateAnnots binds = forM binds $ \MkBind{ _annot, _ident, _type } -> do
-  t <- case _type of
+instantiateAnnots :: [SourcePos] -> [Maybe (Type Closed)] -> TI s [Type (Open s)]
+instantiateAnnots poss types = forM (zip poss types) $ \(pos, type_) -> do
+  t <- case type_ of
     Nothing -> freshVar
     Just t  -> do
-      checkKinds _annot t
+      checkKinds pos t
       instantiate (open t)
-  return (_ident, t)
+  return t
 
 throwHere :: SourcePos -> String -> TI s a
 throwHere annot msg = throwError $ show annot ++ ": " ++ msg
 
 inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident, Type (Open s))]
 inferLet isrec defns = do
-  let (binds, rhss) = unzipDefns defns
+  let (poss, idents, types, rhss) = unzipDefns defns
   t_rhss <- local level succ $ do
-    inst_binds <- instantiateAnnots binds
-    let env | isrec     = Map.fromList inst_binds
+    t_insts <- instantiateAnnots poss types
+    let env | isrec     = Map.fromList $ zip idents t_insts
             | otherwise = Map.empty
     t_rhss <- local locals (Map.union env) (mapM infer rhss)
-    zipWithM_ unify (map snd inst_binds) t_rhss
+    zipWithM_ unify t_insts t_rhss
     return t_rhss
   t_idents <- mapM generalize t_rhss
-  return $ zipWith (\MkBind{ _ident } t -> (_ident, t)) binds t_idents
+  return $ zip idents t_idents
 
 infer :: Expr SourcePos -> TI s (Type (Open s))
 infer expr = do
@@ -315,10 +315,11 @@ infer expr = do
       return t_res
     ApOp{} -> infer (desugarApOp expr)
     Lam{ _binds, _body } -> do
-      inst_binds <- instantiateAnnots _binds
-      let env = Map.fromList inst_binds
+      let (poss, idents, types) = unzipBinds _binds
+      t_insts <- instantiateAnnots poss types
+      let env = Map.fromList $ zipIdents idents t_insts
       t_body <- local locals (Map.union env) (infer _body)
-      return $ map snd inst_binds *~> t_body
+      return $ t_insts *~> t_body
     Let{ _annot, _isrec, _defns, _body } -> do
       env <- Map.fromList <$> inferLet _isrec _defns `catchError` throwHere _annot
       local locals (Map.union env) (infer _body)
@@ -332,12 +333,11 @@ infer expr = do
           then throwHere _annot $
                "wrong number of arguments for constructor " ++ show _cons
           else do
-          let (idents, _) = unzipBinds _binds
+          let (_, idents, _) = unzipBinds _binds
           (t_params, t_fields) <-
-            splitAt (length _params) <$>
-            instantiateMany (map open $ map var _params ++ _fields)
+            splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)
           unifyHere t_expr (app _name t_params)
-          let env = Map.fromList (zip idents t_fields)
+          let env = Map.fromList $ zipIdents idents t_fields
           t_rhs <- local locals (Map.union env) (infer _rhs)
           unifyHere t_res t_rhs
       return t_res

@@ -46,6 +46,7 @@ pukeko@Token.TokenParser
   , Token.parens
   -- , Token.braces
   -- , Token.commaSep
+  , Token.symbol
   , Token.whiteSpace
   } =
   Token.makeTokenParser pukekoDef
@@ -80,7 +81,6 @@ atype = choice
 asType :: Parser (Type Closed)
 asType = reservedOp ":" *> type_
 
-
 module_ :: Parser (Module SourcePos)
 module_ = many1 $ choice
   [ let_ Def <* optional (reservedOp ";;")
@@ -93,25 +93,29 @@ module_ = many1 $ choice
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-
-bind :: Bool -> Parser (Bind SourcePos)
-bind needParens =
+typed :: Bool -> (SourcePos -> a -> Maybe (Type Closed) -> b) -> Parser a -> Parser b
+typed needParens constr ident =
   if needParens then
-    MkBind <$> getPosition <*> variable <*> pure Nothing
+    constr <$> getPosition <*> ident <*> pure Nothing
     <|>
-    parens (MkBind <$> getPosition <*> variable <*> (Just <$> asType))
+    parens (constr <$> getPosition <*> ident <*> (Just <$> asType))
   else
-    MkBind <$> getPosition <*> variable <*> optionMaybe asType
+    constr <$> getPosition <*> ident <*> optionMaybe asType
   <?> "declaration"
 
+-- TODO: Parse underscore
+bind :: Bool -> Parser (Bind SourcePos)
+bind needParens =
+  typed needParens MkBind $ (Just <$> variable) <|> (symbol "_" *> pure Nothing)
+
 defnVal :: Parser (Defn SourcePos)
-defnVal = MkDefn <$> bind False <*> (equals *> expr)
+defnVal = typed False MkDefn variable <*> (equals *> expr)
 
 defnFun :: Parser (Defn SourcePos)
 defnFun =
-  MkDefn <$> (MkBind <$> getPosition
-                     <*> variable
-                     <*> pure Nothing)
+  MkDefn <$> getPosition
+         <*> variable
+         <*> pure Nothing
          <*> (Lam <$> getPosition
                   <*> many1 (bind True)
                   <*> (equals *> expr))

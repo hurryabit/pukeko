@@ -191,7 +191,7 @@ val prefix_bind : IO a -> (a -> IO b) -> IO b
 asm prefix_bind
 
 val prefix_semi : IO Unit -> IO a -> IO a
-let prefix_semi m1 m2 = m1 >>= fun x -> m2
+let prefix_semi m1 m2 = m1 >>= fun _ -> m2
 
 val sequence_io : List (IO a) -> IO (List a)
 let rec sequence_io ms =

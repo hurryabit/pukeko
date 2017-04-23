@@ -11,11 +11,14 @@ module Pukeko.Language.Syntax
   , desugarIf
   , unzipBinds
   , unzipDefns
-  , unzipDefns3
+  , zipIdents
   , Annot (..)
   , module Pukeko.Language.Ident
   )
   where
+
+import Data.List (unzip4)
+import Data.Maybe (catMaybes)
 
 import Pukeko.Language.ADT
 import Pukeko.Language.Ident
@@ -45,10 +48,11 @@ data Expr a
   deriving (Show, Functor)
 
 data Bind a =
-  MkBind { _annot :: a, _ident :: Ident, _type :: Maybe (Type Closed) }
+  MkBind { _annot :: a, _ident :: Maybe Ident, _type :: Maybe (Type Closed) }
   deriving (Show, Functor)
 
-data Defn a = MkDefn { _bind :: Bind a, _expr :: Expr a }
+data Defn a =
+  MkDefn { _annot :: a, _ident :: Ident, _type :: Maybe (Type Closed), _expr :: Expr a }
   deriving (Show, Functor)
 
 data Altn a =
@@ -87,15 +91,19 @@ desugarIf If{ _annot, _cond, _then, _else } =
         }
 desugarIf _ = error "desugarIf can only be applied to If nodes"
 
-unzipBinds :: [Bind a] -> ([Ident], [Maybe (Type Closed)])
-unzipBinds = unzip . map (\MkBind{ _ident, _type} -> (_ident, _type))
+lhs :: Defn a -> Bind a
+lhs MkDefn{ _annot, _ident, _type, _expr} =
+  MkBind{ _annot, _ident = Just _ident, _type }
 
-unzipDefns :: [Defn a] -> ([Bind a], [Expr a])
-unzipDefns = unzip . map (\MkDefn{ _bind, _expr} -> (_bind, _expr))
+unzipBinds :: [Bind a] -> ([a], [Maybe Ident], [Maybe (Type Closed)])
+unzipBinds = unzip3 . map (\MkBind{ _annot, _ident, _type } -> (_annot, _ident, _type))
 
-unzipDefns3 :: [Defn a] -> ([Ident], [Maybe (Type Closed)], [Expr a])
-unzipDefns3 = unzip3 .
-  map (\MkDefn{ _bind = MkBind{ _ident, _type }, _expr } -> (_ident, _type, _expr))
+unzipDefns :: [Defn a] -> ([a], [Ident], [Maybe (Type Closed)], [Expr a])
+unzipDefns = unzip4 .
+  map (\MkDefn{ _annot, _ident, _type, _expr } -> (_annot, _ident, _type, _expr))
+
+zipIdents :: [Maybe Ident] -> [a] -> [(Ident, a)]
+zipIdents idents = catMaybes . zipWith (\ident x -> (,) <$> ident <*> pure x) idents
 
 class Annot f where
   annot :: f a -> a
@@ -148,18 +156,20 @@ instance Pretty (Expr a) where
         map (pPrintPrec lvl 0) _altns
 
 instance Pretty (Defn a) where
-  pPrintPrec lvl _ MkDefn{ _bind, _expr } =
-    case _expr of
-      Lam { _binds, _body } ->
-        let lhs = pPrintPrec lvl 0 _bind <+> hsep (map (pPrintPrec lvl 1) _binds)
-        in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
-      _ -> hang (pPrintPrec lvl 0 _bind <+> equals) 2 (pPrintPrec lvl 0 _expr)
+  pPrintPrec lvl _ defn@MkDefn{ _ident, _type, _expr } =
+    let bind = lhs defn
+    in  case _expr of
+          Lam { _binds, _body } ->
+            let lhs = pPrintPrec lvl 0 bind <+> hsep (map (pPrintPrec lvl 1) _binds)
+            in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
+          _ -> hang (pPrintPrec lvl 0 bind <+> equals) 2 (pPrintPrec lvl 0 _expr)
 
 instance Pretty (Bind a) where
   pPrintPrec _ prec MkBind{ _ident, _type } =
-    case _type of
-      Nothing -> pretty _ident
-      Just t  -> maybeParens (prec > 0) $ pretty _ident <> colon <+> pretty t
+    let p_ident = maybe (text "_") pretty _ident
+    in case _type of
+         Nothing -> p_ident
+         Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
 
 instance Pretty (Altn a) where
   pPrintPrec lvl _ MkAltn{ _cons, _binds, _rhs } = hang

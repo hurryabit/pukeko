@@ -65,15 +65,15 @@ findConstructor ident = do
     Just constr -> return constr
 
 compileDefn :: MonadError String m => Map Ident Constructor -> Defn a -> m Global
-compileDefn _constrs MkDefn{ _bind = MkBind{ _ident }, _expr } = do
+compileDefn _constrs MkDefn{ _ident, _expr } = do
   let (binds, body) =
         case _expr of
           Lam { _binds, _body } -> (_binds, _body)
           _                     -> ([]    , _expr)
       n = length binds
-      (idents, _) = unzipBinds binds
+      (_, idents, _) = unzipBinds binds
       context = MkContext
-        { _offsets = Map.fromList (zip idents [n, n-1 ..])
+        { _offsets = Map.fromList $ zipIdents idents [n, n-1 ..]
         , _depth   = n
         , _constrs
         }
@@ -165,15 +165,15 @@ ccExpr mode expr =
     Lam { } -> throwError "All lambdas should be lifted by now"
     Let { _isrec = False, _defns, _body } -> do
       let n = length _defns
-          (idents, _, rhss) = unzipDefns3 _defns
+          (_, idents, _, rhss) = unzipDefns _defns
       zipWithM_ (\rhs k -> local depth (+k) $ ccExpr Stack rhs) rhss [0 ..]
-      localDecls idents $ ccExpr mode _body
+      localDecls (map Just idents) $ ccExpr mode _body
       whenStackOrEval mode $ tell [SLIDE n]
     Let { _isrec = True, _defns, _body } -> do
       let n = length _defns
-          (idents, _, rhss) = unzipDefns3 _defns
+          (_, idents, _, rhss) = unzipDefns _defns
       tell [ALLOC n]
-      localDecls idents $ do
+      localDecls (map Just idents) $ do
         zipWithM_ (\rhs k -> ccExpr Stack rhs >> tell [UPDATE (n-k)]) rhss [0 ..]
         ccExpr mode _body
       whenStackOrEval mode $ tell [SLIDE n]
@@ -200,17 +200,17 @@ ccAltn mode altns MkConstructor{ _name } =
     Nothing -> throwError $ "match statement does not mention " ++ show _name
     Just MkAltn{ _binds, _rhs } -> do
       let arity = length _binds
-          (idents, _) = unzipBinds _binds
+          (_, idents, _) = unzipBinds _binds
       tell [UNCONS arity]
       localDecls (reverse idents) (ccExpr mode _rhs)
       whenStackOrEval mode $ tell [SLIDE arity]
 
 
-localDecls :: [Ident] -> CC a -> CC a
+localDecls :: [Maybe Ident] -> CC a -> CC a
 localDecls idents cc = do
   let n = length idents
   d <- asks depth
-  let offs = Map.fromList (zip idents [d+1 ..])
+  let offs = Map.fromList $ zipIdents idents [d+1 ..]
   local offsets (Map.union offs) $ local depth (+n) $ cc
 
 name :: Ident -> Name
