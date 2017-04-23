@@ -15,7 +15,7 @@ import Pukeko.Language.Syntax
 
 type FvExpr = Expr (Set Ident)
 type FvDefn = Defn (Set Ident)
-type FvPatn = Patn (Set Ident)
+type FvBind = Bind (Set Ident)
 type FvAltn = Altn (Set Ident)
 
 data Env = MkEnv{ _bound :: Set Ident }
@@ -45,7 +45,7 @@ liftModule module_ =
 
 -- TODO: Fix the awful hack for the right naming of non-CAFs.
 liftTopDefn :: Defn a -> [FvDefn]
-liftTopDefn defn@MkDefn{ _patn = MkPatn{ _ident }, _expr } =
+liftTopDefn defn@MkDefn{ _bind = MkBind{ _ident }, _expr } =
   let env = MkEnv{ _bound = Set.empty }
       st0 = map (\n -> MkIdent $ unIdent _ident ++ '$':show n) [1 :: Int ..]
       is_lambda = case _expr of
@@ -56,23 +56,23 @@ liftTopDefn defn@MkDefn{ _patn = MkPatn{ _ident }, _expr } =
       (defn1, defns) = evalRWS (unLL $ liftDefn defn) env st
   in  if is_lambda then defns else defns ++ [defn1]
 
-liftPatn :: Patn a -> LL FvPatn
-liftPatn MkPatn{ _ident, _type } = do
+liftBind :: Bind a -> LL FvBind
+liftBind MkBind{ _ident, _type } = do
   let _annot = Set.singleton _ident
-  return MkPatn{ _annot, _ident, _type }
+  return MkBind{ _annot, _ident, _type }
 
 liftDefn :: Defn a -> LL FvDefn
-liftDefn MkDefn{ _patn, _expr } = do
-  _patn <- liftPatn _patn
+liftDefn MkDefn{ _bind, _expr } = do
+  _bind <- liftBind _bind
   _expr <- liftExpr _expr
-  return MkDefn{ _patn, _expr }
+  return MkDefn{ _bind, _expr }
 
 liftAltn :: Altn a -> LL FvAltn
-liftAltn MkAltn{ _cons, _patns, _rhs } = do
-  _patns <- mapM liftPatn _patns
-  _rhs  <- localize _patns (liftExpr _rhs)
-  let _annot = annot _rhs `Set.difference` Set.unions (map annot _patns)
-  return MkAltn{ _annot, _cons, _patns, _rhs }
+liftAltn MkAltn{ _cons, _binds, _rhs } = do
+  _binds <- mapM liftBind _binds
+  _rhs  <- localize _binds (liftExpr _rhs)
+  let _annot = annot _rhs `Set.difference` Set.unions (map annot _binds)
+  return MkAltn{ _annot, _cons, _binds, _rhs }
 
 liftExpr :: Expr a -> LL FvExpr
 liftExpr expr = case expr of
@@ -93,25 +93,25 @@ liftExpr expr = case expr of
     let _annot = annot _arg1 `Set.union` annot _arg2
     return ApOp{ _annot, _op, _arg1, _arg2 }
   Let{ _isrec, _defns, _body } -> do
-    let patns = map _patn _defns
-    _defns <- localize (if _isrec then patns else []) (mapM liftDefn _defns)
-    _body  <- localize patns (liftExpr _body)
-    let (patns, rhss) = unzipDefns _defns
-        fv_patns = Set.unions (map annot patns)
+    let binds = map _bind _defns
+    _defns <- localize (if _isrec then binds else []) (mapM liftDefn _defns)
+    _body  <- localize binds (liftExpr _body)
+    let (binds, rhss) = unzipDefns _defns
+        fv_binds = Set.unions (map annot binds)
         fv_rhss  = Set.unions (map annot rhss)
         fv_body  = annot _body
         _annot
-          | _isrec    = (fv_body `Set.union` fv_rhss) `Set.difference` fv_patns
-          | otherwise = (fv_body `Set.difference` fv_patns) `Set.union` fv_rhss
+          | _isrec    = (fv_body `Set.union` fv_rhss) `Set.difference` fv_binds
+          | otherwise = (fv_body `Set.difference` fv_binds) `Set.union` fv_rhss
     return Let{ _annot, _isrec, _defns, _body }
-  Lam{ _patns, _body } -> do
+  Lam{ _binds, _body } -> do
     _ident <- freshIdent
-    _body <- localize _patns (liftExpr _body)
-    _patns <- mapM liftPatn _patns
-    let _annot = annot _body `Set.difference` Set.unions (map annot _patns)
+    _body <- localize _binds (liftExpr _body)
+    _binds <- mapM liftBind _binds
+    let _annot = annot _body `Set.difference` Set.unions (map annot _binds)
         frees = Set.toList _annot
-    let rhs = Lam{ _annot = Set.empty, _patns = map mkPatn frees ++ _patns, _body }
-    tell [MkDefn{ _patn = mkPatn _ident, _expr = rhs }]
+    let rhs = Lam{ _annot = Set.empty, _binds = map mkBind frees ++ _binds, _body }
+    tell [MkDefn{ _bind = mkBind _ident, _expr = rhs }]
     return Ap{ _annot, _fun = mkVar False _ident, _args = map (mkVar True) frees }
   If{ _cond, _then, _else } -> do
     _cond <- liftExpr _cond
@@ -125,15 +125,15 @@ liftExpr expr = case expr of
     let _annot = annot _expr `Set.union` Set.unions (map annot _altns)
     return Match{ _annot, _expr, _altns }
 
-mkPatn :: Ident -> FvPatn
-mkPatn _ident = MkPatn{ _annot = Set.singleton _ident, _ident, _type = Nothing }
+mkBind :: Ident -> FvBind
+mkBind _ident = MkBind{ _annot = Set.singleton _ident, _ident, _type = Nothing }
 
 mkVar :: Bool -> Ident -> FvExpr
 mkVar is_local _ident =
   let _annot = if is_local then Set.singleton _ident else Set.empty
   in  Var{ _annot, _ident }
 
-localize :: [Patn a] -> LL b -> LL b
-localize patns ll = do
-  let (idents, _) = unzipPatns patns
+localize :: [Bind a] -> LL b -> LL b
+localize binds ll = do
+  let (idents, _) = unzipBinds binds
   local bound (Set.fromList idents `Set.union`) ll

@@ -94,26 +94,26 @@ module_ = many1 $ choice
   ]
 
 
-patn :: Bool -> Parser (Patn SourcePos)
-patn needParens =
+bind :: Bool -> Parser (Bind SourcePos)
+bind needParens =
   if needParens then
-    MkPatn <$> getPosition <*> variable <*> pure Nothing
+    MkBind <$> getPosition <*> variable <*> pure Nothing
     <|>
-    parens (MkPatn <$> getPosition <*> variable <*> (Just <$> asType))
+    parens (MkBind <$> getPosition <*> variable <*> (Just <$> asType))
   else
-    MkPatn <$> getPosition <*> variable <*> optionMaybe asType
+    MkBind <$> getPosition <*> variable <*> optionMaybe asType
   <?> "declaration"
 
 defnVal :: Parser (Defn SourcePos)
-defnVal = MkDefn <$> patn False <*> (equals *> expr)
+defnVal = MkDefn <$> bind False <*> (equals *> expr)
 
 defnFun :: Parser (Defn SourcePos)
 defnFun =
-  MkDefn <$> (MkPatn <$> getPosition
+  MkDefn <$> (MkBind <$> getPosition
                      <*> variable
                      <*> pure Nothing)
          <*> (Lam <$> getPosition
-                  <*> many1 (patn True)
+                  <*> many1 (bind True)
                   <*> (equals *> expr))
 
 defn :: Parser (Defn SourcePos)
@@ -123,7 +123,7 @@ altn :: Parser (Altn SourcePos)
 altn =
   MkAltn <$> getPosition
          <*> (bar *> constructor)
-         <*> many (patn True)
+         <*> many (bind True)
          <*> (arrow *> expr)
 
 let_ :: (SourcePos -> Bool -> [Defn SourcePos] -> a) -> Parser a
@@ -138,7 +138,7 @@ expr =
   [ mkAp <$> getPosition <*> aexpr <*> many aexpr
   , let_ Let <*> (reserved "in" *> expr)
   , Lam <$> getPosition
-        <*> (reserved "fun" *> many1 (patn True))
+        <*> (reserved "fun" *> many1 (bind True))
         <*> (arrow *> expr)
   , If  <$> getPosition
         <*> (reserved "if"   *> expr)

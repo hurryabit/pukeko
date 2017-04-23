@@ -3,7 +3,7 @@ module Pukeko.Language.Rewrite
   , bottomUpM
   , topDown
   , topDownM
-  , Rewrite (rewrite_expr, rewrite_defn, rewrite_patn, rewrite_altn)
+  , Rewrite (rewrite_expr, rewrite_defn, rewrite_bind, rewrite_altn)
   , emptyRewrite
   , runRewrite
   )
@@ -15,58 +15,58 @@ import Pukeko.Language.Syntax
 
 bottomUp :: (Expr a -> Expr a)
          -> (Defn a -> Defn a)
-         -> (Patn a -> Patn a)
+         -> (Bind a -> Bind a)
          -> (Altn a -> Altn a)
          -> (Expr a -> Expr a)
-bottomUp post_expr post_defn post_patn post_altn =
+bottomUp post_expr post_defn post_bind post_altn =
   runIdentity . bottomUpM
   (Identity . post_expr)
   (Identity . post_defn)
-  (Identity . post_patn)
+  (Identity . post_bind)
   (Identity . post_altn)
 
 bottomUpM :: Monad m => (Expr a -> m (Expr a))
                      -> (Defn a -> m (Defn a))
-                     -> (Patn a -> m (Patn a))
+                     -> (Bind a -> m (Bind a))
                      -> (Altn a -> m (Altn a))
                      -> (Expr a -> m (Expr a))
-bottomUpM post_expr post_defn post_patn post_altn =
+bottomUpM post_expr post_defn post_bind post_altn =
   runRewrite $ emptyRewrite
     { rewrite_expr = \descend expr -> descend expr >>= post_expr
     , rewrite_defn = \descend defn -> descend defn >>= post_defn
-    , rewrite_patn = \descend patn -> descend patn >>= post_patn
+    , rewrite_bind = \descend bind -> descend bind >>= post_bind
     , rewrite_altn = \descend altn -> descend altn >>= post_altn
     }
 
 topDown :: (Expr a -> Expr a)
         -> (Defn a -> Defn a)
-        -> (Patn a -> Patn a)
+        -> (Bind a -> Bind a)
         -> (Altn a -> Altn a)
         -> (Expr a -> Expr a)
-topDown pre_expr pre_defn pre_patn pre_altn =
+topDown pre_expr pre_defn pre_bind pre_altn =
   runIdentity . topDownM
   (Identity . pre_expr)
   (Identity . pre_defn)
-  (Identity . pre_patn)
+  (Identity . pre_bind)
   (Identity . pre_altn)
 
 topDownM :: Monad m => (Expr a -> m (Expr a))
                     -> (Defn a -> m (Defn a))
-                    -> (Patn a -> m (Patn a))
+                    -> (Bind a -> m (Bind a))
                     -> (Altn a -> m (Altn a))
                     -> (Expr a -> m (Expr a))
-topDownM pre_expr pre_defn pre_patn pre_altn =
+topDownM pre_expr pre_defn pre_bind pre_altn =
   runRewrite $ emptyRewrite
     { rewrite_expr = \descend expr -> pre_expr expr >>= descend
     , rewrite_defn = \descend defn -> pre_defn defn >>= descend
-    , rewrite_patn = \descend patn -> pre_patn patn >>= descend
+    , rewrite_bind = \descend bind -> pre_bind bind >>= descend
     , rewrite_altn = \descend altn -> pre_altn altn >>= descend
     }
 
 data Rewrite m a = MkRewrite
   { rewrite_expr :: (Expr a -> m (Expr a)) -> Expr a -> m (Expr a)
   , rewrite_defn :: (Defn a -> m (Defn a)) -> Defn a -> m (Defn a)
-  , rewrite_patn :: (Patn a -> m (Patn a)) -> Patn a -> m (Patn a)
+  , rewrite_bind :: (Bind a -> m (Bind a)) -> Bind a -> m (Bind a)
   , rewrite_altn :: (Altn a -> m (Altn a)) -> Altn a -> m (Altn a)
   }
 
@@ -74,17 +74,17 @@ emptyRewrite :: Rewrite m a
 emptyRewrite = MkRewrite
   { rewrite_expr = ($)
   , rewrite_defn = ($)
-  , rewrite_patn = ($)
+  , rewrite_bind = ($)
   , rewrite_altn = ($)
   }
 
 runRewrite :: Monad m => Rewrite m a -> Expr a -> m (Expr a)
-runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_patn, rewrite_altn } =
+runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_bind, rewrite_altn } =
   whole_expr
   where
     whole_expr = rewrite_expr sub_expr
     whole_defn = rewrite_defn sub_defn
-    whole_patn = rewrite_patn sub_patn
+    whole_bind = rewrite_bind sub_bind
     whole_altn = rewrite_altn sub_altn
     sub_expr expr = do
       case expr of
@@ -102,10 +102,10 @@ runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_patn, rewrite_altn } =
           _defns <- mapM whole_defn _defns
           _body  <- whole_expr _body
           return $ expr { _defns, _body }
-        Lam { _patns, _body } -> do
-          _patns <- mapM whole_patn _patns
+        Lam { _binds, _body } -> do
+          _binds <- mapM whole_bind _binds
           _body  <- whole_expr _body
-          return $ expr { _patns, _body }
+          return $ expr { _binds, _body }
         If { _cond, _then, _else } -> do
           _cond <- whole_expr _cond
           _then <- whole_expr _then
@@ -115,13 +115,13 @@ runRewrite MkRewrite{ rewrite_expr, rewrite_defn, rewrite_patn, rewrite_altn } =
           _expr  <- whole_expr _expr
           _altns <- mapM whole_altn _altns
           return $ expr { _expr, _altns }
-    sub_defn defn@MkDefn{ _patn , _expr } = do
-      _patn <- whole_patn _patn
+    sub_defn defn@MkDefn{ _bind , _expr } = do
+      _bind <- whole_bind _bind
       _expr <- whole_expr _expr
-      return $ defn { _patn, _expr }
-    sub_patn patn =
-      return $ patn
-    sub_altn altn@MkAltn{ _patns, _rhs } = do
-      _patns <- mapM whole_patn _patns
+      return $ defn { _bind, _expr }
+    sub_bind bind =
+      return $ bind
+    sub_altn altn@MkAltn{ _binds, _rhs } = do
+      _binds <- mapM whole_bind _binds
       _rhs   <- whole_expr _rhs
-      return $ altn { _patns, _rhs }
+      return $ altn { _binds, _rhs }

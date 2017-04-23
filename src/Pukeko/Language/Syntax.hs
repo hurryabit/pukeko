@@ -3,13 +3,13 @@ module Pukeko.Language.Syntax
   ( Module
   , TopLevel (..)
   , Expr (..)
-  , Patn (..)
+  , Bind (..)
   , Defn (..)
   , Altn (..)
   , mkAp
   , desugarApOp
   , desugarIf
-  , unzipPatns
+  , unzipBinds
   , unzipDefns
   , unzipDefns3
   , Annot (..)
@@ -39,20 +39,20 @@ data Expr a
   | Ap     { _annot :: a, _fun   :: Expr a, _args :: [Expr a] }
   | ApOp   { _annot :: a, _op    :: Ident, _arg1 :: Expr a, _arg2 :: Expr a }
   | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn a], _body :: Expr a }
-  | Lam    { _annot :: a, _patns :: [Patn a], _body :: Expr a }
+  | Lam    { _annot :: a, _binds :: [Bind a], _body :: Expr a }
   | If     { _annot :: a, _cond  :: Expr a, _then  :: Expr a, _else :: Expr a }
   | Match  { _annot :: a, _expr  :: Expr a, _altns :: [Altn a] }
   deriving (Show, Functor)
 
-data Patn a =
-  MkPatn { _annot :: a, _ident :: Ident, _type :: Maybe (Type Closed) }
+data Bind a =
+  MkBind { _annot :: a, _ident :: Ident, _type :: Maybe (Type Closed) }
   deriving (Show, Functor)
 
-data Defn a = MkDefn { _patn :: Patn a, _expr :: Expr a }
+data Defn a = MkDefn { _bind :: Bind a, _expr :: Expr a }
   deriving (Show, Functor)
 
 data Altn a =
-  MkAltn { _annot :: a, _cons :: Ident, _patns :: [Patn a], _rhs :: Expr a }
+  MkAltn { _annot :: a, _cons :: Ident, _binds :: [Bind a], _rhs :: Expr a }
   deriving (Show, Functor)
 
 mkAp :: a -> Expr a -> [Expr a] -> Expr a
@@ -75,27 +75,27 @@ desugarIf If{ _annot, _cond, _then, _else } =
         , _altns =
           [ MkAltn { _annot = annot _then
                    , _cons  = MkIdent "True"
-                   , _patns = []
+                   , _binds = []
                    , _rhs   = _then
                    }
           , MkAltn { _annot = annot _else
                    , _cons  = MkIdent "False"
-                   , _patns = []
+                   , _binds = []
                    , _rhs   = _else
                    }
           ]
         }
 desugarIf _ = error "desugarIf can only be applied to If nodes"
 
-unzipPatns :: [Patn a] -> ([Ident], [Maybe (Type Closed)])
-unzipPatns = unzip . map (\MkPatn{ _ident, _type} -> (_ident, _type))
+unzipBinds :: [Bind a] -> ([Ident], [Maybe (Type Closed)])
+unzipBinds = unzip . map (\MkBind{ _ident, _type} -> (_ident, _type))
 
-unzipDefns :: [Defn a] -> ([Patn a], [Expr a])
-unzipDefns = unzip . map (\MkDefn{ _patn, _expr} -> (_patn, _expr))
+unzipDefns :: [Defn a] -> ([Bind a], [Expr a])
+unzipDefns = unzip . map (\MkDefn{ _bind, _expr} -> (_bind, _expr))
 
 unzipDefns3 :: [Defn a] -> ([Ident], [Maybe (Type Closed)], [Expr a])
 unzipDefns3 = unzip3 .
-  map (\MkDefn{ _patn = MkPatn{ _ident, _type }, _expr } -> (_ident, _type, _expr))
+  map (\MkDefn{ _bind = MkBind{ _ident, _type }, _expr } -> (_ident, _type, _expr))
 
 class Annot f where
   annot :: f a -> a
@@ -130,9 +130,9 @@ instance Pretty (Expr a) where
               ]
             , pPrintPrec lvl 0 _body
             ]
-      Lam    { _patns, _body  } ->
+      Lam    { _binds, _body  } ->
         maybeParens (prec > 0) $ hsep
-          [ text "fun", hsep (map (pPrintPrec lvl 1) _patns)
+          [ text "fun", hsep (map (pPrintPrec lvl 1) _binds)
           , text "->" , pPrintPrec lvl 0 _body
           ]
       If { _cond, _then, _else } ->
@@ -148,22 +148,22 @@ instance Pretty (Expr a) where
         map (pPrintPrec lvl 0) _altns
 
 instance Pretty (Defn a) where
-  pPrintPrec lvl _ MkDefn{ _patn, _expr } =
+  pPrintPrec lvl _ MkDefn{ _bind, _expr } =
     case _expr of
-      Lam { _patns, _body } ->
-        let lhs = pPrintPrec lvl 0 _patn <+> hsep (map (pPrintPrec lvl 1) _patns)
+      Lam { _binds, _body } ->
+        let lhs = pPrintPrec lvl 0 _bind <+> hsep (map (pPrintPrec lvl 1) _binds)
         in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
-      _ -> hang (pPrintPrec lvl 0 _patn <+> equals) 2 (pPrintPrec lvl 0 _expr)
+      _ -> hang (pPrintPrec lvl 0 _bind <+> equals) 2 (pPrintPrec lvl 0 _expr)
 
-instance Pretty (Patn a) where
-  pPrintPrec _ prec MkPatn{ _ident, _type } =
+instance Pretty (Bind a) where
+  pPrintPrec _ prec MkBind{ _ident, _type } =
     case _type of
       Nothing -> pretty _ident
       Just t  -> maybeParens (prec > 0) $ pretty _ident <> colon <+> pretty t
 
 instance Pretty (Altn a) where
-  pPrintPrec lvl _ MkAltn{ _cons, _patns, _rhs } = hang
-    (hsep [text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _patns), text "->"]) 2
+  pPrintPrec lvl _ MkAltn{ _cons, _binds, _rhs } = hang
+    (hsep [text "|", pretty _cons, hsep (map (pPrintPrec lvl 1) _binds), text "->"]) 2
     (pPrintPrec lvl 0 _rhs)
 
 instance Annot TopLevel where
@@ -172,8 +172,8 @@ instance Annot TopLevel where
 instance Annot Expr where
   annot = _annot :: Expr _ -> _
 
-instance Annot Patn where
-  annot = _annot :: Patn _ -> _
+instance Annot Bind where
+  annot = _annot :: Bind _ -> _
 
 instance Annot Altn where
   annot = _annot :: Altn _ -> _

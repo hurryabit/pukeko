@@ -65,13 +65,13 @@ findConstructor ident = do
     Just constr -> return constr
 
 compileDefn :: MonadError String m => Map Ident Constructor -> Defn a -> m Global
-compileDefn _constrs MkDefn{ _patn = MkPatn{ _ident }, _expr } = do
-  let (patns, body) =
+compileDefn _constrs MkDefn{ _bind = MkBind{ _ident }, _expr } = do
+  let (binds, body) =
         case _expr of
-          Lam { _patns, _body } -> (_patns, _body)
+          Lam { _binds, _body } -> (_binds, _body)
           _                     -> ([]    , _expr)
-      n = length patns
-      (idents, _) = unzipPatns patns
+      n = length binds
+      (idents, _) = unzipBinds binds
       context = MkContext
         { _offsets = Map.fromList (zip idents [n, n-1 ..])
         , _depth   = n
@@ -198,9 +198,9 @@ ccAltn :: Mode -> [Altn a] -> Constructor -> CC ()
 ccAltn mode altns MkConstructor{ _name } =
   case List.find (\MkAltn{ _cons } -> _cons == _name) altns of
     Nothing -> throwError $ "match statement does not mention " ++ show _name
-    Just MkAltn{ _patns, _rhs } -> do
-      let arity = length _patns
-          (idents, _) = unzipPatns _patns
+    Just MkAltn{ _binds, _rhs } -> do
+      let arity = length _binds
+          (idents, _) = unzipBinds _binds
       tell [UNCONS arity]
       localDecls (reverse idents) (ccExpr mode _rhs)
       whenStackOrEval mode $ tell [SLIDE arity]
