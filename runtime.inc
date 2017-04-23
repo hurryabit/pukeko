@@ -96,6 +96,15 @@ default rel
 %endif
 %endmacro
 
+%macro g_assert_good_tag_or_fwd 2
+%ifdef DEBUG
+  cmp  byte [%1], TAG_FWD
+  je   %%ok
+  g_assert_good_tag %1, %2
+%%ok:
+%endif
+%endmacro
+
 ;; Heap operations
 %define TAG_ARITY_SIZE(tag, arity, size) tag | (arity << 8) | (size << 16)
 
@@ -223,7 +232,7 @@ __install__main__:
 %macro g_update 1
   @@(13)
   pop  rax
-  g_assert_good_tag rax, MSG_BAD_TAG_UPDATE
+  g_assert_good_tag_or_fwd rax, MSG_BAD_TAG_UPDATE
   mov  rbx, [rsp+8*(%1-1)]
   mov  [rsp+8*(%1-1)], rax
   mov  byte [rbx], TAG_FWD

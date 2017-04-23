@@ -59,7 +59,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_push 1
-g_eval
 g_update 4
 g_pop 3
 g_unwind
@@ -152,7 +151,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_push 1
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -195,7 +193,6 @@ g_jump .2
 g_label .1
 g_uncons 0
 g_pushglobal Nil, 0
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -204,7 +201,6 @@ g_label .2
 
 g_globstart prefix_semi$1, 2
 g_push 0
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -311,7 +307,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
-g_eval
 g_update 2
 g_pop 1
 g_unwind

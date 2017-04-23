@@ -116,10 +116,7 @@ ccExpr mode expr =
       case mode of
         Stack -> return ()
         Eval  -> tell [EVAL]
-        Redex -> do
-          -- TODO: This is not necessary if we've just pushed a non-CAF global
-          tell [EVAL]
-          continueRedex UNWIND
+        Redex -> continueRedex UNWIND
     Num { _int } -> do
       tell [PUSHINT _int]
       whenRedex mode $ continueRedex RETURN

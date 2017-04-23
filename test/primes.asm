@@ -62,7 +62,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_pushglobal abort, 0
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -90,7 +89,6 @@ g_jump .5
 g_label .4
 g_uncons 0
 g_push 0
-g_eval
 g_update 5
 g_pop 4
 g_unwind
@@ -106,7 +104,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_push 1
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -133,7 +130,6 @@ g_pushglobal append, 2
 g_mkap 2
 g_update 1
 g_push 0
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -145,7 +141,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
-g_eval
 g_update 4
 g_pop 3
 g_unwind
@@ -188,7 +183,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_pushglobal Nil, 0
-g_eval
 g_update 4
 g_pop 3
 g_unwind
@@ -206,7 +200,6 @@ g_jumpcase .3, .4
 g_label .3
 g_uncons 0
 g_push 0
-g_eval
 g_update 7
 g_pop 6
 g_unwind
@@ -232,7 +225,6 @@ g_pushglobal filter$1, 3
 g_mkap 2
 g_update 1
 g_push 0
-g_eval
 g_update 3
 g_pop 2
 g_unwind
@@ -256,7 +248,6 @@ g_jumpcase .0, .1
 g_label .0
 g_uncons 0
 g_pushglobal abort, 0
-g_eval
 g_update 2
 g_pop 1
 g_unwind
