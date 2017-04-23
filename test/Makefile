@@ -21,6 +21,7 @@ SOURCES     = monad_io.pu \
 							primes.pu \
 							catalan.pu \
 							wildcard.pu \
+							rmq.pu \
 							sort_gen.pu
 LAMBDAS     = $(SOURCES:.pu=.ll)
 ASSEMBLES   = $(SOURCES:.pu=.asm)

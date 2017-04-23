@@ -1,0 +1,86 @@
+val nats : List Int
+let nats =
+  let rec nats_from n = Cons n (nats_from (n+1)) in
+  nats_from 0
+
+val pair : (a -> a -> a) -> List a -> List a
+let rec pair op xs1 =
+  match xs1 with
+  | Nil -> Nil
+  | Cons x1 xs2 ->
+    match xs2 with
+    | Nil -> xs1
+    | Cons x2 xs3 -> Cons (op x1 x2) (pair op xs3)
+
+type RmqTree a =
+  | RmqEmpty
+  | RmqNode Int Int a (RmqTree a) (RmqTree a)
+
+val single : Int -> a -> RmqTree a
+let single i x = RmqNode i i x RmqEmpty RmqEmpty
+
+val combine : (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a
+let combine op t1 t2 =
+  match t1 with
+  | RmqEmpty -> abort
+  | RmqNode s1 _ v1 _ _ ->
+    match t2 with
+    | RmqEmpty -> abort
+    | RmqNode _ e2 v2 _ _ ->
+      RmqNode s1 e2 (op v1 v2) t1 t2
+
+val build : (a -> a -> a) -> List a -> RmqTree a
+let build op xs =
+  let rec run ts =
+    match ts with
+    | Nil -> abort
+    | Cons t1 ts2 ->
+      match ts2 with
+      | Nil -> t1
+      | Cons _ _ -> run (pair (combine op) ts)
+  in
+  run (zip_with single nats xs)
+
+val query : a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a
+let query one op q_lo q_hi =
+  let rec aux t =
+    match t with
+    | RmqEmpty -> one
+    | RmqNode t_lo t_hi value left right ->
+      if q_hi < t_lo || q_lo > t_hi then
+        one
+      else if q_lo <= t_lo && t_hi <= q_hi then
+        value
+      else
+        op (aux left) (aux right)
+  in
+  aux
+
+val infinity : Int
+let infinity = 1000000000
+
+val min : Int -> Int -> Int
+let min x y = if x <= y then x else y
+
+val replicate_io : Int -> IO a -> IO (List a)
+let replicate_io n act = sequence_io (replicate n act)
+
+val main : IO Unit
+let main =
+  input
+  >>= fun n ->
+  input
+  >>= fun m ->
+  replicate_io n input
+  >>= fun xs ->
+  let t = build min xs in
+  replicate_io m (
+      input
+      >>= fun lo ->
+      input
+      >>= fun hi ->
+      let res = query infinity min lo hi t in
+      print res
+  )
+  >>= fun x ->
+  return Unit

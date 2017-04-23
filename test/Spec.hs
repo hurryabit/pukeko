@@ -28,7 +28,7 @@ prop_prog_correct gen spec prog = monadicIO $ do
 prop_sort_correct :: FilePath -> Property
 prop_sort_correct =
   let gen = do
-        n <- choose (0, 100)
+        n <- choose (0, 1000)
         xs <- vectorOf n (choose (-1000, 1000))
         return (n:xs)
   in  prop_prog_correct gen (sort . tail)
@@ -81,6 +81,23 @@ spec_primes n =
       primes = 2 : 3 : sieve (scanl1 (+) (5 : cycle [2, 4]))
   in  primes !! n
 
+prop_rmq_correct :: FilePath -> Property
+prop_rmq_correct prog = monadicIO $ do
+  (m,n,xs,qs) <- pick $ do
+    m <- choose (1, 1000)
+    let n = 10
+    xs <- vectorOf m $ choose (-1000, 1000)
+    qs <- vectorOf n $ do
+      lo <- choose (0, m-1)
+      hi <- choose (lo, m-1)
+      return (lo, hi)
+    return (m, n, xs, qs)
+  let input = m:n:xs ++ concatMap (\(lo, hi) -> [lo, hi]) qs
+  (exitCode, stdout) <- run $ runProg prog input
+  assert (exitCode == ExitSuccess)
+  let output = map (\(lo, hi) -> minimum $ take (hi-lo+1) $ drop lo xs) qs
+  assert (stdout == render output)
+
 compile :: IO ()
 compile = do
   setCurrentDirectory "test"
@@ -101,3 +118,4 @@ main = hspec $ beforeAll_ compile $ do
     testFunction "catalan"  100 spec_catalan
     testBasic    "queens"   [8] [92]
     testFunction "primes"   100 spec_primes
+    specify "rmq" (prop_rmq_correct "rmq")
