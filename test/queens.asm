@@ -57,10 +57,9 @@ g_push 2
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
-g_push 1
-g_update 4
-g_pop 3
+g_pop 2
+g_update 2
+g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
@@ -83,12 +82,12 @@ g_eval
 g_leq
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
+g_pop 1
 g_push 1
 g_eval
 g_jumpcase .3, .4
 g_label .3
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 3
 g_pop 2
@@ -110,7 +109,7 @@ g_jump .5
 g_label .5
 g_jump .2
 g_label .1
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 3
 g_pop 2
@@ -122,7 +121,7 @@ g_push 1
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 4
 g_pop 3
@@ -133,7 +132,7 @@ g_push 4
 g_eval
 g_jumpcase .3, .4
 g_label .3
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 6
 g_pop 5
@@ -162,10 +161,8 @@ g_push 0
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
-g_push 1
-g_update 3
 g_pop 2
+g_update 1
 g_unwind
 g_label .1
 g_uncons 2
@@ -192,7 +189,7 @@ g_push 1
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 3
 g_pop 2
@@ -245,7 +242,7 @@ g_eval
 g_leq
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
+g_pop 1
 g_push 1
 g_pushint 1
 g_push 2
@@ -259,7 +256,7 @@ g_pop 2
 g_return
 g_jump .2
 g_label .1
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 3
 g_pop 2
@@ -271,7 +268,7 @@ g_push 0
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_update 3
 g_pop 2
@@ -282,10 +279,9 @@ g_push 3
 g_eval
 g_jumpcase .3, .4
 g_label .3
-g_uncons 0
-g_push 2
-g_update 5
-g_pop 4
+g_pop 3
+g_update 2
+g_pop 1
 g_unwind
 g_label .4
 g_uncons 2
@@ -296,7 +292,7 @@ g_eval
 g_les
 g_jumpcase .6, .7
 g_label .6
-g_uncons 0
+g_pop 1
 g_push 0
 g_eval
 g_push 3
@@ -304,7 +300,7 @@ g_eval
 g_eqv
 g_jumpcase .9, .10
 g_label .9
-g_uncons 0
+g_pop 1
 g_push 1
 g_push 5
 g_pushglobal diff, 2
@@ -312,7 +308,7 @@ g_updap 2, 7
 g_pop 6
 g_unwind
 g_label .10
-g_uncons 0
+g_pop 1
 g_push 1
 g_push 4
 g_pushglobal diff, 2
@@ -322,7 +318,7 @@ g_unwind
 g_label .11
 g_jump .8
 g_label .7
-g_uncons 0
+g_pop 1
 g_push 5
 g_push 4
 g_pushglobal diff, 2
@@ -404,7 +400,7 @@ g_push 0
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_uncons 0
+g_pop 1
 g_pushglobal Nil, 0
 g_pushglobal Nil, 0
 g_updcons 1, 2, 2
