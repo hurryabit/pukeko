@@ -23,6 +23,8 @@ default rel
 
 %define MAX_CON 32
 
+%define CAF_SIZE 3
+
 ;; Stats stuff
 %define step_ctr r14
 %define claim_ctr r15
@@ -137,10 +139,10 @@ default rel
 ;; TODO: make this faster
 %macro g_alloc 1
   @@(3*%1)
-  g_claim 2*%1
+  g_claim 3*%1
 %rep %1
   push rhp
-  g_create TAG_ARITY_SIZE(TAG_NIX, 0, 2), 0
+  g_create TAG_ARITY_SIZE(TAG_NIX, 0, 2), 0, 0
 %endrep
 %endmacro
 
@@ -152,7 +154,9 @@ section .data
   align 8
 __cafs__start__:
 %rep %0
-  CAF(%1): dq TAG_ARITY_SIZE(TAG_FUN, 0, 2), 0
+  CAF(%1):
+  dq TAG_ARITY_SIZE(TAG_FUN, 0, CAF_SIZE)
+  times (CAF_SIZE-1) dq 0
 %rotate 1
 %endrep
 __cafs__end__:
@@ -217,8 +221,12 @@ __install__main__:
 %endmacro
 
 %macro g_pop 1
+%if %1 = 0
+%fatal "g_pop 0 is invalid"
+%else
   @@(1)
   add rsp, 8*%1
+%endif
 %endmacro
 
 %macro g_slide 1
@@ -230,6 +238,9 @@ __install__main__:
 
 ;; TODO: Update inplace if space is sufficient.
 %macro g_update 1
+%if %1 = 0
+%fatal "g_update 0 is invalid"
+%else
   @@(13)
   pop  rax
   g_assert_good_tag_or_fwd rax, MSG_BAD_TAG_UPDATE
@@ -237,6 +248,7 @@ __install__main__:
   mov  [rsp+8*(%1-1)], rax
   mov  byte [rbx], TAG_FWD
   mov  [rbx+8], rax
+%endif
 %endmacro
 
 
@@ -261,7 +273,9 @@ __install__main__:
 %endmacro
 
 %macro g_mkap 1
-%if %1 > 0                      ; TODO: get rid of this check
+%if %1 = 0
+%fatal "g_mkap 0 is invalid"
+%else
   @@(10*%1+3)
   g_claim 3*%1
   mov  qword [rhp], TAG_ARITY_SIZE(TAG_APP, 0, 3)
@@ -278,11 +292,41 @@ __install__main__:
 %endif
 %endmacro
 
+%macro g_updap 2                ; %1 = arity, %2 = offset
+%if %1 = 0 || %2 = 0
+%fatal "g_updap %1, %2 is invalid"
+%elif %1 = 1
+  @@(11)
+  mov  rax, [rsp+8*(%2+1)]
+  mov  qword [rax], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  pop  qword [rax+ 8]
+  pop  qword [rax+16]
+%else
+  @@(10*%1+1)
+  g_claim 3*(%1-1)
+  mov  qword [rhp], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  pop  qword [rhp+ 8]
+  pop  qword [rhp+16]
+%rep %1 - 2
+  mov  qword [rhp+24], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rhp+32], rhp
+  pop  qword [rhp+40]
+  add  rhp, 24
+%endrep
+  mov  rax, [rsp+8*%2]
+  mov  qword [rax   ], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rax+ 8], rhp
+  pop  qword [rax+16]
+  add  rhp, 24
+%endif
+%endmacro
+
 %macro g_cons 2                 ; %1 = tag, %2 = arity
   @@(3+%2*3+4)
-%assign size 1+%2
-%if size < 2
+%if %2 = 0
 %assign size 2
+%else
+%assign size 1+%2
 %endif
   g_claim size
   mov  qword [rhp], TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
@@ -293,6 +337,28 @@ __install__main__:
 %endrep
   push rhp
   add  rhp, 8*size
+%endmacro
+
+%macro g_updcons 3              ; %1 = tag, %2 = arity, %3 = offset
+%if %3 = 0
+  %fatal "g_updcons %1, %2, %3 is invalid"
+%elif %2 > 2
+  g_cons %1, %2
+  g_update %3
+%else
+%if %2 = 0
+%assign size 2
+%else
+%assign size 1+%2
+%endif
+  mov  rax, [rsp+8*(%2+%3-1)]
+  mov  qword [rax], TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
+%assign idx 0
+%rep %2
+%assign idx idx+1
+  pop  qword [rax+8*idx]
+%endrep
+%endif
 %endmacro
 
 ;; TODO: Specialize case %1 = 0 if speed matters.

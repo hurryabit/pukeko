@@ -25,7 +25,9 @@ data GInst lab
   | PUSHINT     Int
   | PUSHGLOBAL  lab
   | MKAP        Int
+  | UPDAP       Int Int
   | CONS        Int Int
+  | UPDCONS     Int Int Int
   | UNCONS      Int
   -- Arithmetic
   | NEG

@@ -16,6 +16,8 @@
 
 #define LIM_CON 4
 
+#define CAF_SIZE 3
+
 typedef struct heap_cell {
   uint8_t tag;
   uint8_t arity;
@@ -154,7 +156,7 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
   }
   heap_cell* follow_ptr = info->heap_ptr;
 
-  for (heap_cell* caf_ptr = info->cafs_start; caf_ptr < info->cafs_end; caf_ptr += caf_ptr->size) {
+  for (heap_cell* caf_ptr = info->cafs_start; caf_ptr < info->cafs_end; caf_ptr += CAF_SIZE) {
     gc_assert_good_tag(caf_ptr, "gc_follow@cafs", true);
     gc_follow(info, caf_ptr);
   }

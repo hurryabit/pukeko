@@ -1,10 +1,10 @@
 benchmarking echo 13 | ./queens > /dev/null
-time                 10.96 s    (10.83 s .. 11.23 s)
+time                 9.694 s    (9.665 s .. 9.734 s)
                      1.000 R²   (1.000 R² .. 1.000 R²)
-mean                 11.05 s    (10.99 s .. 11.10 s)
-std dev              73.43 ms   (0.0 s .. 81.97 ms)
+mean                 9.690 s    (9.686 s .. 9.694 s)
+std dev              5.924 ms   (0.0 s .. 6.250 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
-Steps      :  29666882033
-Alloc bytes:  12144408672          (Checks:    426480050)
-GC runs    :          112
+Steps      :  26832719563
+Alloc bytes:  10133890888          (Checks:    391384726)
+GC runs    :           93

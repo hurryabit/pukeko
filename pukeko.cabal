@@ -18,6 +18,7 @@ library
                      , Pukeko.GMachine.Compiler
                      , Pukeko.GMachine.GCode
                      , Pukeko.GMachine.NASM
+                     , Pukeko.GMachine.PeepHole
                      , Pukeko.Language.ADT
                      , Pukeko.Language.Ident
                      , Pukeko.Language.LambdaLifter

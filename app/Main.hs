@@ -10,9 +10,9 @@ import Pukeko.Pretty
 
 import qualified Pukeko.GMachine.Compiler     as Compiler
 import qualified Pukeko.GMachine.NASM         as NASM
+import qualified Pukeko.GMachine.PeepHole     as PeepHole
 import qualified Pukeko.Language.LambdaLifter as Lifter
 import qualified Pukeko.Language.Parser       as Parser
--- import qualified Pukeko.Language.Type         as Type
 import qualified Pukeko.Language.TypeChecker  as TypeChecker
 
 compile :: Bool -> Bool -> Bool -> String -> IO ()
@@ -33,8 +33,9 @@ compile write_ll write_gm no_prelude file_user = do
         constrs <- TypeChecker.checkModule module_
         let lifted_expr = Lifter.liftModule module_
         program <- Compiler.compile constrs (fmap (const ()) lifted_expr)
-        nasm <- NASM.assemble program
-        return (lifted_expr, program, nasm)
+        let optProgram = PeepHole.optimize program
+        nasm <- NASM.assemble optProgram
+        return (lifted_expr, optProgram, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
