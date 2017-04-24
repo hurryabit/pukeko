@@ -22,7 +22,8 @@ SOURCES     = monad_io.pu \
 							catalan.pu \
 							wildcard.pu \
 							rmq.pu \
-							sort_gen.pu
+							sort_gen.pu \
+							rmq_gen.pu
 LAMBDAS     = $(SOURCES:.pu=.ll)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
@@ -51,7 +52,7 @@ gc.o: ../gc.c
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 clean:
-	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) sort*.in
+	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
 
 .PHONEY: all clean bench clean.bench
 
@@ -60,10 +61,10 @@ clean:
 bench: $(BENCHMARKS)
 
 sort400.in: sort_gen
-	echo 400000 | ./sort_gen > $@
+	echo 400000 | ./$< > $@
 
 sort20.in: sort_gen
-	echo 20000 | ./sort_gen > $@
+	echo 20000 | ./$< > $@
 
 qsort.bench: qsort sort400.in
 	bench "./$< < sort400.in > /dev/null" > $@
@@ -84,6 +85,13 @@ queens.bench: queens
 catalan.bench: catalan
 	bench "echo 1666 | ./$< > /dev/null" > $@
 	echo 1666 | ./$< > /dev/null 2>> $@
+
+rmq.in: rmq_gen
+	./$< > $@
+
+rmq.bench: rmq rmq.in
+	bench "./$< < rmq.in > /dev/null" > $@
+	./$< < rmq.in > /dev/null 2>> $@
 
 clean.bench:
 	rm -f $(BENCHMARKS)

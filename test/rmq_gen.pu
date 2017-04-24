@@ -1,0 +1,42 @@
+val gen : (a -> a) -> a -> List a
+let rec gen f x = Cons x (gen f (f x))
+
+val split_at : Int -> List a -> Pair (List a) (List a)
+let rec split_at n xs =
+  if n <= 0 then
+    Pair Nil xs
+  else
+    match xs with
+    | Nil -> Pair Nil Nil
+    | Cons x xs ->
+      match split_at (n-1) xs with
+      | Pair ys zs -> Pair (Cons x ys) zs
+
+val random : List Int
+let random = gen (fun x -> (91*x) % 1000000007) 1
+
+val main : IO Unit
+let main =
+  let n = 400000 in
+  print n;
+  let m = 100000 in
+  print m;
+  match split_at n random with
+  | Pair xs random ->
+    iter_io print xs;
+    match split_at m random with
+    | Pair ys random ->
+      let zs = take m random in
+      sequence_io (
+        zip_with
+          (fun y z ->
+             let y = y % n in
+             let z = z % n in
+             if y < z then
+               (print y; print z)
+             else
+               (print z; print y))
+          ys
+          zs)
+      >>= fun _ ->
+      return Unit
