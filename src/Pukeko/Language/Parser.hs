@@ -103,25 +103,24 @@ typed needParens constr ident =
     constr <$> getPosition <*> ident <*> optionMaybe asType
   <?> "declaration"
 
--- TODO: Parse underscore
 bind :: Bool -> Parser (Bind SourcePos)
 bind needParens =
   typed needParens MkBind $ (Just <$> variable) <|> (symbol "_" *> pure Nothing)
 
-defnVal :: Parser (Defn SourcePos)
-defnVal = typed False MkDefn variable <*> (equals *> expr)
+defnValLhs :: Parser (Expr SourcePos -> Defn SourcePos)
+defnValLhs = typed False MkDefn variable
 
-defnFun :: Parser (Defn SourcePos)
-defnFun =
-  MkDefn <$> getPosition
-         <*> variable
-         <*> pure Nothing
-         <*> (Lam <$> getPosition
-                  <*> many1 (bind True)
-                  <*> (equals *> expr))
+defnFunLhs :: Parser (Expr SourcePos -> Defn SourcePos)
+defnFunLhs =
+  (.) <$> (MkDefn <$> getPosition
+                  <*> variable
+                  <*> pure Nothing)
+      <*> (Lam <$> getPosition
+               <*> many1 (bind True))
 
+-- TODO: Improve this code.
 defn :: Parser (Defn SourcePos)
-defn = try defnVal <|> defnFun <?> "definition"
+defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
 
 altn :: Parser (Altn SourcePos)
 altn =
