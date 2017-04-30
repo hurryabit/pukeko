@@ -1,4 +1,7 @@
-module Pukeko.GMachine.NASM where
+module Pukeko.GMachine.NASM
+  ( assemble
+  )
+where
 
 import Control.Monad.Except
 import Data.List (isPrefixOf, intercalate)

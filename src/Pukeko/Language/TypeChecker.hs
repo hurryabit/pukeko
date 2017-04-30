@@ -2,7 +2,7 @@
 module Pukeko.Language.TypeChecker
   ( checkModule
   )
-  where
+where
 
 import Control.Monad
 import Control.Monad.Except
@@ -24,18 +24,20 @@ import Pukeko.Language.ADT
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type
 
+import qualified Pukeko.Language.Ident as Ident
+
 data Environment s = MkEnvironment
-  { _locals :: Map Ident (Type (Open s))
+  { _locals :: Map Ident.Var (Type (Open s))
   , _level  :: Int
   }
 
 data GlobalStatus = Imported | Declared | Defined
 
 data State = MkState
-  { _globals :: Map Ident (Type Closed, GlobalStatus)
-  , _types   :: Map Ident ADT
-  , _constrs :: Map Ident Constructor
-  , _fresh   :: [Ident]
+  { _globals :: Map Ident.Var (Type Closed, GlobalStatus)
+  , _types   :: Map Ident.Con ADT
+  , _constrs :: Map Ident.Con Constructor
+  , _fresh   :: [Ident.Var]
   }
 mkLabels [''Environment, ''State]
 
@@ -53,7 +55,7 @@ instance MonadFail (TI s) where
 liftST :: ST s a -> TI s a
 liftST = TI . lift . lift . lift
 
-checkModule :: MonadError String m => Module SourcePos -> m (Map Ident Constructor)
+checkModule :: MonadError String m => Module SourcePos -> m (Map Ident.Con Constructor)
 checkModule tops = do
   let env = MkEnvironment
         { _locals = Map.empty
@@ -122,7 +124,7 @@ addType _annot adt@MkADT{ _name } = do
     throwHere _annot $ "Type " ++ show _name ++ " has already been defined"
   modify types (Map.insert _name adt)
 
-findType :: SourcePos -> Ident -> TI s ADT
+findType :: SourcePos -> Ident.Con -> TI s ADT
 findType annot ident = do
   _types <- gets types
   case Map.lookup ident _types of
@@ -141,7 +143,7 @@ addConstructor annot constr@MkConstructor{ _adt = MkADT{ _params }, _name, _fiel
   mapM_ (checkKinds annot) _fields
   modify constrs (Map.insert _name constr)
 
-findConstructor :: SourcePos -> Ident -> TI s Constructor
+findConstructor :: SourcePos -> Ident.Con -> TI s Constructor
 findConstructor annot ident = do
   _constrs <- gets constrs
   case Map.lookup ident _constrs of
@@ -152,7 +154,7 @@ findConstructor annot ident = do
 resetFresh :: TI s ()
 resetFresh = do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
-  puts fresh (map MkIdent vars)
+  puts fresh (map Ident.variable vars)
 
 freshVar :: TI s (Type (Open s))
 freshVar = do
@@ -161,25 +163,20 @@ freshVar = do
   var <- liftST $ newSTRef $ Free { _ident, _level }
   return (TVar var)
 
-lookupType :: SourcePos -> Ident -> TI s (Type (Open s))
-lookupType annot ident
-  | isVariable ident = do
-      t_local <- Map.lookup ident <$> asks locals
-      case t_local of
-        Just t -> return t
-        Nothing -> do
-          t_global <- Map.lookup ident <$> gets globals
-          case t_global of
-            Just (t, Imported) -> return (open t)
-            Just (t, Defined)  -> return (open t)
-            Just (_, Declared) ->
-              throwHere annot $ "function " ++ show ident ++ " has not been defined yet"
-            Nothing ->
-              throwHere annot $ "function " ++ show ident ++ " is unknown"
-  | isConstructor ident = do
-      constr <- findConstructor annot ident
-      return $ open (typeOf constr)
-  | otherwise = throwHere annot $ "invalid symbol: " ++ show ident
+lookupType :: SourcePos -> Ident.Var -> TI s (Type (Open s))
+lookupType annot ident = do
+  t_local <- Map.lookup ident <$> asks locals
+  case t_local of
+    Just t -> return t
+    Nothing -> do
+      t_global <- Map.lookup ident <$> gets globals
+      case t_global of
+        Just (t, Imported) -> return (open t)
+        Just (t, Defined)  -> return (open t)
+        Just (_, Declared) ->
+          throwHere annot $ "function " ++ show ident ++ " has not been defined yet"
+        Nothing ->
+          throwHere annot $ "function " ++ show ident ++ " is unknown"
 
 occursCheck :: (STRef s (TypeVar (Open s))) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
@@ -252,7 +249,7 @@ instantiateMany :: [Type (Open s)] -> TI s [Type (Open s)]
 instantiateMany ts = evalStateT (mapM inst ts) Map.empty
   where
     inst :: Type (Open s)
-         -> StateT (Map Ident (Type (Open s))) (TI s) (Type (Open s))
+         -> StateT (Map Ident.Var (Type (Open s))) (TI s) (Type (Open s))
     inst t =
       case t of
         TVar tvr -> do
@@ -274,27 +271,26 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
 instantiate :: Type (Open s) -> TI s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateAnnots :: [SourcePos] -> [Maybe (Type Closed)] -> TI s [Type (Open s)]
-instantiateAnnots poss types = forM (zip poss types) $ \(pos, type_) -> do
-  t <- case type_ of
-    Nothing -> freshVar
-    Just t  -> do
-      checkKinds pos t
-      instantiate (open t)
-  return t
+instantiateBind :: BindGen _ SourcePos -> TI s (Type (Open s))
+instantiateBind MkBind{ _annot, _type } = case _type of
+  Nothing -> freshVar
+  Just t  -> do
+    checkKinds _annot t
+    instantiate (open t)
 
 throwHere :: SourcePos -> String -> TI s a
 throwHere annot msg = throwError $ show annot ++ ": " ++ msg
 
-inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident, Type (Open s))]
+inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident.Var, Type (Open s))]
 inferLet isrec defns = do
-  let (poss, idents, types, rhss) = unzipDefns defns
+  let (lhss, rhss) = unzipDefns defns
+      idents = map (_ident :: Bind _ -> _) lhss
   t_rhss <- local level succ $ do
-    t_insts <- instantiateAnnots poss types
-    let env | isrec     = Map.fromList $ zip idents t_insts
+    t_lhss <- mapM instantiateBind lhss
+    let env | isrec     = Map.fromList $ zip idents t_lhss
             | otherwise = Map.empty
     t_rhss <- local locals (Map.union env) (mapM infer rhss)
-    zipWithM_ unify t_insts t_rhss
+    zipWithM_ unify t_lhss t_rhss
     return t_rhss
   t_idents <- mapM generalize t_rhss
   return $ zip idents t_idents
@@ -303,8 +299,12 @@ infer :: Expr SourcePos -> TI s (Type (Open s))
 infer expr = do
   let unifyHere t1 t2 = unify t1 t2 `catchError` throwHere (annot expr)
   case expr of
-    Var{ _annot, _ident } -> do
-      t <- lookupType _annot _ident
+    Var{ _annot, _var } -> do
+      t <- lookupType _annot _var
+      instantiate t
+    Con{ _annot, _con } -> do
+      constr <- findConstructor _annot _con
+      let t = open (typeOf constr)
       instantiate t
     Num{} -> return (open int)
     Ap{ _fun, _args } -> do
@@ -313,13 +313,12 @@ infer expr = do
       t_res <- freshVar
       unifyHere t_fun (t_args *~> t_res)
       return t_res
-    ApOp{} -> infer (desugarApOp expr)
     Lam{ _binds, _body } -> do
-      let (poss, idents, types) = unzipBinds _binds
-      t_insts <- instantiateAnnots poss types
-      let env = Map.fromList $ zipIdents idents t_insts
+      let params = map (_ident :: Bind0 _ -> _) _binds
+      t_params <- mapM instantiateBind _binds
+      let env = Map.fromList $ zipMaybe params t_params
       t_body <- local locals (Map.union env) (infer _body)
-      return $ t_insts *~> t_body
+      return $ t_params *~> t_body
     Let{ _annot, _isrec, _defns, _body } -> do
       env <- Map.fromList <$> inferLet _isrec _defns `catchError` throwHere _annot
       local locals (Map.union env) (infer _body)
@@ -327,17 +326,17 @@ infer expr = do
     Match{ _expr, _altns } -> do
       t_expr <- infer _expr
       t_res <- freshVar
-      forM_ _altns $ \MkAltn{ _annot, _cons, _binds, _rhs } -> do
-        MkConstructor{ _adt = MkADT{ _name, _params }, _fields } <- findConstructor _annot _cons
+      forM_ _altns $ \MkAltn{ _annot, _con, _binds, _rhs } -> do
+        MkConstructor{ _adt = MkADT{ _name, _params }, _fields } <- findConstructor _annot _con
         if length _binds /= length _fields
           then throwHere _annot $
-               "wrong number of arguments for constructor " ++ show _cons
+               "wrong number of arguments for constructor " ++ show _con
           else do
-          let (_, idents, _) = unzipBinds _binds
+          let idents = map (_ident :: Bind0 _ -> _) _binds
           (t_params, t_fields) <-
             splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)
           unifyHere t_expr (app _name t_params)
-          let env = Map.fromList $ zipIdents idents t_fields
+          let env = Map.fromList $ zipMaybe idents t_fields
           t_rhs <- local locals (Map.union env) (infer _rhs)
           unifyHere t_res t_rhs
       return t_res

@@ -2,66 +2,57 @@ module Pukeko.Language.Operator
   ( Spec (..)
   , Assoc (..)
   , table
-  , syms
+  , letters
   , aprec
-  , find
-  , findByName
+  , mangle
   )
-  where
+where
 
 import Data.Map (Map)
 import Data.Ratio ()
 import Text.Parsec.Expr (Assoc (..))
-
-import qualified Data.List as List
 import qualified Data.Map as Map
 
-import Pukeko.Language.Ident
+import Pukeko.Pretty
 
-data Spec =
-  MkSpec { _sym :: String, _name :: Ident, _prec :: Rational, _assoc :: Assoc }
+data Spec = MkSpec{ _sym :: String, _prec :: Rational, _assoc :: Assoc }
 
-mkSpec :: Assoc -> String -> String -> Spec
-mkSpec _assoc _sym _name =
-  MkSpec { _sym, _name = MkIdent ("prefix_" ++_name), _prec = undefined, _assoc }
+mangleTable :: Map Char Char
+mangleTable = Map.fromList
+  [ ('+', 'p'), ('-', 'm'), ('*', 't'), ('/', 'd'), ('%', 'r')
+  , ('=', 'e'), ('<', 'l'), ('>', 'g'), ('!', 'n')
+  , ('&', 'a'), ('|', 'o'), (';', 's'), (':', 'c')
+  ]
 
-left, right, none :: String -> String -> Spec
+mangle :: String -> Maybe String
+mangle "" = Nothing
+mangle xs = ("op$" ++) <$> traverse (`Map.lookup` mangleTable) xs
+
+letters :: [Char]
+letters = Map.keys mangleTable
+
+mkSpec :: Assoc -> String -> Spec
+mkSpec _assoc _sym = case mangle _sym of
+  Just _  -> MkSpec{ _sym, _prec = undefined, _assoc }
+  Nothing -> perror $ text "invalid operator name:" <> quotes (text _sym)
+
+left, right, none :: String -> Spec
 left  = mkSpec AssocLeft
 right = mkSpec AssocRight
 none  = mkSpec AssocNone
 
 table :: [[Spec]]
 table = fixPrecs
-  [ [left ">>=" "bind", left ";" "semi"]
-  , [right "||" "or" ]
-  , [right "&&" "and"]
-  , zipWith none
-    ["<" , "<=", "==", "!=", ">=", ">" ]
-    ["lt", "le", "eq", "ne", "ge", "gt"]
-  , [right "+" "add", none "-" "sub"]
-  , [right "*" "mul", none "/" "div", none "%" "mod"]
+  [ [left ">>=", left ";"]
+  , [right "||"]
+  , [right "&&"]
+  , map none ["<" , "<=", "==", "!=", ">=", ">" ]
+  , [right "+", none "-"]
+  , [right "*", none "/", none "%"]
   ]
-
-syms :: [String]
-syms = map _sym (concat table)
 
 aprec :: Rational
 aprec = fromIntegral (length table + 1)
-
-dict :: Map String Spec
-dict = Map.fromList $ map (\spec -> (_sym spec, spec)) (concat table)
-
-find :: String -> Spec
-find sym =
-  case Map.lookup sym dict of
-    Nothing  -> error ("unknown operator: " ++ sym)
-    Just res -> res
-
-findByName :: Ident -> Spec
-findByName name =
-  case List.find (\spec -> _name spec == name) (concat table) of
-    Nothing  -> error ("unknown operator name: " ++ show name)
-    Just res -> res
 
 fixPrecs :: [[Spec]] -> [[Spec]]
 fixPrecs = zipWith (\prec -> map (\spec -> spec { _prec = prec })) [1 ..]

@@ -14,6 +14,7 @@ import Pukeko.Language.Operator (Spec (..))
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type (Type, Closed, var, (~>), app)
 
+import qualified Pukeko.Language.Ident    as Ident
 import qualified Pukeko.Language.Operator as Operator
 
 parseModule :: MonadError String m => String -> String -> m (Module SourcePos)
@@ -32,20 +33,20 @@ pukekoDef = haskellStyle
       , "if", "then", "else"
       , "match", "with"
       , "type"
-      , "asm"
+      , "external"
       ]
-  , Token.opStart  = Token.opLetter pukekoDef
-  , Token.opLetter = Token.opLetter haskellStyle <|> char ';'
-  , Token.reservedOpNames = ["=", "->", ":", ".", "|", ";;"] ++ Operator.syms
+  , Token.opStart  = oneOf Operator.letters
+  , Token.opLetter = oneOf Operator.letters
+  , Token.reservedOpNames = ["=", "->", ":", ".", "|"]
   }
 
 pukeko@Token.TokenParser
   { Token.reserved
   , Token.reservedOp
+  , Token.operator
   , Token.natural
+  , Token.identifier
   , Token.parens
-  -- , Token.braces
-  -- , Token.commaSep
   , Token.symbol
   , Token.whiteSpace
   } =
@@ -59,10 +60,12 @@ equals  = reservedOp "="
 arrow   = reservedOp "->"
 bar     = reservedOp "|"
 
-identifier, variable, constructor  :: Parser Ident
-identifier  = MkIdent <$> Token.identifier pukeko
-variable    = lookAhead lower *> identifier
-constructor = lookAhead upper *> identifier
+variable, alphaVariable :: Parser Ident.Var
+alphaVariable = Ident.variable <$> (lookAhead lower *> identifier)
+variable = alphaVariable <|> Ident.operator <$> try (parens operator)
+
+constructor :: Parser Ident.Con
+constructor = Ident.constructor <$> (lookAhead upper *> Token.identifier pukeko)
 
 type_, atype :: Parser (Type Closed)
 type_ =
@@ -73,7 +76,7 @@ type_ =
     )
   <?> "type"
 atype = choice
-  [ var <$> variable
+  [ var <$> alphaVariable
   , app <$> constructor <*> pure []
   , parens type_
   ]
@@ -85,7 +88,8 @@ module_ :: Parser (Module SourcePos)
 module_ = many1 $ choice
   [ let_ Def <* optional (reservedOp ";;")
   , Asm <$> getPosition
-        <*> (reserved "asm" *> variable)
+        <*> (reserved "external" *> variable)
+        <*> (equals *> Token.stringLiteral pukeko)
   , Val <$> getPosition
         <*> (reserved "val" *> variable)
         <*> asType
@@ -104,19 +108,19 @@ typed needParens constr ident =
   <?> "declaration"
 
 bind :: Bool -> Parser (Bind SourcePos)
-bind needParens =
-  typed needParens MkBind $ (Just <$> variable) <|> (symbol "_" *> pure Nothing)
+bind needParens = typed needParens MkBind $ variable
+
+bind0 :: Bool -> Parser (Bind0 SourcePos)
+bind0 needParens =
+  typed needParens MkBind (Just <$> variable <|> symbol "_" *> pure Nothing)
 
 defnValLhs :: Parser (Expr SourcePos -> Defn SourcePos)
-defnValLhs = typed False MkDefn variable
+defnValLhs = MkDefn <$> bind False
 
 defnFunLhs :: Parser (Expr SourcePos -> Defn SourcePos)
 defnFunLhs =
-  (.) <$> (MkDefn <$> getPosition
-                  <*> variable
-                  <*> pure Nothing)
-      <*> (Lam <$> getPosition
-               <*> many1 (bind True))
+  (.) <$> (MkDefn <$> (MkBind <$> getPosition <*> variable <*> pure Nothing))
+      <*> (Lam <$> getPosition <*> many1 (bind0 True))
 
 -- TODO: Improve this code.
 defn :: Parser (Defn SourcePos)
@@ -126,7 +130,7 @@ altn :: Parser (Altn SourcePos)
 altn =
   MkAltn <$> getPosition
          <*> (bar *> constructor)
-         <*> many (bind True)
+         <*> many (bind0 True)
          <*> (arrow *> expr)
 
 let_ :: (SourcePos -> Bool -> [Defn SourcePos] -> a) -> Parser a
@@ -141,7 +145,7 @@ expr =
   [ mkAp <$> getPosition <*> aexpr <*> many aexpr
   , let_ Let <*> (reserved "in" *> expr)
   , Lam <$> getPosition
-        <*> (reserved "fun" *> many1 (bind True))
+        <*> (reserved "fun" *> many1 (bind0 True))
         <*> (arrow *> expr)
   , If  <$> getPosition
         <*> (reserved "if"   *> expr)
@@ -153,15 +157,15 @@ expr =
   ])
   <?> "expression"
 aexpr = choice
-  [ Var <$> getPosition <*> identifier
+  [ Var <$> getPosition <*> variable
+  , Con <$> getPosition <*> constructor
   , Num <$> getPosition <*> nat
   , parens expr
   ]
 
 operatorTable = map (map f) (reverse Operator.table)
   where
-    f MkSpec { _sym, _name, _assoc } =
-      Infix (ApOp <$> getPosition <*> (reservedOp _sym *> pure _name)) _assoc
+    f MkSpec { _sym, _assoc } = Infix (mkApOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
 
 adt :: Parser ADT
 adt = mkADT <$> constructor

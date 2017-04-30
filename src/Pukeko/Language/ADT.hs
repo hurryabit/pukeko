@@ -5,18 +5,19 @@ module Pukeko.Language.ADT
   , mkADT
   , mkConstructor
   , typeOf
-  )where
+  )
+where
 
-import Pukeko.Language.Ident
 import Pukeko.Language.Type
+import qualified Pukeko.Language.Ident as Ident
 
 data ADT = MkADT
-  { _name         :: Ident
-  , _params       :: [Ident]
+  { _name         :: Ident.Con
+  , _params       :: [Ident.Var]
   , _constructors :: [Constructor]
   }
 
-mkADT :: Ident -> [Ident] -> [Constructor] -> ADT
+mkADT :: Ident.Con -> [Ident.Var] -> [Constructor] -> ADT
 mkADT _name _params constructors =
   let _adt = MkADT
         { _name
@@ -28,19 +29,19 @@ mkADT _name _params constructors =
 
 data Constructor = MkConstructor
   { _adt    :: ADT
-  , _name   :: Ident
+  , _name   :: Ident.Con
   , _tag    :: Int
   , _fields :: [Type Closed]
   }
 
-mkConstructor :: Ident -> [Type Closed] -> Constructor
+mkConstructor :: Ident.Con -> [Type Closed] -> Constructor
 mkConstructor _name _fields =
   MkConstructor { _adt = undefined, _name, _tag = undefined, _fields }
 
 adt :: ADT -> [Type Closed] -> Type Closed
 adt MkADT{ _name } = app _name
 
-constructors :: ADT -> [(Ident, Type Closed)]
+constructors :: ADT -> [(Ident.Con, Type Closed)]
 constructors t@MkADT{ _params, _constructors } = map f _constructors
   where
     f MkConstructor{ _name, _fields } =

@@ -22,8 +22,9 @@ import Data.STRef
 
 import qualified Data.Set as Set
 
-import Pukeko.Language.Ident
 import Pukeko.Pretty hiding (int)
+
+import qualified Pukeko.Language.Ident as Ident
 
 infixr 1 ~>, *~>
 
@@ -31,20 +32,17 @@ data Open s
 data Closed
 
 data TypeVar s
-  = Free { _ident :: Ident, _level :: Int }
+  = Free { _ident :: Ident.Var, _level :: Int }
   | Link { _type  :: Type s }
 
 data Type a where
   TVar :: STRef s (TypeVar (Open s)) -> Type (Open s)
-  QVar :: Ident                      -> Type a
-  TFun :: Type a -> Type a           -> Type a
-  TApp :: Ident  -> [Type a]         -> Type a
+  QVar :: Ident.Var                  -> Type a
+  TFun :: Type a    -> Type a        -> Type a
+  TApp :: Ident.Con -> [Type a]      -> Type a
 
-var :: Ident -> Type a
-var ident
-  | isVariable ident = QVar ident
-  | otherwise        = perror $
-    pretty ident <+> text "is not a valid variable name"
+var :: Ident.Var -> Type a
+var = QVar
 
 (~>) :: Type a -> Type a -> Type a
 (~>) = TFun
@@ -52,14 +50,11 @@ var ident
 (*~>) :: [Type a] -> Type a -> Type a
 t_args *~> t_res = foldr (~>) t_res t_args
 
-app :: Ident -> [Type a] -> Type a
-app ident ts
-  | isConstructor ident = TApp ident ts
-  | otherwise           = perror $
-    pPrint ident <+> text "is not a valid type constructor name"
+app :: Ident.Con -> [Type a] -> Type a
+app = TApp
 
 int :: Type Closed
-int  = app (MkIdent "Int")  []
+int  = app (Ident.constructor "Int")  []
 
 open :: Type Closed -> Type (Open s)
 open t =
@@ -68,7 +63,7 @@ open t =
     TFun tx ty -> TFun (open tx) (open ty)
     TApp c  ts -> TApp c (map open ts)
 
-qvars :: Type Closed -> Set Ident
+qvars :: Type Closed -> Set Ident.Var
 qvars t = case t of
   QVar _ident -> Set.singleton _ident
   TFun t_arg t_res -> qvars t_arg `Set.union` qvars t_res

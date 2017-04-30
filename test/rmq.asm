@@ -1,7 +1,58 @@
-g_declare_cafs False, Nil, RmqEmpty, True, Unit, abort, nats, infinity, main
+g_declare_cafs gm$cons_0_0, gm$cons_1_0, gm$abort, nats, infinity, main
 g_declare_main main
 
-g_globstart prefix_add, 2
+g_globstart gm$cons_0_0, 0
+g_updcons 0, 0, 1
+g_return
+
+g_globstart gm$cons_1_0, 0
+g_updcons 1, 0, 1
+g_return
+
+g_globstart gm$cons_1_2, 2
+g_updcons 1, 2, 1
+g_return
+
+g_globstart gm$cons_1_5, 5
+g_updcons 1, 5, 1
+g_return
+
+g_globstart gm$abort, 0
+g_abort
+
+g_globstart op$aa, 2
+g_push 0
+g_eval
+g_jumpcase .0, .1
+g_label .0
+g_pop 1
+g_pushglobal gm$cons_0_0, 0
+g_update 3
+g_pop 2
+g_unwind
+g_label .1
+g_pop 2
+g_update 1
+g_unwind
+g_label .2
+
+g_globstart op$oo, 2
+g_push 0
+g_eval
+g_jumpcase .0, .1
+g_label .0
+g_pop 2
+g_update 1
+g_unwind
+g_label .1
+g_pop 1
+g_pushglobal gm$cons_1_0, 0
+g_update 3
+g_pop 2
+g_unwind
+g_label .2
+
+g_globstart gm$add, 2
 g_push 1
 g_eval
 g_push 1
@@ -11,7 +62,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_sub, 2
+g_globstart gm$sub, 2
 g_push 1
 g_eval
 g_push 1
@@ -21,7 +72,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_lt, 2
+g_globstart gm$lt, 2
 g_push 1
 g_eval
 g_push 1
@@ -31,7 +82,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_le, 2
+g_globstart gm$le, 2
 g_push 1
 g_eval
 g_push 1
@@ -41,7 +92,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart prefix_gt, 2
+g_globstart gm$gt, 2
 g_push 1
 g_eval
 g_push 1
@@ -51,95 +102,13 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart False, 0
-g_updcons 0, 0, 1
-g_return
-
-g_globstart Nil, 0
-g_updcons 0, 0, 1
-g_return
-
-g_globstart RmqEmpty, 0
-g_updcons 0, 0, 1
-g_return
-
-g_globstart True, 0
-g_updcons 1, 0, 1
-g_return
-
-g_globstart Unit, 0
-g_updcons 0, 0, 1
-g_return
-
-g_globstart return, 2
-g_updcons 0, 2, 1
-g_return
-
-g_globstart print, 2
-g_eval
-g_print
-g_cons 0, 0
-g_updcons 0, 2, 1
-g_return
-
-g_globstart input, 1
-g_input
-g_updcons 0, 2, 1
-g_return
-
-g_globstart prefix_bind, 3
-g_push 2
-g_push 1
-g_mkap 1
-g_eval
-g_uncons 2
-g_push 3
-g_updap 2, 4
-g_pop 3
-g_unwind
-
-g_globstart abort, 0
-g_abort
-
-g_globstart prefix_and, 2
-g_push 0
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 1
-g_pushglobal False, 0
-g_update 3
-g_pop 2
-g_unwind
-g_label .1
-g_pop 2
-g_update 1
-g_unwind
-g_label .2
-
-g_globstart prefix_or, 2
-g_push 0
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 2
-g_update 1
-g_unwind
-g_label .1
-g_pop 1
-g_pushglobal True, 0
-g_update 3
-g_pop 2
-g_unwind
-g_label .2
-
 g_globstart zip_with, 3
 g_push 1
 g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_pushglobal Nil, 0
+g_pushglobal gm$cons_0_0, 0
 g_update 4
 g_pop 3
 g_unwind
@@ -150,7 +119,7 @@ g_eval
 g_jumpcase .3, .4
 g_label .3
 g_pop 1
-g_pushglobal Nil, 0
+g_pushglobal gm$cons_0_0, 0
 g_update 6
 g_pop 5
 g_unwind
@@ -184,7 +153,7 @@ g_pop 1
 g_push 1
 g_pushint 1
 g_push 2
-g_pushglobal prefix_sub, 2
+g_pushglobal gm$sub, 2
 g_mkap 2
 g_pushglobal replicate, 2
 g_mkap 2
@@ -195,17 +164,44 @@ g_return
 g_jump .2
 g_label .1
 g_pop 1
-g_pushglobal Nil, 0
+g_pushglobal gm$cons_0_0, 0
 g_update 3
 g_pop 2
 g_unwind
 g_label .2
 
+g_globstart gm$return, 2
+g_updcons 0, 2, 1
+g_return
+
+g_globstart gm$print, 2
+g_eval
+g_print
+g_cons 0, 0
+g_updcons 0, 2, 1
+g_return
+
+g_globstart gm$input, 1
+g_input
+g_updcons 0, 2, 1
+g_return
+
+g_globstart gm$bind, 3
+g_push 2
+g_push 1
+g_mkap 1
+g_eval
+g_uncons 2
+g_push 3
+g_updap 2, 4
+g_pop 3
+g_unwind
+
 g_globstart sequence_io$2, 2
 g_push 1
 g_push 1
 g_cons 1, 2
-g_pushglobal return, 2
+g_pushglobal gm$return, 2
 g_updap 1, 3
 g_pop 2
 g_unwind
@@ -217,7 +213,7 @@ g_mkap 1
 g_push 1
 g_pushglobal sequence_io, 1
 g_mkap 1
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$bind, 3
 g_updap 2, 3
 g_pop 2
 g_unwind
@@ -228,8 +224,8 @@ g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_pushglobal Nil, 0
-g_pushglobal return, 2
+g_pushglobal gm$cons_0_0, 0
+g_pushglobal gm$return, 2
 g_updap 1, 2
 g_pop 1
 g_unwind
@@ -239,7 +235,7 @@ g_push 1
 g_pushglobal sequence_io$1, 2
 g_mkap 1
 g_push 1
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$bind, 3
 g_updap 2, 4
 g_pop 3
 g_unwind
@@ -248,7 +244,7 @@ g_label .2
 g_globstart nats$1, 2
 g_pushint 1
 g_push 2
-g_pushglobal prefix_add, 2
+g_pushglobal gm$add, 2
 g_mkap 2
 g_push 1
 g_mkap 1
@@ -274,7 +270,7 @@ g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_pushglobal Nil, 0
+g_pushglobal gm$cons_0_0, 0
 g_update 3
 g_pop 2
 g_unwind
@@ -306,8 +302,8 @@ g_jump .2
 g_label .2
 
 g_globstart single, 2
-g_pushglobal RmqEmpty, 0
-g_pushglobal RmqEmpty, 0
+g_pushglobal gm$cons_0_0, 0
+g_pushglobal gm$cons_0_0, 0
 g_push 3
 g_push 3
 g_push 4
@@ -321,7 +317,7 @@ g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_pushglobal abort, 0
+g_pushglobal gm$abort, 0
 g_update 4
 g_pop 3
 g_unwind
@@ -332,7 +328,7 @@ g_eval
 g_jumpcase .3, .4
 g_label .3
 g_pop 1
-g_pushglobal abort, 0
+g_pushglobal gm$abort, 0
 g_update 9
 g_pop 8
 g_unwind
@@ -360,7 +356,7 @@ g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_pushglobal abort, 0
+g_pushglobal gm$abort, 0
 g_update 4
 g_pop 3
 g_unwind
@@ -419,13 +415,13 @@ g_label .1
 g_uncons 5
 g_push 1
 g_push 10
-g_pushglobal prefix_gt, 2
+g_pushglobal gm$gt, 2
 g_mkap 2
 g_push 1
 g_push 10
-g_pushglobal prefix_lt, 2
+g_pushglobal gm$lt, 2
 g_mkap 2
-g_pushglobal prefix_or, 2
+g_pushglobal op$oo, 2
 g_mkap 2
 g_eval
 g_jumpcase .3, .4
@@ -433,13 +429,13 @@ g_label .3
 g_pop 1
 g_push 8
 g_push 2
-g_pushglobal prefix_le, 2
+g_pushglobal gm$le, 2
 g_mkap 2
 g_push 1
 g_push 11
-g_pushglobal prefix_le, 2
+g_pushglobal gm$le, 2
 g_mkap 2
-g_pushglobal prefix_and, 2
+g_pushglobal op$aa, 2
 g_mkap 2
 g_eval
 g_jumpcase .6, .7
@@ -526,7 +522,7 @@ g_pushglobal infinity, 0
 g_pushglobal query, 4
 g_mkap 5
 g_push 0
-g_pushglobal print, 2
+g_pushglobal gm$print, 2
 g_updap 1, 5
 g_pop 4
 g_unwind
@@ -536,15 +532,15 @@ g_push 0
 g_push 2
 g_pushglobal main$5, 3
 g_mkap 2
-g_pushglobal input, 1
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$input, 1
+g_pushglobal gm$bind, 3
 g_updap 2, 3
 g_pop 2
 g_unwind
 
 g_globstart main$6, 1
-g_pushglobal Unit, 0
-g_pushglobal return, 2
+g_pushglobal gm$cons_0_0, 0
+g_pushglobal gm$return, 2
 g_updap 1, 2
 g_pop 1
 g_unwind
@@ -558,13 +554,13 @@ g_pushglobal main$6, 1
 g_push 1
 g_pushglobal main$4, 2
 g_mkap 1
-g_pushglobal input, 1
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$input, 1
+g_pushglobal gm$bind, 3
 g_mkap 2
 g_push 3
 g_pushglobal replicate_io, 2
 g_mkap 2
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$bind, 3
 g_updap 2, 4
 g_pop 3
 g_unwind
@@ -573,11 +569,11 @@ g_globstart main$2, 2
 g_push 1
 g_pushglobal main$3, 2
 g_mkap 1
-g_pushglobal input, 1
+g_pushglobal gm$input, 1
 g_push 2
 g_pushglobal replicate_io, 2
 g_mkap 2
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$bind, 3
 g_updap 2, 3
 g_pop 2
 g_unwind
@@ -586,15 +582,15 @@ g_globstart main$1, 1
 g_push 0
 g_pushglobal main$2, 2
 g_mkap 1
-g_pushglobal input, 1
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$input, 1
+g_pushglobal gm$bind, 3
 g_updap 2, 2
 g_pop 1
 g_unwind
 
 g_globstart main, 0
 g_pushglobal main$1, 1
-g_pushglobal input, 1
-g_pushglobal prefix_bind, 3
+g_pushglobal gm$input, 1
+g_pushglobal gm$bind, 3
 g_updap 2, 1
 g_unwind

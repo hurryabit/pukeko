@@ -1,38 +1,54 @@
 module Pukeko.GMachine.Builtins
-  ( everything
-  , binops
+  ( externalName
+  , constructorName
+  , constructor
+  , findGlobal
+  , findInline
   )
   where
 
+import Control.Monad.Except
+import Data.Map (Map)
+import qualified Data.Map as Map
+
+import Pukeko.Pretty
 import Pukeko.GMachine.GCode
-import Pukeko.Language.ADT (Constructor (..))
-import Pukeko.Language.Ident
 
-mkGlobal :: String -> Int -> [GInst String] -> Global
-mkGlobal name _arity code =
-  let _name = Name name
-      _code = GLOBSTART _name _arity : map (fmap Name) code
-  in  MkGlobal { _name, _arity, _code }
+externalName :: Name -> Name
+externalName (MkName name) = MkName ("gm$" ++ name)
 
-everything :: [Constructor] -> [Global]
-everything constrs = concat
-  [ neg : map (snd . snd) binops
-  , map mkConstr constrs
-  , [ return_, print_, input, prefix_bind
-    , abort
-    ]
-  ]
+constructorName :: Int -> Int -> Name
+constructorName tag arity = MkName ("gm$cons_" ++ show tag ++ "_" ++ show arity)
+
+findGlobal :: MonadError String m => Name -> m Global
+findGlobal name = case Map.lookup (externalName name) globalTable of
+  Nothing -> perror $ text "Unknown external:" <+> quotes (pretty name)
+  Just global -> return global
+
+mkBuiltinGen :: Name -> Int -> [Inst] -> Global
+mkBuiltinGen _name _arity code =
+  let _code = GLOBSTART _name _arity : code
+  in  MkGlobal{_name, _arity, _code}
+
+mkBuiltin :: String -> Int -> [Inst] -> Global
+mkBuiltin = mkBuiltinGen . externalName . MkName
+
+globalTable :: Map Name Global
+globalTable =
+  Map.fromList $
+  map (\global@MkGlobal{_name} -> (_name, global)) $
+  neg : map fst binops ++ [return_, print_, input, bind, abort]
 
 -- TODO: Produce more efficient code in Redex mode.
 neg :: Global
-neg = mkGlobal "neg" 1
+neg = mkBuiltin "neg" 1
   [ EVAL
   , NEG
   , UPDATE 1
   , RETURN
   ]
 
-binops :: [(Ident, (Inst, Global))]
+binops :: [(Global, Inst)]
 binops =
   [ mk "add" ADD
   , mk "sub" SUB
@@ -47,36 +63,33 @@ binops =
   , mk "gt"  GTR
   ]
   where
-    mk name inst = (MkIdent prefix_name, (fmap Name inst, global))
-      where
-        prefix_name = "prefix_" ++ name
-        global = mkGlobal prefix_name 2
-          [ PUSH 1
-          , EVAL
-          , PUSH 1
-          , EVAL
-          , inst
-          , UPDATE 3
-          , POP 2
-          , RETURN
-          ]
+    mk name inst =
+      let global = mkBuiltin name 2
+            [ PUSH 1
+            , EVAL
+            , PUSH 1
+            , EVAL
+            , inst
+            , UPDATE 3
+            , POP 2
+            , RETURN
+            ]
+      in  (global, inst)
 
-mkConstr :: Constructor -> Global
-mkConstr MkConstructor{ _name, _tag, _fields } =
-  let arity = length _fields
-  in  mkGlobal (unIdent _name) arity
-      [ CONS _tag arity
-      , UPDATE 1
-      , RETURN
-      ]
+constructor :: Int -> Int -> Global
+constructor tag arity = mkBuiltinGen (constructorName tag arity) arity
+  [ CONS tag arity
+  , UPDATE 1
+  , RETURN
+  ]
 
-return_, print_, input, prefix_bind :: Global
-return_ = mkGlobal "return" 2
+return_, print_, input, bind :: Global
+return_ = mkBuiltin "return" 2
   [ CONS 0 2
   , UPDATE 1
   , RETURN
   ]
-print_ = mkGlobal "print" 2
+print_ = mkBuiltin "print" 2
   [ EVAL
   , PRINT
   , CONS 0 0 -- unit
@@ -84,13 +97,13 @@ print_ = mkGlobal "print" 2
   , UPDATE 1
   , RETURN
   ]
-input = mkGlobal "input" 1
+input = mkBuiltin "input" 1
   [ INPUT
   , CONS 0 2 -- pair
   , UPDATE 1
   , RETURN
   ]
-prefix_bind = mkGlobal "prefix_bind" 3
+bind = mkBuiltin "bind" 3
   [ PUSH 2
   , PUSH 1
   , MKAP 1
@@ -104,18 +117,12 @@ prefix_bind = mkGlobal "prefix_bind" 3
   ]
 
 abort :: Global
-abort = mkGlobal "abort" 0 [ABORT]
+abort = mkBuiltin "abort" 0 [ABORT]
 
-{-
-type IO a = World -> (a, World)
+inlineTable :: Map Name (Inst, Int)
+inlineTable =
+  Map.fromList $
+  map (\(MkGlobal{_name, _arity}, inst) -> (_name, (inst, _arity))) binops
 
-print :: Int -> IO ()
-print n world = {- print it -}; ((), world)
-
-return :: a -> IO a
-return x world = (x, world)
-
-bind :: IO a -> (a -> IO b) -> IO b
-bind m f world =
-  let (x, world') = m world in f x world'
--}
+findInline :: Name -> Maybe (Inst, Int)
+findInline name = Map.lookup (externalName name) inlineTable

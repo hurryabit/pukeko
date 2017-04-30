@@ -2,7 +2,7 @@
 
 -- Fundamental functions
 val abort : a
-asm abort
+external abort = "abort"
 
 -- Unit
 type Unit =
@@ -16,50 +16,50 @@ type Bool =
 val not : Bool -> Bool
 let not x = if x then False else True
 
-val prefix_and : Bool -> Bool -> Bool
-let prefix_and x y = if x then y     else False
+val (&&) : Bool -> Bool -> Bool
+let (&&) x y = if x then y else False
 
-val prefix_or  : Bool -> Bool -> Bool
-let prefix_or  x y = if x then True  else y
+val (||) : Bool -> Bool -> Bool
+let (||) x y = if x then True else y
 
 -- Integers
 type Int
 
 val neg : Int -> Int
-asm neg
+external neg = "neg"
 
-val prefix_add : Int -> Int -> Int
-asm prefix_add
+val (+) : Int -> Int -> Int
+external (+) = "add"
 
-val prefix_sub : Int -> Int -> Int
-asm prefix_sub
+val (-) : Int -> Int -> Int
+external (-) = "sub"
 
-val prefix_mul : Int -> Int -> Int
-asm prefix_mul
+val ( * ) : Int -> Int -> Int
+external ( * ) = "mul"
 
-val prefix_div : Int -> Int -> Int
-asm prefix_div
+val (/) : Int -> Int -> Int
+external (/) = "div"
 
-val prefix_mod : Int -> Int -> Int
-asm prefix_mod
+val (%) : Int -> Int -> Int
+external (%) = "mod"
 
-val prefix_eq : Int -> Int -> Bool
-asm prefix_eq
+val (==) : Int -> Int -> Bool
+external (==) = "eq"
 
-val prefix_ne : Int -> Int -> Bool
-asm prefix_ne
+val (!=) : Int -> Int -> Bool
+external (!=) = "ne"
 
-val prefix_lt : Int -> Int -> Bool
-asm prefix_lt
+val (<) : Int -> Int -> Bool
+external (<) = "lt"
 
-val prefix_le : Int -> Int -> Bool
-asm prefix_le
+val (<=) : Int -> Int -> Bool
+external (<=) = "le"
 
-val prefix_ge : Int -> Int -> Bool
-asm prefix_ge
+val (>=) : Int -> Int -> Bool
+external (>=) = "ge"
 
-val prefix_gt : Int -> Int -> Bool
-asm prefix_gt
+val (>) : Int -> Int -> Bool
+external (>) = "gt"
 
 -- Some fundamental types
 type Pair a b =
@@ -179,19 +179,19 @@ let rec in_order t =
 type IO a
 
 val return : a -> IO a
-asm return
+external return = "return"
 
 val print : Int -> IO Unit
-asm print
+external print = "print"
 
 val input : IO Int
-asm input
+external input = "input"
 
-val prefix_bind : IO a -> (a -> IO b) -> IO b
-asm prefix_bind
+val (>>=) : IO a -> (a -> IO b) -> IO b
+external (>>=) = "bind"
 
-val prefix_semi : IO Unit -> IO a -> IO a
-let prefix_semi m1 m2 = m1 >>= fun _ -> m2
+val (;) : IO Unit -> IO a -> IO a
+let (;) m1 m2 = m1 >>= fun _ -> m2
 
 val sequence_io : List (IO a) -> IO (List a)
 let rec sequence_io ms =

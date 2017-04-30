@@ -36,6 +36,8 @@ BENCHMARKS  = qsort.bench \
 
 all: $(EXECUTABLES)
 
+asm: $(ASSEMBLES)
+
 %.asm: %.pu prelude.pu
 	$(COMP) $<
 
@@ -54,7 +56,7 @@ gc.o: ../gc.c
 clean:
 	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
 
-.PHONEY: all clean bench clean.bench
+.PHONEY: all asm clean bench clean.bench
 
 .PRECIOUS: %.asm %.ll
 

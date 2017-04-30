@@ -14,16 +14,22 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:    src
-  exposed-modules:     Pukeko.GMachine.Builtins
+  exposed-modules:     Pukeko.Core.Info
+                     , Pukeko.Core.Syntax
+                     , Pukeko.GMachine.Builtins
                      , Pukeko.GMachine.Compiler
                      , Pukeko.GMachine.GCode
                      , Pukeko.GMachine.NASM
                      , Pukeko.GMachine.PeepHole
                      , Pukeko.Language.ADT
+                     , Pukeko.Language.CoreCompiler
+                     , Pukeko.Language.DeadCode
+                     , Pukeko.Language.FreeVars
                      , Pukeko.Language.Ident
                      , Pukeko.Language.LambdaLifter
                      , Pukeko.Language.Operator
                      , Pukeko.Language.Parser
+                     , Pukeko.Language.PatternMatcher
                      , Pukeko.Language.Rewrite
                      , Pukeko.Language.Syntax
                      , Pukeko.Language.Type

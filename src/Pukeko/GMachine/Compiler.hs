@@ -10,23 +10,17 @@ import Control.Monad.RWS hiding (asks, local)
 import Data.Label.Derive
 import Data.Label.Monadic
 import Data.Map (Map)
-import Data.Set (Set)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import qualified Data.List as List
-import qualified Data.Map  as Map
-import qualified Data.Set  as Set
-
+import Pukeko.Core.Info
+import Pukeko.Core.Syntax
 import Pukeko.GMachine.GCode
-import Pukeko.Language.ADT
-import Pukeko.Language.Syntax
-
-import qualified Pukeko.GMachine.GCode    as GCode
-import qualified Pukeko.GMachine.Builtins as Builtins
+import Pukeko.GMachine.Builtins as Builtins
 
 data Context = MkContext
-  { _offsets :: Map Ident Int
+  { _offsets :: Map Name Int
   , _depth   :: Int
-  , _constrs :: Map Ident Constructor
   }
 mkLabels [''Context]
 
@@ -38,53 +32,33 @@ newtype CC a = CC { unCC :: ExceptT String (RWS Context [Inst] Int) a }
            )
 
 freshLabel :: CC Name
-freshLabel = CC $ state $ \n -> (Name ('.':show n), n+1)
+freshLabel = CC $ state $ \n -> (MkName ('.':show n), n+1)
 
-compile :: MonadError String m => Map Ident Constructor -> Expr () -> m Program
-compile constrs Let{ _isrec = True, _defns, _body = Var{ _ident }} = do
-  globals <- mapM (compileDefn constrs) _defns
-  let all_globals = Builtins.everything (Map.elems constrs) ++ globals
-      name_to_global =
-        Map.fromList $ map (\global -> (GCode._name global, global)) all_globals
-      deps name =
-        case Map.lookup name name_to_global of
-          Nothing     -> throwError $ "Unknown global: " ++ unName name
-          Just global -> return $ dependencies global
-  let _main = name _ident
-  reachable_names <- saturate deps _main
-  let _globals =
-        filter (\global -> GCode._name global `Set.member` reachable_names) all_globals
-  return $ MkProgram { _globals, _main }
-compile _ _ = throwError "compile expects output of lambda lifter"
+compile :: MonadError String m => Module -> m Program
+compile module_ = do
+  let MkInfo{_constructors} = info module_
+  let constructors =
+        map (uncurry Builtins.constructor) (Set.toList _constructors)
+  globals <- mapM compileTopDefn module_
+  let _globals = constructors ++ globals
+  return MkProgram{ _globals, _main = MkName "main" }
 
-findConstructor :: Ident -> CC Constructor
-findConstructor ident = do
-  _constrs <- asks constrs
-  case Map.lookup ident _constrs of
-    Nothing -> throwError $ "unknown constructor: " ++ show ident
-    Just constr -> return constr
-
-compileDefn :: MonadError String m => Map Ident Constructor -> Defn a -> m Global
-compileDefn _constrs MkDefn{ _ident, _expr } = do
-  let (binds, body) =
-        case _expr of
-          Lam { _binds, _body } -> (_binds, _body)
-          _                     -> ([]    , _expr)
-      n = length binds
-      (_, idents, _) = unzipBinds binds
-      context = MkContext
-        { _offsets = Map.fromList $ zipIdents idents [n, n-1 ..]
-        , _depth   = n
-        , _constrs
-        }
-      (res, code) = evalRWS (runExceptT (unCC $ ccExpr Redex body)) context 0
-  case res of
-    Left error -> throwError error
-    Right ()   -> do
-      let _name  = name _ident
-          _arity = n
-          _code  = GLOBSTART _name _arity : code
-      return $ MkGlobal { _name, _arity, _code }
+compileTopDefn :: MonadError String m => TopLevel -> m Global
+compileTopDefn top = case top of
+  Def{_name, _binds, _body} -> do
+    let n = length _binds
+        context = MkContext
+          { _offsets = Map.fromList $ zipMaybe _binds [n, n-1 ..]
+          , _depth   = n
+          }
+        (res, code) = evalRWS (runExceptT (unCC $ ccExpr Redex _body)) context 0
+    case res of
+      Left error -> throwError error
+      Right ()   -> do
+        let _arity = n
+            _code  = GLOBSTART _name _arity : code
+        return $ MkGlobal { _name, _arity, _code }
+  Asm{_name} -> Builtins.findGlobal _name
 
 data Mode = Stack | Eval | Redex
 
@@ -105,124 +79,108 @@ continueRedex inst = do
   d <- asks depth
   tell [UPDATE (d+1), POP d, inst]
 
-ccExpr :: Mode -> Expr a -> CC ()
+ccExpr :: Mode -> Expr -> CC ()
 ccExpr mode expr =
   case expr of
-    Var { _ident } -> do
+    Local{_name} -> do
       MkContext { _offsets, _depth } <- ask
-      case Map.lookup _ident _offsets of
-        Nothing     -> tell [PUSHGLOBAL (name _ident)]
+      case Map.lookup _name _offsets of
+        Nothing     -> error "BUG: unknown local variable in compiler"
         Just offset -> tell [PUSH (_depth - offset)]
       case mode of
         Stack -> return ()
         Eval  -> tell [EVAL]
         Redex -> continueRedex UNWIND
-    Num { _int } -> do
+    Global{_name} -> do
+      tell [PUSHGLOBAL _name]
+      case mode of
+        Stack -> return ()
+        Eval  -> tell [EVAL]
+        Redex -> continueRedex UNWIND
+    External{_name} ->
+      ccExpr mode $ Global{_name = Builtins.externalName _name}
+    Pack{ _tag, _arity } -> do
+      let _name = Builtins.constructorName _tag _arity
+      ccExpr mode $ Global{_name}
+    Num{ _int } -> do
       tell [PUSHINT _int]
       whenRedex mode $ continueRedex RETURN
     Ap{ _fun, _args } -> do
       let n = length _args
-      constr_tag <-
-        case _fun of
-          Var{ _ident }
-            | isConstructor _ident -> do
-                MkConstructor{ _tag, _fields } <- findConstructor _ident
-                case length _fields `compare` n of
-                  LT -> throwError $
-                    "constructor " ++ show _ident ++ " has too many arguments"
-                  EQ | n > 0 -> return (Just _tag)
-                  _          -> return Nothing
-          _ -> return Nothing
-      let ccExprAt i expr = local depth (+i) $ ccExpr Stack expr
-      zipWithM_ ccExprAt [0..] (reverse _args)
-      case constr_tag of
-        Just tag -> do
-          tell [CONS tag n]
-          case mode of
-            Stack -> return ()
-            Eval  -> return ()
-            Redex -> continueRedex RETURN
-        Nothing -> do
-          ccExprAt n _fun
-          tell [MKAP n]
-          case mode of
-            Stack -> return ()
-            Eval  -> tell [EVAL]
-            Redex -> continueRedex UNWIND
-    ApOp{ _op, _arg1, _arg2 } -> do
-      let eval continue = do
-            case lookup _op Builtins.binops of
-              Nothing -> ccExpr mode $ desugarApOp expr
-              Just (inst, _) -> do
-                ccExpr Eval _arg2
-                local depth succ $ ccExpr Eval _arg1
-                tell [inst]
-                continue
-      case mode of
-        Stack -> ccExpr mode $ desugarApOp expr
-        Eval  -> eval $ return ()
-        Redex -> eval $ continueRedex RETURN
-    Lam { } -> throwError "All lambdas should be lifted by now"
-    Let { _isrec = False, _defns, _body } -> do
+      let ccExprAt mode i expr = local depth (+i) $ ccExpr mode expr
+          ccArgs mode = zipWithM_ (ccExprAt mode) [0..] (reverse _args)
+      let ccDefault = do
+            ccArgs Stack
+            ccExprAt Stack n _fun
+            tell [MKAP n]
+            case mode of
+              Stack -> return ()
+              Eval  -> tell [EVAL]
+              Redex -> continueRedex UNWIND
+      case _fun of
+        Pack{_tag, _arity}
+          | n > _arity -> error "BUG: overapplied constructor in compiler"
+          | n == _arity && _arity > 0 -> do
+              ccArgs Stack
+              tell [CONS _tag _arity]
+              case mode of
+                Stack -> return ()
+                Eval  -> return ()
+                Redex -> continueRedex RETURN
+          | otherwise -> ccDefault
+        External{_name} ->
+          case Builtins.findInline _name of
+            Nothing -> ccDefault
+            Just (inst, arity)
+              | n == arity -> do
+                  let eval continue = do
+                        ccArgs Eval
+                        tell [inst]
+                        continue
+                  case mode of
+                    Stack -> ccDefault
+                    Eval  -> eval $ return ()
+                    Redex -> eval $ continueRedex RETURN
+              | otherwise -> ccDefault
+        _ -> ccDefault
+    Let{ _isrec = False, _defns, _body } -> do
       let n = length _defns
-          (_, idents, _, rhss) = unzipDefns _defns
+          (idents, rhss) = unzipDefns _defns
       zipWithM_ (\rhs k -> local depth (+k) $ ccExpr Stack rhs) rhss [0 ..]
       localDecls (map Just idents) $ ccExpr mode _body
       whenStackOrEval mode $ tell [SLIDE n]
-    Let { _isrec = True, _defns, _body } -> do
+    Let{ _isrec = True, _defns, _body } -> do
       let n = length _defns
-          (_, idents, _, rhss) = unzipDefns _defns
+          (idents, rhss) = unzipDefns _defns
       tell [ALLOC n]
       localDecls (map Just idents) $ do
         zipWithM_ (\rhs k -> ccExpr Stack rhs >> tell [UPDATE (n-k)]) rhss [0 ..]
         ccExpr mode _body
       whenStackOrEval mode $ tell [SLIDE n]
-    If { } -> ccExpr mode $ desugarIf expr
     Match{ _expr, _altns } -> do
       ccExpr Eval _expr
-      let MkAltn{ _cons }:_ = _altns
-      MkConstructor{ _adt = MkADT{ _constructors } } <- findConstructor _cons
-      case _constructors of
-        [c] -> ccAltn mode _altns c
-        cs -> do
-          ls <- mapM (\_ -> freshLabel) cs
+      case _altns of
+        [altn] -> ccAltn mode altn
+        _ -> do
+          ls <- mapM (\_ -> freshLabel) _altns
           done <- freshLabel
           tell [JUMPCASE ls]
-          forM_ (zip ls cs) $ \(l, c) -> do
+          forM_ (zip ls _altns) $ \(l, altn) -> do
             tell [LABEL l]
-            ccAltn mode _altns c
+            ccAltn mode altn
             tell [JUMP done]
           tell [LABEL done]
 
-ccAltn :: Mode -> [Altn a] -> Constructor -> CC ()
-ccAltn mode altns MkConstructor{ _name } =
-  case List.find (\MkAltn{ _cons } -> _cons == _name) altns of
-    Nothing -> throwError $ "match statement does not mention " ++ show _name
-    Just MkAltn{ _binds, _rhs } -> do
-      let arity = length _binds
-          (_, idents, _) = unzipBinds _binds
-      tell [UNCONS arity]
-      localDecls (reverse idents) (ccExpr mode _rhs)
-      whenStackOrEval mode $ tell [SLIDE arity]
+ccAltn :: Mode -> Altn -> CC ()
+ccAltn mode MkAltn{_binds, _rhs} = do
+  let arity = length _binds
+  tell [UNCONS arity]
+  localDecls (reverse _binds) (ccExpr mode _rhs)
+  whenStackOrEval mode $ tell [SLIDE arity]
 
-
-localDecls :: [Maybe Ident] -> CC a -> CC a
-localDecls idents cc = do
-  let n = length idents
+localDecls :: [Maybe Name] -> CC a -> CC a
+localDecls binds cc = do
+  let n = length binds
   d <- asks depth
-  let offs = Map.fromList $ zipIdents idents [d+1 ..]
+  let offs = Map.fromList $ zipMaybe binds [d+1 ..]
   local offsets (Map.union offs) $ local depth (+n) $ cc
-
-name :: Ident -> Name
-name ident = Name (unIdent ident)
-
-
-saturate :: (Monad m, Ord a) => (a -> m (Set a)) -> a -> m (Set a)
-saturate f x0 = run [x0] Set.empty
-  where
-    run []     visited = return visited
-    run (x:xs) visited
-      | x `Set.member` visited = run xs visited
-      | otherwise              = do
-          ys <- f x
-          run (Set.toList ys ++ xs) (Set.insert x visited)
