@@ -33,10 +33,10 @@ data Closed
 
 data TypeVar s
   = Free { _ident :: Ident.Var, _level :: Int }
-  | Link { _type  :: Type s }
+  | Link { _type  :: Type (Open s) }
 
 data Type a where
-  TVar :: STRef s (TypeVar (Open s)) -> Type (Open s)
+  TVar :: STRef s (TypeVar s) -> Type (Open s)
   QVar :: Ident.Var                  -> Type a
   TFun :: Type a    -> Type a        -> Type a
   TApp :: Ident.Con -> [Type a]      -> Type a
@@ -69,7 +69,7 @@ qvars t = case t of
   TFun t_arg t_res -> qvars t_arg `Set.union` qvars t_res
   TApp _ t_params -> Set.unions (map qvars t_params)
 
-prettyTypeVar :: PrettyLevel -> Rational -> TypeVar (Open s) -> ST s Doc
+prettyTypeVar :: PrettyLevel -> Rational -> TypeVar s -> ST s Doc
 prettyTypeVar lvl prec tv =
   case tv of
     Free { _ident } -> return $ pretty _ident

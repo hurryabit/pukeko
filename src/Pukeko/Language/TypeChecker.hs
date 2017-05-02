@@ -178,7 +178,7 @@ lookupType annot ident = do
         Nothing ->
           throwHere annot $ "function " ++ show ident ++ " is unknown"
 
-occursCheck :: (STRef s (TypeVar (Open s))) -> Type (Open s) -> TI s ()
+occursCheck :: (STRef s (TypeVar s)) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
   case t2 of
     TVar tvr2
