@@ -8,6 +8,7 @@ module Pukeko.Language.ADT
   )
 where
 
+import Pukeko.Language.Ident (Con)
 import Pukeko.Language.Type
 import qualified Pukeko.Language.Ident as Ident
 
@@ -31,22 +32,22 @@ data Constructor = MkConstructor
   { _adt    :: ADT
   , _name   :: Ident.Con
   , _tag    :: Int
-  , _fields :: [Type Closed]
+  , _fields :: [Type Con Closed]
   }
 
-mkConstructor :: Ident.Con -> [Type Closed] -> Constructor
+mkConstructor :: Ident.Con -> [Type Con Closed] -> Constructor
 mkConstructor _name _fields =
   MkConstructor { _adt = undefined, _name, _tag = undefined, _fields }
 
-adt :: ADT -> [Type Closed] -> Type Closed
+adt :: ADT -> [Type Con Closed] -> Type Con Closed
 adt MkADT{ _name } = app _name
 
-constructors :: ADT -> [(Ident.Con, Type Closed)]
+constructors :: ADT -> [(Ident.Con, Type Con Closed)]
 constructors t@MkADT{ _params, _constructors } = map f _constructors
   where
     f MkConstructor{ _name, _fields } =
       (_name, foldr (~>) (adt t $ map var _params) _fields)
 
-typeOf :: Constructor -> Type Closed
+typeOf :: Constructor -> Type Con Closed
 typeOf MkConstructor{ _adt, _fields } =
   foldr (~>) (adt _adt $ map var $ _params _adt) _fields

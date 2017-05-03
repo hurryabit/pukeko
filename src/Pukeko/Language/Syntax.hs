@@ -3,11 +3,12 @@ module Pukeko.Language.Syntax
   ( Module
   , TopLevel (..)
   , Expr (..)
-  , BindGen (..)
+  , BindX (..)
   , Bind
   , Bind0
   , Defn (..)
   , Altn (..)
+  , IsConstructor (..)
   , mkAp
   , mkApOp
   , desugarIf
@@ -26,60 +27,68 @@ import Pukeko.Pretty
 
 import qualified Pukeko.Language.Ident    as Ident
 
-type Module a = [TopLevel a]
+class (Pretty con, Pretty (TypeOf con)) => IsConstructor con where
+  type TypeOf con
+  boolValue :: Bool -> con
 
-data TopLevel a
+instance IsConstructor Ident.Con where
+  type TypeOf Ident.Con = Ident.Con
+  boolValue bool = Ident.constructor (show bool)
+
+type Module con a = [TopLevel con a]
+
+data TopLevel con a
   = Type{ _annot :: a, _adts :: [ADT] }
-  | Val{ _annot :: a, _ident :: Ident.Var, _type :: Type Closed }
-  | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
+  | Val{ _annot :: a, _ident :: Ident.Var, _type :: Type con Closed }
+  | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn con a] }
   | Asm{ _annot :: a, _ident :: Ident.Var, _asm :: String }
 
-data Expr a
+data Expr con a
   = Var    { _annot :: a, _var   :: Ident.Var }
-  | Con    { _annot :: a, _con   :: Ident.Con }
+  | Con    { _annot :: a, _con   :: con }
   | Num    { _annot :: a, _int   :: Int }
-  | Ap     { _annot :: a, _fun   :: Expr a   , _args  :: [Expr a] }
-  | Lam    { _annot :: a, _binds :: [Bind0 a], _body  :: Expr a   }
-  | Let    { _annot :: a, _isrec :: Bool     , _defns :: [Defn a], _body :: Expr a }
-  | If     { _annot :: a, _cond  :: Expr a   , _then  :: Expr a  , _else :: Expr a }
-  | Match  { _annot :: a, _expr  :: Expr a   , _altns :: [Altn a] }
+  | Ap     { _annot :: a, _fun   :: Expr con a, _args :: [Expr con a] }
+  | Lam    { _annot :: a, _binds :: [Bind0 con a], _body :: Expr con a }
+  | Let    { _annot :: a, _isrec :: Bool, _defns :: [Defn con a], _body :: Expr con a }
+  | If     { _annot :: a, _cond  :: Expr con a, _then :: Expr con a, _else :: Expr con a }
+  | Match  { _annot :: a, _expr  :: Expr con a, _altns :: [Altn con a] }
+  deriving (Functor)
+
+data BindX con i a = MkBind{ _annot :: a, _ident :: i, _type :: Maybe (Type con Closed) }
   deriving (Show, Functor)
 
-data BindGen i a = MkBind{ _annot :: a, _ident :: i, _type :: Maybe (Type Closed) }
-  deriving (Show, Functor)
+type Bind con = BindX con Ident.Var
 
-type Bind = BindGen Ident.Var
+type Bind0 con = BindX con (Maybe Ident.Var)
 
-type Bind0 = BindGen (Maybe Ident.Var)
+data Defn con a = MkDefn{ _lhs :: Bind con a, _rhs :: Expr con a }
+  deriving (Functor)
 
-data Defn a = MkDefn{ _lhs :: Bind a, _rhs :: Expr a }
-  deriving (Show, Functor)
+data Altn con a = MkAltn{ _annot :: a, _con :: con, _binds :: [Bind0 con a], _rhs :: Expr con a }
+  deriving (Functor)
 
-data Altn a = MkAltn{ _annot :: a, _con :: Ident.Con, _binds :: [Bind0 a], _rhs :: Expr a }
-  deriving (Show, Functor)
-
-mkAp :: a -> Expr a -> [Expr a] -> Expr a
+mkAp :: a -> Expr con a -> [Expr con a] -> Expr con a
 mkAp _annot _fun _args
   | null _args = _fun
   | otherwise  = Ap { _annot, _fun, _args }
 
-mkApOp :: String -> a -> Expr a -> Expr a -> Expr a
+mkApOp :: String -> a -> Expr con a -> Expr con a -> Expr con a
 mkApOp sym _annot arg1 arg2 =
   let _fun = Var{ _annot, _var = Ident.operator sym }
   in  Ap{ _annot, _fun, _args = [arg1, arg2]}
 
-desugarIf :: Expr a -> Expr a
+desugarIf :: IsConstructor con => Expr con a -> Expr con a
 desugarIf If{ _annot, _cond, _then, _else } =
   Match { _annot = _annot
         , _expr  = _cond
         , _altns =
           [ MkAltn { _annot = annot _else
-                   , _con   = Ident.constructor "False"
+                   , _con   = boolValue False
                    , _binds = []
                    , _rhs   = _else
                    }
           , MkAltn { _annot = annot _then
-                   , _con   = Ident.constructor "True"
+                   , _con   = boolValue True
                    , _binds = []
                    , _rhs   = _then
                    }
@@ -87,13 +96,13 @@ desugarIf If{ _annot, _cond, _then, _else } =
         }
 desugarIf _ = error "BUG: desugarIf called on wrong node"
 
-unzipDefns :: [Defn a] -> ([Bind a], [Expr a])
+unzipDefns :: [Defn con a] -> ([Bind con a], [Expr con a])
 unzipDefns = unzip . map (\MkDefn{ _lhs, _rhs } -> (_lhs, _rhs))
 
 zipMaybe :: [Maybe a] -> [b] -> [(a, b)]
 zipMaybe xs = catMaybes . zipWith (\x y -> (,) <$> x <*> pure y) xs
 
-instance Pretty (Expr a) where
+instance IsConstructor con => Pretty (Expr con a) where
   pPrintPrec lvl prec expr =
     case expr of
       Var  { _var } -> pretty _var
@@ -141,33 +150,33 @@ instance Pretty (Expr a) where
         (text "match" <+> pPrintPrec lvl 0 _expr <+> text "with") :
         map (pPrintPrec lvl 0) _altns
 
-instance Pretty (Defn a) where
+instance IsConstructor con => Pretty (Defn con a) where
   pPrintPrec lvl _ MkDefn{ _lhs, _rhs } = case _rhs of
     Lam { _binds, _body } ->
       let lhs = pPrintPrec lvl 0 _lhs <+> hsep (map (pPrintPrec lvl 1) _binds)
       in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
     _ -> hang (pPrintPrec lvl 0 _lhs <+> equals) 2 (pPrintPrec lvl 0 _rhs)
 
-instance Pretty (Bind a) where
+instance IsConstructor con => Pretty (Bind con a) where
   pPrintPrec _ prec MkBind{ _ident, _type } =
     let p_ident = pretty _ident
     in case _type of
          Nothing -> p_ident
          Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
 
-instance Pretty (Bind0 a) where
+instance IsConstructor con => Pretty (Bind0 con a) where
   pPrintPrec _ prec MkBind{ _ident, _type } =
     let p_ident = maybe (text "_") pretty _ident
     in case _type of
          Nothing -> p_ident
          Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
 
-instance Pretty (Altn a) where
+instance IsConstructor con => Pretty (Altn con a) where
   pPrintPrec lvl _ MkAltn{ _con, _binds, _rhs } = hang
     (hsep [text "|", pretty _con, hsep (map (pPrintPrec lvl 1) _binds), text "->"]) 2
     (pPrintPrec lvl 0 _rhs)
 
-instance Pretty (TopLevel a) where
+instance IsConstructor con => Pretty (TopLevel con a) where
   pPrintPrec lvl _ top = case top of
     Type{} -> empty
     Val{} -> empty
@@ -183,14 +192,14 @@ instance Pretty (TopLevel a) where
 class Annot f where
   annot :: f a -> a
 
-instance Annot TopLevel where
-  annot = _annot :: TopLevel _ -> _
+instance Annot (TopLevel con) where
+  annot = _annot :: TopLevel con _ -> _
 
-instance Annot Expr where
-  annot = _annot :: Expr _ -> _
+instance Annot (Expr con) where
+  annot = _annot :: Expr _ _ -> _
 
-instance Annot (BindGen i) where
-  annot = _annot :: BindGen _ _ -> _
+instance Annot (BindX i con) where
+  annot = _annot :: BindX _ _ _ -> _
 
-instance Annot Altn where
-  annot = _annot :: Altn _ -> _
+instance Annot (Altn con) where
+  annot = _annot :: Altn _ _ -> _

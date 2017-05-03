@@ -10,6 +10,7 @@ import Text.Parsec.Language
 import qualified Text.Parsec.Token    as Token
 
 import Pukeko.Language.ADT (ADT, Constructor, mkADT, mkConstructor)
+import Pukeko.Language.Ident (Con)
 import Pukeko.Language.Operator (Spec (..))
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type (Type, Closed, var, (~>), app)
@@ -17,7 +18,7 @@ import Pukeko.Language.Type (Type, Closed, var, (~>), app)
 import qualified Pukeko.Language.Ident    as Ident
 import qualified Pukeko.Language.Operator as Operator
 
-parseModule :: MonadError String m => String -> String -> m (Module SourcePos)
+parseModule :: MonadError String m => String -> String -> m (Module Con SourcePos)
 parseModule file code =
   case parse (whiteSpace *> module_ <* eof) file code of
     Left error  -> throwError (show error)
@@ -67,7 +68,7 @@ variable = alphaVariable <|> Ident.operator <$> try (parens operator)
 constructor :: Parser Ident.Con
 constructor = Ident.constructor <$> (lookAhead upper *> Token.identifier pukeko)
 
-type_, atype :: Parser (Type Closed)
+type_, atype :: Parser (Type Con Closed)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
@@ -81,10 +82,10 @@ atype = choice
   , parens type_
   ]
 
-asType :: Parser (Type Closed)
+asType :: Parser (Type Con Closed)
 asType = reservedOp ":" *> type_
 
-module_ :: Parser (Module SourcePos)
+module_ :: Parser (Module Con SourcePos)
 module_ = many1 $ choice
   [ let_ Def <* optional (reservedOp ";;")
   , Asm <$> getPosition
@@ -97,7 +98,7 @@ module_ = many1 $ choice
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-typed :: Bool -> (SourcePos -> a -> Maybe (Type Closed) -> b) -> Parser a -> Parser b
+typed :: Bool -> (SourcePos -> a -> Maybe (Type Con Closed) -> b) -> Parser a -> Parser b
 typed needParens constr ident =
   if needParens then
     constr <$> getPosition <*> ident <*> pure Nothing
@@ -107,39 +108,39 @@ typed needParens constr ident =
     constr <$> getPosition <*> ident <*> optionMaybe asType
   <?> "declaration"
 
-bind :: Bool -> Parser (Bind SourcePos)
+bind :: Bool -> Parser (Bind Con SourcePos)
 bind needParens = typed needParens MkBind $ variable
 
-bind0 :: Bool -> Parser (Bind0 SourcePos)
+bind0 :: Bool -> Parser (Bind0 Con SourcePos)
 bind0 needParens =
   typed needParens MkBind (Just <$> variable <|> symbol "_" *> pure Nothing)
 
-defnValLhs :: Parser (Expr SourcePos -> Defn SourcePos)
+defnValLhs :: Parser (Expr Con SourcePos -> Defn Con SourcePos)
 defnValLhs = MkDefn <$> bind False
 
-defnFunLhs :: Parser (Expr SourcePos -> Defn SourcePos)
+defnFunLhs :: Parser (Expr Con SourcePos -> Defn Con SourcePos)
 defnFunLhs =
   (.) <$> (MkDefn <$> (MkBind <$> getPosition <*> variable <*> pure Nothing))
       <*> (Lam <$> getPosition <*> many1 (bind0 True))
 
 -- TODO: Improve this code.
-defn :: Parser (Defn SourcePos)
+defn :: Parser (Defn Con SourcePos)
 defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
 
-altn :: Parser (Altn SourcePos)
+altn :: Parser (Altn Con SourcePos)
 altn =
   MkAltn <$> getPosition
          <*> (bar *> constructor)
          <*> many (bind0 True)
          <*> (arrow *> expr)
 
-let_ :: (SourcePos -> Bool -> [Defn SourcePos] -> a) -> Parser a
+let_ :: (SourcePos -> Bool -> [Defn Con SourcePos] -> a) -> Parser a
 let_ f =
   f <$> getPosition
     <*> (reserved "let" *> (reserved "rec" *> pure True <|> pure False))
     <*> sepBy1 defn (reserved "and")
 
-expr, aexpr :: Parser (Expr SourcePos)
+expr, aexpr :: Parser (Expr Con SourcePos)
 expr =
   buildExpressionParser operatorTable (choice
   [ mkAp <$> getPosition <*> aexpr <*> many aexpr
