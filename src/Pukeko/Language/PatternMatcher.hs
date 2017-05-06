@@ -10,7 +10,6 @@ import Text.Parsec (SourcePos)
 import qualified Data.Map as Map
 
 import Pukeko.Language.ADT
-import Pukeko.Language.Ident (Con)
 import Pukeko.Language.Syntax
 import qualified Pukeko.Language.Ident as Ident
 import qualified Pukeko.Language.Rewrite as Rewrite
@@ -34,7 +33,7 @@ resolve ident = do
     Nothing -> error "BUG: unknown constructor in pattern matcher"
     Just constr -> return constr
 
-pmExpr :: Expr Con SourcePos -> PM (Expr Con SourcePos)
+pmExpr :: Expr SourcePos -> PM (Expr SourcePos)
 pmExpr expr = case expr of
   Match{_annot, _expr, _altns} -> case _altns of
     [] -> error "BUG: zero alternatives in pattern matcher"
@@ -46,13 +45,13 @@ pmExpr expr = case expr of
           _:_:_ -> throwHere _annot $ "match mentions " ++ show _name ++ " multiple times"
           [altn@MkAltn{_rhs}] -> do
             _rhs <- pmExpr _rhs
-            return (altn{_rhs} :: Altn _ _)
+            return (altn{_rhs} :: Altn _)
       _expr <- pmExpr _expr
       return expr{_expr, _altns}
   _ -> Rewrite.expr pmExpr expr
 
 compileModule :: MonadError String m =>
-                 Map Ident.Con Constructor -> Module Con SourcePos -> m (Module Con SourcePos)
+                 Map Ident.Con Constructor -> Module SourcePos -> m (Module SourcePos)
 compileModule env module_ =
   either throwError return $
   runReader (runExceptT (unPM (Rewrite.module_ pmExpr module_))) env

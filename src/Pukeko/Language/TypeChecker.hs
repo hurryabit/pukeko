@@ -21,21 +21,20 @@ import qualified Data.Set as Set
 
 import Pukeko.Pretty hiding (int)
 import Pukeko.Language.ADT
-import Pukeko.Language.Ident (Con)
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type
 
 import qualified Pukeko.Language.Ident as Ident
 
 data Environment s = MkEnvironment
-  { _locals :: Map Ident.Var (Type Con (Open s))
+  { _locals :: Map Ident.Var (Type (Open s))
   , _level  :: Int
   }
 
 data GlobalStatus = Imported | Declared | Defined
 
 data State = MkState
-  { _globals :: Map Ident.Var (Type Con Closed, GlobalStatus)
+  { _globals :: Map Ident.Var (Type Closed, GlobalStatus)
   , _types   :: Map Ident.Con ADT
   , _constrs :: Map Ident.Con Constructor
   , _fresh   :: [Ident.Var]
@@ -56,7 +55,7 @@ instance MonadFail (TI s) where
 liftST :: ST s a -> TI s a
 liftST = TI . lift . lift . lift
 
-checkModule :: MonadError String m => Module Con SourcePos -> m (Map Ident.Con Constructor)
+checkModule :: MonadError String m => Module SourcePos -> m (Map Ident.Con Constructor)
 checkModule tops = do
   let env = MkEnvironment
         { _locals = Map.empty
@@ -73,7 +72,7 @@ checkModule tops = do
     Left error -> throwError error
     Right ()   -> return $ _constrs st'
 
-checkTopLevel :: TopLevel Con SourcePos -> TI s ()
+checkTopLevel :: TopLevel SourcePos -> TI s ()
 checkTopLevel top = case top of
   Type{ _annot, _adts } -> do
     forM_ _adts (addType _annot)
@@ -157,14 +156,14 @@ resetFresh = do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
   puts fresh (map Ident.variable vars)
 
-freshVar :: TI s (Type Con (Open s))
+freshVar :: TI s (Type (Open s))
 freshVar = do
   _level <- asks level
   _ident <- modifyAndGet fresh (\(x:xs) -> (x,xs))
   var <- liftST $ newSTRef $ Free { _ident, _level }
   return (TVar var)
 
-lookupType :: SourcePos -> Ident.Var -> TI s (Type Con (Open s))
+lookupType :: SourcePos -> Ident.Var -> TI s (Type (Open s))
 lookupType annot ident = do
   t_local <- Map.lookup ident <$> asks locals
   case t_local of
@@ -179,7 +178,7 @@ lookupType annot ident = do
         Nothing ->
           throwHere annot $ "function " ++ show ident ++ " is unknown"
 
-occursCheck :: (STRef s (TypeVar Con s)) -> Type Con (Open s) -> TI s ()
+occursCheck :: (STRef s (TypeVar s)) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
   case t2 of
     TVar tvr2
@@ -197,7 +196,7 @@ occursCheck tvr1 t2 =
     TApp _ ts -> mapM_ (occursCheck tvr1) ts
 
 -- TODO: link compression
-unwind :: Type Con (Open s) -> TI s (Type Con (Open s))
+unwind :: Type (Open s) -> TI s (Type (Open s))
 unwind t =
   case t of
     TVar tvr -> do
@@ -207,7 +206,7 @@ unwind t =
         Free{} -> return t
     _ -> return t
 
-unify :: Type Con (Open s) -> Type Con (Open s) -> TI s ()
+unify :: Type (Open s) -> Type (Open s) -> TI s ()
 unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
@@ -230,7 +229,7 @@ unify t1 t2 = do
       p2 <- liftST $ prettyType prettyNormal 0 t2
       pthrow $ hsep [text "mismatching types", p1, text "and", p2]
 
-generalize :: Type Con (Open s) -> TI s (Type Con (Open s))
+generalize :: Type (Open s) -> TI s (Type (Open s))
 generalize t =
   case t of
     TVar tvr -> do
@@ -246,11 +245,11 @@ generalize t =
     TFun tx ty -> TFun <$> generalize tx <*> generalize ty
     TApp c  ts -> TApp c <$> mapM generalize ts
 
-instantiateMany :: [Type Con (Open s)] -> TI s [Type Con (Open s)]
+instantiateMany :: [Type (Open s)] -> TI s [Type (Open s)]
 instantiateMany ts = evalStateT (mapM inst ts) Map.empty
   where
-    inst :: Type Con (Open s)
-         -> StateT (Map Ident.Var (Type Con (Open s))) (TI s) (Type Con (Open s))
+    inst :: Type (Open s)
+         -> StateT (Map Ident.Var (Type (Open s))) (TI s) (Type (Open s))
     inst t =
       case t of
         TVar tvr -> do
@@ -269,10 +268,10 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
         TFun tx ty -> TFun <$> inst tx <*> inst ty
         TApp c  ts -> TApp c <$> mapM inst ts
 
-instantiate :: Type Con (Open s) -> TI s (Type Con (Open s))
+instantiate :: Type (Open s) -> TI s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateBind :: BindX Con _ SourcePos -> TI s (Type Con (Open s))
+instantiateBind :: BindGen _ SourcePos -> TI s (Type (Open s))
 instantiateBind MkBind{ _annot, _type } = case _type of
   Nothing -> freshVar
   Just t  -> do
@@ -282,10 +281,10 @@ instantiateBind MkBind{ _annot, _type } = case _type of
 throwHere :: SourcePos -> String -> TI s a
 throwHere annot msg = throwError $ show annot ++ ": " ++ msg
 
-inferLet :: Bool -> [Defn Con SourcePos] -> TI s [(Ident.Var, Type Con (Open s))]
+inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident.Var, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
-      idents = map (_ident :: Bind _ _ -> _) lhss
+      idents = map (_ident :: Bind _ -> _) lhss
   t_rhss <- local level succ $ do
     t_lhss <- mapM instantiateBind lhss
     let env | isrec     = Map.fromList $ zip idents t_lhss
@@ -296,7 +295,7 @@ inferLet isrec defns = do
   t_idents <- mapM generalize t_rhss
   return $ zip idents t_idents
 
-infer :: Expr Con SourcePos -> TI s (Type Con (Open s))
+infer :: Expr SourcePos -> TI s (Type (Open s))
 infer expr = do
   let unifyHere t1 t2 = unify t1 t2 `catchError` throwHere (annot expr)
   case expr of
@@ -315,7 +314,7 @@ infer expr = do
       unifyHere t_fun (t_args *~> t_res)
       return t_res
     Lam{ _binds, _body } -> do
-      let params = map (_ident :: Bind0 _ _ -> _) _binds
+      let params = map (_ident :: Bind0 _ -> _) _binds
       t_params <- mapM instantiateBind _binds
       let env = Map.fromList $ zipMaybe params t_params
       t_body <- local locals (Map.union env) (infer _body)
@@ -333,7 +332,7 @@ infer expr = do
           then throwHere _annot $
                "wrong number of arguments for constructor " ++ show _con
           else do
-          let idents = map (_ident :: Bind0 _ _ -> _) _binds
+          let idents = map (_ident :: Bind0 _ -> _) _binds
           (t_params, t_fields) <-
             splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)
           unifyHere t_expr (app _name t_params)
@@ -342,7 +341,7 @@ infer expr = do
           unifyHere t_res t_rhs
       return t_res
 
-checkKinds :: SourcePos -> Type Con _ -> TI s ()
+checkKinds :: SourcePos -> Type _ -> TI s ()
 checkKinds annot t = case t of
   QVar _ -> return ()
   TVar _ -> return ()

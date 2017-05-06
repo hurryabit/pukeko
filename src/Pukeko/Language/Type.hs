@@ -31,53 +31,51 @@ infixr 1 ~>, *~>
 data Open s
 data Closed
 
-data TypeVar con s
+data TypeVar s
   = Free { _ident :: Ident.Var, _level :: Int }
-  | Link { _type  :: Type con (Open s) }
+  | Link { _type  :: Type (Open s) }
 
-data Type con a where
-  TVar :: STRef s (TypeVar con s)       -> Type con (Open s)
-  QVar :: Ident.Var                        -> Type con a
-  TFun :: Type con a ->  Type con a  -> Type con a
-  TApp :: con           -> [Type con a] -> Type con a
+data Type a where
+  TVar :: STRef s (TypeVar s) -> Type (Open s)
+  QVar :: Ident.Var                  -> Type a
+  TFun :: Type a    -> Type a        -> Type a
+  TApp :: Ident.Con -> [Type a]      -> Type a
 
-var :: Ident.Var -> Type con a
+var :: Ident.Var -> Type a
 var = QVar
 
-(~>) :: Type con a -> Type con a -> Type con a
+(~>) :: Type a -> Type a -> Type a
 (~>) = TFun
 
-(*~>) :: [Type con a] -> Type con a -> Type con a
+(*~>) :: [Type a] -> Type a -> Type a
 t_args *~> t_res = foldr (~>) t_res t_args
 
-app :: con -> [Type con a] -> Type con a
+app :: Ident.Con -> [Type a] -> Type a
 app = TApp
 
-int :: Type Ident.Con Closed
+int :: Type Closed
 int  = app (Ident.constructor "Int")  []
 
-open :: Type con Closed -> Type con (Open s)
+open :: Type Closed -> Type (Open s)
 open t =
   case t of
     QVar name  -> QVar name
     TFun tx ty -> TFun (open tx) (open ty)
     TApp c  ts -> TApp c (map open ts)
 
-qvars :: Type con Closed -> Set Ident.Var
+qvars :: Type Closed -> Set Ident.Var
 qvars t = case t of
   QVar _ident -> Set.singleton _ident
   TFun t_arg t_res -> qvars t_arg `Set.union` qvars t_res
   TApp _ t_params -> Set.unions (map qvars t_params)
 
-prettyTypeVar :: Pretty con
-              => PrettyLevel -> Rational -> TypeVar con s -> ST s Doc
+prettyTypeVar :: PrettyLevel -> Rational -> TypeVar s -> ST s Doc
 prettyTypeVar lvl prec tv =
   case tv of
     Free { _ident } -> return $ pretty _ident
     Link { _type }  -> brackets <$> prettyType lvl prec _type
 
-prettyType :: Pretty con
-           => PrettyLevel -> Rational -> Type con (Open s) -> ST s Doc
+prettyType :: PrettyLevel -> Rational -> Type (Open s) -> ST s Doc
 prettyType lvl prec t =
   case t of
     TVar tvr -> do
@@ -93,8 +91,8 @@ prettyType lvl prec t =
       ps <- mapM (prettyType lvl 3) ts
       return $ maybeParens (prec > 2) $ pretty c <+> hsep ps
 
-instance Pretty con => Pretty (Type con Closed) where
+instance Pretty (Type Closed) where
   pPrintPrec lvl prec t = runST $ prettyType lvl prec (open t)
 
-instance Pretty con => Show (Type con Closed) where
+instance Show (Type Closed) where
   show = prettyShow

@@ -10,7 +10,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Pukeko.Language.ADT
-import Pukeko.Language.Ident (Con)
 import qualified Pukeko.Language.Ident  as Ident
 import qualified Pukeko.Language.Syntax as L
 import qualified Pukeko.Core.Syntax     as C
@@ -29,7 +28,7 @@ newtype CC a = CC{unCC :: RWS Env () Asm a}
 name :: Ident.Var -> C.Name
 name = C.MkName . Ident.mangled
 
-ccExpr :: L.Expr Con FV -> CC C.Expr
+ccExpr :: L.Expr FV -> CC C.Expr
 ccExpr expr = case expr of
   L.Var{_annot, _var}
     | _var `Set.member` _annot -> return C.Local{_name}
@@ -62,20 +61,20 @@ ccExpr expr = case expr of
     _altns <- traverse ccAltn _altns
     return C.Match{_expr, _altns}
 
-ccDefn :: L.Defn Con FV -> CC C.Defn
+ccDefn :: L.Defn FV -> CC C.Defn
 ccDefn L.MkDefn{_lhs = L.MkBind{_ident}, _rhs} = do
   _rhs <- ccExpr _rhs
   return C.MkDefn{_lhs = name _ident, _rhs}
 
-ccBind :: L.Bind0 Con FV -> Maybe C.Name
+ccBind :: L.Bind0 FV -> Maybe C.Name
 ccBind L.MkBind{_ident} = name <$> _ident
 
-ccAltn :: L.Altn Con FV -> CC C.Altn
+ccAltn :: L.Altn FV -> CC C.Altn
 ccAltn L.MkAltn{_binds, _rhs} = do
   _rhs <- ccExpr _rhs
   return C.MkAltn{_binds = map ccBind _binds, _rhs}
 
-ccTopDefn :: L.Defn Con FV -> CC C.TopLevel
+ccTopDefn :: L.Defn FV -> CC C.TopLevel
 ccTopDefn L.MkDefn{_lhs = L.MkBind{_ident}, _rhs} = do
   let (_binds, _body) = case _rhs of
         L.Lam{_binds, _body} -> (_binds, _body)
@@ -83,7 +82,7 @@ ccTopDefn L.MkDefn{_lhs = L.MkBind{_ident}, _rhs} = do
   _body <- ccExpr _body
   return C.Def{_name = name _ident, _binds = map ccBind _binds, _body}
 
-ccTopLevel :: L.TopLevel Con FV -> CC [C.TopLevel]
+ccTopLevel :: L.TopLevel FV -> CC [C.TopLevel]
 ccTopLevel top = case top of
   L.Type{} -> return []
   L.Val{} -> return []
@@ -92,9 +91,9 @@ ccTopLevel top = case top of
     modify (Map.insert _ident (C.MkName _asm))
     return [C.Asm{_name = C.MkName _asm}]
 
-ccModule :: L.Module Con FV -> CC C.Module
+ccModule :: L.Module FV -> CC C.Module
 ccModule module_ = concat <$> mapM ccTopLevel module_
 
-compileModule :: Map Ident.Con Constructor -> L.Module Con FV -> C.Module
+compileModule :: Map Ident.Con Constructor -> L.Module FV -> C.Module
 compileModule constructors module_ =
   fst $ evalRWS (unCC (ccModule module_)) constructors Map.empty

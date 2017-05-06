@@ -24,18 +24,18 @@ runFV fv = runReader (unFV fv) Set.empty
 localize :: FreeVars -> FV a -> FV a
 localize fvs = local (fvs `Set.union`)
 
-fvBind :: Bind con a -> FV (Bind con FreeVars)
+fvBind :: Bind a -> FV (Bind FreeVars)
 fvBind bind@MkBind{ _ident } =
-  return (bind{ _annot = Set.singleton _ident } :: Bind _ _)
+  return (bind{ _annot = Set.singleton _ident } :: Bind _)
 
-fvBind0 :: Bind0 con a -> FV (Bind0 con FreeVars)
+fvBind0 :: Bind0 a -> FV (Bind0 FreeVars)
 fvBind0 bind0@MkBind{ _ident } =
-  return (bind0{ _annot = maybe Set.empty Set.singleton _ident } :: Bind0 _ _)
+  return (bind0{ _annot = maybe Set.empty Set.singleton _ident } :: Bind0 _)
 
-fvDefn :: Defn con a -> FV (Defn con FreeVars)
+fvDefn :: Defn a -> FV (Defn FreeVars)
 fvDefn MkDefn{ _lhs, _rhs } = MkDefn <$> fvBind _lhs <*> fvExpr _rhs
 
-fvAltn :: Altn con a -> FV (Altn con FreeVars)
+fvAltn :: Altn a -> FV (Altn FreeVars)
 fvAltn altn@MkAltn{ _binds, _rhs } = do
   _binds <- mapM fvBind0 _binds
   let fv_binds = Set.unions (map annot _binds)
@@ -43,7 +43,7 @@ fvAltn altn@MkAltn{ _binds, _rhs } = do
   let _annot = annot _rhs `Set.difference` fv_binds
   return altn{ _annot, _binds, _rhs }
 
-fvExpr :: Expr con a -> FV (Expr con FreeVars)
+fvExpr :: Expr a -> FV (Expr FreeVars)
 fvExpr expr = case expr of
   Var{ _var } -> do
     is_local <- asks (_var `Set.member`)
@@ -88,7 +88,7 @@ fvExpr expr = case expr of
     let _annot = annot _expr `Set.union` Set.unions (map annot _altns)
     return Match{ _annot, _expr, _altns }
 
-fvTopLevel :: TopLevel con a -> FV (TopLevel con FreeVars)
+fvTopLevel :: TopLevel a -> FV (TopLevel FreeVars)
 fvTopLevel top = case top of
   Type{ _adts} -> return Type{ _annot = Set.empty, _adts }
   Val{ _ident, _type } -> return Val{ _annot = Set.empty, _ident, _type }
@@ -97,8 +97,8 @@ fvTopLevel top = case top of
     return Def{ _annot = Set.empty, _isrec, _defns }
   Asm{ _ident, _asm } -> return Asm{ _annot = Set.empty, _ident, _asm }
 
-fvModule :: Module con a -> FV (Module con FreeVars)
+fvModule :: Module a -> FV (Module FreeVars)
 fvModule = mapM fvTopLevel
 
-annotModule :: Module con a -> Module con FreeVars
+annotModule :: Module a -> Module FreeVars
 annotModule = runFV . fvModule
