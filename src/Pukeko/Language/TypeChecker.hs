@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes, TemplateHaskell #-}
 module Pukeko.Language.TypeChecker
   ( checkModule
   )
@@ -6,8 +6,8 @@ where
 
 import Control.Monad
 import Control.Monad.Fail
-import Control.Monad.Reader hiding (asks, local)
-import Control.Monad.State  hiding (State, gets, modify)
+import Control.Monad.RWS hiding (asks, local, gets, modify)
+import Control.Monad.State hiding (gets, modify)
 import Control.Monad.ST
 import Data.Label (mkLabels)
 import Data.Label.Monadic
@@ -32,39 +32,41 @@ data Environment s = MkEnvironment
 
 data GlobalStatus = Imported | Declared | Defined
 
-data State = MkState
+data TCState = MkTCState
   { _globals :: Map Ident.Var (Type Closed, GlobalStatus)
   , _fresh   :: [Ident.Var]
   }
-mkLabels [''Environment, ''State]
+mkLabels [''Environment, ''TCState]
 
-newtype TI s a =
-  TI { unTI :: ExceptT String (ReaderT (Environment s) (StateT State (ST s))) a }
+newtype TC s a = TC {unTC :: RWST (Environment s) () TCState (ExceptT String (ST s)) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment s)
-           , MonadState State
+           , MonadState TCState
            )
 
-instance MonadFail (TI s) where
+instance MonadFail (TC s) where
   fail = throwError
 
-liftST :: ST s a -> TI s a
-liftST = TI . lift . lift . lift
-
-checkModule :: MonadError String m => Module StageTR SourcePos -> m ()
-checkModule tops =
+evalTC :: MonadError String m => (forall s. TC s a) -> m a
+evalTC tc =
   let env = MkEnvironment
         { _locals = Map.empty
         , _level  = 0
         }
-      st = MkState
+      st = MkTCState
         { _globals = Map.empty
         , _fresh   = []
         }
-  in  runST (evalStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
+  in  fst <$> runST (runExceptT (evalRWST (unTC tc) env st))
 
-checkTopLevel :: TopLevel StageTR SourcePos -> TI s ()
+liftST :: ST s a -> TC s a
+liftST = TC . lift . lift
+
+checkModule :: MonadError String m => Module StageTR SourcePos -> m ()
+checkModule module_ = evalTC (mapM_ checkTopLevel module_)
+
+checkTopLevel :: TopLevel StageTR SourcePos -> TC s ()
 checkTopLevel top = case top of
   Type{} -> bug "type checker" "type definition" Nothing
   Val{ _annot, _ident, _type } -> do
@@ -92,19 +94,19 @@ checkTopLevel top = case top of
       Just _  -> throwAt _annot "duplicate definition of function" _ident
       Nothing -> throwAt _annot "undeclared function" _ident
 
-resetFresh :: TI s ()
+resetFresh :: TC s ()
 resetFresh = do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
   puts fresh (map Ident.variable vars)
 
-freshVar :: TI s (Type (Open s))
+freshVar :: TC s (Type (Open s))
 freshVar = do
   _level <- asks level
   _ident <- modifyAndGet fresh (\(x:xs) -> (x,xs))
   var <- liftST $ newSTRef $ Free { _ident, _level }
   return (TVar var)
 
-lookupType :: SourcePos -> Ident.Var -> TI s (Type (Open s))
+lookupType :: SourcePos -> Ident.Var -> TC s (Type (Open s))
 lookupType annot ident = do
   t_local <- Map.lookup ident <$> asks locals
   case t_local of
@@ -117,7 +119,7 @@ lookupType annot ident = do
         Just (_, Declared) -> throwAt annot "undefined function" ident
         Nothing            -> throwAt annot "undeclared function" ident
 
-occursCheck :: (STRef s (TypeVar (TypeConOf StageTR) s)) -> Type (Open s) -> TI s ()
+occursCheck :: (STRef s (TypeVar (TypeConOf StageTR) s)) -> Type (Open s) -> TC s ()
 occursCheck tvr1 t2 =
   case t2 of
     TVar tvr2
@@ -135,7 +137,7 @@ occursCheck tvr1 t2 =
     TApp _ ts -> mapM_ (occursCheck tvr1) ts
 
 -- TODO: link compression
-unwind :: Type (Open s) -> TI s (Type (Open s))
+unwind :: Type (Open s) -> TC s (Type (Open s))
 unwind t =
   case t of
     TVar tvr -> do
@@ -145,7 +147,7 @@ unwind t =
         Free{} -> return t
     _ -> return t
 
-unify :: Pretty (TypeConOf StageTR) => Type (Open s) -> Type (Open s) -> TI s ()
+unify :: Pretty (TypeConOf StageTR) => Type (Open s) -> Type (Open s) -> TC s ()
 unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
@@ -169,7 +171,7 @@ unify t1 t2 = do
       p2 <- liftST $ prettyType prettyNormal 0 t2
       throwDoc $ "mismatching types" <+> p1 <+> "and" <+> p2
 
-generalize :: Type (Open s) -> TI s (Type (Open s))
+generalize :: Type (Open s) -> TC s (Type (Open s))
 generalize t =
   case t of
     TVar tvr -> do
@@ -185,11 +187,11 @@ generalize t =
     TFun tx ty -> TFun <$> generalize tx <*> generalize ty
     TApp c  ts -> TApp c <$> mapM generalize ts
 
-instantiateMany :: [Type (Open s)] -> TI s [Type (Open s)]
+instantiateMany :: [Type (Open s)] -> TC s [Type (Open s)]
 instantiateMany ts = evalStateT (mapM inst ts) Map.empty
   where
     inst :: Type (Open s)
-         -> StateT (Map Ident.Var (Type (Open s))) (TI s) (Type (Open s))
+         -> StateT (Map Ident.Var (Type (Open s))) (TC s) (Type (Open s))
     inst t =
       case t of
         TVar tvr -> do
@@ -208,15 +210,15 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
         TFun tx ty -> TFun <$> inst tx <*> inst ty
         TApp c  ts -> TApp c <$> mapM inst ts
 
-instantiate :: Type (Open s) -> TI s (Type (Open s))
+instantiate :: Type (Open s) -> TC s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateBind :: BindGen _ StageTR SourcePos -> TI s (Type (Open s))
+instantiateBind :: BindGen _ StageTR SourcePos -> TC s (Type (Open s))
 instantiateBind MkBind{ _annot, _type } = case _type of
   Nothing -> freshVar
   Just t  -> instantiate (open t)
 
-inferLet :: Bool -> [Defn StageTR SourcePos] -> TI s [(Ident.Var, Type (Open s))]
+inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.Var, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
       idents = map (_ident :: Bind _ _ -> _) lhss
@@ -230,7 +232,7 @@ inferLet isrec defns = do
   t_idents <- mapM generalize t_rhss
   return $ zip idents t_idents
 
-infer :: Expr StageTR SourcePos -> TI s (Type (Open s))
+infer :: Expr StageTR SourcePos -> TC s (Type (Open s))
 infer expr = do
   let unifyHere t1 t2 = unify t1 t2 `catchError` throwErrorAt (annot expr)
   case expr of
