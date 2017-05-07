@@ -130,7 +130,7 @@ prettyType lvl prec t =
     TFun tx ty -> do
       px <- prettyType lvl 2 tx
       py <- prettyType lvl 1 ty
-      return $ maybeParens (prec > 1) $ px <+> text "->" <+> py
+      return $ maybeParens (prec > 1) $ px <+> "->" <+> py
     TApp c [] -> return $ pretty c
     TApp c ts -> do
       ps <- mapM (prettyType lvl 3) ts

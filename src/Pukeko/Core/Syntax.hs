@@ -60,16 +60,11 @@ instance Show Name where
   show = prettyShow
 
 pPrintBind :: Maybe Name -> Doc
-pPrintBind = maybe (char '_') pPrint
+pPrintBind = maybe "_" pretty
 
 pPrintAltn :: Int -> Altn -> Doc
 pPrintAltn tag MkAltn{_binds, _rhs} = hang
-    (hsep
-      [ text "|"
-      , braces (int tag)
-      , hsep (map pPrintBind _binds)
-      , text "->"
-      ])
+    (hsep ["|", braces (int tag), hsep (map pPrintBind _binds), "->"])
     2
     (pPrint _rhs)
 
@@ -77,9 +72,9 @@ instance Pretty Expr where
   pPrintPrec lvl prec expr =
     case expr of
       Local{_name} -> pPrintPrec lvl prec _name
-      Global{_name} -> char '@' <> pPrintPrec lvl prec _name
-      External{_name} -> char '$' <> pPrintPrec lvl prec _name
-      Pack{ _tag, _arity } -> text "Pack" <> braces (int _tag <> comma <> int _arity)
+      Global{_name} -> "@" <> pPrintPrec lvl prec _name
+      External{_name} -> "$" <> pPrintPrec lvl prec _name
+      Pack{ _tag, _arity } -> "Pack" <> braces (int _tag <> comma <> int _arity)
       Num{ _int } -> int _int
       Ap{ _fun, _args } ->
         maybeParens (prec > 0) $ hsep $
@@ -88,20 +83,20 @@ instance Pretty Expr where
         case _defns of
           [] -> bug "core printer" "empty let" Nothing
           defn0:defns ->
-            let let_ | _isrec    = text "let rec"
-                     | otherwise = text "let"
+            let let_ | _isrec    = "let rec"
+                     | otherwise = "let"
             in  vcat
                 [ sep
                   [ vcat $
                     (let_ <+> pPrintPrec lvl 0 defn0) :
-                    map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
-                  , text "in"
+                    map (\defn -> "and" <+> pPrintPrec lvl 0 defn) defns
+                  , "in"
                   ]
                 , pPrintPrec lvl 0 _body
                 ]
       Match { _expr, _altns } ->
         maybeParens (prec > 0) $ vcat $
-        (text "match" <+> pPrintPrec lvl 0 _expr <+> text "with") :
+        ("match" <+> pPrintPrec lvl 0 _expr <+> "with") :
         zipWith pPrintAltn [0..] _altns
 
 instance Pretty Defn where
@@ -111,11 +106,11 @@ instance Pretty Defn where
 instance Pretty TopLevel where
   pPrintPrec lvl _ top = case top of
     Def{_name, _binds, _body} -> hang
-      (hsep [ text "let"
+      (hsep [ "let"
             , pPrintPrec lvl 0 _name
             , hsep (map pPrintBind _binds)
             , equals
             ])
       2
       (pPrintPrec lvl 0 _body)
-    Asm{_name} -> text "asm" <+> pPrintPrec lvl 0 _name
+    Asm{_name} -> "asm" <+> pPrintPrec lvl 0 _name

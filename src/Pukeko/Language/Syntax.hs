@@ -142,27 +142,27 @@ instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Expr st
           defn0:defns -> vcat
             [ sep
               [ vcat $
-                (text (if _isrec then "let rec" else "let") <+> pPrintPrec lvl 0 defn0) :
-                map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
-              , text "in"
+                ((if _isrec then "let rec" else "let") <+> pPrintPrec lvl 0 defn0) :
+                map (\defn -> "and" <+> pPrintPrec lvl 0 defn) defns
+              , "in"
               ]
             , pPrintPrec lvl 0 _body
             ]
       Lam    { _binds, _body  } ->
         maybeParens (prec > 0) $ hsep
-          [ text "fun", hsep (map (pPrintPrec lvl 1) _binds)
-          , text "->" , pPrintPrec lvl 0 _body
+          [ "fun", hsep (map (pPrintPrec lvl 1) _binds)
+          , "->" , pPrintPrec lvl 0 _body
           ]
       If { _cond, _then, _else } ->
         maybeParens (prec > 0) $ sep
-          [ text "if"  <+> pPrintPrec lvl 0 _cond <+> text "then"
+          [ "if"  <+> pPrintPrec lvl 0 _cond <+> "then"
           , nest 2 (pPrintPrec lvl 0 _then)
-          , text "else"
+          , "else"
           , nest 2 (pPrintPrec lvl 0 _else)
           ]
       Match { _expr, _altns } ->
         maybeParens (prec > 0) $ vcat $
-        (text "match" <+> pPrintPrec lvl 0 _expr <+> text "with") :
+        ("match" <+> pPrintPrec lvl 0 _expr <+> "with") :
         map (pPrintPrec lvl 0) _altns
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Defn stage a) where
@@ -181,14 +181,14 @@ instance (Pretty (TypeConOf stage)) => Pretty (Bind stage a) where
 
 instance (Pretty (TypeConOf stage)) => Pretty (Bind0 stage a) where
   pPrintPrec _ prec MkBind{ _ident, _type } =
-    let p_ident = maybe (text "_") pretty _ident
+    let p_ident = maybe "_" pretty _ident
     in case _type of
          Nothing -> p_ident
          Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Altn stage a) where
   pPrintPrec lvl _ MkAltn{ _con, _binds, _rhs } = hang
-    (hsep [text "|", pretty _con, hsep (map (pPrintPrec lvl 1) _binds), text "->"]) 2
+    (hsep ["|", pretty _con, hsep (map (pPrintPrec lvl 1) _binds), "->"]) 2
     (pPrintPrec lvl 0 _rhs)
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (TopLevel stage a) where
@@ -199,10 +199,10 @@ instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (TopLeve
     Def{ _isrec, _defns } -> case _defns of
       [] -> empty
       defn0:defns -> vcat $
-        (text (if _isrec then "let rec" else "let") <+> pPrintPrec lvl 0 defn0) :
-        map (\defn -> text "and" <+> pPrintPrec lvl 0 defn) defns
+        ((if _isrec then "let rec" else "let") <+> pPrintPrec lvl 0 defn0) :
+        map (\defn -> "and" <+> pPrintPrec lvl 0 defn) defns
     Asm{ _ident, _asm } ->
-      hsep [text "external", pretty _ident, equals, text (show _asm)]
+      hsep ["external", pretty _ident, equals, text (show _asm)]
 
 class Annot f where
   annot :: f a -> a

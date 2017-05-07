@@ -48,7 +48,7 @@ mangled var = _name var ++ maybe "" (\n -> '$':show n) (_part var)
 
 instance Pretty Var where
   pPrint var = case var of
-    Var{_name, _part} -> text _name <> maybe empty (\n -> char '$' <> int n) _part
+    Var{_name, _part} -> text _name <> maybe empty (\n -> "$" <> int n) _part
     Op {_sym , _part} -> parens (text _sym <> maybe empty int _part)
 
 instance Show Var where
