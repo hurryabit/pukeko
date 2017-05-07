@@ -1,6 +1,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 module Pukeko.Language.Rewrite
-  ( expr
+  ( type_
+  , expr
   , defn
   , altn
   , topLevel
@@ -9,8 +10,16 @@ module Pukeko.Language.Rewrite
 where
 
 import Pukeko.Language.Syntax
+import Pukeko.Language.Type (Type (..))
 
-expr :: Applicative f => (Expr a -> f (Expr a)) -> Expr a -> f (Expr a)
+type_ :: Applicative f => (Type con a -> f (Type con a)) -> Type con a -> f (Type con a)
+type_ f t = case t of
+  TVar{} -> pure t
+  QVar{} -> pure t
+  TFun tx ty -> TFun <$> type_ f tx <*> type_ f ty
+  TApp c ts -> TApp c <$> traverse (type_ f) ts
+
+expr :: Applicative f => (Expr stage a -> f (Expr stage a)) -> Expr stage a -> f (Expr stage a)
 expr f e = case e of
   Var{} -> pure e
   Con{} -> pure e
@@ -36,22 +45,22 @@ expr f e = case e of
     _altns <- traverse (altn f) _altns
     pure e{_expr, _altns}
 
-defn :: Applicative f => (Expr a -> f (Expr a)) -> Defn a -> f (Defn a)
+defn :: Applicative f => (Expr stage a -> f (Expr stage a)) -> Defn stage a -> f (Defn stage a)
 defn f d@MkDefn{_rhs} = do
   _rhs <- f _rhs
-  return (d{_rhs} :: Defn _)
+  return (d{_rhs} :: Defn _ _)
 
-altn :: Applicative f => (Expr a -> f (Expr a)) -> Altn a -> f (Altn a)
+altn :: Applicative f => (Expr stage a -> f (Expr stage a)) -> Altn stage a -> f (Altn stage a)
 altn f a@MkAltn{_rhs} = do
   _rhs <- f _rhs
-  pure (a{_rhs} :: Altn _)
+  pure (a{_rhs} :: Altn _ _)
 
-topLevel :: Applicative f => (Expr a -> f (Expr a)) -> TopLevel a -> f (TopLevel a)
+topLevel :: Applicative f => (Expr stage a -> f (Expr stage a)) -> TopLevel stage a -> f (TopLevel stage a)
 topLevel f t = case t of
   Def{_defns} -> do
     _defns <- traverse (defn f) _defns
-    pure (t{_defns} :: TopLevel _)
+    pure (t{_defns} :: TopLevel _ _)
   _ -> pure t
 
-module_ :: Applicative f => (Expr a -> f (Expr a)) -> Module a -> f (Module a)
+module_ :: Applicative f => (Expr stage a -> f (Expr stage a)) -> Module stage a -> f (Module stage a)
 module_ f = traverse (topLevel f)

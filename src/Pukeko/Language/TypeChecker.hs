@@ -17,14 +17,13 @@ import Data.STRef
 import Text.Parsec (SourcePos)
 
 import qualified Data.Map as Map
-import qualified Data.Set as Set
-
 import Pukeko.Pretty hiding (int)
-import Pukeko.Language.ADT
 import Pukeko.Language.Syntax
-import Pukeko.Language.Type
-
+import Pukeko.Language.Type hiding (Type)
 import qualified Pukeko.Language.Ident as Ident
+import qualified Pukeko.Language.Type as Type
+
+type Type a = Type.Type (ADT Ident.Con) a
 
 data Environment s = MkEnvironment
   { _locals :: Map Ident.Var (Type (Open s))
@@ -35,8 +34,6 @@ data GlobalStatus = Imported | Declared | Defined
 
 data State = MkState
   { _globals :: Map Ident.Var (Type Closed, GlobalStatus)
-  , _types   :: Map Ident.Con ADT
-  , _constrs :: Map Ident.Con Constructor
   , _fresh   :: [Ident.Var]
   }
 mkLabels [''Environment, ''State]
@@ -55,7 +52,7 @@ instance MonadFail (TI s) where
 liftST :: ST s a -> TI s a
 liftST = TI . lift . lift . lift
 
-checkModule :: MonadError String m => Module SourcePos -> m (Map Ident.Con Constructor)
+checkModule :: MonadError String m => Module StageTR SourcePos -> m ()
 checkModule tops = do
   let env = MkEnvironment
         { _locals = Map.empty
@@ -63,23 +60,17 @@ checkModule tops = do
         }
       st = MkState
         { _globals = Map.empty
-        , _types   = Map.empty
-        , _constrs = Map.empty
         , _fresh   = []
         }
-      (res,st') = runST (runStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
+      res = runST (evalStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
   case res of
     Left error -> throwError error
-    Right ()   -> return $ _constrs st'
+    Right ()   -> return ()
 
-checkTopLevel :: TopLevel SourcePos -> TI s ()
+checkTopLevel :: TopLevel StageTR SourcePos -> TI s ()
 checkTopLevel top = case top of
-  Type{ _annot, _adts } -> do
-    forM_ _adts (addType _annot)
-    forM_ _adts $ \MkADT{ _constructors } ->
-      forM_ _constructors (addConstructor _annot)
+  Type{} -> error "BUG: type definition in type checker"
   Val{ _annot, _ident, _type } -> do
-    checkKinds _annot _type
     look <- modifyAndGet globals $
       Map.insertLookupWithKey (\_ -> const) _ident (_type, Declared)
     let throw verb = throwHere _annot $
@@ -116,41 +107,6 @@ checkTopLevel top = case top of
       Just (t_decl, Declared) ->
         modify globals $ Map.insert _ident (t_decl, Defined)
 
-
-addType :: SourcePos -> ADT -> TI s ()
-addType _annot adt@MkADT{ _name } = do
-  _types <- gets types
-  when (_name `Map.member` _types) $
-    throwHere _annot $ "Type " ++ show _name ++ " has already been defined"
-  modify types (Map.insert _name adt)
-
-findType :: SourcePos -> Ident.Con -> TI s ADT
-findType annot ident = do
-  _types <- gets types
-  case Map.lookup ident _types of
-    Nothing -> throwHere annot $ "Type constructor " ++ show ident ++ " unknown"
-    Just t -> return t
-
-addConstructor :: SourcePos -> Constructor -> TI s ()
-addConstructor annot constr@MkConstructor{ _adt = MkADT{ _params }, _name, _fields } = do
-  _constrs <- gets constrs
-  when (_name `Map.member` _constrs) $
-    throwHere annot $ "Constructor " ++ show _name ++ " has already been defined"
-  let unbound = Set.unions (map qvars _fields) `Set.difference` Set.fromList _params
-  unless (Set.null unbound) $
-    throwHere annot $ "Unbound type variables in constructor " ++ show _name ++ ": "
-      ++ unwords (map show $ Set.toList unbound)
-  mapM_ (checkKinds annot) _fields
-  modify constrs (Map.insert _name constr)
-
-findConstructor :: SourcePos -> Ident.Con -> TI s Constructor
-findConstructor annot ident = do
-  _constrs <- gets constrs
-  case Map.lookup ident _constrs of
-    Nothing -> throwHere annot $ "Constructor " ++ show ident ++ " unknown"
-    Just constr -> return constr
-
-
 resetFresh :: TI s ()
 resetFresh = do
   let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
@@ -178,7 +134,7 @@ lookupType annot ident = do
         Nothing ->
           throwHere annot $ "function " ++ show ident ++ " is unknown"
 
-occursCheck :: (STRef s (TypeVar s)) -> Type (Open s) -> TI s ()
+occursCheck :: (STRef s (TypeVar (TypeConOf StageTR) s)) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
   case t2 of
     TVar tvr2
@@ -206,7 +162,7 @@ unwind t =
         Free{} -> return t
     _ -> return t
 
-unify :: Type (Open s) -> Type (Open s) -> TI s ()
+unify :: Pretty (TypeConOf StageTR) => Type (Open s) -> Type (Open s) -> TI s ()
 unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
@@ -222,8 +178,9 @@ unify t1 t2 = do
     (QVar name1, QVar name2)
       | name1 == name2 -> return ()
     (TFun tx1 ty1, TFun tx2 ty2) -> unify tx1 tx2 >> unify ty1 ty2
-    (TApp c1  ts1, TApp c2  ts2)
-      | c1 == c2 && length ts1 == length ts2 -> zipWithM_ unify ts1 ts2
+    -- TODO: Make ADT comparable itself.
+    (TApp MkADT{_name = c1} ts1, TApp MkADT{_name = c2} ts2)
+      | c1 == c2 -> zipWithM_ unify ts1 ts2
     _ -> do
       p1 <- liftST $ prettyType prettyNormal 0 t1
       p2 <- liftST $ prettyType prettyNormal 0 t2
@@ -271,20 +228,18 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
 instantiate :: Type (Open s) -> TI s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateBind :: BindGen _ SourcePos -> TI s (Type (Open s))
+instantiateBind :: BindGen _ StageTR SourcePos -> TI s (Type (Open s))
 instantiateBind MkBind{ _annot, _type } = case _type of
   Nothing -> freshVar
-  Just t  -> do
-    checkKinds _annot t
-    instantiate (open t)
+  Just t  -> instantiate (open t)
 
 throwHere :: SourcePos -> String -> TI s a
 throwHere annot msg = throwError $ show annot ++ ": " ++ msg
 
-inferLet :: Bool -> [Defn SourcePos] -> TI s [(Ident.Var, Type (Open s))]
+inferLet :: Bool -> [Defn StageTR SourcePos] -> TI s [(Ident.Var, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
-      idents = map (_ident :: Bind _ -> _) lhss
+      idents = map (_ident :: Bind _ _ -> _) lhss
   t_rhss <- local level succ $ do
     t_lhss <- mapM instantiateBind lhss
     let env | isrec     = Map.fromList $ zip idents t_lhss
@@ -295,7 +250,7 @@ inferLet isrec defns = do
   t_idents <- mapM generalize t_rhss
   return $ zip idents t_idents
 
-infer :: Expr SourcePos -> TI s (Type (Open s))
+infer :: Expr StageTR SourcePos -> TI s (Type (Open s))
 infer expr = do
   let unifyHere t1 t2 = unify t1 t2 `catchError` throwHere (annot expr)
   case expr of
@@ -303,8 +258,7 @@ infer expr = do
       t <- lookupType _annot _var
       instantiate t
     Con{ _annot, _con } -> do
-      constr <- findConstructor _annot _con
-      let t = open (typeOf constr)
+      let t = open (typeOf _con)
       instantiate t
     Num{} -> return (open int)
     Ap{ _fun, _args } -> do
@@ -314,7 +268,7 @@ infer expr = do
       unifyHere t_fun (t_args *~> t_res)
       return t_res
     Lam{ _binds, _body } -> do
-      let params = map (_ident :: Bind0 _ -> _) _binds
+      let params = map (_ident :: Bind0 _ _ -> _) _binds
       t_params <- mapM instantiateBind _binds
       let env = Map.fromList $ zipMaybe params t_params
       t_body <- local locals (Map.union env) (infer _body)
@@ -326,30 +280,14 @@ infer expr = do
     Match{ _expr, _altns } -> do
       t_expr <- infer _expr
       t_res <- freshVar
-      forM_ _altns $ \MkAltn{ _annot, _con, _binds, _rhs } -> do
-        MkConstructor{ _adt = MkADT{ _name, _params }, _fields } <- findConstructor _annot _con
-        if length _binds /= length _fields
-          then throwHere _annot $
-               "wrong number of arguments for constructor " ++ show _con
-          else do
-          let idents = map (_ident :: Bind0 _ -> _) _binds
-          (t_params, t_fields) <-
-            splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)
-          unifyHere t_expr (app _name t_params)
-          let env = Map.fromList $ zipMaybe idents t_fields
-          t_rhs <- local locals (Map.union env) (infer _rhs)
-          unifyHere t_res t_rhs
+      forM_ _altns $ \MkAltn{ _annot, _con = MkConstructor{_name, _adt = adt@MkADT{_params}, _fields}, _binds, _rhs } -> do
+        when (length _binds /= length _fields) $
+          throwHere _annot ("wrong number of arguments for constructor " ++ show _name)
+        let idents = map (_ident :: Bind0 _ _ -> _) _binds
+        (t_params, t_fields) <-
+          splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)
+        unifyHere t_expr (app adt t_params)
+        let env = Map.fromList $ zipMaybe idents t_fields
+        t_rhs <- local locals (Map.union env) (infer _rhs)
+        unifyHere t_res t_rhs
       return t_res
-
-checkKinds :: SourcePos -> Type _ -> TI s ()
-checkKinds annot t = case t of
-  QVar _ -> return ()
-  TVar _ -> return ()
-  TFun t_arg t_res -> do
-    checkKinds annot t_arg
-    checkKinds annot t_res
-  TApp ident t_params -> do
-    MkADT{ _params } <- findType annot ident
-    let arity = length _params
-    when (length t_params /= arity) $
-      throwHere annot $ "Type constructor " ++ show ident ++ " expects " ++ show arity ++ " parameters"

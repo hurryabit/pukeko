@@ -14,10 +14,12 @@ import qualified Pukeko.GMachine.PeepHole       as PeepHole
 import qualified Pukeko.Language.CoreCompiler   as CoreCompiler
 import qualified Pukeko.Language.DeadCode       as DeadCode
 import qualified Pukeko.Language.FreeVars       as FreeVars
+import qualified Pukeko.Language.KindChecker    as KindChecker
 import qualified Pukeko.Language.LambdaLifter   as Lifter
 import qualified Pukeko.Language.Parser         as Parser
 import qualified Pukeko.Language.PatternMatcher as PatternMatcher
 import qualified Pukeko.Language.TypeChecker    as TypeChecker
+import qualified Pukeko.Language.TypeResolver   as TypeResolver
 
 compile :: Bool -> Bool -> Bool -> String -> IO ()
 compile write_ll write_gm no_prelude file_user = do
@@ -34,28 +36,30 @@ compile write_ll write_gm no_prelude file_user = do
           then return []
           else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
-        constrs <- TypeChecker.checkModule module_
-        module_pm <- PatternMatcher.compileModule constrs module_
-        let module_fv = FreeVars.annotModule module_pm
-            module_dc = DeadCode.eliminate module_fv
-            module_ll = Lifter.liftModule module_dc
-            module_cc = CoreCompiler.compileModule constrs module_ll
-        program_raw <- Compiler.compile module_cc
-        let program_opt = PeepHole.optimize program_raw
-        nasm <- NASM.assemble program_opt
-        return (module_ll, module_cc, program_opt, nasm)
+        module_ <- TypeResolver.resolve module_
+        module_ <- KindChecker.check module_
+        TypeChecker.checkModule module_
+        module_ <- PatternMatcher.compileModule module_
+        module_ <- pure $ FreeVars.annotModule module_
+        module_ <- pure $ DeadCode.eliminate module_
+        module_ <- pure $ Lifter.liftModule module_
+        module_cc <- pure $ CoreCompiler.compileModule module_
+        program <- Compiler.compile module_cc
+        program <- pure $ PeepHole.optimize program
+        nasm <- NASM.assemble program
+        return (module_, module_cc, program, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (module_ll, module_cc, program_opt, nasm) -> do
+    Right (module_, module_cc, program, nasm) -> do
       when write_ll $ do
         writeFile (file_user `replaceExtension` ".ll") $
-          (render $ vcat $ map pretty module_ll) ++ "\n"
+          (render $ vcat $ map pretty module_) ++ "\n"
         writeFile (file_user `replaceExtension` ".co") $
           (render $ vcat $ map pretty module_cc) ++ "\n"
       when write_gm $
-        writeFile (file_user `replaceExtension` ".gm") (prettyShow program_opt)
+        writeFile (file_user `replaceExtension` ".gm") (prettyShow program)
       writeFile (file_user `replaceExtension` ".asm") nasm
       exitWith ExitSuccess
 

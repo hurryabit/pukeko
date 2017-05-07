@@ -21,11 +21,11 @@ library
                      , Pukeko.GMachine.GCode
                      , Pukeko.GMachine.NASM
                      , Pukeko.GMachine.PeepHole
-                     , Pukeko.Language.ADT
                      , Pukeko.Language.CoreCompiler
                      , Pukeko.Language.DeadCode
                      , Pukeko.Language.FreeVars
                      , Pukeko.Language.Ident
+                     , Pukeko.Language.KindChecker
                      , Pukeko.Language.LambdaLifter
                      , Pukeko.Language.Operator
                      , Pukeko.Language.Parser
@@ -34,6 +34,7 @@ library
                      , Pukeko.Language.Syntax
                      , Pukeko.Language.Type
                      , Pukeko.Language.TypeChecker
+                     , Pukeko.Language.TypeResolver
                      , Pukeko.Pretty
   build-depends:       base >= 4.7 && < 5
                      , array

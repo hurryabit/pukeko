@@ -16,25 +16,25 @@ type State = [Ident.Var]
 
 type FV = Set Ident.Var
 
-newtype LL a = LL{unLL :: RWS () [TopLevel FV] State a}
+newtype LL a = LL{unLL :: RWS () [TopLevel StageTR FV] State a}
   deriving ( Functor, Applicative, Monad
-           , MonadWriter [TopLevel FV]
+           , MonadWriter [TopLevel StageTR FV]
            , MonadState State
            )
 
-execLL :: LL () -> Module FV
+execLL :: LL () -> Module StageTR FV
 execLL ll =
   let state = []
       ((), defns) = evalRWS (unLL ll) () state
   in  defns
 
-emit :: Defn FV -> LL ()
+emit :: Defn StageTR FV -> LL ()
 emit defn = tell [Def{_annot = Set.empty, _isrec = False, _defns = [defn]}]
 
 freshIdent :: LL Ident.Var
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-llExpr :: Expr FV -> LL (Expr FV)
+llExpr :: Expr StageTR FV -> LL (Expr StageTR FV)
 llExpr expr = case expr of
   Lam{_annot, _binds, _body} -> do
     _ident <- freshIdent
@@ -52,7 +52,7 @@ llExpr expr = case expr of
   _ -> Rewrite.expr llExpr expr
 
 -- TODO: Fix the awful hack for the right naming of non-CAFs.
-llTopDefn :: Defn FV -> LL ()
+llTopDefn :: Defn StageTR FV -> LL ()
 llTopDefn defn@MkDefn{_lhs = MkBind{_ident}, _rhs} = do
   let is_lambda = case _rhs of
         Lam{} -> True
@@ -61,12 +61,12 @@ llTopDefn defn@MkDefn{_lhs = MkBind{_ident}, _rhs} = do
   defn <- Rewrite.defn llExpr defn
   unless is_lambda $ emit defn
 
-llModule :: Module FV -> LL ()
+llModule :: Module StageTR FV -> LL ()
 llModule module_ = do
   forM_ module_ $ \top ->
     case top of
       Def{_defns} -> mapM_ llTopDefn _defns
       _ -> tell [top]
 
-liftModule :: Module FV -> Module FV
+liftModule :: Module StageTR FV -> Module StageTR FV
 liftModule = execLL . llModule

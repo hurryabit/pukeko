@@ -3,55 +3,38 @@ module Pukeko.Language.PatternMatcher
   )
 where
 
-import Control.Monad.Reader
 import Control.Monad.Except
-import Data.Map (Map)
 import Text.Parsec (SourcePos)
-import qualified Data.Map as Map
 
-import Pukeko.Language.ADT
 import Pukeko.Language.Syntax
+import Pukeko.Language.Type (ADT (..), Constructor (..))
 import qualified Pukeko.Language.Ident as Ident
 import qualified Pukeko.Language.Rewrite as Rewrite
 
-type Env = Map Ident.Con Constructor
-
-newtype PM a = PM{ unPM :: ExceptT String (Reader Env) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadError String
-           , MonadReader Env
-           )
+type PM a = Except String a
 
 -- TODO: Put this in some utils module.
 throwHere :: MonadError String m => SourcePos -> String -> m a
 throwHere annot msg = throwError $ show annot ++ ": " ++ msg
 
-resolve :: Ident.Con -> PM Constructor
-resolve ident = do
-  constr_opt <- asks (ident `Map.lookup`)
-  case constr_opt of
-    Nothing -> error "BUG: unknown constructor in pattern matcher"
-    Just constr -> return constr
+altnWith :: Ident.Con -> Altn StageTR a -> Bool
+altnWith name MkAltn{_con = MkConstructor{_name}} = name == _name
 
-pmExpr :: Expr SourcePos -> PM (Expr SourcePos)
+pmExpr :: Expr StageTR SourcePos -> PM (Expr StageTR SourcePos)
 pmExpr expr = case expr of
   Match{_annot, _expr, _altns} -> case _altns of
     [] -> error "BUG: zero alternatives in pattern matcher"
-    MkAltn{_con}:_ -> do
-      MkConstructor{_adt = MkADT{_constructors}} <- resolve _con
+    MkAltn{_con = MkConstructor{_adt = MkADT{_constructors}}}:_ -> do
       _altns <- forM _constructors $ \MkConstructor{_name} -> do
-        case filter (\MkAltn{_con} -> _con == _name) _altns of
+        case filter (altnWith _name) _altns of
           []    -> throwHere _annot $ "match does not mention " ++ show _name
           _:_:_ -> throwHere _annot $ "match mentions " ++ show _name ++ " multiple times"
           [altn@MkAltn{_rhs}] -> do
             _rhs <- pmExpr _rhs
-            return (altn{_rhs} :: Altn _)
+            return (altn{_rhs} :: Altn _ _)
       _expr <- pmExpr _expr
       return expr{_expr, _altns}
   _ -> Rewrite.expr pmExpr expr
 
-compileModule :: MonadError String m =>
-                 Map Ident.Con Constructor -> Module SourcePos -> m (Module SourcePos)
-compileModule env module_ =
-  either throwError return $
-  runReader (runExceptT (unPM (Rewrite.module_ pmExpr module_))) env
+compileModule :: MonadError String m => Module StageTR SourcePos -> m (Module StageTR SourcePos)
+compileModule = either throwError return . runExcept . Rewrite.module_ pmExpr

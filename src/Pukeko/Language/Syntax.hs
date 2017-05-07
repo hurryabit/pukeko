@@ -14,72 +14,96 @@ module Pukeko.Language.Syntax
   , unzipDefns
   , zipMaybe
   , Annot (..)
+  , TypeConOf
+  , TermConOf
+  , StageLP
+  , StageTR
   )
 where
 
 import Data.Maybe (catMaybes)
 
-import Pukeko.Language.ADT
 import Pukeko.Language.Operator (aprec)
-import Pukeko.Language.Type (Type, Closed)
+import Pukeko.Language.Type (Type, Closed, ADT (..), Constructor (..), mkADT, mkConstructor)
 import Pukeko.Pretty
 
 import qualified Pukeko.Language.Ident    as Ident
 
-type Module a = [TopLevel a]
+type family TypeConOf stage
+type family TermConOf stage
 
-data TopLevel a
-  = Type{ _annot :: a, _adts :: [ADT] }
-  | Val{ _annot :: a, _ident :: Ident.Var, _type :: Type Closed }
-  | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn a] }
+data StageLP
+type instance TypeConOf StageLP = Ident.Con
+type instance TermConOf StageLP = Ident.Con
+
+data StageTR
+type instance TypeConOf StageTR = ADT Ident.Con
+type instance TermConOf StageTR = Constructor (ADT Ident.Con)
+
+
+type Module stage a = [TopLevel stage a]
+
+data TopLevel stage a
+  = Type{ _annot :: a, _adts :: [ADT (TypeConOf stage)] }
+  | Val{ _annot :: a, _ident :: Ident.Var, _type :: Type (TypeConOf stage) Closed }
+  | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn stage a] }
   | Asm{ _annot :: a, _ident :: Ident.Var, _asm :: String }
 
-data Expr a
+data Expr stage a
   = Var    { _annot :: a, _var   :: Ident.Var }
-  | Con    { _annot :: a, _con   :: Ident.Con }
+  | Con    { _annot :: a, _con   :: TermConOf stage }
   | Num    { _annot :: a, _int   :: Int }
-  | Ap     { _annot :: a, _fun   :: Expr a   , _args  :: [Expr a] }
-  | Lam    { _annot :: a, _binds :: [Bind0 a], _body  :: Expr a   }
-  | Let    { _annot :: a, _isrec :: Bool     , _defns :: [Defn a], _body :: Expr a }
-  | If     { _annot :: a, _cond  :: Expr a   , _then  :: Expr a  , _else :: Expr a }
-  | Match  { _annot :: a, _expr  :: Expr a   , _altns :: [Altn a] }
-  deriving (Show, Functor)
+  | Ap     { _annot :: a, _fun   :: Expr stage a   , _args  :: [Expr stage a] }
+  | Lam    { _annot :: a, _binds :: [Bind0 stage a], _body  :: Expr stage a   }
+  | Let    { _annot :: a, _isrec :: Bool     , _defns :: [Defn stage a], _body :: Expr stage a }
+  | If     { _annot :: a, _cond  :: Expr stage a   , _then  :: Expr stage a  , _else :: Expr stage a }
+  | Match  { _annot :: a, _expr  :: Expr stage a   , _altns :: [Altn stage a] }
+  deriving (Functor)
 
-data BindGen i a = MkBind{ _annot :: a, _ident :: i, _type :: Maybe (Type Closed) }
-  deriving (Show, Functor)
+data BindGen i stage a = MkBind{ _annot :: a, _ident :: i, _type :: Maybe (Type (TypeConOf stage) Closed) }
+  deriving (Functor)
 
 type Bind = BindGen Ident.Var
 
 type Bind0 = BindGen (Maybe Ident.Var)
 
-data Defn a = MkDefn{ _lhs :: Bind a, _rhs :: Expr a }
-  deriving (Show, Functor)
+data Defn stage a = MkDefn{ _lhs :: Bind stage a, _rhs :: Expr stage a }
+  deriving (Functor)
 
-data Altn a = MkAltn{ _annot :: a, _con :: Ident.Con, _binds :: [Bind0 a], _rhs :: Expr a }
-  deriving (Show, Functor)
+data Altn stage a = MkAltn{ _annot :: a, _con :: TermConOf stage, _binds :: [Bind0 stage a], _rhs :: Expr stage a }
+  deriving (Functor)
 
-mkAp :: a -> Expr a -> [Expr a] -> Expr a
+mkAp :: a -> Expr stage a -> [Expr stage a] -> Expr stage a
 mkAp _annot _fun _args
   | null _args = _fun
   | otherwise  = Ap { _annot, _fun, _args }
 
-mkApOp :: String -> a -> Expr a -> Expr a -> Expr a
+mkApOp :: String -> a -> Expr stage a -> Expr stage a -> Expr stage a
 mkApOp sym _annot arg1 arg2 =
   let _fun = Var{ _annot, _var = Ident.operator sym }
   in  Ap{ _annot, _fun, _args = [arg1, arg2]}
 
-desugarIf :: Expr a -> Expr a
+boolFalse, boolTrue :: Constructor (ADT Ident.Con)
+MkADT{_constructors = [boolFalse, boolTrue]} =
+  let ident = Ident.constructor "Bool"
+      mk adt = mkADT ident adt []
+        [ mkConstructor (Ident.constructor "False") []
+        , mkConstructor (Ident.constructor "True" ) []
+        ]
+  in  mk (mk ident)
+
+desugarIf :: Expr StageTR a -> Expr StageTR a
 desugarIf If{ _annot, _cond, _then, _else } =
   Match { _annot = _annot
         , _expr  = _cond
         , _altns =
           [ MkAltn { _annot = annot _else
-                   , _con   = Ident.constructor "False"
+                   , _con   = boolFalse
                    , _binds = []
                    , _rhs   = _else
                    }
           , MkAltn { _annot = annot _then
-                   , _con   = Ident.constructor "True"
+                   , _con   = boolTrue
                    , _binds = []
                    , _rhs   = _then
                    }
@@ -87,13 +111,13 @@ desugarIf If{ _annot, _cond, _then, _else } =
         }
 desugarIf _ = error "BUG: desugarIf called on wrong node"
 
-unzipDefns :: [Defn a] -> ([Bind a], [Expr a])
+unzipDefns :: [Defn stage a] -> ([Bind stage a], [Expr stage a])
 unzipDefns = unzip . map (\MkDefn{ _lhs, _rhs } -> (_lhs, _rhs))
 
 zipMaybe :: [Maybe a] -> [b] -> [(a, b)]
 zipMaybe xs = catMaybes . zipWith (\x y -> (,) <$> x <*> pure y) xs
 
-instance Pretty (Expr a) where
+instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Expr stage a) where
   pPrintPrec lvl prec expr =
     case expr of
       Var  { _var } -> pretty _var
@@ -141,33 +165,33 @@ instance Pretty (Expr a) where
         (text "match" <+> pPrintPrec lvl 0 _expr <+> text "with") :
         map (pPrintPrec lvl 0) _altns
 
-instance Pretty (Defn a) where
+instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Defn stage a) where
   pPrintPrec lvl _ MkDefn{ _lhs, _rhs } = case _rhs of
     Lam { _binds, _body } ->
       let lhs = pPrintPrec lvl 0 _lhs <+> hsep (map (pPrintPrec lvl 1) _binds)
       in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
     _ -> hang (pPrintPrec lvl 0 _lhs <+> equals) 2 (pPrintPrec lvl 0 _rhs)
 
-instance Pretty (Bind a) where
+instance (Pretty (TypeConOf stage)) => Pretty (Bind stage a) where
   pPrintPrec _ prec MkBind{ _ident, _type } =
     let p_ident = pretty _ident
     in case _type of
          Nothing -> p_ident
          Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
 
-instance Pretty (Bind0 a) where
+instance (Pretty (TypeConOf stage)) => Pretty (Bind0 stage a) where
   pPrintPrec _ prec MkBind{ _ident, _type } =
     let p_ident = maybe (text "_") pretty _ident
     in case _type of
          Nothing -> p_ident
          Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
 
-instance Pretty (Altn a) where
+instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Altn stage a) where
   pPrintPrec lvl _ MkAltn{ _con, _binds, _rhs } = hang
     (hsep [text "|", pretty _con, hsep (map (pPrintPrec lvl 1) _binds), text "->"]) 2
     (pPrintPrec lvl 0 _rhs)
 
-instance Pretty (TopLevel a) where
+instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (TopLevel stage a) where
   pPrintPrec lvl _ top = case top of
     Type{} -> empty
     Val{} -> empty
@@ -183,14 +207,14 @@ instance Pretty (TopLevel a) where
 class Annot f where
   annot :: f a -> a
 
-instance Annot TopLevel where
-  annot = _annot :: TopLevel _ -> _
+instance Annot (TopLevel stage) where
+  annot = _annot :: TopLevel _ _ -> _
 
-instance Annot Expr where
-  annot = _annot :: Expr _ -> _
+instance Annot (Expr stage) where
+  annot = _annot :: Expr _ _ -> _
 
-instance Annot (BindGen i) where
-  annot = _annot :: BindGen _ _ -> _
+instance Annot (BindGen i stage) where
+  annot = _annot :: BindGen _ _ _ -> _
 
-instance Annot Altn where
-  annot = _annot :: Altn _ -> _
+instance Annot (Altn stage) where
+  annot = _annot :: Altn _ _ -> _
