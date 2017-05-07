@@ -13,7 +13,7 @@ import Data.Ratio ()
 import Text.Parsec.Expr (Assoc (..))
 import qualified Data.Map as Map
 
-import Pukeko.Pretty
+import Pukeko.Error
 
 data Spec = MkSpec{ _sym :: String, _prec :: Rational, _assoc :: Assoc }
 
@@ -34,7 +34,7 @@ letters = Map.keys mangleTable
 mkSpec :: Assoc -> String -> Spec
 mkSpec _assoc _sym = case mangle _sym of
   Just _  -> MkSpec{ _sym, _prec = undefined, _assoc }
-  Nothing -> perror $ text "invalid operator name:" <> quotes (text _sym)
+  Nothing -> bug "operator table" "invalid operator name" (Just _sym)
 
 left, right, none :: String -> Spec
 left  = mkSpec AssocLeft

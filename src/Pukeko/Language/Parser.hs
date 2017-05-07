@@ -3,24 +3,21 @@ module Pukeko.Language.Parser
   )
   where
 
-import Control.Monad.Except
 import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Language
-import qualified Text.Parsec.Token    as Token
+import qualified Text.Parsec.Token as Token
 
+import Pukeko.Error
 import Pukeko.Language.Operator (Spec (..))
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type (ADT, Constructor, mkADT, mkConstructor, Type, Closed, var, (~>), app)
-
 import qualified Pukeko.Language.Ident    as Ident
 import qualified Pukeko.Language.Operator as Operator
 
 parseModule :: MonadError String m => String -> String -> m (Module StageLP SourcePos)
 parseModule file code =
-  case parse (whiteSpace *> module_ <* eof) file code of
-    Left error  -> throwError (show error)
-    Right expr -> return expr
+  either (throwError . show) return $ parse (whiteSpace *> module_ <* eof) file code
 
 type Parser = Parsec String ()
 
@@ -85,7 +82,7 @@ asType = reservedOp ":" *> type_
 
 module_ :: Parser (Module StageLP SourcePos)
 module_ = many1 $ choice
-  [ let_ Def <* optional (reservedOp ";;")
+  [ let_ Def
   , Asm <$> getPosition
         <*> (reserved "external" *> variable)
         <*> (equals *> Token.stringLiteral pukeko)

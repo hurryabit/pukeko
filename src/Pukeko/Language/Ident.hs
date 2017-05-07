@@ -14,6 +14,7 @@ where
 
 import Data.Char (isAlpha, isLower, isUpper)
 
+import Pukeko.Error
 import Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Operator
 
@@ -25,12 +26,10 @@ data Var
 variable, operator :: String -> Var
 variable _name@(first:_)
   | isLower first || not (isAlpha first) = Var{ _name, _part = Nothing }
-variable _name =
-  perror $ text "invalid variable name:" <+> quotes (text _name)
+variable _name = bug "ident" "invalid variable name" (Just _name)
 operator _sym = case Operator.mangle _sym of
   Just _name -> Op{ _sym, _name, _part = Nothing }
-  Nothing ->
-    perror $ text "invalid operator symbol:" <+> quotes (text _sym)
+  Nothing -> bug "ident" "invalid operator symbol" (Just _sym)
 
 main :: Var
 main = variable "main"
@@ -61,8 +60,7 @@ data Con = Con String
 constructor :: String -> Con
 constructor name@(first:_)
   | isUpper first = Con name
-constructor name =
-  perror $ text "invalid constructor name:" <+> quotes (text name)
+constructor name = bug "ident" "invalid constructor name" (Just name)
 
 instance Pretty Con where
   pPrint (Con name) = text name

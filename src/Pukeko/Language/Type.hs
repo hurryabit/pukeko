@@ -15,7 +15,7 @@ module Pukeko.Language.Type
   , (~>)
   , (*~>)
   , app
-  , int
+  , typeInt
   , qvars
   , prettyType
   )
@@ -98,8 +98,8 @@ app :: con -> [Type con a] -> Type con a
 app = TApp
 
 -- TODO: Remove this undefined hack.
-int :: Type (ADT Ident.Con) Closed
-int  = app (mkADT (Ident.constructor "Int") undefined [] []) []
+typeInt :: Type (ADT Ident.Con) Closed
+typeInt  = app (mkADT (Ident.constructor "Int") undefined [] []) []
 
 open :: Type con Closed -> Type con (Open s)
 open t =

@@ -7,10 +7,10 @@ module Pukeko.GMachine.Builtins
   )
   where
 
-import Control.Monad.Except
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Pukeko.Error
 import Pukeko.Pretty
 import Pukeko.GMachine.GCode
 
@@ -22,7 +22,7 @@ constructorName tag arity = MkName ("gm$cons_" ++ show tag ++ "_" ++ show arity)
 
 findGlobal :: MonadError String m => Name -> m Global
 findGlobal name = case Map.lookup (externalName name) globalTable of
-  Nothing -> perror $ text "Unknown external:" <+> quotes (pretty name)
+  Nothing -> throwDoc $ "unknown external" <+> quotes (pretty name)
   Just global -> return global
 
 mkBuiltinGen :: Name -> Int -> [Inst] -> Global

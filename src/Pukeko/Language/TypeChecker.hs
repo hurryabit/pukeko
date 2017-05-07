@@ -5,7 +5,6 @@ module Pukeko.Language.TypeChecker
 where
 
 import Control.Monad
-import Control.Monad.Except
 import Control.Monad.Fail
 import Control.Monad.Reader hiding (asks, local)
 import Control.Monad.State  hiding (State, gets, modify)
@@ -15,9 +14,10 @@ import Data.Label.Monadic
 import Data.Map (Map)
 import Data.STRef
 import Text.Parsec (SourcePos)
-
 import qualified Data.Map as Map
-import Pukeko.Pretty hiding (int)
+
+import Pukeko.Error
+import Pukeko.Pretty
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type hiding (Type)
 import qualified Pukeko.Language.Ident as Ident
@@ -53,7 +53,7 @@ liftST :: ST s a -> TI s a
 liftST = TI . lift . lift . lift
 
 checkModule :: MonadError String m => Module StageTR SourcePos -> m ()
-checkModule tops = do
+checkModule tops =
   let env = MkEnvironment
         { _locals = Map.empty
         , _level  = 0
@@ -62,50 +62,35 @@ checkModule tops = do
         { _globals = Map.empty
         , _fresh   = []
         }
-      res = runST (evalStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
-  case res of
-    Left error -> throwError error
-    Right ()   -> return ()
+  in  runST (evalStateT (runReaderT (runExceptT (unTI (mapM_ checkTopLevel tops))) env) st)
 
 checkTopLevel :: TopLevel StageTR SourcePos -> TI s ()
 checkTopLevel top = case top of
-  Type{} -> error "BUG: type definition in type checker"
+  Type{} -> bug "type checker" "type definition" Nothing
   Val{ _annot, _ident, _type } -> do
     look <- modifyAndGet globals $
       Map.insertLookupWithKey (\_ -> const) _ident (_type, Declared)
-    let throw verb = throwHere _annot $
-          "the function " ++ show _ident ++ " cannot be declared, it " ++ verb
     case look of
       Nothing -> return ()
-      Just (_, Imported) -> throw "has been imported"
-      Just (_, Declared) -> throw "has already been declared"
-      Just (_, Defined)  -> throw "has already beed defined"
+      Just _ -> throwAt _annot "duplicate declaration of function" _ident
   Def{ _annot, _isrec, _defns } -> do
     resetFresh
     env <- inferLet _isrec _defns
     forM_ env $ \(ident, t_infer) -> do
       look <- Map.lookup ident <$> gets globals
-      let throw verb = throwHere _annot $
-            "the function " ++ show ident ++ " cannot be defined, it " ++ verb
       case look of
-        Nothing            -> throw "has not been declared"
-        Just (_, Imported) -> throw "has been imported"
-        Just (_, Defined)  -> throw "has already been defined"
         Just (t_decl, Declared) -> do
           t_infer <- instantiate t_infer
-          unify (open t_decl) t_infer `catchError` throwHere _annot
+          unify (open t_decl) t_infer `catchError` throwErrorAt _annot
           modify globals $ Map.insert ident (t_decl, Defined)
+        Just _  -> throwAt _annot "duplicate definition of function" ident
+        Nothing -> throwAt _annot "undeclared function" ident
   Asm{ _annot, _ident } -> do
     look <- Map.lookup _ident <$> gets globals
-    let throw verb = throwHere _annot $
-          "the function " ++ show _ident ++
-          " cannot be defined as assembly, it " ++ verb
     case look of
-      Nothing            -> throw "has not been declared"
-      Just (_, Imported) -> throw "has been imported"
-      Just (_, Defined)  -> throw "has already been defined"
-      Just (t_decl, Declared) ->
-        modify globals $ Map.insert _ident (t_decl, Defined)
+      Just (t_decl, Declared) -> modify globals $ Map.insert _ident (t_decl, Defined)
+      Just _  -> throwAt _annot "duplicate definition of function" _ident
+      Nothing -> throwAt _annot "undeclared function" _ident
 
 resetFresh :: TI s ()
 resetFresh = do
@@ -129,10 +114,8 @@ lookupType annot ident = do
       case t_global of
         Just (t, Imported) -> return (open t)
         Just (t, Defined)  -> return (open t)
-        Just (_, Declared) ->
-          throwHere annot $ "function " ++ show ident ++ " has not been defined yet"
-        Nothing ->
-          throwHere annot $ "function " ++ show ident ++ " is unknown"
+        Just (_, Declared) -> throwAt annot "undefined function" ident
+        Nothing            -> throwAt annot "undeclared function" ident
 
 occursCheck :: (STRef s (TypeVar (TypeConOf StageTR) s)) -> Type (Open s) -> TI s ()
 occursCheck tvr1 t2 =
@@ -172,7 +155,7 @@ unify t1 t2 = do
       Free{ _ident } <- liftST $ readSTRef tvr1
       occursCheck tvr1 t2 `catchError` \_ -> do
         p2 <- liftST $ prettyType prettyNormal 0 t2
-        pthrow $ hsep [pretty _ident, text "occurs in", p2]
+        throwDoc $ quotes (pretty _ident) <+> "occurs in" <+> p2
       liftST $ writeSTRef tvr1 $ Link { _type = t2 }
     (_, TVar _) -> unify t2 t1
     (QVar name1, QVar name2)
@@ -184,7 +167,7 @@ unify t1 t2 = do
     _ -> do
       p1 <- liftST $ prettyType prettyNormal 0 t1
       p2 <- liftST $ prettyType prettyNormal 0 t2
-      pthrow $ hsep [text "mismatching types", p1, text "and", p2]
+      throwDoc $ "mismatching types" <+> p1 <+> "and" <+> p2
 
 generalize :: Type (Open s) -> TI s (Type (Open s))
 generalize t =
@@ -233,9 +216,6 @@ instantiateBind MkBind{ _annot, _type } = case _type of
   Nothing -> freshVar
   Just t  -> instantiate (open t)
 
-throwHere :: SourcePos -> String -> TI s a
-throwHere annot msg = throwError $ show annot ++ ": " ++ msg
-
 inferLet :: Bool -> [Defn StageTR SourcePos] -> TI s [(Ident.Var, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
@@ -252,7 +232,7 @@ inferLet isrec defns = do
 
 infer :: Expr StageTR SourcePos -> TI s (Type (Open s))
 infer expr = do
-  let unifyHere t1 t2 = unify t1 t2 `catchError` throwHere (annot expr)
+  let unifyHere t1 t2 = unify t1 t2 `catchError` throwErrorAt (annot expr)
   case expr of
     Var{ _annot, _var } -> do
       t <- lookupType _annot _var
@@ -260,7 +240,7 @@ infer expr = do
     Con{ _annot, _con } -> do
       let t = open (typeOf _con)
       instantiate t
-    Num{} -> return (open int)
+    Num{} -> return (open typeInt)
     Ap{ _fun, _args } -> do
       t_fun <- infer _fun
       t_args <- mapM infer _args
@@ -274,7 +254,7 @@ infer expr = do
       t_body <- local locals (Map.union env) (infer _body)
       return $ t_params *~> t_body
     Let{ _annot, _isrec, _defns, _body } -> do
-      env <- Map.fromList <$> inferLet _isrec _defns `catchError` throwHere _annot
+      env <- Map.fromList <$> inferLet _isrec _defns `catchError` throwErrorAt _annot
       local locals (Map.union env) (infer _body)
     If{} -> infer (desugarIf expr)
     Match{ _expr, _altns } -> do
@@ -282,7 +262,8 @@ infer expr = do
       t_res <- freshVar
       forM_ _altns $ \MkAltn{ _annot, _con = MkConstructor{_name, _adt = adt@MkADT{_params}, _fields}, _binds, _rhs } -> do
         when (length _binds /= length _fields) $
-          throwHere _annot ("wrong number of arguments for constructor " ++ show _name)
+          throwDocAt _annot $ "term cons" <+> quotes (pretty _name) <+>
+          "expects" <+> int (length _fields) <+> "arguments"
         let idents = map (_ident :: Bind0 _ _ -> _) _binds
         (t_params, t_fields) <-
           splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)

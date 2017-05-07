@@ -3,7 +3,6 @@ module Pukeko.Language.LambdaLifter
   )
 where
 
-import Control.Monad.Except
 import Control.Monad.RWS
 import Data.Set (Set)
 import qualified Data.Set as Set

@@ -35,6 +35,7 @@ library
                      , Pukeko.Language.Type
                      , Pukeko.Language.TypeChecker
                      , Pukeko.Language.TypeResolver
+                     , Pukeko.Error
                      , Pukeko.Pretty
   build-depends:       base >= 4.7 && < 5
                      , array
@@ -51,6 +52,7 @@ library
                      , GeneralizedNewtypeDeriving
                      , MonadFailDesugaring
                      , NamedFieldPuns
+                     , OverloadedStrings
                      , PartialTypeSignatures
                      , TypeFamilies
 

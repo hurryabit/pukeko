@@ -9,6 +9,7 @@ import Data.Set (Set)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Pukeko.Error
 import Pukeko.Language.Type (Constructor (..))
 import qualified Pukeko.Language.Ident  as Ident
 import qualified Pukeko.Language.Syntax as L
@@ -44,7 +45,7 @@ ccExpr expr = case expr of
     _fun <- ccExpr _fun
     _args <- traverse ccExpr _args
     return C.Ap{_fun, _args}
-  L.Lam{} -> error "BUG: lambda in core compiler"
+  L.Lam{} -> bug "core compiler" "unlifted lambda" Nothing
   L.Let{_isrec, _defns, _body} -> do
     _defns <- traverse ccDefn _defns
     _body <- ccExpr _body

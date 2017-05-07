@@ -23,10 +23,10 @@ where
 
 import Data.Maybe (catMaybes)
 
+import Pukeko.Error
+import Pukeko.Pretty
 import Pukeko.Language.Operator (aprec)
 import Pukeko.Language.Type (Type, Closed, ADT (..), Constructor (..), mkADT, mkConstructor)
-import Pukeko.Pretty
-
 import qualified Pukeko.Language.Ident    as Ident
 
 type family TypeConOf stage
@@ -109,7 +109,7 @@ desugarIf If{ _annot, _cond, _then, _else } =
                    }
           ]
         }
-desugarIf _ = error "BUG: desugarIf called on wrong node"
+desugarIf _ = bug "syntax" "desugarIf on wrong node" Nothing
 
 unzipDefns :: [Defn stage a] -> ([Bind stage a], [Expr stage a])
 unzipDefns = unzip . map (\MkDefn{ _lhs, _rhs } -> (_lhs, _rhs))

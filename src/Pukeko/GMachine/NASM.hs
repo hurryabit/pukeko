@@ -3,12 +3,11 @@ module Pukeko.GMachine.NASM
   )
 where
 
-import Control.Monad.Except
 import Data.List (isPrefixOf, intercalate)
 import Data.Map (Map)
-
 import qualified Data.Map as Map
 
+import Pukeko.Error
 import Pukeko.GMachine.GCode
 
 assemble :: MonadError String m => Program -> m String
@@ -38,7 +37,7 @@ assembleInst arities inst = do
         let s = show label
         if "." `isPrefixOf` s
           then return ()
-          else throwError $ s ++ " is not a valid jump label"
+          else throw "invalid jump label" label
   case inst of
     EVAL   -> code "eval"   []
     UNWIND -> code "unwind" []
@@ -59,7 +58,7 @@ assembleInst arities inst = do
     PUSHINT num -> code "pushint" [show num]
     PUSHGLOBAL name -> do
       case Map.lookup name arities of
-        Nothing -> throwError $ "Unknown global: " ++ show name
+        Nothing -> throw "unknown global" name
         Just arity -> code "pushglobal" [show name, show arity]
     GLOBSTART name arity ->
       code "globstart" [show name, show arity]
@@ -87,4 +86,4 @@ assembleInst arities inst = do
     PRINT -> code "print" []
     INPUT -> code "input" []
     ABORT -> code "abort" []
-    EXIT -> throwError "EXIT not allowed"
+    EXIT -> throwError "forbidden instruction 'EXIT'"

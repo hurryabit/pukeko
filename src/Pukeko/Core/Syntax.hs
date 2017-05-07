@@ -13,6 +13,7 @@ where
 
 import Data.Maybe (catMaybes)
 
+import Pukeko.Error
 import Pukeko.Pretty
 
 newtype Name = MkName{unName :: String}
@@ -85,7 +86,7 @@ instance Pretty Expr where
           pPrintPrec lvl 1 _fun : map (pPrintPrec lvl 1) _args
       Let{ _isrec, _defns, _body } ->
         case _defns of
-          [] -> error "BUG: empty let in core"
+          [] -> bug "core printer" "empty let" Nothing
           defn0:defns ->
             let let_ | _isrec    = text "let rec"
                      | otherwise = text "let"

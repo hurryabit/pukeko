@@ -5,7 +5,6 @@ module Pukeko.Language.TypeResolver
 where
 
 import Control.Monad
-import Control.Monad.Except
 import Control.Monad.State hiding (gets, modify)
 import Data.Label (mkLabels)
 import Data.Label.Monadic
@@ -13,6 +12,7 @@ import Data.Map (Map)
 import Text.Parsec (SourcePos)
 import qualified Data.Map as Map
 
+import Pukeko.Error
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type
 import qualified Pukeko.Language.Ident as Ident
@@ -32,12 +32,7 @@ newtype TR a = TR {unTR :: ExceptT String (State TRState) a}
 runTR :: MonadError String m => TR a -> m a
 runTR tr =
   let st = MkTRState{_types = Map.empty, _constrs= Map.empty}
-  in  case evalState (runExceptT (unTR tr)) st of
-        Left error -> throwError error
-        Right res  -> return res
-
-throwHere :: SourcePos -> String -> TR a
-throwHere annot msg = throwError $ show annot ++ ": " ++ msg
+  in  evalState (runExceptT (unTR tr)) st
 
 trType :: SourcePos
        -> Type (TypeConOf StageLP) Closed -> TR (Type (TypeConOf StageTR) Closed)
@@ -47,30 +42,28 @@ trType posn typ = case typ of
     TApp con typs -> do
       adt_opt <- Map.lookup con <$> gets types
       case adt_opt of
-        Nothing ->
-          throwHere posn $ "unknown type cons " ++ show con
+        Nothing -> throwAt posn "unknown type cons" con
         Just adt -> TApp adt <$> traverse (trType posn) typs
 
 -- TODO: Have only one insert function.
 insertTypeCon :: SourcePos -> ADT Ident.Con -> TR ()
 insertTypeCon posn adt@MkADT{_name} = do
   conflict <- Map.member _name <$> gets types
-  when conflict $
-    throwHere posn ("Type " ++ show _name ++ " has already been defined")
+  when conflict $ throwAt posn "duplicate type cons" _name
   modify types (Map.insert _name adt)
 
 insertTermCon :: SourcePos -> Constructor (ADT Ident.Con) -> TR ()
 insertTermCon posn con@MkConstructor{_name} = do
   conflict <- Map.member _name <$> gets constrs
   when conflict $
-    throwHere posn ("Constructor " ++ show _name ++ " has already been defined")
+    throwAt posn "duplicate term cons" _name
   modify constrs (Map.insert _name con)
 
 findTermCon :: SourcePos -> Ident.Con -> TR (TermConOf StageTR)
 findTermCon posn name = do
   con_opt <- Map.lookup name <$> gets constrs
   case con_opt of
-    Nothing -> throwHere posn $ "unknown term cons " ++ show name
+    Nothing -> throwAt posn "unknown term cons" name
     Just con -> return con
 
 trBind :: BindGen i StageLP SourcePos -> TR (BindGen i StageTR SourcePos)

@@ -3,11 +3,13 @@ module Pukeko.Language.KindChecker
   )
 where
 
-import Control.Monad.Except
+import Control.Monad
 import Data.Maybe (catMaybes)
 import Text.Parsec (SourcePos)
 import qualified Data.Set as Set
 
+import Pukeko.Error
+import Pukeko.Pretty
 import Pukeko.Language.Syntax
 import Pukeko.Language.Type hiding (Type)
 import qualified Pukeko.Language.Ident   as Ident
@@ -18,22 +20,14 @@ type Type a = Type.Type (ADT Ident.Con) a
 
 type KC a = Except String a
 
-runKC :: MonadError String m => KC a -> m a
-runKC kc = case runExcept kc of
-  Left error -> throwError error
-  Right res -> return res
-
-throwHere :: SourcePos -> String -> KC a
-throwHere annot msg = throwError $ show annot ++ ": " ++ msg
-
 kcType :: SourcePos -> Type a -> KC (Type a)
 kcType posn typ = case typ of
     TApp MkADT{_name, _params} typs
       -- TODO: Check that params are mutually distinct.
       | length _params /= length typs ->
-          throwHere posn $
-          "Type constructor " ++ show _name ++ " expects "
-          ++ show (length _params) ++ " parameters"
+          throwDocAt posn $
+          "type cons" <+> quotes (pretty _name) <+> "expects" <+>
+          int (length _params) <+> "parameters"
     _ -> Rewrite.type_ (kcType posn) typ
 
 kcBind :: BindGen i StageTR SourcePos -> KC (BindGen i StageTR SourcePos)
@@ -75,9 +69,7 @@ kcTopLevel top = case top of
         let unbound =
               Set.unions (map qvars _fields) `Set.difference` Set.fromList _params
         unless (Set.null unbound) $
-          throwHere _annot $
-          "Unbound type variables in constructor " ++ show _name ++ ": "
-          ++ unwords (map show $ Set.toList unbound)
+          throwAt _annot "unbound type vars in term cons" _name
         mapM_ (kcType _annot) _fields
     return Nothing
   Val{_annot, _type} -> do
@@ -92,4 +84,4 @@ kcModule :: Module StageTR SourcePos -> KC (Module StageTR SourcePos)
 kcModule module_ = catMaybes <$> traverse kcTopLevel module_
 
 check :: MonadError String m => Module StageTR SourcePos -> m (Module StageTR SourcePos)
-check = runKC . kcModule
+check = runExcept . kcModule

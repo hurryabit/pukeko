@@ -5,7 +5,6 @@ module Pukeko.GMachine.Compiler
   )
   where
 
-import Control.Monad.Except
 import Control.Monad.RWS hiding (asks, local)
 import Data.Label.Derive
 import Data.Label.Monadic
@@ -13,6 +12,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
+import Pukeko.Error
+import Pukeko.Pretty (pretty, render)
 import Pukeko.Core.Info
 import Pukeko.Core.Syntax
 import Pukeko.GMachine.GCode
@@ -24,7 +25,7 @@ data Context = MkContext
   }
 mkLabels [''Context]
 
-newtype CC a = CC { unCC :: ExceptT String (RWS Context [Inst] Int) a }
+newtype CC a = CC { unCC :: RWST Context [Inst] Int (Except String) a }
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader Context
@@ -51,13 +52,10 @@ compileTopDefn top = case top of
           { _offsets = Map.fromList $ zipMaybe _binds [n, n-1 ..]
           , _depth   = n
           }
-        (res, code) = evalRWS (runExceptT (unCC $ ccExpr Redex _body)) context 0
-    case res of
-      Left error -> throwError error
-      Right ()   -> do
-        let _arity = n
-            _code  = GLOBSTART _name _arity : code
-        return $ MkGlobal { _name, _arity, _code }
+    ((), code) <- runExcept (evalRWST (unCC $ ccExpr Redex _body) context 0)
+    let _arity = n
+        _code  = GLOBSTART _name _arity : code
+    return $ MkGlobal { _name, _arity, _code }
   Asm{_name} -> Builtins.findGlobal _name
 
 data Mode = Stack | Eval | Redex
@@ -85,7 +83,7 @@ ccExpr mode expr =
     Local{_name} -> do
       MkContext { _offsets, _depth } <- ask
       case Map.lookup _name _offsets of
-        Nothing     -> error "BUG: unknown local variable in compiler"
+        Nothing     -> bug "compiler" "unknown local variable" (Just (show _name))
         Just offset -> tell [PUSH (_depth - offset)]
       case mode of
         Stack -> return ()
@@ -119,7 +117,7 @@ ccExpr mode expr =
               Redex -> continueRedex UNWIND
       case _fun of
         Pack{_tag, _arity}
-          | n > _arity -> error "BUG: overapplied constructor in compiler"
+          | n > _arity -> bug "compiler" "overapplied constructor" (Just (render (pretty _fun)))
           | n == _arity && _arity > 0 -> do
               ccArgs Stack
               tell [CONS _tag _arity]
