@@ -15,16 +15,16 @@ import qualified Pukeko.Language.Ident  as Ident
 import qualified Pukeko.Language.Syntax as L
 import qualified Pukeko.Core.Syntax     as C
 
-type FV = Set Ident.Var
+type FV = Set Ident.EVar
 
-type CCState = Map Ident.Var C.Name
+type CCState = Map Ident.EVar C.Name
 
 newtype CC a = CC{unCC :: State CCState a}
   deriving (Functor, Applicative, Monad
            , MonadState CCState
            )
 
-name :: Ident.Var -> C.Name
+name :: Ident.EVar -> C.Name
 name = C.MkName . Ident.mangled
 
 ccExpr :: L.Expr L.StageTR FV -> CC C.Expr

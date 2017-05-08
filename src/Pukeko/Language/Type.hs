@@ -36,11 +36,11 @@ infixr 1 ~>, *~>
 
 data ADT con = MkADT
   { _name         :: Ident.Con
-  , _params       :: [Ident.Var]
+  , _params       :: [Ident.TVar]
   , _constructors :: [Constructor con]
   }
 
-mkADT :: Ident.Con -> con -> [Ident.Var] -> [Constructor con] -> ADT con
+mkADT :: Ident.Con -> con -> [Ident.TVar] -> [Constructor con] -> ADT con
 mkADT _name con _params constructors = MkADT
   { _name
   , _params
@@ -76,16 +76,16 @@ data Open s
 data Closed
 
 data TypeVar con s
-  = Free { _ident :: Ident.Var, _level :: Int }
+  = Free { _ident :: Ident.TVar, _level :: Int }
   | Link { _type  :: Type con (Open s) }
 
 data Type con a where
   TVar :: STRef s (TypeVar con s)    -> Type con (Open s)
-  QVar :: Ident.Var                  -> Type con a
+  QVar :: Ident.TVar                 -> Type con a
   TFun :: Type con a ->  Type con a  -> Type con a
   TApp :: con        -> [Type con a] -> Type con a
 
-var :: Ident.Var -> Type con a
+var :: Ident.TVar -> Type con a
 var = QVar
 
 (~>) :: Type con a -> Type con a -> Type con a
@@ -108,7 +108,7 @@ open t =
     TFun tx ty -> TFun (open tx) (open ty)
     TApp c  ts -> TApp c (map open ts)
 
-qvars :: Type con Closed -> Set Ident.Var
+qvars :: Type con Closed -> Set Ident.TVar
 qvars t = case t of
   QVar _ident -> Set.singleton _ident
   TFun t_arg t_res -> qvars t_arg `Set.union` qvars t_res

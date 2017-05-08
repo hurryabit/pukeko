@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 import Pukeko.Language.Syntax
 import qualified Pukeko.Language.Ident as Ident
 
-type FreeVars = Set Ident.Var
+type FreeVars = Set Ident.EVar
 
 newtype FV a = FV { unFV :: Reader FreeVars a }
   deriving ( Functor, Applicative, Monad

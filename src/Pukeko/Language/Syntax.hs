@@ -45,12 +45,12 @@ type Module stage a = [TopLevel stage a]
 
 data TopLevel stage a
   = Type{ _annot :: a, _adts :: [ADT (TypeConOf stage)] }
-  | Val{ _annot :: a, _ident :: Ident.Var, _type :: Type (TypeConOf stage) Closed }
+  | Val{ _annot :: a, _ident :: Ident.EVar, _type :: Type (TypeConOf stage) Closed }
   | Def{ _annot :: a, _isrec :: Bool, _defns :: [Defn stage a] }
-  | Asm{ _annot :: a, _ident :: Ident.Var, _asm :: String }
+  | Asm{ _annot :: a, _ident :: Ident.EVar, _asm :: String }
 
 data Expr stage a
-  = Var    { _annot :: a, _var   :: Ident.Var }
+  = Var    { _annot :: a, _var   :: Ident.EVar }
   | Con    { _annot :: a, _con   :: TermConOf stage }
   | Num    { _annot :: a, _int   :: Int }
   | Ap     { _annot :: a, _fun   :: Expr stage a   , _args  :: [Expr stage a] }
@@ -63,9 +63,9 @@ data Expr stage a
 data BindGen i stage a = MkBind{ _annot :: a, _ident :: i, _type :: Maybe (Type (TypeConOf stage) Closed) }
   deriving (Functor)
 
-type Bind = BindGen Ident.Var
+type Bind = BindGen Ident.EVar
 
-type Bind0 = BindGen (Maybe Ident.Var)
+type Bind0 = BindGen (Maybe Ident.EVar)
 
 data Defn stage a = MkDefn{ _lhs :: Bind stage a, _rhs :: Expr stage a }
   deriving (Functor)
@@ -80,7 +80,7 @@ mkAp _annot _fun _args
 
 mkApOp :: String -> a -> Expr stage a -> Expr stage a -> Expr stage a
 mkApOp sym _annot arg1 arg2 =
-  let _fun = Var{ _annot, _var = Ident.operator sym }
+  let _fun = Var{ _annot, _var = Ident.op sym }
   in  Ap{ _annot, _fun, _args = [arg1, arg2]}
 
 boolFalse, boolTrue :: Constructor (ADT Ident.Con)

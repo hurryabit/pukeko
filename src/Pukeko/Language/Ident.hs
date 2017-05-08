@@ -1,57 +1,81 @@
 module Pukeko.Language.Ident
-  ( Var
-  , variable
-  , operator
+  ( EVar
+  , evar
+  , op
   , main
-  , isVariable
-  , isOperator
-  , freshVars
+  , isVar
+  , isOp
+  , freshEVars
   , mangled
+  , TVar
+  , tvar
+  , freshTVars
   , Con
   , constructor
   )
 where
 
-import Data.Char (isAlpha, isLower, isUpper)
+import Data.Char (isLower, isUpper)
 
 import Pukeko.Error
 import Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Operator
 
-data Var
-  = Var{ _name :: String,                  _part :: Maybe Int }
-  | Op { _sym  :: String, _name :: String, _part :: Maybe Int }
+data EVar
+  = EVar{_name :: String,                  _part :: Maybe Int}
+  | Op  {_sym  :: String, _name :: String, _part :: Maybe Int}
   deriving (Eq, Ord)
 
-variable, operator :: String -> Var
-variable _name@(first:_)
-  | isLower first || not (isAlpha first) = Var{ _name, _part = Nothing }
-variable _name = bug "ident" "invalid variable name" (Just _name)
-operator _sym = case Operator.mangle _sym of
-  Just _name -> Op{ _sym, _name, _part = Nothing }
+evar, op :: String -> EVar
+evar _name@(first:_)
+  | isLower first = EVar{_name, _part = Nothing}
+evar _name = bug "ident" "invalid variable name" (Just _name)
+op _sym = case Operator.mangle _sym of
+  Just _name -> Op{_sym, _name, _part = Nothing}
   Nothing -> bug "ident" "invalid operator symbol" (Just _sym)
 
-main :: Var
-main = variable "main"
+main :: EVar
+main = evar "main"
 
-isVariable, isOperator :: Var -> Bool
-isVariable Var{} = True
-isVariable _     = False
-isOperator Op{}  = True
-isOperator _     = False
+isVar, isOp :: EVar -> Bool
+isVar EVar{} = True
+isVar _      = False
+isOp  Op{}   = True
+isOp  _      = False
 
-freshVars :: Var -> [Var]
-freshVars var = map (\n -> var{_part = Just n}) [1 ..]
+freshEVars :: EVar -> [EVar]
+freshEVars var = map (\n -> var{_part = Just n}) [1 ..]
 
-mangled :: Var -> String
-mangled var = _name var ++ maybe "" (\n -> '$':show n) (_part var)
+mangled :: EVar -> String
+mangled var = (_name :: EVar -> _) var ++ maybe "" (\n -> '$':show n) (_part var)
 
-instance Pretty Var where
+instance Pretty EVar where
   pPrint var = case var of
-    Var{_name, _part} -> text _name <> maybe empty (\n -> "$" <> int n) _part
-    Op {_sym , _part} -> parens (text _sym <> maybe empty int _part)
+    EVar{_name, _part} -> text _name <> maybe empty (\n -> "$" <> int n) _part
+    Op  {_sym , _part} -> parens (text _sym <> maybe empty int _part)
 
-instance Show Var where
+instance Show EVar where
+  show = prettyShow
+
+data TVar
+  = TVar{_name :: String}
+  | IVar{_id   :: Int   }
+  deriving (Eq, Ord)
+
+tvar :: String -> TVar
+tvar _name@(first:_)
+  | isLower first = TVar{_name}
+tvar _name = bug "ident" "invalid type variable name" (Just _name)
+
+freshTVars :: [TVar]
+freshTVars = map IVar [1..]
+
+instance Pretty TVar where
+  pPrint tvar = case tvar of
+    TVar{_name} -> text _name
+    IVar{_id}   -> "_" <> int _id
+
+instance Show TVar where
   show = prettyShow
 
 data Con = Con String

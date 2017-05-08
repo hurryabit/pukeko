@@ -10,15 +10,15 @@ import qualified Data.Set as Set
 import Pukeko.Language.Syntax
 import qualified Pukeko.Language.Ident as Ident
 
-type FV = Set Ident.Var
+type FV = Set Ident.EVar
 
-glDefn :: Defn _ FV -> Set Ident.Var
+glDefn :: Defn _ FV -> Set Ident.EVar
 glDefn MkDefn{_rhs} = glExpr _rhs
 
-glAltn :: Altn stage FV -> Set Ident.Var
+glAltn :: Altn stage FV -> Set Ident.EVar
 glAltn MkAltn{_rhs} = glExpr _rhs
 
-glExpr :: Expr stage FV -> Set Ident.Var
+glExpr :: Expr stage FV -> Set Ident.EVar
 glExpr expr = case expr of
   Var{_annot, _var}
     | _var `Set.member` _annot -> Set.empty
@@ -31,7 +31,7 @@ glExpr expr = case expr of
   If{_cond, _then, _else} -> Set.unions (map glExpr [_cond, _then, _else])
   Match{_expr, _altns} -> glExpr _expr `Set.union` Set.unions (map glAltn _altns)
 
-type DC a = State (Set Ident.Var) a
+type DC a = State (Set Ident.EVar) a
 
 dcTopLevel :: TopLevel stage FV -> DC Bool
 dcTopLevel top = case top of

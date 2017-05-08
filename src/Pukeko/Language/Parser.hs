@@ -56,9 +56,12 @@ equals  = reservedOp "="
 arrow   = reservedOp "->"
 bar     = reservedOp "|"
 
-variable, alphaVariable :: Parser Ident.Var
-alphaVariable = Ident.variable <$> (lookAhead lower *> identifier)
-variable = alphaVariable <|> Ident.operator <$> try (parens operator)
+evar :: Parser Ident.EVar
+evar = Ident.evar <$> (lookAhead lower *> identifier)
+  <|> Ident.op <$> try (parens operator)
+
+tvar :: Parser Ident.TVar
+tvar = Ident.tvar <$> (lookAhead lower *> identifier)
 
 constructor :: Parser Ident.Con
 constructor = Ident.constructor <$> (lookAhead upper *> Token.identifier pukeko)
@@ -72,7 +75,7 @@ type_ =
     )
   <?> "type"
 atype = choice
-  [ var <$> alphaVariable
+  [ var <$> tvar
   , app <$> constructor <*> pure []
   , parens type_
   ]
@@ -84,10 +87,10 @@ module_ :: Parser (Module StageLP SourcePos)
 module_ = many1 $ choice
   [ let_ Def
   , Asm <$> getPosition
-        <*> (reserved "external" *> variable)
+        <*> (reserved "external" *> evar)
         <*> (equals *> Token.stringLiteral pukeko)
   , Val <$> getPosition
-        <*> (reserved "val" *> variable)
+        <*> (reserved "val" *> evar)
         <*> asType
   , Type <$> getPosition
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
@@ -104,18 +107,18 @@ typed needParens constr ident =
   <?> "declaration"
 
 bind :: Bool -> Parser (Bind StageLP SourcePos)
-bind needParens = typed needParens MkBind $ variable
+bind needParens = typed needParens MkBind $ evar
 
 bind0 :: Bool -> Parser (Bind0 StageLP SourcePos)
 bind0 needParens =
-  typed needParens MkBind (Just <$> variable <|> symbol "_" *> pure Nothing)
+  typed needParens MkBind (Just <$> evar <|> symbol "_" *> pure Nothing)
 
 defnValLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnValLhs = MkDefn <$> bind False
 
 defnFunLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnFunLhs =
-  (.) <$> (MkDefn <$> (MkBind <$> getPosition <*> variable <*> pure Nothing))
+  (.) <$> (MkDefn <$> (MkBind <$> getPosition <*> evar <*> pure Nothing))
       <*> (Lam <$> getPosition <*> many1 (bind0 True))
 
 -- TODO: Improve this code.
@@ -153,7 +156,7 @@ expr =
   ])
   <?> "expression"
 aexpr = choice
-  [ Var <$> getPosition <*> variable
+  [ Var <$> getPosition <*> evar
   , Con <$> getPosition <*> constructor
   , Num <$> getPosition <*> nat
   , parens expr
@@ -165,7 +168,7 @@ operatorTable = map (map f) (reverse Operator.table)
 
 adt :: Parser (ADT Ident.Con)
 adt = mkADT' <$> constructor
-             <*> many variable
+             <*> many tvar
              <*> option [] (reservedOp "=" *> many1 adtConstructor)
   where mkADT' con = mkADT con con
 

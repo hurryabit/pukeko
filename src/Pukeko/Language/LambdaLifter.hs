@@ -11,9 +11,9 @@ import Pukeko.Language.Syntax
 import Pukeko.Language.Ident as Ident
 import qualified Pukeko.Language.Rewrite as Rewrite
 
-type State = [Ident.Var]
+type State = [Ident.EVar]
 
-type FV = Set Ident.Var
+type FV = Set Ident.EVar
 
 newtype LL a = LL{unLL :: RWS () [TopLevel StageTR FV] State a}
   deriving ( Functor, Applicative, Monad
@@ -30,7 +30,7 @@ execLL ll =
 emit :: Defn StageTR FV -> LL ()
 emit defn = tell [Def{_annot = Set.empty, _isrec = False, _defns = [defn]}]
 
-freshIdent :: LL Ident.Var
+freshIdent :: LL Ident.EVar
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
 llExpr :: Expr StageTR FV -> LL (Expr StageTR FV)
@@ -56,7 +56,7 @@ llTopDefn defn@MkDefn{_lhs = MkBind{_ident}, _rhs} = do
   let is_lambda = case _rhs of
         Lam{} -> True
         _     -> False
-  put $ (if is_lambda then [_ident] else []) ++ Ident.freshVars _ident
+  put $ (if is_lambda then [_ident] else []) ++ Ident.freshEVars _ident
   defn <- Rewrite.defn llExpr defn
   unless is_lambda $ emit defn
 

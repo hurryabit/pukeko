@@ -26,15 +26,15 @@ import qualified Pukeko.Language.Type as Type
 type Type a = Type.Type (ADT Ident.Con) a
 
 data Environment s = MkEnvironment
-  { _locals :: Map Ident.Var (Type (Open s))
+  { _locals :: Map Ident.EVar (Type (Open s))
   , _level  :: Int
   }
 
 data GlobalStatus = Imported | Declared | Defined
 
 data TCState = MkTCState
-  { _globals :: Map Ident.Var (Type Closed, GlobalStatus)
-  , _fresh   :: [Ident.Var]
+  { _globals :: Map Ident.EVar (Type Closed, GlobalStatus)
+  , _fresh   :: [Ident.TVar]
   }
 mkLabels [''Environment, ''TCState]
 
@@ -95,9 +95,7 @@ checkTopLevel top = case top of
       Nothing -> throwAt _annot "undeclared function" _ident
 
 resetFresh :: TC s ()
-resetFresh = do
-  let vars = "$":[ xs ++ [x] | xs <- vars, x <- ['a'..'z'] ]
-  puts fresh (map Ident.variable vars)
+resetFresh = puts fresh Ident.freshTVars
 
 freshVar :: TC s (Type (Open s))
 freshVar = do
@@ -106,7 +104,7 @@ freshVar = do
   var <- liftST $ newSTRef $ Free { _ident, _level }
   return (TVar var)
 
-lookupType :: SourcePos -> Ident.Var -> TC s (Type (Open s))
+lookupType :: SourcePos -> Ident.EVar -> TC s (Type (Open s))
 lookupType annot ident = do
   t_local <- Map.lookup ident <$> asks locals
   case t_local of
@@ -191,7 +189,7 @@ instantiateMany :: [Type (Open s)] -> TC s [Type (Open s)]
 instantiateMany ts = evalStateT (mapM inst ts) Map.empty
   where
     inst :: Type (Open s)
-         -> StateT (Map Ident.Var (Type (Open s))) (TC s) (Type (Open s))
+         -> StateT (Map Ident.TVar (Type (Open s))) (TC s) (Type (Open s))
     inst t =
       case t of
         TVar tvr -> do
@@ -218,7 +216,7 @@ instantiateBind MkBind{ _annot, _type } = case _type of
   Nothing -> freshVar
   Just t  -> instantiate (open t)
 
-inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.Var, Type (Open s))]
+inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.EVar, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
       idents = map (_ident :: Bind _ _ -> _) lhss
