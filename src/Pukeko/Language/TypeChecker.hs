@@ -227,6 +227,8 @@ inferLet isrec defns = do
     t_rhss <- local locals (Map.union env) (mapM infer rhss)
     zipWithM_ unify t_lhss t_rhss
     return t_rhss
+  -- TODO: Add test case which makes sure this generalization is not moved into
+  -- the scope of the @local@ above.
   t_idents <- mapM generalize t_rhss
   return $ zip idents t_idents
 
