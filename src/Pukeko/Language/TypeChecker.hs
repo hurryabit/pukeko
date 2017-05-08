@@ -63,37 +63,6 @@ evalTC tc =
 liftST :: ST s a -> TC s a
 liftST = TC . lift . lift
 
-checkModule :: MonadError String m => Module StageTR SourcePos -> m ()
-checkModule module_ = evalTC (mapM_ checkTopLevel module_)
-
-checkTopLevel :: TopLevel StageTR SourcePos -> TC s ()
-checkTopLevel top = case top of
-  Type{} -> bug "type checker" "type definition" Nothing
-  Val{ _annot, _ident, _type } -> do
-    look <- modifyAndGet globals $
-      Map.insertLookupWithKey (\_ -> const) _ident (_type, Declared)
-    case look of
-      Nothing -> return ()
-      Just _ -> throwAt _annot "duplicate declaration of function" _ident
-  Def{ _annot, _isrec, _defns } -> do
-    resetFresh
-    env <- inferLet _isrec _defns
-    forM_ env $ \(ident, t_infer) -> do
-      look <- Map.lookup ident <$> gets globals
-      case look of
-        Just (t_decl, Declared) -> do
-          t_infer <- instantiate t_infer
-          unify (open t_decl) t_infer `catchError` throwErrorAt _annot
-          modify globals $ Map.insert ident (t_decl, Defined)
-        Just _  -> throwAt _annot "duplicate definition of function" ident
-        Nothing -> throwAt _annot "undeclared function" ident
-  Asm{ _annot, _ident } -> do
-    look <- Map.lookup _ident <$> gets globals
-    case look of
-      Just (t_decl, Declared) -> modify globals $ Map.insert _ident (t_decl, Defined)
-      Just _  -> throwAt _annot "duplicate definition of function" _ident
-      Nothing -> throwAt _annot "undeclared function" _ident
-
 resetFresh :: TC s ()
 resetFresh = puts fresh Ident.freshTVars
 
@@ -274,3 +243,34 @@ infer expr = do
         t_rhs <- local locals (Map.union env) (infer _rhs)
         unifyHere t_res t_rhs
       return t_res
+
+checkTopLevel :: TopLevel StageTR SourcePos -> TC s ()
+checkTopLevel top = case top of
+  Type{} -> bug "type checker" "type definition" Nothing
+  Val{ _annot, _ident, _type } -> do
+    look <- modifyAndGet globals $
+      Map.insertLookupWithKey (\_ -> const) _ident (_type, Declared)
+    case look of
+      Nothing -> return ()
+      Just _ -> throwAt _annot "duplicate declaration of function" _ident
+  Def{ _annot, _isrec, _defns } -> do
+    resetFresh
+    env <- inferLet _isrec _defns
+    forM_ env $ \(ident, t_infer) -> do
+      look <- Map.lookup ident <$> gets globals
+      case look of
+        Just (t_decl, Declared) -> do
+          t_infer <- instantiate t_infer
+          unify (open t_decl) t_infer `catchError` throwErrorAt _annot
+          modify globals $ Map.insert ident (t_decl, Defined)
+        Just _  -> throwAt _annot "duplicate definition of function" ident
+        Nothing -> throwAt _annot "undeclared function" ident
+  Asm{ _annot, _ident } -> do
+    look <- Map.lookup _ident <$> gets globals
+    case look of
+      Just (t_decl, Declared) -> modify globals $ Map.insert _ident (t_decl, Defined)
+      Just _  -> throwAt _annot "duplicate definition of function" _ident
+      Nothing -> throwAt _annot "undeclared function" _ident
+
+checkModule :: MonadError String m => Module StageTR SourcePos -> m ()
+checkModule module_ = evalTC (mapM_ checkTopLevel module_)
