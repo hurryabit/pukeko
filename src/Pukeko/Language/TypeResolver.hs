@@ -37,7 +37,7 @@ runTR tr =
 trType :: SourcePos
        -> Type (TypeConOf StageLP) Closed -> TR (Type (TypeConOf StageTR) Closed)
 trType posn typ = case typ of
-    QVar var -> return $ QVar var
+    TVar var -> return $ TVar var
     TFun tx ty -> TFun <$> trType posn tx <*> trType posn ty
     TApp con typs -> do
       adt_opt <- Map.lookup con <$> gets types

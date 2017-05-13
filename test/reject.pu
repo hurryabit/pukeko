@@ -258,14 +258,14 @@ and g x = f x
 -- SUBSECTION term cons
 
 -- TEST underapplication in expression
--- EXPECT (line 4, column 1): mismatching types A {a} and _3 -> A _3
+-- EXPECT (line 4, column 1): mismatching types A a and _3 -> A _3
 type A a =
   | X a
 val x : A a
 let x = X
 
 -- TEST overapplication in expression
--- EXPECT (line 4, column 11): mismatching types A [_2] and _2 -> _4
+-- EXPECT (line 4, column 11): mismatching types A _2 and _2 -> _4
 type A a =
   | X a
 val f : a -> A a
@@ -300,59 +300,59 @@ val x : A
 let x = Y
 
 -- TEST type cons vs arrow
--- EXPECT (line 3, column 1): mismatching types A {a} and _3 -> _3
+-- EXPECT (line 3, column 1): mismatching types A a and _3 -> _3
 type A a
 val x : A a
 let x = fun y -> y
 
 -- TEST arrow vs type cons
--- EXPECT (line 4, column 1): mismatching types {a} -> {b} and A
+-- EXPECT (line 4, column 1): mismatching types a -> b and A
 type A =
   | X
 val f : a -> b
 let f = X
 
 -- TEST qvar vs qvar
--- EXPECT (line 2, column 1): mismatching types {b} and {a}
+-- EXPECT (line 2, column 1): mismatching types b and a
 val f : a -> b
 let f x = x
 
 -- TEST qvar vs type cons
--- EXPECT (line 4, column 1): mismatching types {a} and A
+-- EXPECT (line 4, column 1): mismatching types a and A
 type A =
   | X
 val x : a
 let x = X
 
 -- TEST qvar vs arrow
--- EXPECT (line 2, column 1): mismatching types {a} and _3 -> _3
+-- EXPECT (line 2, column 1): mismatching types a and _3 -> _3
 val x : a
 let x = fun y -> y
 
 -- TEST in type cons, 1
--- EXPECT (line 3, column 1): mismatching types {b} and {a}
+-- EXPECT (line 3, column 1): mismatching types b and a
 type A a
 val f : A a -> A b
 let f x = x
 
 -- TEST in type cons, 2
--- EXPECT (line 3, column 1): mismatching types {c} and {b}
+-- EXPECT (line 3, column 1): mismatching types c and b
 type A a b
 val f : A a b -> A a c
 let f x = x
 
 -- TEST in lhs of arrow
--- EXPECT (line 2, column 1): mismatching types {b} and {a}
+-- EXPECT (line 2, column 1): mismatching types b and a
 val f : (a -> c) -> (b -> c)
 let f x = x
 
 -- TEST in rhs of arrow
--- EXPECT (line 2, column 1): mismatching types {c} and {b}
+-- EXPECT (line 2, column 1): mismatching types c and b
 val f : (a -> b) -> (a -> c)
 let f x = x
 
 -- TEST occurs check
--- EXPECT (line 4, column 9): '_1' occurs in A [_1]
+-- EXPECT (line 4, column 9): '_1' occurs in A _1
 type A a =
   | X a
 val x : A a
@@ -361,7 +361,7 @@ let rec x = X x
 -- SUBSECTION function application
 
 -- TEST unifies
--- EXPECT (line 4, column 1): mismatching types {b} and {a}
+-- EXPECT (line 4, column 1): mismatching types b and a
 val f : a -> a
 external f = "f"
 val g : a -> b

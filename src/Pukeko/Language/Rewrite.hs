@@ -15,9 +15,9 @@ import Pukeko.Language.Type (Type (..))
 type_ :: Applicative f => (Type con a -> f (Type con a)) -> Type con a -> f (Type con a)
 type_ f t = case t of
   TVar{} -> pure t
-  QVar{} -> pure t
   TFun tx ty -> TFun <$> type_ f tx <*> type_ f ty
   TApp c ts -> TApp c <$> traverse (type_ f) ts
+  UVar{} -> pure t
 
 expr :: Applicative f => (Expr stage a -> f (Expr stage a)) -> Expr stage a -> f (Expr stage a)
 expr f e = case e of

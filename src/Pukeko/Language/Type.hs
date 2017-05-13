@@ -7,7 +7,7 @@ module Pukeko.Language.Type
   , mkConstructor
   , typeOf
   , Type (..)
-  , TypeVar (..)
+  , UVar (..)
   , Open
   , Closed
   , open
@@ -16,7 +16,7 @@ module Pukeko.Language.Type
   , (*~>)
   , app
   , typeInt
-  , qvars
+  , vars
   , prettyType
   )
   where
@@ -75,18 +75,18 @@ typeOf MkConstructor{ _adt, _fields } =
 data Open s
 data Closed
 
-data TypeVar con s
+data UVar con s
   = Free { _ident :: Ident.TVar, _level :: Int }
   | Link { _type  :: Type con (Open s) }
 
 data Type con a where
-  TVar :: STRef s (TypeVar con s)    -> Type con (Open s)
-  QVar :: Ident.TVar                 -> Type con a
+  TVar :: Ident.TVar                 -> Type con a
   TFun :: Type con a ->  Type con a  -> Type con a
   TApp :: con        -> [Type con a] -> Type con a
+  UVar :: STRef s (UVar con s)       -> Type con (Open s)
 
 var :: Ident.TVar -> Type con a
-var = QVar
+var = TVar
 
 (~>) :: Type con a -> Type con a -> Type con a
 (~>) = TFun
@@ -104,29 +104,25 @@ typeInt  = app (mkADT (Ident.constructor "Int") undefined [] []) []
 open :: Type con Closed -> Type con (Open s)
 open t =
   case t of
-    QVar name  -> QVar name
+    TVar name  -> TVar name
     TFun tx ty -> TFun (open tx) (open ty)
     TApp c  ts -> TApp c (map open ts)
 
-qvars :: Type con Closed -> Set Ident.TVar
-qvars t = case t of
-  QVar _ident -> Set.singleton _ident
-  TFun t_arg t_res -> qvars t_arg `Set.union` qvars t_res
-  TApp _ t_params -> Set.unions (map qvars t_params)
+vars :: Type con Closed -> Set Ident.TVar
+vars t = case t of
+  TVar _ident -> Set.singleton _ident
+  TFun t_arg t_res -> vars t_arg `Set.union` vars t_res
+  TApp _ t_params -> Set.unions (map vars t_params)
 
-prettyTypeVar :: Pretty con => PrettyLevel -> Rational -> TypeVar con s -> ST s Doc
-prettyTypeVar lvl prec tv =
-  case tv of
-    Free { _ident } -> return $ pretty _ident
-    Link { _type }  -> brackets <$> prettyType lvl prec _type
+prettyUVar :: Pretty con => PrettyLevel -> Rational -> UVar con s -> ST s Doc
+prettyUVar lvl prec uvar = case uvar of
+  Free{_ident} -> return $ pretty _ident
+  Link{_type}  ->  prettyType lvl prec _type
 
 prettyType :: Pretty con => PrettyLevel -> Rational -> Type con (Open s) -> ST s Doc
 prettyType lvl prec t =
   case t of
-    TVar tvr -> do
-      tv <- readSTRef tvr
-      prettyTypeVar lvl prec tv
-    QVar v -> return $ braces $ pretty v
+    TVar v -> return $ pretty v
     TFun tx ty -> do
       px <- prettyType lvl 2 tx
       py <- prettyType lvl 1 ty
@@ -135,6 +131,9 @@ prettyType lvl prec t =
     TApp c ts -> do
       ps <- mapM (prettyType lvl 3) ts
       return $ maybeParens (prec > 2) $ pretty c <+> hsep ps
+    UVar uref -> do
+      uvar <- readSTRef uref
+      prettyUVar lvl prec uvar
 
 instance Pretty (ADT Ident.Con) where
   pPrintPrec lvl prec MkADT{_name} = pPrintPrec lvl prec _name

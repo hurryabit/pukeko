@@ -36,7 +36,7 @@ kcTopLevel top = case top of
     forM_ _adts $ \MkADT{_params, _constructors} -> do
       forM_ _constructors $ \MkConstructor{_name, _fields} -> do
         let unbound =
-              Set.unions (map qvars _fields) `Set.difference` Set.fromList _params
+              Set.unions (map vars _fields) `Set.difference` Set.fromList _params
         unless (Set.null unbound) $
           throwAt _annot "unbound type vars in term cons" _name
         mapM_ (kcType _annot) _fields

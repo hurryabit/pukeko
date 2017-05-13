@@ -67,12 +67,12 @@ liftST = TC . lift . lift
 resetFresh :: TC s ()
 resetFresh = puts fresh Ident.freshTVars
 
-freshVar :: TC s (Type (Open s))
-freshVar = do
+freshUVar :: TC s (Type (Open s))
+freshUVar = do
   _level <- asks level
   _ident <- modifyAndGet fresh (\(x:xs) -> (x,xs))
-  var <- liftST $ newSTRef $ Free { _ident, _level }
-  return (TVar var)
+  uref <- liftST $ newSTRef $ Free{_ident, _level}
+  return (UVar uref)
 
 lookupType :: SourcePos -> Ident.EVar -> TC s (Type (Open s))
 lookupType annot ident = do
@@ -87,31 +87,31 @@ lookupType annot ident = do
         Just (_, Declared) -> throwAt annot "undefined function" ident
         Nothing            -> throwAt annot "undeclared function" ident
 
-occursCheck :: (STRef s (TypeVar (TypeConOf StageTR) s)) -> Type (Open s) -> TC s ()
-occursCheck tvr1 t2 =
+occursCheck :: (STRef s (UVar (TypeConOf StageTR) s)) -> Type (Open s) -> TC s ()
+occursCheck uref1 t2 =
   case t2 of
-    TVar tvr2
-      | tvr1 == tvr2 -> throwError "occurs check"
+    UVar uref2
+      | uref1 == uref2 -> throwError "occurs check"
       | otherwise    -> do
-          tv2 <- liftST $ readSTRef tvr2
-          case tv2 of
-            Free{ _ident, _level = level2 } -> do
-              Free{ _level = level1 } <- liftST $ readSTRef tvr1
-              liftST $ writeSTRef tvr2 $
-                Free { _ident, _level = min level1 level2 }
-            Link t2' -> occursCheck tvr1 t2'
-    QVar _ -> return ()
-    TFun tx ty -> occursCheck tvr1 tx >> occursCheck tvr1 ty
-    TApp _ ts -> mapM_ (occursCheck tvr1) ts
+          uvar2 <- liftST $ readSTRef uref2
+          case uvar2 of
+            Free{_ident, _level = level2} -> do
+              Free{_level = level1} <- liftST $ readSTRef uref1
+              liftST $ writeSTRef uref2 $
+                Free {_ident, _level = min level1 level2}
+            Link t2' -> occursCheck uref1 t2'
+    TVar _ -> return ()
+    TFun tx ty -> occursCheck uref1 tx >> occursCheck uref1 ty
+    TApp _ ts -> mapM_ (occursCheck uref1) ts
 
 -- TODO: link compression
 unwind :: Type (Open s) -> TC s (Type (Open s))
 unwind t =
   case t of
-    TVar tvr -> do
-      tv <- liftST $ readSTRef tvr
-      case tv of
-        Link{ _type } -> unwind _type
+    UVar uref -> do
+      uvar <- liftST $ readSTRef uref
+      case uvar of
+        Link{_type} -> unwind _type
         Free{} -> return t
     _ -> return t
 
@@ -120,15 +120,15 @@ unify pos t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
   case (t1, t2) of
-    (TVar tvr1, TVar tvr2) | tvr1 == tvr2 -> return ()
-    (TVar tvr1, _) -> do
-      Free{ _ident } <- liftST $ readSTRef tvr1
-      occursCheck tvr1 t2 `catchError` \_ -> do
+    (UVar uref1, UVar uref2) | uref1 == uref2 -> return ()
+    (UVar uref1, _) -> do
+      Free{_ident} <- liftST $ readSTRef uref1
+      occursCheck uref1 t2 `catchError` \_ -> do
         p2 <- liftST $ prettyType prettyNormal 0 t2
         throwDocAt pos $ quotes (pretty _ident) <+> "occurs in" <+> p2
-      liftST $ writeSTRef tvr1 $ Link { _type = t2 }
-    (_, TVar _) -> unify pos t2 t1
-    (QVar name1, QVar name2)
+      liftST $ writeSTRef uref1 $ Link{_type = t2}
+    (_, UVar _) -> unify pos t2 t1
+    (TVar name1, TVar name2)
       | name1 == name2 -> return ()
     (TFun tx1 ty1, TFun tx2 ty2) -> unify pos tx1 tx2 >> unify pos ty1 ty2
     -- TODO: Make ADT comparable itself.
@@ -142,16 +142,16 @@ unify pos t1 t2 = do
 generalize :: Type (Open s) -> TC s (Type (Open s))
 generalize t =
   case t of
-    TVar tvr -> do
-      tv <- liftST $ readSTRef tvr
-      case tv of
-        Free{ _ident, _level = tv_level } -> do
+    UVar uref -> do
+      uvar <- liftST $ readSTRef uref
+      case uvar of
+        Free{_ident, _level = tv_level} -> do
           cur_level <- asks level
           if tv_level > cur_level
-            then return $ QVar _ident
+            then return $ TVar _ident
             else return t
         Link{ _type } -> generalize _type
-    QVar _ -> return t
+    TVar _ -> return t
     TFun tx ty -> TFun <$> generalize tx <*> generalize ty
     TApp c  ts -> TApp c <$> mapM generalize ts
 
@@ -162,17 +162,17 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
          -> StateT (Map Ident.TVar (Type (Open s))) (TC s) (Type (Open s))
     inst t =
       case t of
-        TVar tvr -> do
-          tv <- lift $ liftST $ readSTRef tvr
-          case tv of
+        UVar uref -> do
+          uvar <- lift $ liftST $ readSTRef uref
+          case uvar of
             Free{} -> return t
             Link{ _type } -> inst _type
-        QVar name -> do
+        TVar name -> do
           subst <- get
           case Map.lookup name subst of
             Just t' -> return t'
             Nothing -> do
-              t' <- lift freshVar
+              t' <- lift freshUVar
               put $ Map.insert name t' subst
               return t'
         TFun tx ty -> TFun <$> inst tx <*> inst ty
@@ -186,7 +186,7 @@ inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
       idents = map (_ident :: Bind _ _ -> _) lhss
   t_rhss <- local level succ $ do
-    t_lhss <- mapM (const freshVar) lhss
+    t_lhss <- mapM (const freshUVar) lhss
     let env | isrec     = Map.fromList $ zip idents t_lhss
             | otherwise = Map.empty
     t_rhss <- local locals (Map.union env) (mapM infer rhss)
@@ -212,12 +212,12 @@ infer expr = do
     Ap{ _fun, _args } -> do
       t_fun <- infer _fun
       t_args <- mapM infer _args
-      t_res <- freshVar
+      t_res <- freshUVar
       unifyHere t_fun (t_args *~> t_res)
       return t_res
     Lam{ _binds, _body } -> do
       let params = map (_ident :: Bind0 _ _ -> _) _binds
-      t_params <- mapM (const freshVar) _binds
+      t_params <- mapM (const freshUVar) _binds
       let env = Map.fromList $ zipMaybe params t_params
       t_body <- local locals (Map.union env) (infer _body)
       return $ t_params *~> t_body
@@ -227,7 +227,7 @@ infer expr = do
     If{} -> infer (desugarIf expr)
     Match{ _expr, _altns } -> do
       t_expr <- infer _expr
-      t_res <- freshVar
+      t_res <- freshUVar
       forM_ _altns $ \MkAltn{ _annot, _con = MkConstructor{_name, _adt = adt@MkADT{_params}, _fields}, _binds, _rhs } -> do
         when (length _binds /= length _fields) $
           throwDocAt _annot $ "term cons" <+> quotes (pretty _name) <+>

@@ -101,7 +101,7 @@ prop_rmq_correct prog = monadicIO $ do
 compile :: IO ()
 compile = do
   setCurrentDirectory "test"
-  callCommand "make all"
+  callCommand "make -B all"
 
 main :: IO ()
 main = hspec $ beforeAll_ compile $ do
