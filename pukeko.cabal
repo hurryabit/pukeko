@@ -14,7 +14,8 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:    src
-  exposed-modules:     Pukeko.Core.Info
+  exposed-modules:     Pukeko
+                     , Pukeko.Core.Info
                      , Pukeko.Core.Syntax
                      , Pukeko.GMachine.Builtins
                      , Pukeko.GMachine.Compiler
@@ -41,7 +42,6 @@ library
                      , array
                      , containers
                      , fclabels
-                     , haskeline
                      , mtl
                      , parsec
                      , pretty
@@ -55,7 +55,6 @@ library
                      , OverloadedStrings
                      , PartialTypeSignatures
                      , TypeFamilies
-
   ghc-options:         -Wall -Wno-missing-signatures -Wno-name-shadowing -Wno-partial-type-signatures
 
 executable pukeko
@@ -71,16 +70,29 @@ executable pukeko
   default-language:    Haskell2010
   default-extensions:  MonadFailDesugaring
 
-test-suite pukeko-test
+test-suite examples
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Spec.hs
+  main-is:             Examples.hs
   build-depends:       base
                      , directory
                      , hspec
                      , HUnit
                      , process
                      , QuickCheck
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+test-suite reject
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Reject.hs
+  build-depends:       base
+                     , hspec
+                     , hspec-core
+                     , HUnit
+                     , parsec
+                     , pukeko
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

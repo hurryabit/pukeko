@@ -60,7 +60,7 @@ data Expr stage a
   | Match  { _annot :: a, _expr  :: Expr stage a   , _altns :: [Altn stage a] }
   deriving (Functor)
 
-data BindGen i stage a = MkBind{ _annot :: a, _ident :: i, _type :: Maybe (Type (TypeConOf stage) Closed) }
+data BindGen i stage a = MkBind{_annot :: a, _ident :: i}
   deriving (Functor)
 
 type Bind = BindGen Ident.EVar
@@ -173,18 +173,10 @@ instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Defn st
     _ -> hang (pPrintPrec lvl 0 _lhs <+> equals) 2 (pPrintPrec lvl 0 _rhs)
 
 instance (Pretty (TypeConOf stage)) => Pretty (Bind stage a) where
-  pPrintPrec _ prec MkBind{ _ident, _type } =
-    let p_ident = pretty _ident
-    in case _type of
-         Nothing -> p_ident
-         Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
+  pPrintPrec _ _ MkBind{_ident} = pretty _ident
 
 instance (Pretty (TypeConOf stage)) => Pretty (Bind0 stage a) where
-  pPrintPrec _ prec MkBind{ _ident, _type } =
-    let p_ident = maybe "_" pretty _ident
-    in case _type of
-         Nothing -> p_ident
-         Just t  -> maybeParens (prec > 0) $ p_ident <> colon <+> pretty t
+  pPrintPrec _ _ MkBind{_ident} = maybe "_" pretty _ident
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Altn stage a) where
   pPrintPrec lvl _ MkAltn{ _con, _binds, _rhs } = hang

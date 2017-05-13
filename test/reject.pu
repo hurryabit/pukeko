@@ -1,0 +1,368 @@
+-- SECTION type resolver
+
+-- SUBSECTION type cons
+
+-- TEST unknown in type definition
+-- EXPECT (line 1, column 1): unknown type cons 'B'
+type A =
+  | X B
+
+-- TEST unknown in function declaration
+-- EXPECT (line 1, column 1): unknown type cons 'A'
+val x : A
+
+-- TEST duplicate in one type definition
+-- EXPECT (line 1, column 1): duplicate type cons 'A'
+type A
+ and A
+
+-- TEST duplicate in two type definitions
+-- EXPECT (line 2, column 1): duplicate type cons 'A'
+type A
+type A
+
+-- SUBSECTION term cons
+
+-- TEST unknown in expression
+-- EXPECT (line 1, column 9): unknown term cons 'X'
+let x = X
+
+-- TEST unknown in pattern
+-- EXPECT (line 3, column 3): unknown term cons 'X'
+let f x =
+  match x with
+  | X -> x
+
+-- TEST duplicate in one type
+-- EXPECT (line 1, column 1): duplicate term cons 'X'
+type A =
+  | X
+  | X
+
+-- TEST duplicate in mutually recursive types
+-- EXPECT (line 1, column 1): duplicate term cons 'X'
+type A =
+  | X
+and B =
+  | X
+
+-- TEST duplicate in two types
+-- EXPECT (line 3, column 1): duplicate term cons 'X'
+type A =
+  | X
+type B =
+  | X
+
+
+-- SECTION kind checker
+
+-- SUBSECTION type definition
+
+-- TEST underapplication in one definition
+-- EXPECT (line 1, column 1): type cons 'A' expects 1 parameters
+type A a =
+  | X
+and B =
+  | Y A
+
+-- TEST underapplication in recursive definition
+-- EXPECT (line 1, column 1): type cons 'A' expects 2 parameters
+type A a b =
+  | X (A a)
+
+-- TEST underapplication in two definitions
+-- EXPECT (line 3, column 1): type cons 'A' expects 1 parameters
+type A a =
+  | X
+type B =
+  | Y A
+
+-- TEST overapplication in one definition
+-- EXPECT (line 1, column 1): type cons 'A' expects 1 parameters
+type A a =
+  | X
+and B a b =
+  | Y (A a b)
+
+-- TEST overapplication in recursive definition
+-- EXPECT (line 1, column 1): type cons 'A' expects 1 parameters
+type A a =
+  | X (A a a)
+
+-- TEST overapplication in two definitions
+-- EXPECT (line 3, column 1): type cons 'A' expects 1 parameters
+type A a =
+  | X
+type B a b =
+  | Y (A a b)
+
+-- TEST unbound type variable
+-- EXPECT (line 1, column 1): unbound type vars in term cons 'X'
+type A a =
+  | X b
+
+-- XTEST repeated type variable
+-- EXPECT bla bla bla
+type A a a =
+  | X a
+
+-- SUBSECTION function declaration
+
+-- TEST underapplication
+-- EXPECT (line 2, column 1): type cons 'A' expects 1 parameters
+type A a
+val x : A
+
+-- TEST overapplication
+-- EXPECT (line 2, column 1): type cons 'A' expects 1 parameters
+type A a
+val x : A a b
+
+
+-- SECTION declaration/definition checker
+
+-- SUBSECTION too many declarations
+
+-- TEST duplicate declaration
+-- EXPECT (line 2, column 1): duplicate declaration of function 'f'
+val f : a -> a
+val f : a -> a
+
+-- TEST redeclaration
+-- EXPECT (line 3, column 1): duplicate declaration of function 'f'
+val f : a -> a
+let f x = x
+val f : a -> a
+
+-- XTEST missing definition
+-- EXPECT
+val f : a -> a
+
+-- SUBSECTION duplicate definition
+
+-- TEST two definitions
+-- EXPECT (line 3, column 1): duplicate definition of function 'f'
+val f : a -> a
+let f x = x
+let f x = x
+
+-- TEST parallel definition
+-- EXPECT (line 2, column 1): duplicate definition of function 'f'
+val f : a -> a
+let f x = x
+and f x = x
+
+-- TEST with interruption
+-- EXPECT (line 5, column 1): duplicate definition of function 'f'
+val f : a -> a
+let f x = x
+val g : a -> a
+let g x = x
+let f x = x
+
+-- TEST external and definition
+-- EXPECT (line 3, column 1): duplicate definition of function 'f'
+val f : a -> a
+external f = "f"
+let f x = x
+
+-- TEST definition and external
+-- EXPECT (line 3, column 1): duplicate definition of function 'f'
+val f : a -> a
+let f x = x
+external f = "f"
+
+-- TEST external and external
+-- EXPECT (line 3, column 1): duplicate definition of function 'f'
+val f : a -> a
+external f = "f"
+external f = "f"
+
+-- SUBSECTION definition of undeclared function
+
+-- TEST one definition
+-- EXPECT (line 1, column 1): undeclared function 'f'
+let f x = x
+
+-- TEST recursive definition
+-- EXPECT (line 1, column 1): undeclared function 'f'
+let rec f x = f x
+
+-- TEST two definitions
+-- EXPECT (line 3, column 1): undeclared function 'g'
+val f : a -> a
+let f x = x
+let g x = x
+
+-- TEST parallel definition
+-- EXPECT (line 2, column 1): undeclared function 'g'
+val f : a -> a
+let f x = x
+and g x = x
+
+-- TEST mutually recursive definition
+-- EXPECT (line 2, column 1): undeclared function 'g'
+val f : a -> a
+let rec f x = x
+and g x = x
+
+-- TEST post declaration
+-- EXPECT (line 1, column 1): undeclared function 'f'
+let f x = x
+val f : a -> a
+
+-- TEST external
+-- EXPECT (line 1, column 1): undeclared function 'f'
+external f = "f"
+
+-- SUBSECTION call of undeclared function
+
+-- TEST one definition
+-- EXPECT (line 2, column 11): undeclared function 'g'
+val f : x -> x
+let f a = g a
+
+-- TEST recursive definition
+-- EXPECT (line 2, column 15): undeclared function 'g'
+val f : x -> x
+let rec f a = g a
+
+-- TEST post declaration
+-- EXPECT (line 2, column 11): undeclared function 'g'
+val f : a -> a
+let f x = g x
+val g : a -> a
+
+-- SUBSECTION call of undefined function
+
+-- TEST call of other
+-- EXPECT (line 3, column 11): undefined function 'g'
+val f : a -> a
+val g : a -> a
+let f x = g x
+
+-- TEST call of self
+-- EXPECT (line 2, column 11): undefined function 'f'
+val f : a -> a
+let f x = f x
+
+-- TEST parallel call
+-- EXPECT (line 3, column 11): undefined function 'g'
+val f : a -> a
+val g : a -> a
+let f x = g x
+and g x = f x
+
+-- SECTION type checker
+
+-- SUBSECTION term cons
+
+-- TEST underapplication in expression
+-- EXPECT (line 4, column 1): mismatching types A {a} and _3 -> A _3
+type A a =
+  | X a
+val x : A a
+let x = X
+
+-- TEST overapplication in expression
+-- EXPECT (line 4, column 11): mismatching types A [_2] and _2 -> _4
+type A a =
+  | X a
+val f : a -> A a
+let f x = X x x
+
+-- TEST underapplication in pattern
+-- EXPECT (line 6, column 3): term cons 'X' expects 2 arguments
+type A a =
+  | X a a
+val f : A a -> a
+let f x =
+  match x with
+  | X y -> y
+
+-- TEST overapplication in pattern
+-- EXPECT (line 6, column 3): term cons 'X' expects 1 arguments
+type A a =
+  | X a
+val f : A a -> a
+let f x =
+  match x with
+  | X y _ -> y
+
+-- SUBSECTION unification
+
+-- TEST type cons vs type cons
+-- EXPECT (line 5, column 1): mismatching types A and B
+type A
+type B =
+  | Y
+val x : A
+let x = Y
+
+-- TEST type cons vs arrow
+-- EXPECT (line 3, column 1): mismatching types A {a} and _3 -> _3
+type A a
+val x : A a
+let x = fun y -> y
+
+-- TEST arrow vs type cons
+-- EXPECT (line 4, column 1): mismatching types {a} -> {b} and A
+type A =
+  | X
+val f : a -> b
+let f = X
+
+-- TEST qvar vs qvar
+-- EXPECT (line 2, column 1): mismatching types {b} and {a}
+val f : a -> b
+let f x = x
+
+-- TEST qvar vs type cons
+-- EXPECT (line 4, column 1): mismatching types {a} and A
+type A =
+  | X
+val x : a
+let x = X
+
+-- TEST qvar vs arrow
+-- EXPECT (line 2, column 1): mismatching types {a} and _3 -> _3
+val x : a
+let x = fun y -> y
+
+-- TEST in type cons, 1
+-- EXPECT (line 3, column 1): mismatching types {b} and {a}
+type A a
+val f : A a -> A b
+let f x = x
+
+-- TEST in type cons, 2
+-- EXPECT (line 3, column 1): mismatching types {c} and {b}
+type A a b
+val f : A a b -> A a c
+let f x = x
+
+-- TEST in lhs of arrow
+-- EXPECT (line 2, column 1): mismatching types {b} and {a}
+val f : (a -> c) -> (b -> c)
+let f x = x
+
+-- TEST in rhs of arrow
+-- EXPECT (line 2, column 1): mismatching types {c} and {b}
+val f : (a -> b) -> (a -> c)
+let f x = x
+
+-- TEST occurs check
+-- EXPECT (line 4, column 9): '_1' occurs in A [_1]
+type A a =
+  | X a
+val x : A a
+let rec x = X x
+
+-- SUBSECTION function application
+
+-- TEST unifies
+-- EXPECT (line 4, column 1): mismatching types {b} and {a}
+val f : a -> a
+external f = "f"
+val g : a -> b
+let g x = f x

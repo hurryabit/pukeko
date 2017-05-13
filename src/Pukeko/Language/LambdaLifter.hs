@@ -41,7 +41,7 @@ llExpr expr = case expr of
     -- TODO: Use a clever order here.
     let fvs = Set.toList _annot
         mkBind f ident =
-          MkBind{_annot = Set.singleton ident, _ident = f ident, _type = Nothing}
+          MkBind{_annot = Set.singleton ident, _ident = f ident}
         _rhs = Lam{_annot = Set.empty, _binds = map (mkBind Just) fvs ++ _binds, _body}
         _lhs = mkBind id _ident
     emit MkDefn{_lhs, _rhs}

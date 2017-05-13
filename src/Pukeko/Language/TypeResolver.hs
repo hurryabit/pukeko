@@ -67,9 +67,8 @@ findTermCon posn name = do
     Just con -> return con
 
 trBind :: BindGen i StageLP SourcePos -> TR (BindGen i StageTR SourcePos)
-trBind bind@MkBind{_annot, _type} = do
-  _type <- traverse (trType _annot) _type
-  return (bind{_type} :: BindGen _ _ _)
+trBind MkBind{_annot, _ident} = do
+  return MkBind{_annot, _ident}
 
 trDefn :: Defn StageLP SourcePos -> TR (Defn StageTR SourcePos)
 trDefn defn@MkDefn{_lhs, _rhs} = do

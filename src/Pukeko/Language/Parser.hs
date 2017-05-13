@@ -96,30 +96,20 @@ module_ = many1 $ choice
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-typed :: Bool -> (SourcePos -> a -> Maybe (Type Ident.Con Closed) -> b) -> Parser a -> Parser b
-typed needParens constr ident =
-  if needParens then
-    constr <$> getPosition <*> ident <*> pure Nothing
-    <|>
-    parens (constr <$> getPosition <*> ident <*> (Just <$> asType))
-  else
-    constr <$> getPosition <*> ident <*> optionMaybe asType
-  <?> "declaration"
+bind :: Parser (Bind StageLP SourcePos)
+bind = MkBind <$> getPosition <*> evar
 
-bind :: Bool -> Parser (Bind StageLP SourcePos)
-bind needParens = typed needParens MkBind $ evar
-
-bind0 :: Bool -> Parser (Bind0 StageLP SourcePos)
-bind0 needParens =
-  typed needParens MkBind (Just <$> evar <|> symbol "_" *> pure Nothing)
+bind0 :: Parser (Bind0 StageLP SourcePos)
+bind0  =
+  MkBind <$> getPosition <*> (Just <$> evar <|> symbol "_" *> pure Nothing)
 
 defnValLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
-defnValLhs = MkDefn <$> bind False
+defnValLhs = MkDefn <$> bind
 
 defnFunLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnFunLhs =
-  (.) <$> (MkDefn <$> (MkBind <$> getPosition <*> evar <*> pure Nothing))
-      <*> (Lam <$> getPosition <*> many1 (bind0 True))
+  (.) <$> (MkDefn <$> bind)
+      <*> (Lam <$> getPosition <*> many1 bind0)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn StageLP SourcePos)
@@ -129,7 +119,7 @@ altn :: Parser (Altn StageLP SourcePos)
 altn =
   MkAltn <$> getPosition
          <*> (bar *> constructor)
-         <*> many (bind0 True)
+         <*> many bind0
          <*> (arrow *> expr)
 
 let_ :: (SourcePos -> Bool -> [Defn StageLP SourcePos] -> a) -> Parser a
@@ -144,7 +134,7 @@ expr =
   [ mkAp <$> getPosition <*> aexpr <*> many aexpr
   , let_ Let <*> (reserved "in" *> expr)
   , Lam <$> getPosition
-        <*> (reserved "fun" *> many1 (bind0 True))
+        <*> (reserved "fun" *> many1 bind0)
         <*> (arrow *> expr)
   , If  <$> getPosition
         <*> (reserved "if"   *> expr)

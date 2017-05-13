@@ -30,37 +30,6 @@ kcType posn typ = case typ of
           int (length _params) <+> "parameters"
     _ -> Rewrite.type_ (kcType posn) typ
 
-kcBind :: BindGen i StageTR SourcePos -> KC (BindGen i StageTR SourcePos)
-kcBind bind@MkBind{_annot, _type} = do
-  _type <- traverse (kcType _annot) _type
-  return (bind{_type} :: BindGen _ StageTR _)
-
--- TODO: Look for a way to make this a one liner.
-kcDefnLhs :: Defn StageTR SourcePos -> KC (Defn StageTR SourcePos)
-kcDefnLhs defn@MkDefn{_lhs} = do
-  _lhs <- kcBind _lhs
-  return defn{_lhs}
-
-kcAltnLhs :: Altn StageTR SourcePos -> KC (Altn StageTR SourcePos)
-kcAltnLhs altn@MkAltn{_binds} = do
-  _binds <- traverse kcBind _binds
-  return (altn{_binds} :: Altn _ _)
-
-kcExpr :: Expr StageTR SourcePos -> KC (Expr StageTR SourcePos)
-kcExpr expr = do
-  expr <- case expr of
-    Lam{_binds} -> do
-      _binds <- traverse kcBind _binds
-      return (expr{_binds} :: Expr _ _)
-    Let{_defns} -> do
-      _defns <- traverse kcDefnLhs _defns
-      return (expr{_defns} :: Expr _ _)
-    Match{_altns} -> do
-      _altns <- traverse kcAltnLhs _altns
-      return expr{_altns}
-    _ -> return expr
-  Rewrite.expr kcExpr expr
-
 kcTopLevel :: TopLevel StageTR SourcePos -> KC (Maybe (TopLevel StageTR SourcePos))
 kcTopLevel top = case top of
   Type{_annot, _adts} -> do
@@ -75,9 +44,7 @@ kcTopLevel top = case top of
   Val{_annot, _type} -> do
     _type <- kcType _annot _type
     return $ Just (top{_type} :: TopLevel StageTR _)
-  Def{_defns} -> do
-    _defns <- traverse (Rewrite.defn kcExpr) _defns
-    return $ Just (top{_defns} :: TopLevel _ _)
+  Def{} -> return $ Just top
   Asm{} -> return $ Just top
 
 kcModule :: Module StageTR SourcePos -> KC (Module StageTR SourcePos)

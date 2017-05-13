@@ -9,6 +9,7 @@ import Control.Monad.Fail
 import Control.Monad.RWS hiding (asks, local, gets, modify)
 import Control.Monad.State hiding (gets, modify)
 import Control.Monad.ST
+import Data.Foldable
 import Data.Label (mkLabels)
 import Data.Label.Monadic
 import Data.Map (Map)
@@ -114,8 +115,8 @@ unwind t =
         Free{} -> return t
     _ -> return t
 
-unify :: Pretty (TypeConOf StageTR) => Type (Open s) -> Type (Open s) -> TC s ()
-unify t1 t2 = do
+unify :: Pretty (TypeConOf StageTR) => SourcePos -> Type (Open s) -> Type (Open s) -> TC s ()
+unify pos t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
   case (t1, t2) of
@@ -124,19 +125,19 @@ unify t1 t2 = do
       Free{ _ident } <- liftST $ readSTRef tvr1
       occursCheck tvr1 t2 `catchError` \_ -> do
         p2 <- liftST $ prettyType prettyNormal 0 t2
-        throwDoc $ quotes (pretty _ident) <+> "occurs in" <+> p2
+        throwDocAt pos $ quotes (pretty _ident) <+> "occurs in" <+> p2
       liftST $ writeSTRef tvr1 $ Link { _type = t2 }
-    (_, TVar _) -> unify t2 t1
+    (_, TVar _) -> unify pos t2 t1
     (QVar name1, QVar name2)
       | name1 == name2 -> return ()
-    (TFun tx1 ty1, TFun tx2 ty2) -> unify tx1 tx2 >> unify ty1 ty2
+    (TFun tx1 ty1, TFun tx2 ty2) -> unify pos tx1 tx2 >> unify pos ty1 ty2
     -- TODO: Make ADT comparable itself.
     (TApp MkADT{_name = c1} ts1, TApp MkADT{_name = c2} ts2)
-      | c1 == c2 -> zipWithM_ unify ts1 ts2
+      | c1 == c2 -> zipWithM_ (unify pos) ts1 ts2
     _ -> do
       p1 <- liftST $ prettyType prettyNormal 0 t1
       p2 <- liftST $ prettyType prettyNormal 0 t2
-      throwDoc $ "mismatching types" <+> p1 <+> "and" <+> p2
+      throwDocAt pos $ "mismatching types" <+> p1 <+> "and" <+> p2
 
 generalize :: Type (Open s) -> TC s (Type (Open s))
 generalize t =
@@ -180,21 +181,17 @@ instantiateMany ts = evalStateT (mapM inst ts) Map.empty
 instantiate :: Type (Open s) -> TC s (Type (Open s))
 instantiate t = head <$> instantiateMany [t]
 
-instantiateBind :: BindGen _ StageTR SourcePos -> TC s (Type (Open s))
-instantiateBind MkBind{ _annot, _type } = case _type of
-  Nothing -> freshVar
-  Just t  -> instantiate (open t)
-
 inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.EVar, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
       idents = map (_ident :: Bind _ _ -> _) lhss
   t_rhss <- local level succ $ do
-    t_lhss <- mapM instantiateBind lhss
+    t_lhss <- mapM (const freshVar) lhss
     let env | isrec     = Map.fromList $ zip idents t_lhss
             | otherwise = Map.empty
     t_rhss <- local locals (Map.union env) (mapM infer rhss)
-    zipWithM_ unify t_lhss t_rhss
+    for_ (zip3 lhss t_lhss t_rhss) $ \(MkBind{_annot}, t_lhs, t_rhs) ->
+      unify _annot t_lhs t_rhs
     return t_rhss
   -- TODO: Add test case which makes sure this generalization is not moved into
   -- the scope of the @local@ above.
@@ -203,7 +200,7 @@ inferLet isrec defns = do
 
 infer :: Expr StageTR SourcePos -> TC s (Type (Open s))
 infer expr = do
-  let unifyHere t1 t2 = unify t1 t2 `catchError` throwErrorAt (annot expr)
+  let unifyHere t1 t2 = unify (annot expr) t1 t2
   case expr of
     Var{ _annot, _var } -> do
       t <- lookupType _annot _var
@@ -220,7 +217,7 @@ infer expr = do
       return t_res
     Lam{ _binds, _body } -> do
       let params = map (_ident :: Bind0 _ _ -> _) _binds
-      t_params <- mapM instantiateBind _binds
+      t_params <- mapM (const freshVar) _binds
       let env = Map.fromList $ zipMaybe params t_params
       t_body <- local locals (Map.union env) (infer _body)
       return $ t_params *~> t_body
@@ -261,7 +258,7 @@ checkTopLevel top = case top of
       case look of
         Just (t_decl, Declared) -> do
           t_infer <- instantiate t_infer
-          unify (open t_decl) t_infer `catchError` throwErrorAt _annot
+          unify _annot (open t_decl) t_infer
           modify globals $ Map.insert ident (t_decl, Defined)
         Just _  -> throwAt _annot "duplicate definition of function" ident
         Nothing -> throwAt _annot "undeclared function" ident
