@@ -51,17 +51,17 @@ test = do
   c <- many $ line (onlyIf (not . isPrefixOf "--"))
   return $ atSourcePos p $ s $ shouldFail e (unlines c)
 
-many' :: Parser Spec -> Parser Spec
-many' = fmap sequence_ . many
+manySpec :: Parser Spec -> Parser Spec
+manySpec p = sequence_ <$> many p
 
 subsection :: Parser Spec
-subsection = describe <$> pragma "SUBSECTION" <*> (sequence_ <$> many test)
+subsection = describe <$> pragma "SUBSECTION" <*> manySpec test
 
 section :: Parser Spec
-section = describe <$> pragma "SECTION" <*> (sequence_ <$> many subsection)
+section = describe <$> pragma "SECTION" <*> manySpec subsection
 
 spec :: Parser Spec
-spec = sequence_ <$> (skipEmpty *> many section <* eof)
+spec = skipEmpty *> manySpec section <* eof
 
 main :: IO ()
 main = do
