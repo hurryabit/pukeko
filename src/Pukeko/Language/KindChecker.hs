@@ -4,6 +4,7 @@ module Pukeko.Language.KindChecker
 where
 
 import Control.Monad
+import Data.Foldable
 import Data.Maybe (catMaybes)
 import Text.Parsec (SourcePos)
 import qualified Data.Set as Set
@@ -33,13 +34,13 @@ kcType posn typ = case typ of
 kcTopLevel :: TopLevel StageTR SourcePos -> KC (Maybe (TopLevel StageTR SourcePos))
 kcTopLevel top = case top of
   Type{_annot, _adts} -> do
-    forM_ _adts $ \MkADT{_params, _constructors} -> do
-      forM_ _constructors $ \MkConstructor{_name, _fields} -> do
+    for_ _adts $ \MkADT{_params, _constructors} -> do
+      for_ _constructors $ \MkConstructor{_name, _fields} -> do
         let unbound =
               Set.unions (map vars _fields) `Set.difference` Set.fromList _params
         unless (Set.null unbound) $
           throwAt _annot "unbound type vars in term cons" _name
-        mapM_ (kcType _annot) _fields
+        traverse_ (kcType _annot) _fields
     return Nothing
   Val{_annot, _type} -> do
     _type <- kcType _annot _type

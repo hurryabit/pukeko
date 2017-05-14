@@ -81,8 +81,8 @@ data Open s
 data Closed
 
 data UVar con s
-  = Free { _ident :: Ident.TVar, _level :: Int }
-  | Link { _type  :: Type con (Open s) }
+  = Free{_ident :: Ident.TVar, _level :: Int}
+  | Link{_type  :: Type con (Open s)}
 
 data Type con a where
   TVar :: Ident.TVar                 -> Type con a
@@ -107,11 +107,10 @@ typeInt :: Type (ADT Ident.Con) Closed
 typeInt  = app (mkADT (Ident.constructor "Int") undefined [] []) []
 
 open :: Type con Closed -> Type con (Open s)
-open t =
-  case t of
-    TVar name  -> TVar name
-    TFun tx ty -> TFun (open tx) (open ty)
-    TApp c  ts -> TApp c (map open ts)
+open t = case t of
+  TVar name  -> TVar name
+  TFun tx ty -> TFun (open tx) (open ty)
+  TApp c  ts -> TApp c (map open ts)
 
 vars :: Type con Closed -> Set Ident.TVar
 vars t = runST $ openVars (open t)
@@ -150,20 +149,19 @@ prettyUVar lvl prec uvar = case uvar of
   Link{_type}  -> prettyType lvl prec _type
 
 prettyType :: Pretty con => PrettyLevel -> Rational -> Type con (Open s) -> ST s Doc
-prettyType lvl prec t =
-  case t of
-    TVar v -> return $ pretty v
-    TFun tx ty -> do
-      px <- prettyType lvl 2 tx
-      py <- prettyType lvl 1 ty
-      return $ maybeParens (prec > 1) $ px <+> "->" <+> py
-    TApp c [] -> return $ pretty c
-    TApp c ts -> do
-      ps <- mapM (prettyType lvl 3) ts
-      return $ maybeParens (prec > 2) $ pretty c <+> hsep ps
-    UVar uref -> do
-      uvar <- readSTRef uref
-      prettyUVar lvl prec uvar
+prettyType lvl prec t = case t of
+  TVar v -> return $ pretty v
+  TFun tx ty -> do
+    px <- prettyType lvl 2 tx
+    py <- prettyType lvl 1 ty
+    return $ maybeParens (prec > 1) $ px <+> "->" <+> py
+  TApp c [] -> return $ pretty c
+  TApp c ts -> do
+    ps <- traverse (prettyType lvl 3) ts
+    return $ maybeParens (prec > 2) $ pretty c <+> hsep ps
+  UVar uref -> do
+    uvar <- readSTRef uref
+    prettyUVar lvl prec uvar
 
 instance Pretty (ADT Ident.Con) where
   pPrintPrec lvl prec MkADT{_name} = pPrintPrec lvl prec _name
