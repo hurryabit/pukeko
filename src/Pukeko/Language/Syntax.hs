@@ -12,6 +12,7 @@ module Pukeko.Language.Syntax
   , mkApOp
   , desugarIf
   , unzipDefns
+  , envBind0
   , zipMaybe
   , Annot (..)
   , TypeConOf
@@ -21,7 +22,9 @@ module Pukeko.Language.Syntax
   )
 where
 
+import Data.Map (Map)
 import Data.Maybe (catMaybes)
+import qualified Data.Map as Map
 
 import Pukeko.Error
 import Pukeko.Pretty
@@ -113,6 +116,10 @@ desugarIf _ = bug "syntax" "desugarIf on wrong node" Nothing
 
 unzipDefns :: [Defn stage a] -> ([Bind stage a], [Expr stage a])
 unzipDefns = unzip . map (\MkDefn{ _lhs, _rhs } -> (_lhs, _rhs))
+
+envBind0 :: [Bind0 stage a] -> [b] -> Map Ident.EVar b
+envBind0 bs = Map.fromList . catMaybes . zipWith f bs
+  where f MkBind{_ident} x = fmap (\i -> (i,x)) _ident
 
 zipMaybe :: [Maybe a] -> [b] -> [(a, b)]
 zipMaybe xs = catMaybes . zipWith (\x y -> (,) <$> x <*> pure y) xs

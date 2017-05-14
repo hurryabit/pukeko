@@ -7,7 +7,6 @@ where
 import Control.Monad
 import Control.Monad.Fail
 import Control.Monad.RWS hiding (asks, local, gets, modify)
-import Control.Monad.State hiding (gets, modify)
 import Control.Monad.ST
 import Data.Foldable
 import Data.Label (mkLabels)
@@ -155,31 +154,11 @@ generalize t =
     TFun tx ty -> TFun <$> generalize tx <*> generalize ty
     TApp c  ts -> TApp c <$> mapM generalize ts
 
-instantiateMany :: [Type (Open s)] -> TC s [Type (Open s)]
-instantiateMany ts = evalStateT (mapM inst ts) Map.empty
-  where
-    inst :: Type (Open s)
-         -> StateT (Map Ident.TVar (Type (Open s))) (TC s) (Type (Open s))
-    inst t =
-      case t of
-        UVar uref -> do
-          uvar <- lift $ liftST $ readSTRef uref
-          case uvar of
-            Free{} -> return t
-            Link{ _type } -> inst _type
-        TVar name -> do
-          subst <- get
-          case Map.lookup name subst of
-            Just t' -> return t'
-            Nothing -> do
-              t' <- lift freshUVar
-              put $ Map.insert name t' subst
-              return t'
-        TFun tx ty -> TFun <$> inst tx <*> inst ty
-        TApp c  ts -> TApp c <$> mapM inst ts
-
 instantiate :: Type (Open s) -> TC s (Type (Open s))
-instantiate t = head <$> instantiateMany [t]
+instantiate t = do
+  vars <- liftST $ openVars t
+  env <- sequence $ Map.fromSet (const freshUVar) vars
+  liftST $ openSubst env t
 
 inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.EVar, Type (Open s))]
 inferLet isrec defns = do
@@ -232,12 +211,12 @@ infer expr = do
         when (length _binds /= length _fields) $
           throwDocAt _annot $ "term cons" <+> quotes (pretty _name) <+>
           "expects" <+> int (length _fields) <+> "arguments"
-        let idents = map (_ident :: Bind0 _ _ -> _) _binds
-        (t_params, t_fields) <-
-          splitAt (length _params) <$> instantiateMany (map open $ map var _params ++ _fields)
+        t_params <- traverse (const freshUVar) _params
         unifyHere t_expr (app adt t_params)
-        let env = Map.fromList $ zipMaybe idents t_fields
-        t_rhs <- local locals (Map.union env) (infer _rhs)
+        let env_params = Map.fromList $ zip _params t_params
+        env_binds <- liftST $
+          traverse (openSubst env_params . open) (envBind0 _binds _fields)
+        t_rhs <- local locals (Map.union env_binds) (infer _rhs)
         unifyHere t_res t_rhs
       return t_res
 

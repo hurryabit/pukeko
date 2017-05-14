@@ -17,18 +17,23 @@ module Pukeko.Language.Type
   , app
   , typeInt
   , vars
+  , openVars
+  , openSubst
   , prettyType
   )
   where
 
+import Control.Monad.Reader
 import Control.Monad.ST
+import Data.Map (Map)
 import Data.Ratio () -- for precedences in pretty printer
 import Data.Set (Set)
 import Data.STRef
-
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Pukeko.Pretty hiding (int)
+import Pukeko.Error
+import Pukeko.Pretty
 
 import qualified Pukeko.Language.Ident as Ident
 
@@ -109,15 +114,40 @@ open t =
     TApp c  ts -> TApp c (map open ts)
 
 vars :: Type con Closed -> Set Ident.TVar
-vars t = case t of
-  TVar _ident -> Set.singleton _ident
-  TFun t_arg t_res -> vars t_arg `Set.union` vars t_res
-  TApp _ t_params -> Set.unions (map vars t_params)
+vars t = runST $ openVars (open t)
+
+openVars :: Type con (Open s) -> ST s (Set Ident.TVar)
+openVars t = case t of
+  TVar v -> return $ Set.singleton v
+  TFun tx ty -> Set.union <$> openVars tx <*> openVars ty
+  TApp _  ts -> Set.unions <$> traverse openVars ts
+  UVar uref -> do
+    uvar <- readSTRef uref
+    case uvar of
+      Free{} -> return $ Set.empty
+      Link{_type} -> openVars _type
+
+openSubst :: Map Ident.TVar (Type con (Open s)) -> Type con (Open s) -> ST s (Type con (Open s))
+openSubst env t = runReaderT (subst' t) env
+  where
+    subst' :: Type con (Open s)
+           -> ReaderT (Map Ident.TVar (Type con (Open s))) (ST s) (Type con (Open s))
+    subst' t = case t of
+      TVar v -> do
+        let e = bug "type instantiation" "unknown variable" (Just $ show v)
+        Map.findWithDefault e v <$> ask
+      TFun tx ty -> TFun <$> subst' tx <*> subst' ty
+      TApp c  ts -> TApp c <$> traverse subst' ts
+      UVar uref -> do
+        uvar <- lift $ readSTRef uref
+        case uvar of
+          Free{} -> return t
+          Link{_type} -> subst' _type
 
 prettyUVar :: Pretty con => PrettyLevel -> Rational -> UVar con s -> ST s Doc
 prettyUVar lvl prec uvar = case uvar of
   Free{_ident} -> return $ pretty _ident
-  Link{_type}  ->  prettyType lvl prec _type
+  Link{_type}  -> prettyType lvl prec _type
 
 prettyType :: Pretty con => PrettyLevel -> Rational -> Type con (Open s) -> ST s Doc
 prettyType lvl prec t =
