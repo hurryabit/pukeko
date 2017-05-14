@@ -8,14 +8,20 @@ import Text.Parsec
 
 import qualified Pukeko
 
-shouldFail :: String -> String -> Expectation
+shouldFail :: HasCallStack => String -> String -> Expectation
 shouldFail expect code =
-  let ?callStack = freezeCallStack emptyCallStack in
   case Pukeko.parse "<input>" code >>= Pukeko.compileToCore of
     Right _ -> expectationFailure "should fail, but succeeded"
     Left actual -> case stripPrefix "\"<input>\" " actual of
       Nothing -> expectationFailure "error does not start with \"<input>\""
       Just actual -> actual `shouldBe` expect
+
+shouldSucceed :: HasCallStack => String -> Expectation
+shouldSucceed code =
+  case Pukeko.parse "<input>" code >>= Pukeko.compileToCore of
+    Right _ -> return ()
+    Left error ->
+      expectationFailure $ "should succeed, but failed: " ++ error
 
 type Parser a = Parsec [String] () a
 
@@ -44,12 +50,14 @@ atSourcePos pos =
 
 test :: Parser Spec
 test = do
-  s <- specify  <$> pragma "TEST"  <|>
-       xspecify <$> pragma "XTEST"
-  p <- getPosition
-  e <- pragma "EXPECT"
+  spcfy <- specify  <$> pragma "TEST"  <|>
+           xspecify <$> pragma "XTEST"
+  pos <- getPosition
+  should <- shouldFail <$> pragma "FAILURE" <|>
+            pragma "SUCCESS" *> pure shouldSucceed
   c <- many $ line (onlyIf (not . isPrefixOf "--"))
-  return $ atSourcePos p $ s $ shouldFail e (unlines c)
+  let ?callStack = freezeCallStack emptyCallStack
+  return $ atSourcePos pos $ spcfy $ should (unlines c)
 
 manySpec :: Parser Spec -> Parser Spec
 manySpec p = sequence_ <$> many p
