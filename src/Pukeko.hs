@@ -1,5 +1,6 @@
 module Pukeko
-  ( compileToCore
+  ( ModuleLP
+  , compileToCore
   , parse
   )
   where
@@ -19,7 +20,9 @@ import qualified Pukeko.Language.PatternMatcher as PatternMatcher
 import qualified Pukeko.Language.TypeChecker    as TypeChecker
 import qualified Pukeko.Language.TypeResolver   as TypeResolver
 
-parse :: MonadError String m => String -> String -> m (Module StageLP SourcePos)
+type ModuleLP = Module StageLP SourcePos
+
+parse :: MonadError String m => String -> String -> m ModuleLP
 parse = Parser.parseModule
 
 compileToCore :: MonadError String m

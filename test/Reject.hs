@@ -6,26 +6,33 @@ import Test.Hspec
 import Test.Hspec.Core.Spec
 import Text.Parsec
 
+import Pukeko (ModuleLP)
 import qualified Pukeko
 
-shouldFail :: String -> String -> Expectation
-shouldFail expect code =
-  let ?callStack = freezeCallStack emptyCallStack in
-  case Pukeko.parse "<input>" code >>= Pukeko.compileToCore of
+shouldFail :: ModuleLP -> String -> String -> Expectation
+shouldFail prelude expect code = do
+  let result = do
+        module_ <- Pukeko.parse "<input>" code
+        Pukeko.compileToCore (prelude ++ module_)
+  let ?callStack = freezeCallStack emptyCallStack
+  case result of
     Right _ -> expectationFailure "should fail, but succeeded"
     Left actual -> case stripPrefix "\"<input>\" " actual of
       Nothing -> expectationFailure "error does not start with \"<input>\""
       Just actual -> actual `shouldBe` expect
 
-shouldSucceed :: String -> Expectation
-shouldSucceed code =
-  let ?callStack = freezeCallStack emptyCallStack in
-  case Pukeko.parse "<input>" code >>= Pukeko.compileToCore of
+shouldSucceed :: ModuleLP -> String -> Expectation
+shouldSucceed prelude code = do
+  let result = do
+        module_ <- Pukeko.parse "<input>" code
+        Pukeko.compileToCore (prelude ++ module_)
+  let ?callStack = freezeCallStack emptyCallStack
+  case result of
     Right _ -> return ()
     Left error ->
       expectationFailure $ "should succeed, but failed: " ++ error
 
-type Parser a = Parsec [String] () a
+type Parser a = Parsec [String] ModuleLP a
 
 line :: (String -> Maybe a) -> Parser a
 line f = tokenPrim id (\pos _ _ -> incSourceLine pos 1) f
@@ -52,11 +59,12 @@ atSourcePos pos =
 
 test :: Parser Spec
 test = do
+  prelude <- getState
   spcfy <- specify  <$> pragma "TEST"  <|>
            xspecify <$> pragma "XTEST"
   pos <- getPosition
-  should <- shouldFail <$> pragma "FAILURE" <|>
-            pragma "SUCCESS" *> pure shouldSucceed
+  should <- shouldFail prelude <$> pragma "FAILURE" <|>
+            pragma "SUCCESS" *> pure (shouldSucceed prelude)
   c <- many $ line (onlyIf (not . isPrefixOf "--"))
   return $ atSourcePos pos $ spcfy $ should (unlines c)
 
@@ -74,6 +82,9 @@ spec = skipEmpty *> manySpec section <* eof
 
 main :: IO ()
 main = do
-  let testFile = "test/reject.pu"
+  let prelFile = "test/prelude.pu"
+      testFile = "test/reject.pu"
+  prel <- readFile prelFile
   cont <- lines <$> readFile testFile
-  either (fail . show) hspec $ parse spec testFile cont
+  prelude <- either fail return $ Pukeko.parse prelFile prel
+  either (fail . show) hspec $ runParser spec prelude testFile cont
