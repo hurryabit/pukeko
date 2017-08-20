@@ -24,9 +24,10 @@ runFV fv = runReader (unFV fv) Set.empty
 localize :: FreeVars -> FV a -> FV a
 localize fvs = local (fvs `Set.union`)
 
-fvBind0 :: Bind0 stage a -> FV (Bind0 stage FreeVars)
-fvBind0 bind0@MkBind{ _ident } =
-  return (bind0{ _annot = maybe Set.empty Set.singleton _ident } :: Bind0 _ _)
+fvPatn :: Patn stage a -> FV (Patn stage FreeVars)
+fvPatn patn = return $ case patn of
+  Wild{}       -> Wild{_annot = Set.empty}
+  Bind{_ident} -> Bind{_annot = Set.singleton _ident, _ident}
 
 fvDefn :: Defn stage a -> FV (Defn stage FreeVars)
 fvDefn MkDefn{_lhs, _rhs} = do
@@ -35,12 +36,12 @@ fvDefn MkDefn{_lhs, _rhs} = do
   return MkDefn{_annot, _lhs, _rhs}
 
 fvAltn :: Altn stage a -> FV (Altn stage FreeVars)
-fvAltn altn@MkAltn{ _binds, _rhs } = do
-  _binds <- mapM fvBind0 _binds
-  let fv_binds = Set.unions (map annot _binds)
-  _rhs <- localize fv_binds $ fvExpr _rhs
-  let _annot = annot _rhs `Set.difference` fv_binds
-  return altn{ _annot, _binds, _rhs }
+fvAltn altn@MkAltn{_patns, _rhs} = do
+  _patns <- mapM fvPatn _patns
+  let fv_patns = Set.unions (map annot _patns)
+  _rhs <- localize fv_patns $ fvExpr _rhs
+  let _annot = annot _rhs `Set.difference` fv_patns
+  return altn{_annot, _patns, _rhs}
 
 fvExpr :: Expr stage a -> FV (Expr stage FreeVars)
 fvExpr expr = case expr of
@@ -57,12 +58,12 @@ fvExpr expr = case expr of
     _args <- mapM fvExpr _args
     let _annot = annot _fun `Set.union` Set.unions (map annot _args)
     return Ap{ _annot, _fun, _args }
-  Lam{ _binds, _body } -> do
-    _binds <- mapM fvBind0 _binds
-    let fv_binds = Set.unions (map annot _binds)
-    _body <- localize fv_binds $ fvExpr _body
-    let _annot = annot _body `Set.difference` fv_binds
-    return Lam{ _annot, _binds, _body }
+  Lam{_patns, _body} -> do
+    _patns <- traverse fvPatn _patns
+    let fv_patns = Set.unions (map annot _patns)
+    _body <- localize fv_patns $ fvExpr _body
+    let _annot = annot _body `Set.difference` fv_patns
+    return Lam{_annot, _patns, _body}
   Let{ _isrec, _defns, _body } -> do
     let (lhss, _) = unzipDefns _defns
     let fv_lhss = Set.fromList lhss

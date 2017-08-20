@@ -96,9 +96,9 @@ module_ = many1 $ choice
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-bind0 :: Parser (Bind0 StageLP SourcePos)
-bind0  =
-  MkBind <$> getPosition <*> (Just <$> evar <|> symbol "_" *> pure Nothing)
+patn1 :: Parser (Patn1 StageLP SourcePos)
+patn1 = Wild <$> getPosition <*  symbol "_" <|>
+        Bind <$> getPosition <*> evar
 
 defnValLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnValLhs = MkDefn <$> getPosition <*> evar
@@ -106,7 +106,7 @@ defnValLhs = MkDefn <$> getPosition <*> evar
 defnFunLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnFunLhs =
   (.) <$> (MkDefn <$> getPosition <*> evar)
-      <*> (Lam <$> getPosition <*> many1 bind0)
+      <*> (Lam <$> getPosition <*> many1 patn1)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn StageLP SourcePos)
@@ -116,7 +116,7 @@ altn :: Parser (Altn StageLP SourcePos)
 altn =
   MkAltn <$> getPosition
          <*> (bar *> constructor)
-         <*> many bind0
+         <*> many patn1
          <*> (arrow *> expr)
 
 let_ :: (SourcePos -> Bool -> [Defn StageLP SourcePos] -> a) -> Parser a
@@ -131,7 +131,7 @@ expr =
   [ mkAp <$> getPosition <*> aexpr <*> many aexpr
   , let_ Let <*> (reserved "in" *> expr)
   , Lam <$> getPosition
-        <*> (reserved "fun" *> many1 bind0)
+        <*> (reserved "fun" *> many1 patn1)
         <*> (arrow *> expr)
   , If  <$> getPosition
         <*> (reserved "if"   *> expr)

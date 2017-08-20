@@ -35,14 +35,13 @@ freshIdent = state $ \(ident:idents) -> (ident, idents)
 
 llExpr :: Expr StageTR FV -> LL (Expr StageTR FV)
 llExpr expr = case expr of
-  Lam{_annot, _binds, _body} -> do
+  Lam{_annot, _patns, _body} -> do
     _lhs <- freshIdent
     _body <- llExpr _body
     -- TODO: Use a clever order here.
     let fvs = Set.toList _annot
-        mkBind f ident =
-          MkBind{_annot = Set.singleton ident, _ident = f ident}
-        _rhs = Lam{_annot = Set.empty, _binds = map (mkBind Just) fvs ++ _binds, _body}
+        mkBind _ident = Bind{_annot = Set.singleton _ident, _ident}
+        _rhs = Lam{_annot = Set.empty, _patns = map mkBind fvs ++ _patns, _body}
     emit MkDefn{_annot = annot _rhs, _lhs, _rhs}
     let mkGlobalVar _var = Var{_annot = Set.empty, _var}
         mkLocalVar _var = Var{_annot = Set.singleton _var, _var}

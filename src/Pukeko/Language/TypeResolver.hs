@@ -66,9 +66,10 @@ findTermCon posn name = do
     Nothing -> throwAt posn "unknown term cons" name
     Just con -> return con
 
-trBind :: Bind0 StageLP SourcePos -> TR (Bind0 StageTR SourcePos)
-trBind MkBind{_annot, _ident} = do
-  return MkBind{_annot, _ident}
+trPatn :: Patn StageLP SourcePos -> TR (Patn StageTR SourcePos)
+trPatn patn = return $ case patn of
+  Wild{_annot} -> Wild{_annot}
+  Bind{_annot, _ident} -> Bind{_annot, _ident}
 
 trDefn :: Defn StageLP SourcePos -> TR (Defn StageTR SourcePos)
 trDefn defn@MkDefn{_lhs, _rhs} = do
@@ -76,11 +77,11 @@ trDefn defn@MkDefn{_lhs, _rhs} = do
   return (defn{_rhs} :: Defn _ _)
 
 trAltn :: Altn StageLP SourcePos -> TR (Altn StageTR SourcePos)
-trAltn altn@MkAltn{_annot, _con, _binds, _rhs} = do
+trAltn altn@MkAltn{_annot, _con, _patns, _rhs} = do
   _con <- findTermCon _annot _con
-  _binds <- traverse trBind _binds
+  _patns <- traverse trPatn _patns
   _rhs <- trExpr _rhs
-  return altn{_con, _binds, _rhs}
+  return altn{_con, _patns, _rhs}
 
 trExpr :: Expr StageLP SourcePos -> TR (Expr StageTR SourcePos)
 trExpr expr = case expr of
@@ -93,10 +94,10 @@ trExpr expr = case expr of
       _fun <- trExpr _fun
       _args <- traverse trExpr _args
       return expr{_fun, _args}
-    Lam{_binds, _body} -> do
-      _binds <- traverse trBind _binds
+    Lam{_patns, _body} -> do
+      _patns <- traverse trPatn _patns
       _body <- trExpr _body
-      return (expr{_binds, _body} :: Expr _ _)
+      return (expr{_patns, _body} :: Expr _ _)
     Let{_defns, _body} -> do
       _defns <- traverse trDefn _defns
       _body <- trExpr _body

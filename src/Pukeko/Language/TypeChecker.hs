@@ -187,9 +187,9 @@ infer expr = do
       t_res <- freshUVar
       unifyHere t_fun (t_args *~> t_res)
       return t_res
-    Lam{_binds, _body} -> do
-      t_params <- traverse (const freshUVar) _binds
-      let env = envBind0 _binds t_params
+    Lam{_patns, _body} -> do
+      t_params <- traverse (const freshUVar) _patns
+      let env = envPatn1 _patns t_params
       t_body <- localize env (infer _body)
       return (t_params *~> t_body)
     Let{_annot, _isrec, _defns, _body} -> do
@@ -199,17 +199,17 @@ infer expr = do
     Match{_expr, _altns} -> do
       t_expr <- infer _expr
       t_res <- freshUVar
-      for_ _altns $ \MkAltn{_annot, _con, _binds, _rhs} -> do
+      for_ _altns $ \MkAltn{_annot, _con, _patns, _rhs} -> do
         let MkConstructor{_name, _adt = adt@MkADT{_params}, _fields} = _con
-        when (length _binds /= length _fields) $
+        when (length _patns /= length _fields) $
           throwDocAt _annot $ "term cons" <+> quotes (pretty _name) <+>
           "expects" <+> int (length _fields) <+> "arguments"
         t_params <- traverse (const freshUVar) _params
         unifyHere t_expr (app adt t_params)
         let env_params = Map.fromList $ zip _params t_params
-        env_binds <- liftST $
-          traverse (openSubst env_params . open) (envBind0 _binds _fields)
-        t_rhs <- localize env_binds (infer _rhs)
+        env_patns <- liftST $
+          traverse (openSubst env_params . open) (envPatn1 _patns _fields)
+        t_rhs <- localize env_patns (infer _rhs)
         unifyHere t_res t_rhs
       return t_res
 

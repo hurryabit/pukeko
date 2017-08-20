@@ -61,21 +61,23 @@ ccDefn L.MkDefn{_lhs, _rhs} = do
   _rhs <- ccExpr _rhs
   return C.MkDefn{_lhs = name _lhs, _rhs}
 
-ccBind :: L.Bind0 L.StageTR FV -> Maybe C.Name
-ccBind L.MkBind{_ident} = name <$> _ident
+ccPatn :: L.Patn1 L.StageTR FV -> Maybe C.Name
+ccPatn patn = case patn of
+  L.Wild{}       -> Nothing
+  L.Bind{_ident} -> Just (name _ident)
 
 ccAltn :: L.Altn L.StageTR FV -> CC C.Altn
-ccAltn L.MkAltn{_binds, _rhs} = do
+ccAltn L.MkAltn{_patns, _rhs} = do
   _rhs <- ccExpr _rhs
-  return C.MkAltn{_binds = map ccBind _binds, _rhs}
+  return C.MkAltn{_binds = map ccPatn _patns, _rhs}
 
 ccTopDefn :: L.Defn L.StageTR FV -> CC C.TopLevel
 ccTopDefn L.MkDefn{_lhs, _rhs} = do
-  let (_binds, _body) = case _rhs of
-        L.Lam{_binds, _body} -> (_binds, _body)
+  let (_patns, _body) = case _rhs of
+        L.Lam{_patns, _body} -> (_patns, _body)
         _                    -> ([]    , _rhs )
   _body <- ccExpr _body
-  return C.Def{_name = name _lhs, _binds = map ccBind _binds, _body}
+  return C.Def{_name = name _lhs, _binds = map ccPatn _patns, _body}
 
 ccTopLevel :: L.TopLevel L.StageTR FV -> CC [C.TopLevel]
 ccTopLevel top = case top of
