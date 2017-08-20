@@ -67,9 +67,13 @@ findTermCon posn name = do
     Just con -> return con
 
 trPatn :: Patn StageLP SourcePos -> TR (Patn StageTR SourcePos)
-trPatn patn = return $ case patn of
-  Wild{_annot} -> Wild{_annot}
-  Bind{_annot, _ident} -> Bind{_annot, _ident}
+trPatn patn = case patn of
+  Wild{_annot} -> return Wild{_annot}
+  Bind{_annot, _ident} -> return Bind{_annot, _ident}
+  Dest{_annot, _con, _patns} -> do
+    _con <- findTermCon _annot _con
+    _patns <- traverse trPatn _patns
+    return Dest{_annot, _con, _patns}
 
 trDefn :: Defn StageLP SourcePos -> TR (Defn StageTR SourcePos)
 trDefn defn@MkDefn{_lhs, _rhs} = do
@@ -77,11 +81,10 @@ trDefn defn@MkDefn{_lhs, _rhs} = do
   return (defn{_rhs} :: Defn _ _)
 
 trAltn :: Altn StageLP SourcePos -> TR (Altn StageTR SourcePos)
-trAltn altn@MkAltn{_annot, _con, _patns, _rhs} = do
-  _con <- findTermCon _annot _con
+trAltn altn@MkAltn{_annot, _patns, _rhs} = do
   _patns <- traverse trPatn _patns
   _rhs <- trExpr _rhs
-  return altn{_con, _patns, _rhs}
+  return altn{_patns, _rhs}
 
 trExpr :: Expr StageLP SourcePos -> TR (Expr StageTR SourcePos)
 trExpr expr = case expr of
@@ -107,10 +110,10 @@ trExpr expr = case expr of
       _then <- trExpr _then
       _else <- trExpr _else
       return expr{_cond, _then, _else}
-    Match{_altns, _expr} -> do
-      _expr <- trExpr _expr
+    Match{_altns, _exprs} -> do
+      _exprs <- traverse trExpr _exprs
       _altns <- traverse trAltn _altns
-      return expr{_altns, _expr}
+      return expr{_altns, _exprs}
 
 trTopLevel :: TopLevel StageLP SourcePos -> TR (TopLevel StageTR SourcePos)
 trTopLevel top = case top of

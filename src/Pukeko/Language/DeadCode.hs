@@ -29,7 +29,8 @@ glExpr expr = case expr of
   Lam{_body} -> glExpr _body
   Let{_defns, _body} -> glExpr _body `Set.union` Set.unions (map glDefn _defns)
   If{_cond, _then, _else} -> Set.unions (map glExpr [_cond, _then, _else])
-  Match{_expr, _altns} -> glExpr _expr `Set.union` Set.unions (map glAltn _altns)
+  Match{_exprs, _altns} ->
+    Set.unions (map glExpr _exprs) `Set.union` Set.unions (map glAltn _altns)
 
 type DC a = State (Set Ident.EVar) a
 

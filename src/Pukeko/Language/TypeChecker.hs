@@ -157,6 +157,25 @@ instantiate t = do
   env <- sequence $ Map.fromSet (const freshUVar) vars
   liftST $ openSubst env t
 
+instantiateADT :: ADT Ident.Con -> TC s (Type (Open s), Map Ident.TVar (Type (Open s)))
+instantiateADT adt@MkADT{_params} = do
+  t_params <- traverse (const freshUVar) _params
+  return (app adt t_params, Map.fromList $ zip _params t_params)
+
+checkPatn :: Patn StageTR SourcePos -> Type (Open s) -> TC s (Map Ident.EVar (Type (Open s)))
+checkPatn patn t_expr = case patn of
+  Wild{} -> return Map.empty
+  Bind{_ident} -> return (Map.singleton _ident t_expr)
+  Dest{_annot, _con, _patns} -> do
+    let MkConstructor{_name, _adt, _fields} = _con
+    when (length _patns /= length _fields) $
+      throwDocAt _annot $ "term cons" <+> quotes (pretty _name) <+>
+      "expects" <+> int (length _fields) <+> "arguments"
+    (t_adt, env_adt) <- instantiateADT _adt
+    unify _annot t_expr t_adt
+    t_fields <- liftST $ traverse (openSubst env_adt . open) _fields
+    Map.unions <$> zipWithM checkPatn _patns t_fields
+
 inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.EVar, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
@@ -196,21 +215,15 @@ infer expr = do
       env <- Map.fromList <$> inferLet _isrec _defns
       localize env (infer _body)
     If{} -> infer (desugarIf expr)
-    Match{_expr, _altns} -> do
+    Match{_exprs = []} -> bug "type checker" "match without expression" Nothing
+    Match{_exprs = _:_:_} -> bug "type checker" "match with multiple expressions" Nothing
+    Match{_exprs = [_expr], _altns} -> do
       t_expr <- infer _expr
       t_res <- freshUVar
-      for_ _altns $ \MkAltn{_annot, _con, _patns, _rhs} -> do
-        let MkConstructor{_name, _adt = adt@MkADT{_params}, _fields} = _con
-        when (length _patns /= length _fields) $
-          throwDocAt _annot $ "term cons" <+> quotes (pretty _name) <+>
-          "expects" <+> int (length _fields) <+> "arguments"
-        t_params <- traverse (const freshUVar) _params
-        unifyHere t_expr (app adt t_params)
-        let env_params = Map.fromList $ zip _params t_params
-        env_patns <- liftST $
-          traverse (openSubst env_params . open) (envPatn1 _patns _fields)
+      for_ _altns $ \MkAltn{_annot, _patns = [_patn], _rhs} -> do
+        env_patns <- checkPatn _patn t_expr
         t_rhs <- localize env_patns (infer _rhs)
-        unifyHere t_res t_rhs
+        unify _annot t_res t_rhs
       return t_res
 
 checkTopLevel :: TopLevel StageTR SourcePos -> TC s ()

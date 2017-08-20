@@ -43,6 +43,7 @@ pukeko@Token.TokenParser
   , Token.natural
   , Token.identifier
   , Token.parens
+  , Token.commaSep1
   , Token.symbol
   , Token.whiteSpace
   } =
@@ -96,9 +97,19 @@ module_ = many1 $ choice
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-patn1 :: Parser (Patn1 StageLP SourcePos)
+patn1 :: Parser (Patn StageLP SourcePos)
 patn1 = Wild <$> getPosition <*  symbol "_" <|>
         Bind <$> getPosition <*> evar
+
+
+-- <patn>  ::= <apatn> | <con> <apatn>*
+-- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
+patn, apatn :: Parser (Patn StageLP SourcePos)
+patn  = Dest <$> getPosition <*> constructor <*> many apatn <|>
+        apatn
+apatn = patn1 <|>
+        Dest <$> getPosition <*> constructor <*> pure [] <|>
+        parens patn
 
 defnValLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnValLhs = MkDefn <$> getPosition <*> evar
@@ -115,8 +126,7 @@ defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
 altn :: Parser (Altn StageLP SourcePos)
 altn =
   MkAltn <$> getPosition
-         <*> (bar *> constructor)
-         <*> many patn1
+         <*> (bar *> commaSep1 patn)
          <*> (arrow *> expr)
 
 let_ :: (SourcePos -> Bool -> [Defn StageLP SourcePos] -> a) -> Parser a
@@ -138,7 +148,7 @@ expr =
         <*> (reserved "then" *> expr)
         <*> (reserved "else" *> expr)
   , Match <$> getPosition
-          <*> (reserved "match" *> expr)
+          <*> (reserved "match" *> commaSep1 expr)
           <*> (reserved "with"  *> many1 altn)
   ])
   <?> "expression"

@@ -40,10 +40,10 @@ expr f e = case e of
     _then <- f _then
     _else <- f _else
     pure e{_cond, _then, _else}
-  Match{_expr, _altns} -> do
-    _expr <- f _expr
+  Match{_exprs, _altns} -> do
+    _exprs <- traverse f _exprs
     _altns <- traverse (altn f) _altns
-    pure e{_expr, _altns}
+    pure e{_exprs, _altns}
 
 defn :: Applicative f => (Expr stage a -> f (Expr stage a)) -> Defn stage a -> f (Defn stage a)
 defn f d@MkDefn{_rhs} = do

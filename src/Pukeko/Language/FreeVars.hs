@@ -25,9 +25,13 @@ localize :: FreeVars -> FV a -> FV a
 localize fvs = local (fvs `Set.union`)
 
 fvPatn :: Patn stage a -> FV (Patn stage FreeVars)
-fvPatn patn = return $ case patn of
-  Wild{}       -> Wild{_annot = Set.empty}
-  Bind{_ident} -> Bind{_annot = Set.singleton _ident, _ident}
+fvPatn patn = case patn of
+  Wild{}       -> return Wild{_annot = Set.empty}
+  Bind{_ident} -> return Bind{_annot = Set.singleton _ident, _ident}
+  Dest{_con, _patns} -> do
+    _patns <- traverse fvPatn _patns
+    let _annot = Set.unions (map annot _patns)
+    return Dest{_annot, _con, _patns}
 
 fvDefn :: Defn stage a -> FV (Defn stage FreeVars)
 fvDefn MkDefn{_lhs, _rhs} = do
@@ -36,8 +40,8 @@ fvDefn MkDefn{_lhs, _rhs} = do
   return MkDefn{_annot, _lhs, _rhs}
 
 fvAltn :: Altn stage a -> FV (Altn stage FreeVars)
-fvAltn altn@MkAltn{_patns, _rhs} = do
-  _patns <- mapM fvPatn _patns
+fvAltn altn@MkAltn{_patns = old_patns, _rhs} = do
+  _patns <- traverse fvPatn old_patns
   let fv_patns = Set.unions (map annot _patns)
   _rhs <- localize fv_patns $ fvExpr _rhs
   let _annot = annot _rhs `Set.difference` fv_patns
@@ -80,11 +84,11 @@ fvExpr expr = case expr of
     _else <- fvExpr _else
     let _annot = Set.unions (map annot [_cond, _then, _else])
     return If{ _annot, _cond, _then, _else }
-  Match{ _expr, _altns } -> do
-    _expr <- fvExpr _expr
-    _altns <- mapM fvAltn _altns
-    let _annot = annot _expr `Set.union` Set.unions (map annot _altns)
-    return Match{ _annot, _expr, _altns }
+  Match{_exprs, _altns} -> do
+    _exprs <- traverse fvExpr _exprs
+    _altns <- traverse fvAltn _altns
+    let _annot = Set.unions (map annot _exprs) `Set.union` Set.unions (map annot _altns)
+    return Match{_annot, _exprs, _altns}
 
 fvTopLevel :: TopLevel stage a -> FV (TopLevel stage FreeVars)
 fvTopLevel top = case top of

@@ -27,7 +27,7 @@ type Int
 let bad = Con
 
 -- TEST unknown in pattern
--- FAILURE (line 3, column 3): unknown term cons 'Con'
+-- FAILURE (line 3, column 5): unknown term cons 'Con'
 let f x =
   match x with
   | Con -> 1
@@ -221,14 +221,14 @@ val f : a -> Option a
 let f x = Some x x
 
 -- TEST underapplication in pattern
--- FAILURE (line 4, column 3): term cons 'Cons' expects 2 arguments
+-- FAILURE (line 4, column 5): term cons 'Cons' expects 2 arguments
 val f : List a -> a
 let f x =
   match x with
   | Cons y -> y
 
 -- TEST overapplication in pattern
--- FAILURE (line 4, column 3): term cons 'Some' expects 1 arguments
+-- FAILURE (line 4, column 5): term cons 'Some' expects 1 arguments
 val f : Option a -> a
 let f x =
   match x with

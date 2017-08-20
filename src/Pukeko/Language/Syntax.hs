@@ -1,10 +1,9 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, GADTs #-}
 module Pukeko.Language.Syntax
   ( Module
   , TopLevel (..)
   , Expr (..)
   , Patn (..)
-  , Patn1
   , Defn (..)
   , Altn (..)
   , mkAp
@@ -56,23 +55,23 @@ data Expr stage a
   | Con    { _annot :: a, _con   :: TermConOf stage }
   | Num    { _annot :: a, _int   :: Int }
   | Ap     { _annot :: a, _fun   :: Expr stage a   , _args  :: [Expr stage a] }
-  | Lam    { _annot :: a, _patns :: [Patn1 stage a], _body  :: Expr stage a   }
+  | Lam    { _annot :: a, _patns :: [Patn stage a], _body  :: Expr stage a   }
   | Let    { _annot :: a, _isrec :: Bool     , _defns :: [Defn stage a], _body :: Expr stage a }
   | If     { _annot :: a, _cond  :: Expr stage a   , _then  :: Expr stage a  , _else :: Expr stage a }
-  | Match  { _annot :: a, _expr  :: Expr stage a   , _altns :: [Altn stage a] }
+  | Match  { _annot :: a, _exprs :: [Expr stage a] , _altns :: [Altn stage a] }
   deriving (Functor)
 
 data Patn stage a
   = Wild{_annot :: a}
   | Bind{_annot :: a, _ident :: Ident.EVar}
+  | Dest{_annot :: a, _con :: TermConOf stage, _patns :: [Patn stage a]}
   deriving (Functor)
-
-type Patn1 = Patn
 
 data Defn stage a = MkDefn{_annot :: a, _lhs :: Ident.EVar, _rhs :: Expr stage a}
   deriving (Functor)
 
-data Altn stage a = MkAltn{ _annot :: a, _con :: TermConOf stage, _patns :: [Patn1 stage a], _rhs :: Expr stage a }
+data Altn stage a =
+  MkAltn{_annot :: a, _patns :: [Patn stage a], _rhs :: Expr stage a}
   deriving (Functor)
 
 mkAp :: a -> Expr stage a -> [Expr stage a] -> Expr stage a
@@ -96,31 +95,30 @@ MkADT{_constructors = [boolFalse, boolTrue]} =
 
 desugarIf :: Expr StageTR a -> Expr StageTR a
 desugarIf If{ _annot, _cond, _then, _else } =
-  Match { _annot = _annot
-        , _expr  = _cond
-        , _altns =
-          [ MkAltn { _annot = annot _else
-                   , _con   = boolFalse
-                   , _patns = []
-                   , _rhs   = _else
-                   }
-          , MkAltn { _annot = annot _then
-                   , _con   = boolTrue
-                   , _patns = []
-                   , _rhs   = _then
-                   }
-          ]
-        }
+  let mkAltn _con _rhs =
+        let _annot = annot _rhs
+        in  MkAltn{ _annot
+                  , _patns = [Dest{_annot, _con, _patns = []}]
+                  , _rhs
+                  }
+  in  Match{ _annot = _annot
+           , _exprs = [_cond]
+           , _altns =
+             [ mkAltn boolFalse _else
+             , mkAltn boolTrue  _then
+             ]
+           }
 desugarIf _ = bug "syntax" "desugarIf on wrong node" Nothing
 
 unzipDefns :: [Defn stage a] -> ([Ident.EVar], [Expr stage a])
 unzipDefns = unzip . map (\MkDefn{_lhs, _rhs} -> (_lhs, _rhs))
 
-envPatn1 :: [Patn1 stage a] -> [b] -> Map Ident.EVar b
+envPatn1 :: [Patn stage a] -> [b] -> Map Ident.EVar b
 envPatn1 bs = Map.fromList . catMaybes . zipWith f bs
   where f patn x = case patn of
           Wild{}       -> Nothing
           Bind{_ident} -> Just (_ident, x)
+          Dest{}       -> bug "lambda" "constructor pattern" Nothing
 
 zipMaybe :: [Maybe a] -> [b] -> [(a, b)]
 zipMaybe xs = catMaybes . zipWith (\x y -> (,) <$> x <*> pure y) xs
@@ -168,9 +166,9 @@ instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Expr st
           , "else"
           , nest 2 (pPrintPrec lvl 0 _else)
           ]
-      Match { _expr, _altns } ->
+      Match{_exprs, _altns} ->
         maybeParens (prec > 0) $ vcat $
-        ("match" <+> pPrintPrec lvl 0 _expr <+> "with") :
+        ("match" <+> hsep (punctuate "," (map (pPrintPrec lvl 0) _exprs)) <+> "with") :
         map (pPrintPrec lvl 0) _altns
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Defn stage a) where
@@ -180,14 +178,17 @@ instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Defn st
       in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
     _ -> hang (pPrintPrec lvl 0 _lhs <+> equals) 2 (pPrintPrec lvl 0 _rhs)
 
-instance (Pretty (TypeConOf stage)) => Pretty (Patn1 stage a) where
-  pPrintPrec _ _ patn = case patn of
-    Wild{}       -> "_"
-    Bind{_ident} -> pretty _ident
+instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Patn stage a) where
+  pPrintPrec lvl prec patn = case patn of
+    Wild{}             -> "_"
+    Bind{_ident}       -> pretty _ident
+    Dest{_con, _patns} ->
+      maybeParens (prec > 0 && not (null _patns)) $ hsep $
+      pretty _con : map (pPrintPrec lvl 1) _patns
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Altn stage a) where
-  pPrintPrec lvl _ MkAltn{_con, _patns, _rhs} = hang
-    (hsep ["|", pretty _con, hsep (map (pPrintPrec lvl 1) _patns), "->"]) 2
+  pPrintPrec lvl _ MkAltn{_patns, _rhs} = hang
+    ("|" <+> hsep (punctuate "," (map (pPrintPrec lvl 0) _patns)) <+> "->") 2
     (pPrintPrec lvl 0 _rhs)
 
 instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (TopLevel stage a) where

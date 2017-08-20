@@ -10,6 +10,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Pukeko.Error
+import Pukeko.Pretty
 import Pukeko.Language.Type (Constructor (..))
 import qualified Pukeko.Language.Ident  as Ident
 import qualified Pukeko.Language.Syntax as L
@@ -51,7 +52,7 @@ ccExpr expr = case expr of
     _body <- ccExpr _body
     return C.Let{_isrec, _defns, _body}
   L.If{} -> ccExpr (L.desugarIf expr)
-  L.Match{_expr, _altns} -> do
+  L.Match{_exprs = [_expr], _altns} -> do
     _expr <- ccExpr _expr
     _altns <- traverse ccAltn _altns
     return C.Match{_expr, _altns}
@@ -61,13 +62,14 @@ ccDefn L.MkDefn{_lhs, _rhs} = do
   _rhs <- ccExpr _rhs
   return C.MkDefn{_lhs = name _lhs, _rhs}
 
-ccPatn :: L.Patn1 L.StageTR FV -> Maybe C.Name
+ccPatn :: L.Patn L.StageTR FV -> Maybe C.Name
 ccPatn patn = case patn of
   L.Wild{}       -> Nothing
   L.Bind{_ident} -> Just (name _ident)
+  L.Dest{_con}   -> bug "core compiler" "constructor pattern" (Just $ prettyShow _con)
 
 ccAltn :: L.Altn L.StageTR FV -> CC C.Altn
-ccAltn L.MkAltn{_patns, _rhs} = do
+ccAltn L.MkAltn{_patns = [L.Dest{_patns}], _rhs} = do
   _rhs <- ccExpr _rhs
   return C.MkAltn{_binds = map ccPatn _patns, _rhs}
 
