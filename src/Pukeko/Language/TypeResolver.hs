@@ -66,15 +66,14 @@ findTermCon posn name = do
     Nothing -> throwAt posn "unknown term cons" name
     Just con -> return con
 
-trBind :: BindGen i StageLP SourcePos -> TR (BindGen i StageTR SourcePos)
+trBind :: Bind0 StageLP SourcePos -> TR (Bind0 StageTR SourcePos)
 trBind MkBind{_annot, _ident} = do
   return MkBind{_annot, _ident}
 
 trDefn :: Defn StageLP SourcePos -> TR (Defn StageTR SourcePos)
 trDefn defn@MkDefn{_lhs, _rhs} = do
-  _lhs <- trBind _lhs
   _rhs <- trExpr _rhs
-  return defn{_lhs, _rhs}
+  return (defn{_rhs} :: Defn _ _)
 
 trAltn :: Altn StageLP SourcePos -> TR (Altn StageTR SourcePos)
 trAltn altn@MkAltn{_annot, _con, _binds, _rhs} = do

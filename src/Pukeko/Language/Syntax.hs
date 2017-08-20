@@ -3,9 +3,7 @@ module Pukeko.Language.Syntax
   ( Module
   , TopLevel (..)
   , Expr (..)
-  , BindGen (..)
-  , Bind
-  , Bind0
+  , Bind0 (..)
   , Defn (..)
   , Altn (..)
   , mkAp
@@ -63,14 +61,10 @@ data Expr stage a
   | Match  { _annot :: a, _expr  :: Expr stage a   , _altns :: [Altn stage a] }
   deriving (Functor)
 
-data BindGen i stage a = MkBind{_annot :: a, _ident :: i}
+data Bind0 stage a = MkBind{_annot :: a, _ident :: Maybe Ident.EVar}
   deriving (Functor)
 
-type Bind = BindGen Ident.EVar
-
-type Bind0 = BindGen (Maybe Ident.EVar)
-
-data Defn stage a = MkDefn{ _lhs :: Bind stage a, _rhs :: Expr stage a }
+data Defn stage a = MkDefn{_annot :: a, _lhs :: Ident.EVar, _rhs :: Expr stage a}
   deriving (Functor)
 
 data Altn stage a = MkAltn{ _annot :: a, _con :: TermConOf stage, _binds :: [Bind0 stage a], _rhs :: Expr stage a }
@@ -114,8 +108,8 @@ desugarIf If{ _annot, _cond, _then, _else } =
         }
 desugarIf _ = bug "syntax" "desugarIf on wrong node" Nothing
 
-unzipDefns :: [Defn stage a] -> ([Bind stage a], [Expr stage a])
-unzipDefns = unzip . map (\MkDefn{ _lhs, _rhs } -> (_lhs, _rhs))
+unzipDefns :: [Defn stage a] -> ([Ident.EVar], [Expr stage a])
+unzipDefns = unzip . map (\MkDefn{_lhs, _rhs} -> (_lhs, _rhs))
 
 envBind0 :: [Bind0 stage a] -> [b] -> Map Ident.EVar b
 envBind0 bs = Map.fromList . catMaybes . zipWith f bs
@@ -179,9 +173,6 @@ instance (Pretty (TypeConOf stage), Pretty (TermConOf stage)) => Pretty (Defn st
       in  hang (lhs <+> equals) 2 (pPrintPrec lvl 0 _body)
     _ -> hang (pPrintPrec lvl 0 _lhs <+> equals) 2 (pPrintPrec lvl 0 _rhs)
 
-instance (Pretty (TypeConOf stage)) => Pretty (Bind stage a) where
-  pPrintPrec _ _ MkBind{_ident} = pretty _ident
-
 instance (Pretty (TypeConOf stage)) => Pretty (Bind0 stage a) where
   pPrintPrec _ _ MkBind{_ident} = maybe "_" pretty _ident
 
@@ -212,8 +203,11 @@ instance Annot (TopLevel stage) where
 instance Annot (Expr stage) where
   annot = _annot :: Expr _ _ -> _
 
-instance Annot (BindGen i stage) where
-  annot = _annot :: BindGen _ _ _ -> _
+instance Annot (Defn stage) where
+  annot = _annot :: Defn _ _ -> _
+
+instance Annot (Bind0 stage) where
+  annot = _annot :: Bind0 _ _ -> _
 
 instance Annot (Altn stage) where
   annot = _annot :: Altn _ _ -> _

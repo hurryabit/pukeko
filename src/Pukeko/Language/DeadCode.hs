@@ -39,8 +39,7 @@ dcTopLevel top = case top of
   Val{_ident} -> gets (_ident `Set.member`)
   Def{_defns} -> do
     let (lhss, rhss) = unzipDefns _defns
-        idents = map (_ident :: Bind _ _ -> _) lhss
-    keep <- gets $ \globals -> any (`Set.member` globals) idents
+    keep <- gets $ \globals -> any (`Set.member` globals) lhss
     when keep $ do
       -- TODO: Remove idents.
       let globals = Set.unions (map glExpr rhss)

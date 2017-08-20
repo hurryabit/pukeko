@@ -96,19 +96,16 @@ module_ = many1 $ choice
          <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-bind :: Parser (Bind StageLP SourcePos)
-bind = MkBind <$> getPosition <*> evar
-
 bind0 :: Parser (Bind0 StageLP SourcePos)
 bind0  =
   MkBind <$> getPosition <*> (Just <$> evar <|> symbol "_" *> pure Nothing)
 
 defnValLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
-defnValLhs = MkDefn <$> bind
+defnValLhs = MkDefn <$> getPosition <*> evar
 
 defnFunLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
 defnFunLhs =
-  (.) <$> (MkDefn <$> bind)
+  (.) <$> (MkDefn <$> getPosition <*> evar)
       <*> (Lam <$> getPosition <*> many1 bind0)
 
 -- TODO: Improve this code.

@@ -24,16 +24,15 @@ runFV fv = runReader (unFV fv) Set.empty
 localize :: FreeVars -> FV a -> FV a
 localize fvs = local (fvs `Set.union`)
 
-fvBind :: Bind stage a -> FV (Bind stage FreeVars)
-fvBind bind@MkBind{ _ident } =
-  return (bind{ _annot = Set.singleton _ident } :: Bind _ _)
-
 fvBind0 :: Bind0 stage a -> FV (Bind0 stage FreeVars)
 fvBind0 bind0@MkBind{ _ident } =
   return (bind0{ _annot = maybe Set.empty Set.singleton _ident } :: Bind0 _ _)
 
 fvDefn :: Defn stage a -> FV (Defn stage FreeVars)
-fvDefn MkDefn{ _lhs, _rhs } = MkDefn <$> fvBind _lhs <*> fvExpr _rhs
+fvDefn MkDefn{_lhs, _rhs} = do
+  _rhs <- fvExpr _rhs
+  let _annot = annot _rhs
+  return MkDefn{_annot, _lhs, _rhs}
 
 fvAltn :: Altn stage a -> FV (Altn stage FreeVars)
 fvAltn altn@MkAltn{ _binds, _rhs } = do
@@ -65,16 +64,14 @@ fvExpr expr = case expr of
     let _annot = annot _body `Set.difference` fv_binds
     return Lam{ _annot, _binds, _body }
   Let{ _isrec, _defns, _body } -> do
-    let (lhss, rhss) = unzipDefns _defns
-    lhss <- mapM fvBind lhss
-    let fv_lhss = Set.unions (map annot lhss)
-    rhss <- localize (if _isrec then fv_lhss else Set.empty) $ mapM fvExpr rhss
+    let (lhss, _) = unzipDefns _defns
+    let fv_lhss = Set.fromList lhss
+    _defns <- localize (if _isrec then fv_lhss else Set.empty) $ traverse fvDefn _defns
     _body <- localize fv_lhss $ fvExpr _body
-    let fv_rhss = Set.unions (map annot rhss)
+    let fv_defns = Set.unions (map annot _defns)
         fv_body = annot _body
-        _annot | _isrec    = (fv_body `Set.union` fv_rhss) `Set.difference` fv_lhss
-               | otherwise = (fv_body `Set.difference` fv_lhss) `Set.union` fv_rhss
-        _defns = zipWith MkDefn lhss rhss
+        _annot | _isrec    = (fv_body `Set.union` fv_defns) `Set.difference` fv_lhss
+               | otherwise = (fv_body `Set.difference` fv_lhss) `Set.union` fv_defns
     return Let{ _annot, _isrec, _defns, _body }
   If{ _cond, _then, _else } -> do
     _cond <- fvExpr _cond

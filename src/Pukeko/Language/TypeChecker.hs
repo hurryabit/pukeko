@@ -160,18 +160,17 @@ instantiate t = do
 inferLet :: Bool -> [Defn StageTR SourcePos] -> TC s [(Ident.EVar, Type (Open s))]
 inferLet isrec defns = do
   let (lhss, rhss) = unzipDefns defns
-      idents = map (_ident :: Bind _ _ -> _) lhss
   t_rhss <- local level succ $ do
     t_lhss <- traverse (const freshUVar) lhss
-    let env | isrec     = Map.fromList $ zip idents t_lhss
+    let env | isrec     = Map.fromList $ zip lhss t_lhss
             | otherwise = Map.empty
     t_rhss <- localize env (traverse infer rhss)
-    for_ (zip3 lhss t_lhss t_rhss) $ \(MkBind{_annot}, t_lhs, t_rhs) ->
+    for_ (zip3 defns t_lhss t_rhss) $ \(MkDefn{_annot}, t_lhs, t_rhs) ->
       unify _annot t_lhs t_rhs
     return t_rhss
   -- TODO: Add test case which makes sure this generalization is not moved into
   -- the scope of the @local@ above.
-  zip idents <$> traverse generalize t_rhss
+  zip lhss <$> traverse generalize t_rhss
 
 infer :: Expr StageTR SourcePos -> TC s (Type (Open s))
 infer expr = do

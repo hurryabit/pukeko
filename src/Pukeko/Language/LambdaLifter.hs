@@ -36,27 +36,26 @@ freshIdent = state $ \(ident:idents) -> (ident, idents)
 llExpr :: Expr StageTR FV -> LL (Expr StageTR FV)
 llExpr expr = case expr of
   Lam{_annot, _binds, _body} -> do
-    _ident <- freshIdent
+    _lhs <- freshIdent
     _body <- llExpr _body
     -- TODO: Use a clever order here.
     let fvs = Set.toList _annot
         mkBind f ident =
           MkBind{_annot = Set.singleton ident, _ident = f ident}
         _rhs = Lam{_annot = Set.empty, _binds = map (mkBind Just) fvs ++ _binds, _body}
-        _lhs = mkBind id _ident
-    emit MkDefn{_lhs, _rhs}
+    emit MkDefn{_annot = annot _rhs, _lhs, _rhs}
     let mkGlobalVar _var = Var{_annot = Set.empty, _var}
         mkLocalVar _var = Var{_annot = Set.singleton _var, _var}
-    return $ mkAp _annot (mkGlobalVar _ident) (map mkLocalVar fvs)
+    return $ mkAp _annot (mkGlobalVar _lhs) (map mkLocalVar fvs)
   _ -> Rewrite.expr llExpr expr
 
 -- TODO: Fix the awful hack for the right naming of non-CAFs.
 llTopDefn :: Defn StageTR FV -> LL ()
-llTopDefn defn@MkDefn{_lhs = MkBind{_ident}, _rhs} = do
+llTopDefn defn@MkDefn{_lhs, _rhs} = do
   let is_lambda = case _rhs of
         Lam{} -> True
         _     -> False
-  put $ (if is_lambda then [_ident] else []) ++ Ident.freshEVars _ident
+  put $ (if is_lambda then [_lhs] else []) ++ Ident.freshEVars _lhs
   defn <- Rewrite.defn llExpr defn
   unless is_lambda $ emit defn
 
