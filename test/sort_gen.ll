@@ -17,12 +17,12 @@ external return = "return"
 external print = "print"
 external input = "input"
 external (>>=) = "bind"
-let (;1) m2 _ = m2
-let (;) m1 m2 = (>>=) m1 ((;1) m2)
-let iter_io$1 f x m = (;) (f x) m
-let iter_io f = foldr (iter_io$1 f) (return Unit)
+let (;ll1) m2 _ = m2
+let (;) m1 m2 = (>>=) m1 ((;ll1) m2)
+let iter_io$ll1 f x m = (;) (f x) m
+let iter_io f = foldr (iter_io$ll1 f) (return Unit)
 let gen f x = Cons x (gen f (f x))
-let main$2 x = (%) ((*) 91 x) 1000000007
-let main$1 n =
-      (;) (print n) (iter_io print (take n (gen main$2 1)))
-let main = (>>=) input main$1
+let main$ll2 x = (%) ((*) 91 x) 1000000007
+let main$ll1 n =
+      (;) (print n) (iter_io print (take n (gen main$ll2 1)))
+let main = (>>=) input main$ll1

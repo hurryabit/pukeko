@@ -189,14 +189,14 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart op$s$1, 2
+g_globstart op$s$ll1, 2
 g_update 2
 g_pop 1
 g_unwind
 
 g_globstart op$s, 2
 g_push 1
-g_pushglobal op$s$1, 2
+g_pushglobal op$s$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3
@@ -204,7 +204,7 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$2, 2
+g_globstart sequence_io$ll2, 2
 g_push 1
 g_push 1
 g_cons 1, 2
@@ -213,9 +213,9 @@ g_updap 1, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$1, 2
+g_globstart sequence_io$ll1, 2
 g_push 1
-g_pushglobal sequence_io$2, 2
+g_pushglobal sequence_io$ll2, 2
 g_mkap 1
 g_push 1
 g_pushglobal sequence_io, 1
@@ -239,7 +239,7 @@ g_unwind
 g_label .1
 g_uncons 2
 g_push 1
-g_pushglobal sequence_io$1, 2
+g_pushglobal sequence_io$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3
@@ -248,7 +248,7 @@ g_pop 3
 g_unwind
 g_label .2
 
-g_globstart iter_io$1, 3
+g_globstart iter_io$ll1, 3
 g_push 2
 g_push 2
 g_push 2
@@ -263,7 +263,7 @@ g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$return, 2
 g_mkap 1
 g_push 1
-g_pushglobal iter_io$1, 3
+g_pushglobal iter_io$ll1, 3
 g_mkap 1
 g_pushglobal foldr, 3
 g_updap 2, 2
@@ -332,7 +332,7 @@ g_return
 g_jump .2
 g_label .2
 
-g_globstart random$1, 1
+g_globstart random$ll1, 1
 g_pushint 1000000007
 g_push 1
 g_eval
@@ -345,12 +345,12 @@ g_return
 
 g_globstart random, 0
 g_pushint 1
-g_pushglobal random$1, 1
+g_pushglobal random$ll1, 1
 g_pushglobal gen, 2
 g_updap 2, 1
 g_unwind
 
-g_globstart main$1, 3
+g_globstart main$ll1, 3
 g_push 0
 g_push 2
 g_pushglobal gm$mod, 2
@@ -391,7 +391,7 @@ g_pop 5
 g_unwind
 g_label .2
 
-g_globstart main$2, 1
+g_globstart main$ll2, 1
 g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$return, 2
 g_updap 1, 2
@@ -417,11 +417,11 @@ g_push 1
 g_push 5
 g_pushglobal take, 2
 g_mkap 2
-g_pushglobal main$2, 1
+g_pushglobal main$ll2, 1
 g_push 1
 g_push 3
 g_push 9
-g_pushglobal main$1, 3
+g_pushglobal main$ll1, 3
 g_mkap 1
 g_pushglobal zip_with, 3
 g_mkap 3

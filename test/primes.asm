@@ -153,7 +153,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart psums$1, 3
+g_globstart psums$ll1, 3
 g_push 2
 g_eval
 g_jumpcase .0, .1
@@ -183,7 +183,7 @@ g_label .2
 g_globstart psums, 0
 g_alloc 1
 g_push 0
-g_pushglobal psums$1, 3
+g_pushglobal psums$ll1, 3
 g_updap 1, 1
 g_pushint 0
 g_push 1
@@ -191,7 +191,7 @@ g_updap 1, 2
 g_pop 1
 g_unwind
 
-g_globstart filter$1, 3
+g_globstart filter$ll1, 3
 g_push 2
 g_eval
 g_jumpcase .0, .1
@@ -232,13 +232,13 @@ g_globstart filter, 1
 g_alloc 1
 g_push 1
 g_push 1
-g_pushglobal filter$1, 3
+g_pushglobal filter$ll1, 3
 g_updap 2, 1
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart sieve$1, 2
+g_globstart sieve$ll1, 2
 g_pushint 0
 g_push 1
 g_eval
@@ -264,7 +264,7 @@ g_label .1
 g_uncons 2
 g_push 1
 g_push 1
-g_pushglobal sieve$1, 2
+g_pushglobal sieve$ll1, 2
 g_mkap 1
 g_pushglobal filter, 1
 g_mkap 2
@@ -297,7 +297,7 @@ g_pushint 2
 g_updcons 1, 2, 1
 g_return
 
-g_globstart main$1, 1
+g_globstart main$ll1, 1
 g_push 0
 g_pushglobal primes, 0
 g_pushglobal nth, 2
@@ -308,7 +308,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$1, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

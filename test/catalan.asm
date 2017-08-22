@@ -248,7 +248,7 @@ g_pushglobal foldl, 3
 g_updap 2, 1
 g_unwind
 
-g_globstart scanl$1, 4
+g_globstart scanl$ll1, 4
 g_push 3
 g_eval
 g_jumpcase .0, .1
@@ -279,13 +279,13 @@ g_globstart scanl, 1
 g_alloc 1
 g_push 0
 g_push 2
-g_pushglobal scanl$1, 4
+g_pushglobal scanl$ll1, 4
 g_updap 2, 1
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart sols$1, 1
+g_globstart sols$ll1, 1
 g_push 0
 g_pushglobal sols, 0
 g_pushglobal mul_p, 2
@@ -296,7 +296,7 @@ g_updap 1, 2
 g_pop 1
 g_unwind
 
-g_globstart sols$2, 2
+g_globstart sols$ll2, 2
 g_push 0
 g_push 2
 g_updcons 1, 2, 3
@@ -306,17 +306,17 @@ g_return
 g_globstart sols, 0
 g_pushglobal sols, 0
 g_pushglobal gm$cons_0_0, 0
-g_pushglobal sols$2, 2
+g_pushglobal sols$ll2, 2
 g_pushglobal scanl, 1
 g_mkap 3
-g_pushglobal sols$1, 1
+g_pushglobal sols$ll1, 1
 g_pushglobal map, 2
 g_mkap 2
 g_pushint 1
 g_updcons 1, 2, 1
 g_return
 
-g_globstart main$1, 1
+g_globstart main$ll1, 1
 g_push 0
 g_pushglobal sols, 0
 g_pushglobal nth, 2
@@ -327,7 +327,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$1, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

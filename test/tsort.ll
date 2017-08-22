@@ -30,18 +30,19 @@ external return = "return"
 external print = "print"
 external input = "input"
 external (>>=) = "bind"
-let (;1) m2 _ = m2
-let (;) m1 m2 = (>>=) m1 ((;1) m2)
-let sequence_io$2 x xs = return (Cons x xs)
-let sequence_io$1 ms x = (>>=) (sequence_io ms) (sequence_io$2 x)
+let (;ll1) m2 _ = m2
+let (;) m1 m2 = (>>=) m1 ((;ll1) m2)
+let sequence_io$ll2 x xs = return (Cons x xs)
+let sequence_io$ll1 ms x =
+      (>>=) (sequence_io ms) (sequence_io$ll2 x)
 let sequence_io ms =
       match ms with
       | Nil -> return Nil
-      | Cons m ms -> (>>=) m (sequence_io$1 ms)
-let iter_io$1 f x m = (;) (f x) m
-let iter_io f = foldr (iter_io$1 f) (return Unit)
-let tsort$1 t x = insert_tree x t
-let tsort xs = in_order (foldl tsort$1 Leaf xs)
-let main$2 xs = iter_io print (tsort xs)
-let main$1 n = (>>=) (sequence_io (replicate n input)) main$2
-let main = (>>=) input main$1
+      | Cons m ms -> (>>=) m (sequence_io$ll1 ms)
+let iter_io$ll1 f x m = (;) (f x) m
+let iter_io f = foldr (iter_io$ll1 f) (return Unit)
+let tsort$ll1 t x = insert_tree x t
+let tsort xs = in_order (foldl tsort$ll1 Leaf xs)
+let main$ll2 xs = iter_io print (tsort xs)
+let main$ll1 n = (>>=) (sequence_io (replicate n input)) main$ll2
+let main = (>>=) input main$ll1

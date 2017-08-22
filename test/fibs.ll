@@ -24,5 +24,5 @@ let add_mod_prime x y =
       if (<) z prime then z else (-) z prime
 let fibs0 = Cons 0 fibs1
 let fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
-let main$1 n = print (nth fibs0 n)
-let main = (>>=) input main$1
+let main$ll1 n = print (nth fibs0 n)
+let main = (>>=) input main$ll1

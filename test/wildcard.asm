@@ -28,14 +28,14 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart op$s$1, 2
+g_globstart op$s$ll1, 2
 g_update 2
 g_pop 1
 g_unwind
 
 g_globstart op$s, 2
 g_push 1
-g_pushglobal op$s$1, 2
+g_pushglobal op$s$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3
@@ -60,7 +60,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart main$2, 2
+g_globstart main$ll2, 2
 g_push 1
 g_push 1
 g_cons 0, 2
@@ -79,9 +79,9 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart main$1, 1
+g_globstart main$ll1, 1
 g_push 0
-g_pushglobal main$2, 2
+g_pushglobal main$ll2, 2
 g_mkap 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
@@ -90,7 +90,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$1, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

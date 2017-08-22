@@ -31,8 +31,8 @@ let map f xs =
       | Nil -> Nil
       | Cons x xs -> Cons (f x) (map f xs)
 let concat_map f xs = concat (map f xs)
-let length$1 x l = (+) 1 l
-let length = foldr length$1 0
+let length$ll1 x l = (+) 1 l
+let length = foldr length$ll1 0
 let replicate n x =
       if (<=) n 0 then Nil else Cons x (replicate ((-) n 1) x)
 external print = "print"
@@ -49,18 +49,18 @@ let diff xs ys =
             Cons x (diff xs' ys)
           else
             if (==) x y then diff xs' ys' else diff xs ys'
-let ints$1 go k = Cons k (go ((+) k 1))
+let ints$ll1 go k = Cons k (go ((+) k 1))
 let ints =
-      let rec go = ints$1 go in
+      let rec go = ints$ll1 go in
       go 1
-let solve_aux$2 k ls i =
+let solve_aux$ll2 k ls i =
       diff ls (Cons ((-) k i) (Cons k (Cons ((+) k i) Nil)))
-let solve_aux$1 kss k =
-      map (Cons k) (solve_aux (zip_with (solve_aux$2 k) kss ints))
+let solve_aux$ll1 kss k =
+      map (Cons k) (solve_aux (zip_with (solve_aux$ll2 k) kss ints))
 let solve_aux kss =
       match kss with
       | Nil -> Cons Nil Nil
-      | Cons ks kss -> concat_map (solve_aux$1 kss) ks
+      | Cons ks kss -> concat_map (solve_aux$ll1 kss) ks
 let solve n = solve_aux (replicate n (take n ints))
-let main$1 n = print (length (solve n))
-let main = (>>=) input main$1
+let main$ll1 n = print (length (solve n))
+let main = (>>=) input main$ll1

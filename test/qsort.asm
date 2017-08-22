@@ -66,7 +66,7 @@ g_pop 5
 g_unwind
 g_label .2
 
-g_globstart partition$1, 3
+g_globstart partition$ll1, 3
 g_push 2
 g_eval
 g_jumpcase .0, .1
@@ -118,7 +118,7 @@ g_globstart partition, 2
 g_alloc 1
 g_push 0
 g_push 2
-g_pushglobal partition$1, 3
+g_pushglobal partition$ll1, 3
 g_updap 2, 1
 g_push 2
 g_push 1
@@ -202,14 +202,14 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart op$s$1, 2
+g_globstart op$s$ll1, 2
 g_update 2
 g_pop 1
 g_unwind
 
 g_globstart op$s, 2
 g_push 1
-g_pushglobal op$s$1, 2
+g_pushglobal op$s$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3
@@ -217,7 +217,7 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$2, 2
+g_globstart sequence_io$ll2, 2
 g_push 1
 g_push 1
 g_cons 1, 2
@@ -226,9 +226,9 @@ g_updap 1, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$1, 2
+g_globstart sequence_io$ll1, 2
 g_push 1
-g_pushglobal sequence_io$2, 2
+g_pushglobal sequence_io$ll2, 2
 g_mkap 1
 g_push 1
 g_pushglobal sequence_io, 1
@@ -252,7 +252,7 @@ g_unwind
 g_label .1
 g_uncons 2
 g_push 1
-g_pushglobal sequence_io$1, 2
+g_pushglobal sequence_io$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3
@@ -261,7 +261,7 @@ g_pop 3
 g_unwind
 g_label .2
 
-g_globstart iter_io$1, 3
+g_globstart iter_io$ll1, 3
 g_push 2
 g_push 2
 g_push 2
@@ -276,14 +276,14 @@ g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$return, 2
 g_mkap 1
 g_push 1
-g_pushglobal iter_io$1, 3
+g_pushglobal iter_io$ll1, 3
 g_mkap 1
 g_pushglobal foldr, 3
 g_updap 2, 2
 g_pop 1
 g_unwind
 
-g_globstart qsort$1, 2
+g_globstart qsort$ll1, 2
 g_push 0
 g_eval
 g_push 2
@@ -307,7 +307,7 @@ g_label .1
 g_uncons 2
 g_push 1
 g_push 1
-g_pushglobal qsort$1, 2
+g_pushglobal qsort$ll1, 2
 g_mkap 1
 g_pushglobal partition, 2
 g_mkap 2
@@ -327,7 +327,7 @@ g_pop 5
 g_unwind
 g_label .2
 
-g_globstart main$2, 1
+g_globstart main$ll2, 1
 g_push 0
 g_pushglobal qsort, 1
 g_mkap 1
@@ -337,8 +337,8 @@ g_updap 2, 2
 g_pop 1
 g_unwind
 
-g_globstart main$1, 1
-g_pushglobal main$2, 1
+g_globstart main$ll1, 1
+g_pushglobal main$ll2, 1
 g_pushglobal gm$input, 1
 g_push 2
 g_pushglobal replicate, 2
@@ -351,7 +351,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$1, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

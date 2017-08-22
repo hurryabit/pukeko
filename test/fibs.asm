@@ -216,7 +216,7 @@ g_pushint 1
 g_updcons 1, 2, 1
 g_return
 
-g_globstart main$1, 1
+g_globstart main$ll1, 1
 g_push 0
 g_pushglobal fibs0, 0
 g_pushglobal nth, 2
@@ -227,7 +227,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$1, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

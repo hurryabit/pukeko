@@ -22,8 +22,8 @@ import Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Operator
 
 data EVar
-  = EVar{_name :: String,                  _part :: Maybe Int}
-  | Op  {_sym  :: String, _name :: String, _part :: Maybe Int}
+  = EVar{_name :: String,                  _part :: Maybe (String, Int)}
+  | Op  {_sym  :: String, _name :: String, _part :: Maybe (String, Int)}
   deriving (Eq, Ord)
 
 evar, op :: String -> EVar
@@ -43,16 +43,16 @@ isVar _      = False
 isOp  Op{}   = True
 isOp  _      = False
 
-freshEVars :: EVar -> [EVar]
-freshEVars var = map (\n -> var{_part = Just n}) [1 ..]
+freshEVars :: String -> EVar -> [EVar]
+freshEVars comp var = map (\n -> var{_part = Just (comp, n)}) [1 ..]
 
 mangled :: EVar -> String
-mangled var = (_name :: EVar -> _) var ++ maybe "" (\n -> '$':show n) (_part var)
+mangled var = (_name :: EVar -> _) var ++ maybe "" (\(comp, n) -> '$':comp ++ show n) (_part var)
 
 instance Pretty EVar where
   pPrint var = case var of
-    EVar{_name, _part} -> text _name <> maybe empty (\n -> "$" <> int n) _part
-    Op  {_sym , _part} -> parens (text _sym <> maybe empty int _part)
+    EVar{_name, _part} -> text _name <> maybe empty (\(comp, n) -> "$" <> text comp <> int n) _part
+    Op  {_sym , _part} -> parens (text _sym <> maybe empty (\(comp, n) -> text comp <> int n) _part)
 
 instance Show EVar where
   show = prettyShow

@@ -197,7 +197,7 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart sequence_io$2, 2
+g_globstart sequence_io$ll2, 2
 g_push 1
 g_push 1
 g_cons 1, 2
@@ -206,9 +206,9 @@ g_updap 1, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$1, 2
+g_globstart sequence_io$ll1, 2
 g_push 1
-g_pushglobal sequence_io$2, 2
+g_pushglobal sequence_io$ll2, 2
 g_mkap 1
 g_push 1
 g_pushglobal sequence_io, 1
@@ -232,7 +232,7 @@ g_unwind
 g_label .1
 g_uncons 2
 g_push 1
-g_pushglobal sequence_io$1, 2
+g_pushglobal sequence_io$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3
@@ -241,7 +241,7 @@ g_pop 3
 g_unwind
 g_label .2
 
-g_globstart nats$1, 2
+g_globstart nats$ll1, 2
 g_pushint 1
 g_push 2
 g_pushglobal gm$add, 2
@@ -256,7 +256,7 @@ g_return
 g_globstart nats, 0
 g_alloc 1
 g_push 0
-g_pushglobal nats$1, 2
+g_pushglobal nats$ll1, 2
 g_updap 1, 1
 g_pushint 0
 g_push 1
@@ -350,7 +350,7 @@ g_label .5
 g_jump .2
 g_label .2
 
-g_globstart build$1, 3
+g_globstart build$ll1, 3
 g_push 2
 g_eval
 g_jumpcase .0, .1
@@ -390,7 +390,7 @@ g_globstart build, 2
 g_alloc 1
 g_push 0
 g_push 2
-g_pushglobal build$1, 3
+g_pushglobal build$ll1, 3
 g_updap 2, 1
 g_push 2
 g_pushglobal nats, 0
@@ -402,7 +402,7 @@ g_updap 1, 4
 g_pop 3
 g_unwind
 
-g_globstart query$1, 6
+g_globstart query$ll1, 6
 g_push 5
 g_eval
 g_jumpcase .0, .1
@@ -474,7 +474,7 @@ g_push 5
 g_push 4
 g_push 4
 g_push 4
-g_pushglobal query$1, 6
+g_pushglobal query$ll1, 6
 g_updap 5, 1
 g_update 5
 g_pop 4
@@ -513,7 +513,7 @@ g_updap 1, 3
 g_pop 2
 g_unwind
 
-g_globstart main$5, 3
+g_globstart main$ll5, 3
 g_push 1
 g_push 3
 g_push 2
@@ -527,10 +527,10 @@ g_updap 1, 5
 g_pop 4
 g_unwind
 
-g_globstart main$4, 2
+g_globstart main$ll4, 2
 g_push 0
 g_push 2
-g_pushglobal main$5, 3
+g_pushglobal main$ll5, 3
 g_mkap 2
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
@@ -538,21 +538,21 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart main$6, 1
+g_globstart main$ll6, 1
 g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$return, 2
 g_updap 1, 2
 g_pop 1
 g_unwind
 
-g_globstart main$3, 2
+g_globstart main$ll3, 2
 g_push 1
 g_pushglobal min, 2
 g_pushglobal build, 2
 g_mkap 2
-g_pushglobal main$6, 1
+g_pushglobal main$ll6, 1
 g_push 1
-g_pushglobal main$4, 2
+g_pushglobal main$ll4, 2
 g_mkap 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
@@ -565,9 +565,9 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart main$2, 2
+g_globstart main$ll2, 2
 g_push 1
-g_pushglobal main$3, 2
+g_pushglobal main$ll3, 2
 g_mkap 1
 g_pushglobal gm$input, 1
 g_push 2
@@ -578,9 +578,9 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart main$1, 1
+g_globstart main$ll1, 1
 g_push 0
-g_pushglobal main$2, 2
+g_pushglobal main$ll2, 2
 g_mkap 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
@@ -589,7 +589,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$1, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

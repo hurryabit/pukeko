@@ -18,30 +18,30 @@ external (>>=) = "bind"
 let repeat xs =
       let rec ys = append xs ys in
       ys
-let psums$1 psums0 n xs =
+let psums$ll1 psums0 n xs =
       match xs with
       | Nil -> Nil
       | Cons x xs ->
         let y = (+) x n in
         Cons y (psums0 y xs)
 let psums =
-      let rec psums0 = psums$1 psums0 in
+      let rec psums0 = psums$ll1 psums0 in
       psums0 0
-let filter$1 filter_p p xs =
+let filter$ll1 filter_p p xs =
       match xs with
       | Nil -> Nil
       | Cons x xs ->
         let ys = filter_p xs in
         if p x then Cons x ys else ys
 let filter p =
-      let rec filter_p = filter$1 filter_p p in
+      let rec filter_p = filter$ll1 filter_p p in
       filter_p
-let sieve$1 p k = (!=) ((%) k p) 0
+let sieve$ll1 p k = (!=) ((%) k p) 0
 let sieve ks =
       match ks with
       | Nil -> abort
-      | Cons p ks -> Cons p (sieve (filter (sieve$1 p) ks))
+      | Cons p ks -> Cons p (sieve (filter (sieve$ll1 p) ks))
 let primes =
       Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
-let main$1 n = print (nth primes n)
-let main = (>>=) input main$1
+let main$ll1 n = print (nth primes n)
+let main = (>>=) input main$ll1

@@ -54,7 +54,7 @@ llTopDefn defn@MkDefn{_lhs, _rhs} = do
   let is_lambda = case _rhs of
         Lam{} -> True
         _     -> False
-  put $ (if is_lambda then [_lhs] else []) ++ Ident.freshEVars _lhs
+  put $ (if is_lambda then [_lhs] else []) ++ Ident.freshEVars "ll" _lhs
   defn <- Rewrite.defn llExpr defn
   unless is_lambda $ emit defn
 
