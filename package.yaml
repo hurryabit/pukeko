@@ -1,0 +1,88 @@
+name: pukeko
+version: 0.0.1
+synopsis: "A toy compiler based on SPJ's book \"The Implementation of Functional Programming Languages\""
+description: Please see README.md
+category: Compilers/Interpreters
+author: Martin Huschenbett <martin.huschenbett@posteo.me>
+copyright: 2017 Martin Huschenbett
+license: BSD3
+github: hurryabit/pukeko
+
+dependencies:
+- base
+default-extensions:
+- MonadFailDesugaring
+ghc-options:
+- -Wall
+- -Wno-missing-signatures
+- -Wno-name-shadowing
+- -Wno-partial-type-signatures
+
+library:
+  source-dirs: src
+  default-extensions:
+  - DuplicateRecordFields
+  - FlexibleContexts
+  - FlexibleInstances
+  - GeneralizedNewtypeDeriving
+  - NamedFieldPuns
+  - OverloadedStrings
+  - PartialTypeSignatures
+  - TypeFamilies
+  exposed-modules:
+  - Pukeko
+  - Pukeko.GMachine.Compiler
+  - Pukeko.GMachine.NASM
+  - Pukeko.GMachine.PeepHole
+  - Pukeko.Pretty
+  dependencies:
+  - array
+  - containers
+  - fclabels
+  - mtl
+  - parsec
+  - pretty
+
+executables:
+  pukeko:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - base
+    - pukeko
+    - filepath
+    - mtl
+    - optparse-applicative
+
+tests:
+  reject:
+    main: Reject.hs
+    source-dirs: test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hspec
+    - hspec-core
+    - HUnit
+    - parsec
+    - pukeko
+
+  examples:
+    main: Examples.hs
+    source-dirs: test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - directory
+    - hspec
+    - HUnit
+    - process
+    - QuickCheck
