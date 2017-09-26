@@ -7,7 +7,10 @@ external input = "input"
 external (>>=) = "bind"
 let (;ll1) m2 _ = m2
 let (;) m1 m2 = (>>=) m1 ((;ll1) m2)
-let when p m = if p then m else return Unit
+let when p m =
+      match p with
+      | False -> return Unit
+      | True -> m
 let count_down k =
       when ((>=) k 0) ((;) (print k) (count_down ((-) k 1)))
 let repeat_m k m = when ((>) k 0) ((;) m (repeat_m ((-) k 1) m))

@@ -1,6 +1,12 @@
 external abort = "abort"
-let (&&) x y = if x then y else False
-let (||) x y = if x then True else y
+let (&&) x y =
+      match x with
+      | False -> False
+      | True -> y
+let (||) x y =
+      match x with
+      | False -> y
+      | True -> True
 external (+) = "add"
 external (-) = "sub"
 external (<) = "lt"
@@ -14,7 +20,9 @@ let zip_with f xs ys =
         | Nil -> Nil
         | Cons y ys -> Cons (f x y) (zip_with f xs ys)
 let replicate n x =
-      if (<=) n 0 then Nil else Cons x (replicate ((-) n 1) x)
+      match (<=) n 0 with
+      | False -> Cons x (replicate ((-) n 1) x)
+      | True -> Nil
 external return = "return"
 external print = "print"
 external input = "input"
@@ -59,18 +67,20 @@ let query$ll1 aux one op q_hi q_lo t =
       match t with
       | RmqEmpty -> one
       | RmqNode t_lo t_hi value left right ->
-        if (||) ((<) q_hi t_lo) ((>) q_lo t_hi) then
-          one
-        else
-          if (&&) ((<=) q_lo t_lo) ((<=) t_hi q_hi) then
-            value
-          else
-            op (aux left) (aux right)
+        match (||) ((<) q_hi t_lo) ((>) q_lo t_hi) with
+        | False ->
+          match (&&) ((<=) q_lo t_lo) ((<=) t_hi q_hi) with
+          | False -> op (aux left) (aux right)
+          | True -> value
+        | True -> one
 let query one op q_lo q_hi =
       let rec aux = query$ll1 aux one op q_hi q_lo in
       aux
 let infinity = 1000000000
-let min x y = if (<=) x y then x else y
+let min x y =
+      match (<=) x y with
+      | False -> y
+      | True -> x
 let replicate_io n act = sequence_io (replicate n act)
 let main$ll5 lo t hi =
       let res = query infinity min lo hi t in

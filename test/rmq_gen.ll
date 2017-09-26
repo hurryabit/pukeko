@@ -8,12 +8,12 @@ let foldr f y0 xs =
       | Nil -> y0
       | Cons x xs -> f x (foldr f y0 xs)
 let take n xs =
-      if (<=) n 0 then
-        Nil
-      else
+      match (<=) n 0 with
+      | False ->
         match xs with
         | Nil -> Nil
         | Cons x xs -> Cons x (take ((-) n 1) xs)
+      | True -> Nil
 let zip_with f xs ys =
       match xs with
       | Nil -> Nil
@@ -37,23 +37,22 @@ let iter_io$ll1 f x m = (;) (f x) m
 let iter_io f = foldr (iter_io$ll1 f) (return Unit)
 let gen f x = Cons x (gen f (f x))
 let split_at n xs =
-      if (<=) n 0 then
-        Pair Nil xs
-      else
+      match (<=) n 0 with
+      | False ->
         match xs with
         | Nil -> Pair Nil Nil
         | Cons x xs ->
           match split_at ((-) n 1) xs with
           | Pair ys zs -> Pair (Cons x ys) zs
+      | True -> Pair Nil xs
 let random$ll1 x = (%) ((*) 91 x) 1000000007
 let random = gen random$ll1 1
 let main$ll1 n y z =
       let y = (%) y n in
       let z = (%) z n in
-      if (<) y z then
-        (;) (print y) (print z)
-      else
-        (;) (print z) (print y)
+      match (<) y z with
+      | False -> (;) (print z) (print y)
+      | True -> (;) (print y) (print z)
 let main$ll2 _ = return Unit
 let main =
       let n = 400000 in

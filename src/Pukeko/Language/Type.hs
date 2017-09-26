@@ -20,9 +20,13 @@ module Pukeko.Language.Type
   , openVars
   , openSubst
   , prettyType
+
+    -- * Optics
+  , typeCons
   )
   where
 
+import Control.Lens
 import Control.Monad.Reader
 import Control.Monad.ST
 import Data.Map (Map)
@@ -85,22 +89,22 @@ data UVar con s
   | Link{_type  :: Type con (Open s)}
 
 data Type con a where
-  TVar :: Ident.TVar                 -> Type con a
-  TFun :: Type con a ->  Type con a  -> Type con a
-  TApp :: con        -> [Type con a] -> Type con a
+  Var  :: Ident.TVar                 -> Type con a
+  Fun  :: Type con a ->  Type con a  -> Type con a
+  App  :: con        -> [Type con a] -> Type con a
   UVar :: STRef s (UVar con s)       -> Type con (Open s)
 
 var :: Ident.TVar -> Type con a
-var = TVar
+var = Var
 
 (~>) :: Type con a -> Type con a -> Type con a
-(~>) = TFun
+(~>) = Fun
 
 (*~>) :: [Type con a] -> Type con a -> Type con a
 t_args *~> t_res = foldr (~>) t_res t_args
 
 app :: con -> [Type con a] -> Type con a
-app = TApp
+app = App
 
 -- TODO: Remove this undefined hack.
 typeInt :: Type (ADT Ident.Con) Closed
@@ -108,18 +112,18 @@ typeInt  = app (mkADT (Ident.constructor "Int") undefined [] []) []
 
 open :: Type con Closed -> Type con (Open s)
 open t = case t of
-  TVar name  -> TVar name
-  TFun tx ty -> TFun (open tx) (open ty)
-  TApp c  ts -> TApp c (map open ts)
+  Var name  -> Var name
+  Fun tx ty -> Fun (open tx) (open ty)
+  App c  ts -> App c (map open ts)
 
 vars :: Type con Closed -> Set Ident.TVar
 vars t = runST $ openVars (open t)
 
 openVars :: Type con (Open s) -> ST s (Set Ident.TVar)
 openVars t = case t of
-  TVar v -> return $ Set.singleton v
-  TFun tx ty -> Set.union <$> openVars tx <*> openVars ty
-  TApp _  ts -> Set.unions <$> traverse openVars ts
+  Var v -> return $ Set.singleton v
+  Fun tx ty -> Set.union <$> openVars tx <*> openVars ty
+  App _  ts -> Set.unions <$> traverse openVars ts
   UVar uref -> do
     uvar <- readSTRef uref
     case uvar of
@@ -132,11 +136,11 @@ openSubst env t = runReaderT (subst' t) env
     subst' :: Type con (Open s)
            -> ReaderT (Map Ident.TVar (Type con (Open s))) (ST s) (Type con (Open s))
     subst' t = case t of
-      TVar v -> do
+      Var v -> do
         let e = bug "type instantiation" "unknown variable" (Just $ show v)
         Map.findWithDefault e v <$> ask
-      TFun tx ty -> TFun <$> subst' tx <*> subst' ty
-      TApp c  ts -> TApp c <$> traverse subst' ts
+      Fun tx ty -> Fun <$> subst' tx <*> subst' ty
+      App c  ts -> App c <$> traverse subst' ts
       UVar uref -> do
         uvar <- lift $ readSTRef uref
         case uvar of
@@ -150,18 +154,25 @@ prettyUVar lvl prec uvar = case uvar of
 
 prettyType :: Pretty con => PrettyLevel -> Rational -> Type con (Open s) -> ST s Doc
 prettyType lvl prec t = case t of
-  TVar v -> return $ pretty v
-  TFun tx ty -> do
+  Var v -> return $ pretty v
+  Fun tx ty -> do
     px <- prettyType lvl 2 tx
     py <- prettyType lvl 1 ty
     return $ maybeParens (prec > 1) $ px <+> "->" <+> py
-  TApp c [] -> return $ pretty c
-  TApp c ts -> do
+  App c [] -> return $ pretty c
+  App c ts -> do
     ps <- traverse (prettyType lvl 3) ts
     return $ maybeParens (prec > 2) $ pretty c <+> hsep ps
   UVar uref -> do
     uvar <- readSTRef uref
     prettyUVar lvl prec uvar
+
+typeCons :: IndexedTraversal [Type con1 Closed] (Type con1 Closed) (Type con2 Closed) con1 con2
+typeCons f = \case
+  Var x    -> pure $ Var x
+  Fun t u  -> Fun <$> typeCons f t <*> typeCons f u
+  App c ts -> App <$> indexed f ts c <*> (traverse . typeCons) f ts
+
 
 instance Pretty (ADT Ident.Con) where
   pPrintPrec lvl prec MkADT{_name} = pPrintPrec lvl prec _name

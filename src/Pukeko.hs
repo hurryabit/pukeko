@@ -1,40 +1,38 @@
 module Pukeko
-  ( ModuleLP
-  , compileToCore
+  ( Parser.Module
   , parse
+  , compileToCore
+  -- , compileToCore
+  -- , parse
   )
   where
 
-import Control.Monad.Except
-import Text.Parsec (SourcePos)
+import Pukeko.Error
 
-import Pukeko.Language.Syntax
-import qualified Pukeko.Core.Syntax             as Core
 import qualified Pukeko.Language.CoreCompiler   as CoreCompiler
 import qualified Pukeko.Language.DeadCode       as DeadCode
-import qualified Pukeko.Language.FreeVars       as FreeVars
+import qualified Pukeko.Language.DeBruijner     as DeBruijner
 import qualified Pukeko.Language.KindChecker    as KindChecker
-import qualified Pukeko.Language.LambdaLifter   as Lifter
+import qualified Pukeko.Language.LambdaLifter   as LambdaLifter
 import qualified Pukeko.Language.Parser         as Parser
 import qualified Pukeko.Language.PatternMatcher as PatternMatcher
 import qualified Pukeko.Language.TypeChecker    as TypeChecker
 import qualified Pukeko.Language.TypeResolver   as TypeResolver
 
-type ModuleLP = Module StageLP SourcePos
-
-parse :: MonadError String m => String -> String -> m ModuleLP
+parse :: MonadError String m => String -> String -> m Parser.Module
 parse = Parser.parseModule
 
-compileToCore :: MonadError String m
-              => Module StageLP SourcePos
-              -> m (Core.Module, Module StageTR _)
+compileToCore
+  :: MonadError String m
+  => Parser.Module
+  -> m (CoreCompiler.Module, LambdaLifter.Module)
 compileToCore module_ = do
-  module_ <- TypeResolver.resolve module_
-  module_ <- KindChecker.check module_
-  TypeChecker.checkModule module_
-  module_ <- PatternMatcher.compileModule module_
-  module_ <- pure $ FreeVars.annotModule module_
-  module_ <- pure $ DeadCode.eliminate module_
-  module_ll <- pure $ Lifter.liftModule module_
-  module_cc <- pure $ CoreCompiler.compileModule module_ll
+  module_ll <- return (DeBruijner.indexModule module_)
+               >>= TypeResolver.resolveModule
+               >>= KindChecker.checkModule
+               >>= TypeChecker.checkModule
+               >>= PatternMatcher.compileModule
+               >>= return . DeadCode.cleanModule
+               >>= return . LambdaLifter.liftModule
+  let module_cc = CoreCompiler.compileModule module_ll
   return (module_cc, module_ll)

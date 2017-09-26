@@ -11,7 +11,10 @@ let foldl f y0 xs =
 let nth xs n =
       match xs with
       | Nil -> abort
-      | Cons x xs -> if (<=) n 0 then x else nth xs ((-) n 1)
+      | Cons x xs ->
+        match (<=) n 0 with
+        | False -> nth xs ((-) n 1)
+        | True -> x
 let zip_with f xs ys =
       match xs with
       | Nil -> Nil

@@ -6,10 +6,10 @@ import Test.Hspec
 import Test.Hspec.Core.Spec
 import Text.Parsec
 
-import Pukeko (ModuleLP)
+import Pukeko (Module)
 import qualified Pukeko
 
-shouldFail :: ModuleLP -> String -> String -> Expectation
+shouldFail :: Module -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
         module_ <- Pukeko.parse "<input>" code
@@ -21,7 +21,7 @@ shouldFail prelude expect code = do
       Nothing -> expectationFailure "error does not start with \"<input>\""
       Just actual -> actual `shouldBe` expect
 
-shouldSucceed :: ModuleLP -> String -> Expectation
+shouldSucceed :: Module -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
         module_ <- Pukeko.parse "<input>" code
@@ -32,7 +32,7 @@ shouldSucceed prelude code = do
     Left error ->
       expectationFailure $ "should succeed, but failed: " ++ error
 
-type Parser a = Parsec [String] ModuleLP a
+type Parser a = Parsec [String] Module a
 
 line :: (String -> Maybe a) -> Parser a
 line f = tokenPrim id (\pos _ _ -> incSourceLine pos 1) f

@@ -13,15 +13,16 @@ let append xs ys =
       | Nil -> ys
       | Cons x xs -> Cons x (append xs ys)
 let replicate n x =
-      if (<=) n 0 then Nil else Cons x (replicate ((-) n 1) x)
+      match (<=) n 0 with
+      | False -> Cons x (replicate ((-) n 1) x)
+      | True -> Nil
 let insert_tree x t =
       match t with
       | Leaf -> Branch Leaf x Leaf
       | Branch l y r ->
-        if (<=) x y then
-          Branch (insert_tree x l) y r
-        else
-          Branch l y (insert_tree x r)
+        match (<=) x y with
+        | False -> Branch l y (insert_tree x r)
+        | True -> Branch (insert_tree x l) y r
 let in_order t =
       match t with
       | Leaf -> Nil

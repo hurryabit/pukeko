@@ -1,5 +1,7 @@
+-- | Implementation of the parser.
 module Pukeko.Language.Parser
-  ( parseModule
+  ( Module
+  , parseModule
   )
   where
 
@@ -8,14 +10,15 @@ import Text.Parsec.Expr
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-import Pukeko.Error
-import Pukeko.Language.Operator (Spec (..))
-import Pukeko.Language.Syntax
-import Pukeko.Language.Type (ADT, Constructor, mkADT, mkConstructor, Type, Closed, var, (~>), app)
-import qualified Pukeko.Language.Ident    as Ident
-import qualified Pukeko.Language.Operator as Operator
+import           Pukeko.Error
+import           Pukeko.Language.Operator   (Spec (..))
+import           Pukeko.Language.Base.AST   hiding (StdAltn (..))
+import           Pukeko.Language.Parser.AST
+import qualified Pukeko.Language.Type       as Ty
+import qualified Pukeko.Language.Ident      as Id
+import qualified Pukeko.Language.Operator   as Op
 
-parseModule :: MonadError String m => String -> String -> m (Module StageLP SourcePos)
+parseModule :: MonadError String m => String -> String -> m Module
 parseModule file code =
   either (throwError . show) return $ parse (whiteSpace *> module_ <* eof) file code
 
@@ -31,8 +34,8 @@ pukekoDef = haskellStyle
       , "type"
       , "external"
       ]
-  , Token.opStart  = oneOf Operator.letters
-  , Token.opLetter = oneOf Operator.letters
+  , Token.opStart  = oneOf Op.letters
+  , Token.opLetter = oneOf Op.letters
   , Token.reservedOpNames = ["=", "->", ":", ".", "|"]
   }
 
@@ -43,7 +46,6 @@ pukeko@Token.TokenParser
   , Token.natural
   , Token.identifier
   , Token.parens
-  , Token.commaSep1
   , Token.symbol
   , Token.whiteSpace
   } =
@@ -57,100 +59,105 @@ equals  = reservedOp "="
 arrow   = reservedOp "->"
 bar     = reservedOp "|"
 
-evar :: Parser Ident.EVar
-evar = Ident.evar <$> (lookAhead lower *> identifier)
-  <|> Ident.op <$> try (parens operator)
+evar :: Parser Id.EVar
+evar = Id.evar <$> (lookAhead lower *> identifier)
+  <|> Id.op <$> try (parens operator)
 
-tvar :: Parser Ident.TVar
-tvar = Ident.tvar <$> (lookAhead lower *> identifier)
+tvar :: Parser Id.TVar
+tvar = Id.tvar <$> (lookAhead lower *> identifier)
 
-constructor :: Parser Ident.Con
-constructor = Ident.constructor <$> (lookAhead upper *> Token.identifier pukeko)
+constructor :: Parser Id.Con
+constructor = Id.constructor <$> (lookAhead upper *> Token.identifier pukeko)
 
-type_, atype :: Parser (Type Ident.Con Closed)
+type_, atype :: Parser (Ty.Type TypeCon Ty.Closed)
 type_ =
   buildExpressionParser
-    [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
-    ( app <$> constructor <*> many atype
+    [ [ Infix (arrow *> pure (Ty.~>)) AssocRight ] ]
+    ( Ty.app <$> constructor <*> many atype
       <|> atype
     )
   <?> "type"
 atype = choice
-  [ var <$> tvar
-  , app <$> constructor <*> pure []
+  [ Ty.var <$> tvar
+  , Ty.app <$> constructor <*> pure []
   , parens type_
   ]
 
-asType :: Parser (Type Ident.Con Closed)
+asType :: Parser (Ty.Type TypeCon Ty.Closed)
 asType = reservedOp ":" *> type_
 
-module_ :: Parser (Module StageLP SourcePos)
+module_ :: Parser Module
 module_ = many1 $ choice
-  [ let_ Def
+  [ let_ TopLet TopRec
   , Asm <$> getPosition
         <*> (reserved "external" *> evar)
         <*> (equals *> Token.stringLiteral pukeko)
   , Val <$> getPosition
         <*> (reserved "val" *> evar)
         <*> asType
-  , Type <$> getPosition
-         <*> (reserved "type" *> sepBy1 adt (reserved "and"))
+  , TypDef <$> getPosition
+           <*> (reserved "type" *> sepBy1 adt (reserved "and"))
   ]
 
-patn1 :: Parser (Patn StageLP SourcePos)
-patn1 = Wild <$> getPosition <*  symbol "_" <|>
-        Bind <$> getPosition <*> evar
+bind :: Parser Bind
+bind = Wild <$> getPosition <*  symbol "_" <|>
+       Name <$> getPosition <*> evar
 
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
-patn, apatn :: Parser (Patn StageLP SourcePos)
-patn  = Dest <$> getPosition <*> constructor <*> many apatn <|>
-        apatn
-apatn = patn1 <|>
-        Dest <$> getPosition <*> constructor <*> pure [] <|>
-        parens patn
+-- patn, apatn :: Parser Patn
+-- patn  = Dest <$> getPosition <*> constructor <*> many apatn <|>
+--         apatn
+-- apatn = patn1 <|>
+--         Dest <$> getPosition <*> constructor <*> pure [] <|>
+--         parens patn
 
-defnValLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
+defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnValLhs = MkDefn <$> getPosition <*> evar
 
-defnFunLhs :: Parser (Expr StageLP SourcePos -> Defn StageLP SourcePos)
+defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
   (.) <$> (MkDefn <$> getPosition <*> evar)
-      <*> (Lam <$> getPosition <*> many1 patn1)
+      <*> (Lam <$> getPosition <*> many1 bind)
 
 -- TODO: Improve this code.
-defn :: Parser (Defn StageLP SourcePos)
+defn :: Parser (Defn Id.EVar)
 defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
 
-altn :: Parser (Altn StageLP SourcePos)
+altn :: Parser (Altn Id.EVar)
 altn =
   MkAltn <$> getPosition
-         <*> (bar *> commaSep1 patn)
+         <*> (bar *> constructor)
+         <*> many bind
          <*> (arrow *> expr)
 
-let_ :: (SourcePos -> Bool -> [Defn StageLP SourcePos] -> a) -> Parser a
-let_ f =
+let_ :: (Pos -> [Defn Id.EVar] -> a) -> (Pos -> [Defn Id.EVar] -> a) -> Parser a
+let_ mkLet mkRec =
   f <$> getPosition
-    <*> (reserved "let" *> (reserved "rec" *> pure True <|> pure False))
+    <*> (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
     <*> sepBy1 defn (reserved "and")
+  where
+    f w mk = mk w
 
-expr, aexpr :: Parser (Expr StageLP SourcePos)
+expr, aexpr :: Parser (Expr Id.EVar)
 expr =
-  buildExpressionParser operatorTable (choice
-  [ mkAp <$> getPosition <*> aexpr <*> many aexpr
-  , let_ Let <*> (reserved "in" *> expr)
+  (buildExpressionParser operatorTable . choice)
+  [ mkApp <$> getPosition <*> aexpr <*> many aexpr
+  , mkIf  <$> getPosition
+          <*> (reserved "if"   *> expr)
+          <*> getPosition
+          <*> (reserved "then" *> expr)
+          <*> getPosition
+          <*> (reserved "else" *> expr)
+  , Mat <$> getPosition
+        <*> (reserved "match" *> expr)
+        <*> (reserved "with"  *> many1 altn)
   , Lam <$> getPosition
-        <*> (reserved "fun" *> many1 patn1)
+        <*> (reserved "fun" *> many1 bind)
         <*> (arrow *> expr)
-  , If  <$> getPosition
-        <*> (reserved "if"   *> expr)
-        <*> (reserved "then" *> expr)
-        <*> (reserved "else" *> expr)
-  , Match <$> getPosition
-          <*> (reserved "match" *> commaSep1 expr)
-          <*> (reserved "with"  *> many1 altn)
-  ])
+  , let_ Let Rec <*> (reserved "in" *> expr)
+  ]
   <?> "expression"
 aexpr = choice
   [ Var <$> getPosition <*> evar
@@ -159,15 +166,15 @@ aexpr = choice
   , parens expr
   ]
 
-operatorTable = map (map f) (reverse Operator.table)
+operatorTable = map (map f) (reverse Op.table)
   where
-    f MkSpec { _sym, _assoc } = Infix (mkApOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
+    f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
 
-adt :: Parser (ADT Ident.Con)
+adt :: Parser (Ty.ADT Id.Con)
 adt = mkADT' <$> constructor
              <*> many tvar
              <*> option [] (reservedOp "=" *> many1 adtConstructor)
-  where mkADT' con = mkADT con con
+  where mkADT' con = Ty.mkADT con con
 
-adtConstructor :: Parser (Constructor Ident.Con)
-adtConstructor = mkConstructor <$> (reservedOp "|" *> constructor) <*> many atype
+adtConstructor :: Parser (Ty.Constructor Id.Con)
+adtConstructor = Ty.mkConstructor <$> (reservedOp "|" *> constructor) <*> many atype

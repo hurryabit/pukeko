@@ -8,12 +8,12 @@ let foldr f y0 xs =
       | Nil -> y0
       | Cons x xs -> f x (foldr f y0 xs)
 let take n xs =
-      if (<=) n 0 then
-        Nil
-      else
+      match (<=) n 0 with
+      | False ->
         match xs with
         | Nil -> Nil
         | Cons x xs -> Cons x (take ((-) n 1) xs)
+      | True -> Nil
 let zip_with f xs ys =
       match xs with
       | Nil -> Nil
@@ -34,7 +34,9 @@ let concat_map f xs = concat (map f xs)
 let length$ll1 x l = (+) 1 l
 let length = foldr length$ll1 0
 let replicate n x =
-      if (<=) n 0 then Nil else Cons x (replicate ((-) n 1) x)
+      match (<=) n 0 with
+      | False -> Cons x (replicate ((-) n 1) x)
+      | True -> Nil
 external print = "print"
 external input = "input"
 external (>>=) = "bind"
@@ -45,10 +47,12 @@ let diff xs ys =
         match ys with
         | Nil -> xs
         | Cons y ys' ->
-          if (<) x y then
-            Cons x (diff xs' ys)
-          else
-            if (==) x y then diff xs' ys' else diff xs ys'
+          match (<) x y with
+          | False ->
+            match (==) x y with
+            | False -> diff xs ys'
+            | True -> diff xs' ys'
+          | True -> Cons x (diff xs' ys)
 let ints$ll1 go k = Cons k (go ((+) k 1))
 let ints =
       let rec go = ints$ll1 go in

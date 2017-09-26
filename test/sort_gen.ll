@@ -7,12 +7,12 @@ let foldr f y0 xs =
       | Nil -> y0
       | Cons x xs -> f x (foldr f y0 xs)
 let take n xs =
-      if (<=) n 0 then
-        Nil
-      else
+      match (<=) n 0 with
+      | False ->
         match xs with
         | Nil -> Nil
         | Cons x xs -> Cons x (take ((-) n 1) xs)
+      | True -> Nil
 external return = "return"
 external print = "print"
 external input = "input"

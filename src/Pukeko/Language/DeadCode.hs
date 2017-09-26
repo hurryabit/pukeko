@@ -1,53 +1,25 @@
 module Pukeko.Language.DeadCode
-  ( eliminate
+  ( Module
+  , cleanModule
   )
 where
 
-import Control.Monad.State
-import Data.Set (Set)
-import qualified Data.Set as Set
+import           Control.Lens
+import qualified Data.Graph    as G
+import qualified Data.Set      as Set
+import qualified Data.Set.Lens as Set
 
-import Pukeko.Language.Syntax
-import qualified Pukeko.Language.Ident as Ident
+import           Pukeko.Language.Base.AST
+import           Pukeko.Language.DeadCode.AST
+import qualified Pukeko.Language.PatternMatcher.AST as In
+import qualified Pukeko.Language.Ident              as Id
 
-type FV = Set Ident.EVar
-
-glDefn :: Defn _ FV -> Set Ident.EVar
-glDefn MkDefn{_rhs} = glExpr _rhs
-
-glAltn :: Altn stage FV -> Set Ident.EVar
-glAltn MkAltn{_rhs} = glExpr _rhs
-
-glExpr :: Expr stage FV -> Set Ident.EVar
-glExpr expr = case expr of
-  Var{_annot, _var}
-    | _var `Set.member` _annot -> Set.empty
-    | otherwise                -> Set.singleton _var
-  Con{} -> Set.empty
-  Num{} -> Set.empty
-  Ap{_fun, _args} -> glExpr _fun `Set.union` Set.unions (map glExpr _args)
-  Lam{_body} -> glExpr _body
-  Let{_defns, _body} -> glExpr _body `Set.union` Set.unions (map glDefn _defns)
-  If{_cond, _then, _else} -> Set.unions (map glExpr [_cond, _then, _else])
-  Match{_exprs, _altns} ->
-    Set.unions (map glExpr _exprs) `Set.union` Set.unions (map glAltn _altns)
-
-type DC a = State (Set Ident.EVar) a
-
-dcTopLevel :: TopLevel stage FV -> DC Bool
-dcTopLevel top = case top of
-  Type{} -> return True
-  Val{_ident} -> gets (_ident `Set.member`)
-  Def{_defns} -> do
-    let (lhss, rhss) = unzipDefns _defns
-    keep <- gets $ \globals -> any (`Set.member` globals) lhss
-    when keep $ do
-      -- TODO: Remove idents.
-      let globals = Set.unions (map glExpr rhss)
-      modify (globals `Set.union`)
-    return keep
-  Asm{_ident} -> gets (_ident `Set.member`)
-
-eliminate :: Module _ FV -> Module _ FV
-eliminate module_ = reverse $
-  evalState (filterM dcTopLevel $ reverse module_) (Set.singleton Ident.main)
+cleanModule :: In.Module -> Module
+cleanModule module_ =
+  let (g, out, in_) = G.graphFromEdges $ map (\t -> (t, t^.lhs, deps t)) module_
+      reach = Set.fromList
+              $ map (view _2 . out) $ maybe [] (G.reachable g) (in_ Id.main)
+      keep t = (t^.lhs) `Set.member` reach
+  in  filter keep module_
+  where
+    deps = Set.toList . Set.setOf (In.topLevelExpr . traverse)

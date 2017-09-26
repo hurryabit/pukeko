@@ -5,7 +5,9 @@ let foldr f y0 xs =
       | Nil -> y0
       | Cons x xs -> f x (foldr f y0 xs)
 let replicate n x =
-      if (<=) n 0 then Nil else Cons x (replicate ((-) n 1) x)
+      match (<=) n 0 with
+      | False -> Cons x (replicate ((-) n 1) x)
+      | True -> Nil
 external return = "return"
 external print = "print"
 external input = "input"
@@ -25,7 +27,9 @@ let insert y xs =
       match xs with
       | Nil -> Cons y Nil
       | Cons x xs' ->
-        if (<=) y x then Cons y xs else Cons x (insert y xs')
+        match (<=) y x with
+        | False -> Cons x (insert y xs')
+        | True -> Cons y xs
 let isort xs =
       match xs with
       | Nil -> Nil

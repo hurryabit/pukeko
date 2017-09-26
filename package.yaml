@@ -11,7 +11,16 @@ github: hurryabit/pukeko
 dependencies:
 - base
 default-extensions:
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- ExistentialQuantification
+- GeneralizedNewtypeDeriving
+- LambdaCase
 - MonadFailDesugaring
+- Rank2Types
+- StandaloneDeriving
+- TemplateHaskell
 ghc-options:
 - -Wall
 - -Wno-missing-signatures
@@ -24,7 +33,6 @@ library:
   - DuplicateRecordFields
   - FlexibleContexts
   - FlexibleInstances
-  - GeneralizedNewtypeDeriving
   - NamedFieldPuns
   - OverloadedStrings
   - PartialTypeSignatures
@@ -37,11 +45,14 @@ library:
   - Pukeko.Pretty
   dependencies:
   - array
+  - bound
   - containers
   - fclabels
+  - lens
   - mtl
   - parsec
   - pretty
+  - vector
 
 executables:
   pukeko:

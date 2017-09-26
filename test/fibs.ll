@@ -7,7 +7,10 @@ external (<=) = "le"
 let nth xs n =
       match xs with
       | Nil -> abort
-      | Cons x xs -> if (<=) n 0 then x else nth xs ((-) n 1)
+      | Cons x xs ->
+        match (<=) n 0 with
+        | False -> nth xs ((-) n 1)
+        | True -> x
 let zip_with f xs ys =
       match xs with
       | Nil -> Nil
@@ -21,7 +24,9 @@ external (>>=) = "bind"
 let prime = (+) ((*) 1000000 1000000) 39
 let add_mod_prime x y =
       let z = (+) x y in
-      if (<) z prime then z else (-) z prime
+      match (<) z prime with
+      | False -> (-) z prime
+      | True -> z
 let fibs0 = Cons 0 fibs1
 let fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
 let main$ll1 n = print (nth fibs0 n)

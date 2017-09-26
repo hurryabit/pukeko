@@ -27,7 +27,7 @@ type Int
 let bad = Con
 
 -- TEST unknown in pattern
--- FAILURE (line 3, column 5): unknown term cons 'Con'
+-- FAILURE (line 3, column 3): unknown term cons 'Con'
 let f x =
   match x with
   | Con -> 1
@@ -128,39 +128,45 @@ val f : a -> a
 -- SUBSECTION duplicate definition
 
 -- TEST two definitions
--- FAILURE (line 1, column 1): duplicate definition of function 'not'
+-- FAILURE (line 1, column 5): duplicate definition of function 'not'
 let not x = x
 
--- TEST parallel definition
+-- XTEST parallel definition
 -- FAILURE (line 2, column 1): duplicate definition of function 'f'
 val f : a -> a
 let f x = x
 and f x = x
 
+-- XTEST mutually recursive definition
+-- FAILURE (line 2, column 1): duplicate definition of function 'f'
+val f : a -> a
+let rec f x = x
+and f x = x
+
 -- SUBSECTION definition of undeclared function
 
 -- TEST normal definition
--- FAILURE (line 1, column 1): undeclared function 'f'
+-- FAILURE (line 1, column 5): undeclared function 'f'
 let f x = x
 
 -- TEST recursive definition
--- FAILURE (line 1, column 1): undeclared function 'f'
+-- FAILURE (line 1, column 9): undeclared function 'f'
 let rec f x = f x
 
 -- TEST parallel definition
--- FAILURE (line 2, column 1): undeclared function 'g'
+-- FAILURE (line 3, column 5): undeclared function 'g'
 val f : a -> a
 let f x = x
 and g x = x
 
 -- TEST mutually recursive definition
--- FAILURE (line 2, column 1): undeclared function 'g'
+-- FAILURE (line 3, column 5): undeclared function 'g'
 val f : a -> a
 let rec f x = x
 and g x = x
 
 -- TEST post declaration
--- FAILURE (line 1, column 1): undeclared function 'f'
+-- FAILURE (line 1, column 5): undeclared function 'f'
 let f x = x
 val f : a -> a
 
@@ -171,17 +177,17 @@ external f = "f"
 -- SUBSECTION call of undeclared function
 
 -- TEST one definition
--- FAILURE (line 2, column 11): undeclared function 'g'
+-- FAILURE (line 2, column 11): undefined function 'g'
 val f : x -> x
 let f a = g a
 
 -- TEST recursive definition
--- FAILURE (line 2, column 15): undeclared function 'g'
+-- FAILURE (line 2, column 15): undefined function 'g'
 val f : x -> x
 let rec f a = g a
 
 -- TEST post declaration
--- FAILURE (line 2, column 11): undeclared function 'g'
+-- FAILURE (line 2, column 11): undefined function 'g'
 val f : a -> a
 let f x = g x
 val g : a -> a
@@ -211,7 +217,7 @@ and g x = f x
 -- SUBSECTION term cons
 
 -- TEST underapplication in expression
--- FAILURE (line 2, column 1): mismatching types Option a and _3 -> Option _3
+-- FAILURE (line 2, column 5): mismatching types Option a and _3 -> Option _3
 val bad : Option a
 let bad = Some
 
@@ -221,14 +227,14 @@ val f : a -> Option a
 let f x = Some x x
 
 -- TEST underapplication in pattern
--- FAILURE (line 4, column 5): term cons 'Cons' expects 2 arguments
+-- FAILURE (line 4, column 3): term cons 'Cons' expects 2 arguments
 val f : List a -> a
 let f x =
   match x with
   | Cons y -> y
 
 -- TEST overapplication in pattern
--- FAILURE (line 4, column 5): term cons 'Some' expects 1 arguments
+-- FAILURE (line 4, column 3): term cons 'Some' expects 1 arguments
 val f : Option a -> a
 let f x =
   match x with
@@ -237,52 +243,52 @@ let f x =
 -- SUBSECTION unification
 
 -- TEST type cons vs type cons
--- FAILURE (line 2, column 1): mismatching types Unit and Int
+-- FAILURE (line 2, column 5): mismatching types Unit and Int
 val bad : Unit
 let bad = 1
 
 -- TEST type cons vs arrow
--- FAILURE (line 2, column 1): mismatching types Option a and _3 -> _3
+-- FAILURE (line 2, column 5): mismatching types Option a and _3 -> _3
 val bad : Option a
 let bad = fun y -> y
 
 -- TEST arrow vs type cons
--- FAILURE (line 2, column 1): mismatching types a -> b and Unit
+-- FAILURE (line 2, column 5): mismatching types a -> b and Unit
 val f : a -> b
 let f = Unit
 
 -- TEST qvar vs qvar
--- FAILURE (line 2, column 1): mismatching types b and a
+-- FAILURE (line 2, column 5): mismatching types b and a
 val f : a -> b
 let f x = x
 
 -- TEST qvar vs type cons
--- FAILURE (line 2, column 1): mismatching types a and Int
+-- FAILURE (line 2, column 5): mismatching types a and Int
 val bad : a
 let bad = 1
 
 -- TEST qvar vs arrow
--- FAILURE (line 2, column 1): mismatching types a and _3 -> _3
+-- FAILURE (line 2, column 5): mismatching types a and _3 -> _3
 val bad : a
 let bad = fun y -> y
 
 -- TEST in type cons, 1
--- FAILURE (line 2, column 1): mismatching types b and a
+-- FAILURE (line 2, column 5): mismatching types b and a
 val f : Option a -> Option b
 let f x = x
 
 -- TEST in type cons, 2
--- FAILURE (line 2, column 1): mismatching types c and b
+-- FAILURE (line 2, column 5): mismatching types c and b
 val f : Pair a b -> Pair a c
 let f x = x
 
 -- TEST in lhs of arrow
--- FAILURE (line 2, column 1): mismatching types b and a
+-- FAILURE (line 2, column 5): mismatching types b and a
 val f : (a -> c) -> (b -> c)
 let f x = x
 
 -- TEST in rhs of arrow
--- FAILURE (line 2, column 1): mismatching types c and b
+-- FAILURE (line 2, column 5): mismatching types c and b
 val f : (a -> b) -> (a -> c)
 let f x = x
 
@@ -294,7 +300,7 @@ let rec bad = Cons bad Nil
 -- SUBSECTION misc
 
 -- TEST function application unifies
--- FAILURE (line 4, column 1): mismatching types b and a
+-- FAILURE (line 4, column 5): mismatching types b and a
 val f : a -> a
 external f = "f"
 val g : a -> b

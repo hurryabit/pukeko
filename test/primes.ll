@@ -7,7 +7,10 @@ external (<=) = "le"
 let nth xs n =
       match xs with
       | Nil -> abort
-      | Cons x xs -> if (<=) n 0 then x else nth xs ((-) n 1)
+      | Cons x xs ->
+        match (<=) n 0 with
+        | False -> nth xs ((-) n 1)
+        | True -> x
 let append xs ys =
       match xs with
       | Nil -> ys
@@ -32,7 +35,9 @@ let filter$ll1 filter_p p xs =
       | Nil -> Nil
       | Cons x xs ->
         let ys = filter_p xs in
-        if p x then Cons x ys else ys
+        match p x with
+        | False -> ys
+        | True -> Cons x ys
 let filter p =
       let rec filter_p = filter$ll1 filter_p p in
       filter_p

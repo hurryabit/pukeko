@@ -11,7 +11,9 @@ let partition$ll1 p part_p xs =
       | Cons x xs ->
         match part_p xs with
         | Pair ys zs ->
-          if p x then Pair (Cons x ys) zs else Pair ys (Cons x zs)
+          match p x with
+          | False -> Pair ys (Cons x zs)
+          | True -> Pair (Cons x ys) zs
 let partition p xs =
       let rec part_p = partition$ll1 p part_p in
       part_p xs
@@ -20,7 +22,9 @@ let append xs ys =
       | Nil -> ys
       | Cons x xs -> Cons x (append xs ys)
 let replicate n x =
-      if (<=) n 0 then Nil else Cons x (replicate ((-) n 1) x)
+      match (<=) n 0 with
+      | False -> Cons x (replicate ((-) n 1) x)
+      | True -> Nil
 external return = "return"
 external print = "print"
 external input = "input"
