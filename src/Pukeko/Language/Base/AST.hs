@@ -4,13 +4,6 @@
 module Pukeko.Language.Base.AST
   ( -- * Position in the input file
     Pos
-    -- * Usefull type classes
-  , HasPos (..)
-  , HasLhs (..)
-  , HasRhs (..)
-  -- , HasLhs1 (..)
-  , HasRhs1 (..)
-  , HasRhs2 (..)
 
     -- * Standard types for certain ASTs
   , StdDefn (MkDefn)
@@ -28,18 +21,8 @@ module Pukeko.Language.Base.AST
   , _Name
   , bindName
 
-    -- * Type safe de Bruijn indices
-  , Scope (..)
-  , FinScope
-  , _Bound
-  , _Free
-  , bound
-  , free
-  , strengthen
-  , weaken1
-  , abstract1
-  , unscope
-  , IsVar (..)
+  , module Pukeko.Language.AST.Classes
+  , module Pukeko.Language.AST.Scope
 
     -- * Common types
   , Finite
@@ -51,38 +34,14 @@ module Pukeko.Language.Base.AST
 import           Control.Lens
 import           Data.Finite       (Finite)
 import           Data.Foldable     (toList)
-import           Data.Forget
 import           Data.Vector.Sized (Vector)
 import           GHC.TypeLits      (KnownNat)
-import           Text.Parsec       (SourcePos)
 
-import           Pukeko.Error      (bug)
+import           Pukeko.Pos
 import           Pukeko.Pretty
+import           Pukeko.Language.AST.Classes
+import           Pukeko.Language.AST.Scope
 import qualified Pukeko.Language.Ident as Id
-
-type Pos = SourcePos
-
-class HasPos a where
-  pos :: Lens' a Pos
-
-class HasLhs a where
-  type Lhs a
-  lhs :: Lens' a (Lhs a)
-
-class HasRhs a where
-  type Rhs a
-  rhs :: Lens' a (Rhs a)
-
--- class HasLhs1 (t :: * -> *) where
---   type Lhs1 t :: * -> *
---   lhs1 :: Lens (t a) (t b) (Lhs1 t a) (Lhs1 t b)
-
-class HasRhs1 (t :: * -> *) where
-  type Rhs1 t :: * -> *
-  rhs1 :: Lens (t a) (t b) (Rhs1 t a) (Rhs1 t b)
-
-class HasRhs2 (t :: (* -> *) -> * -> *) where
-  rhs2 :: Lens (t f a) (t g b) (f a) (g b)
 
 data StdDefn (expr :: * -> *) v = MkDefn
   { _defnPos :: Pos
@@ -132,66 +91,11 @@ bindName = \case
   Wild _   -> Nothing
   Name _ x -> Just x
 
-data Scope i v
-  = Bound i (Forget Id.EVar)
-  | Free v
-  deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
-
-type FinScope n = Scope (Finite n)
-
-bound :: i -> Id.EVar -> Scope i v
-bound i x = Bound i (Forget x)
-
-free :: v -> Scope i v
-free = Free
-
-strengthen :: String -> Scope i v -> v
-strengthen component = \case
-  Bound _ (Forget x) -> bug component "cannot strengthen" (Just (show x))
-  Free  x            -> x
-
-weaken1 :: Scope j v -> Scope j (Scope i v)
-weaken1 = \case
-  Bound j x -> Bound j x
-  Free  x   -> Free  (Free x)
-
-abstract1 :: (j -> Maybe i) -> Scope j v -> Scope j (Scope i v)
-abstract1 f = \case
-  Bound (f -> Just i) x -> Free (Bound i x)
-  Bound j             x -> Bound j x
-  Free  x               -> Free (Free x)
-
--- TODO: Find out where we use the inverse 'scope' without naming it like this.
--- It's probably in the de Bruijn indexer.
-unscope :: Scope i Id.EVar -> Id.EVar
-unscope = \case
-  Bound _ (Forget x) -> x
-  Free  x            -> x
-
-class (Eq v, Ord v, Pretty v) => IsVar v where
-  varName :: v -> Id.EVar
-  isTotallyFree :: v -> Bool
-  mkTotallyFree :: Id.EVar -> v
-
-instance IsVar Id.EVar where
-  varName = id
-  isTotallyFree = const True
-  mkTotallyFree = id
-
-instance (Ord i, IsVar v) => IsVar (Scope i v) where
-  varName = \case
-    Bound _ (Forget x) -> x
-    Free  v            -> varName v
-  isTotallyFree = \case
-    Bound _ _ -> False
-    Free  v   -> isTotallyFree v
-  mkTotallyFree = Free . mkTotallyFree
 
 -- * Optics
 makeLenses ''StdDefn
 
 makePrisms ''Bind
-makePrisms ''Scope
 makePrisms ''StdPatn
 
 -- * Instances
@@ -216,11 +120,6 @@ instance HasRhs2 StdDefn where
 instance HasPos (StdAltn con expr v) where
   pos f (MkAltn w p t) = fmap (\w' -> MkAltn w' p t) (f w)
 
-
-instance Pretty v => Pretty (Scope i v) where
-  pPrint = \case
-    Bound _ (Forget x) -> pretty x
-    Free v -> pretty v
 
 instance Pretty con => Pretty (StdPatn con) where
   pPrintPrec lvl prec = \case

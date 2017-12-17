@@ -173,7 +173,7 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest con0 _) _)) (MkRowMatch ts rs) = do
       LS.Cons (MkDest con (traverse patnToBind -> Just bs), MkRow qs u) LS.Nil -> do
         let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
         let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
-        let ts1 = LS.map (fmap free) ts
+        let ts1 = LS.map (fmap weaken) ts
         pure $ MkGrpMatchItem con bs (MkRowMatch ts1 (LS.Singleton row))
       drs2@(LS.Cons (MkDest con ps0, _) _) -> do
         xs <- traverse (const freshEVar) ps0
@@ -182,7 +182,7 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest con0 _) _)) (MkRowMatch ts rs) = do
             case LS.match ixs ps of
               Nothing  -> bug "pattern matcher" "wrong number of patterns" Nothing
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap weaken1 u)
-          let ts1 = LS.map (Var w . uncurry bound ) ixs LS.++ LS.map (fmap free) ts
+          let ts1 = LS.map (Var w . uncurry bound ) ixs LS.++ LS.map (fmap weaken) ts
           pure $ MkGrpMatchItem con (map (Name w) xs) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps
 

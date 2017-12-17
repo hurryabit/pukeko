@@ -18,6 +18,7 @@ import           Data.Traversable (for)
 import qualified Data.Vector.Sized as V
 
 import           Pukeko.Error
+import           Pukeko.Pos
 import           Pukeko.Pretty
 import           Pukeko.Language.Base.AST        hiding (Bound, Free)
 import           Pukeko.Language.TypeChecker.AST (TypeCon, Module, TopLevel (..))
@@ -94,7 +95,7 @@ localizeBinds name xs ts (TC tc) = TC $ withReaderT (locals %~ upd) tc
     f i x = case name x of
       Nothing -> mempty
       Just y  -> Map.singleton (bound i y) (ts V.! i)
-    upd old = ifoldMap f xs <> Map.mapKeysMonotonic free old
+    upd old = ifoldMap f xs <> Map.mapKeysMonotonic weaken old
 
 localizePatn ::
   (IsVar v) =>
@@ -103,7 +104,7 @@ localizePatn ::
   TC v s a
 localizePatn mp (TC tc) = TC $ withReaderT (locals %~ upd) tc
   where
-    upd old = Map.mapKeysMonotonic (\x -> bound x x) mp <> Map.mapKeysMonotonic free old
+    upd old = Map.mapKeysMonotonic (\x -> bound x x) mp <> Map.mapKeysMonotonic weaken old
 
 lookupType :: (Ord v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
 lookupType w ident = do

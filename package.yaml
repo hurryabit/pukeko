@@ -23,6 +23,7 @@ default-extensions:
 - TemplateHaskell
 ghc-options:
 - -Wall
+- -Werror
 - -Wno-missing-signatures
 - -Wno-name-shadowing
 - -Wno-partial-type-signatures

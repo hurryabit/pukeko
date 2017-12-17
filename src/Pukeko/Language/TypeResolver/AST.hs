@@ -17,6 +17,7 @@ import           Data.Monoid
 import           Data.Set    (Set)
 import qualified Data.Set    as Set
 
+import           Pukeko.Pos
 import           Pukeko.Language.Base.AST
 import qualified Pukeko.Language.Ident    as Id
 import qualified Pukeko.Language.Type     as Ty

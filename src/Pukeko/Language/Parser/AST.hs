@@ -18,7 +18,8 @@ module Pukeko.Language.Parser.AST
   )
 where
 
-import           Pukeko.Language.Base.AST hiding (StdAltn (..))
+import           Pukeko.Pos
+import           Pukeko.Language.Base.AST (StdDefn (..), StdPatn (..), Bind (..))
 import qualified Pukeko.Language.Type     as Ty
 import qualified Pukeko.Language.Ident    as Id
 

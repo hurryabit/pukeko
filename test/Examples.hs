@@ -53,8 +53,8 @@ spec_catalan n =
       sols = 1 : map (sum . zipWith (*) sols) (tail $ scanl (flip (:)) [] sols)
   in  fromInteger $ (sols !! n) `mod` p
 
-spec_queens :: Int -> Int
-spec_queens n =
+_spec_queens :: Int -> Int
+_spec_queens n =
   let diff [] _  = []
       diff xs [] = xs
       diff (x:xs) (y:ys) = case x `compare` y of
@@ -77,7 +77,8 @@ spec_fibs n =
 
 spec_primes :: Int -> Int
 spec_primes n =
-  let sieve (p:ks) = p : sieve (filter ((0 /=) . (`mod` p)) ks)
+  let sieve [] = undefined
+      sieve (p:ks) = p : sieve (filter ((0 /=) . (`mod` p)) ks)
       primes = 2 : 3 : sieve (scanl1 (+) (5 : cycle [2, 4]))
   in  primes !! n
 
