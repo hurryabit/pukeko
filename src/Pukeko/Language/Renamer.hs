@@ -1,8 +1,8 @@
 {-# LANGUAGE TupleSections #-}
 -- | Transform AST to use type safe de Bruijn indices.
-module Pukeko.Language.DeBruijner
+module Pukeko.Language.Renamer
   ( Module
-  , indexModule
+  , renameModule
   )
   where
 
@@ -12,12 +12,12 @@ import qualified Data.Map      as Map
 import qualified Data.Vector.Sized as V
 
 import           Pukeko.Language.Base.AST
-import           Pukeko.Language.DeBruijner.AST
+import           Pukeko.Language.Renamer.AST
 import qualified Pukeko.Language.Parser.AST     as P
 import qualified Pukeko.Language.Ident          as Id
 
-indexModule :: P.Module -> Module
-indexModule = map ixTopLevel
+renameModule :: P.Module -> Module
+renameModule = map ixTopLevel
 
 ixTopLevel :: P.TopLevel -> TopLevel
 ixTopLevel top = case top of
