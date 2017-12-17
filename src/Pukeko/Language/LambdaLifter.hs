@@ -1,5 +1,5 @@
 module Pukeko.Language.LambdaLifter
-  ( Module
+  ( LL.Module
   , liftModule
   )
 where
@@ -16,20 +16,21 @@ import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 -- import           GHC.TypeLits
 
-import           Pukeko.Language.Base.AST
-import           Pukeko.Language.LambdaLifter.AST
-import qualified Pukeko.Language.DeadCode.AST     as In
+import           Pukeko.Language.AST.Classes
+import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.LambdaLifter.AST as LL
+import qualified Pukeko.Language.DeadCode.AST     as DC
 import qualified Pukeko.Language.Ident            as Id
 
 type State = [Id.EVar]
 
-newtype LL a = LL{unLL :: RWS () [TopLevel] State a}
+newtype LL a = LL{unLL :: RWS () [LL.TopLevel] State a}
   deriving ( Functor, Applicative, Monad
-           , MonadWriter [TopLevel]
+           , MonadWriter [LL.TopLevel]
            , MonadState State
            )
 
-execLL :: LL () -> Module
+execLL :: LL () -> LL.Module
 execLL ll =
   let state = []
       ((), defns) = evalRWS (unLL ll) () state
@@ -38,17 +39,16 @@ execLL ll =
 freshIdent :: LL Id.EVar
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-llExpr :: forall v. (IsVar v) => In.Expr v -> LL (Expr v)
+llExpr :: forall v. (IsVar v) => DC.Expr v -> LL (LL.Expr v)
 llExpr = \case
-  In.Var w x -> pure $ Var w x
-  In.Con w c -> pure $ Con w c
-  In.Num w n -> pure $ Num w n
-  In.App w t  us -> App w <$> llExpr t <*> traverse llExpr us
-  -- In.If  w t  u  v -> If w <$> llExpr t <*> llExpr u <*> llExpr v
-  In.Mat w t  as -> Mat w <$> llExpr t <*> traverse (altnRhs llExpr) as
-  In.Let w ds t -> Let w <$> (traverse . rhs2) llExpr ds <*> llExpr t
-  In.Rec w ds t -> Rec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
-  In.Lam w oldBinds rhs -> do
+  Var w x -> pure $ Var w x
+  Con w c -> pure $ Con w c
+  Num w n -> pure $ Num w n
+  App w t  us -> App w <$> llExpr t <*> traverse llExpr us
+  Cas w t  cs -> Cas w <$> llExpr t <*> traverse (case2rhs llExpr) cs
+  Let w ds t -> Let w <$> (traverse . rhs2) llExpr ds <*> llExpr t
+  Rec w ds t -> Rec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
+  Lam w oldBinds rhs -> do
     lhs <- freshIdent
     rhs <- llExpr rhs
     let isCaptured v = is _Free v && not (isTotallyFree v)
@@ -63,7 +63,7 @@ llExpr = \case
             Free  v   -> Free  (varName v)
       let renameCaptured i v = Map.singleton v (bound (Fin.weaken i) (varName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
-      tell [Def w lhs newBinds (fmap (rename Map.!) rhs)]
+      tell [LL.Def w lhs newBinds (fmap (rename Map.!) rhs)]
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
@@ -72,19 +72,19 @@ llExpr = \case
         []  -> return fun
         _:_ -> return $ App w fun (map (Var w . unfree) capturedL)
 
-llTopLevel :: In.TopLevel -> LL ()
+llTopLevel :: DC.TopLevel -> LL ()
 llTopLevel = \case
-  In.Def w lhs rhs -> do
+  DC.Def w lhs rhs -> do
     put $ Id.freshEVars "ll" lhs
     case rhs of
-      In.Lam{} -> do
+      Lam{} -> do
         -- NOTE: Make sure this lambda gets lifted to the name it is defining.
         modify (lhs:)
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [Caf w lhs rhs]
-  In.Asm w lhs asm -> tell [Asm w lhs asm]
+        tell [LL.Caf w lhs rhs]
+  DC.Asm w lhs asm -> tell [LL.Asm w lhs asm]
 
-liftModule :: In.Module -> Module
+liftModule :: DC.Module -> LL.Module
 liftModule = execLL . traverse_ llTopLevel

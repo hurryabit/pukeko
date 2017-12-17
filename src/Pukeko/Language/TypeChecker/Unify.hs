@@ -10,8 +10,8 @@ import           Data.Foldable        (traverse_)
 import           Data.STRef
 
 import           Pukeko.Error
+import           Pukeko.Pos
 import           Pukeko.Pretty
-import           Pukeko.Language.Base.AST (Pos)
 import           Pukeko.Language.Type
 import           Pukeko.Language.TypeChecker.AST (TypeCon)
 

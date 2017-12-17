@@ -1,5 +1,5 @@
 module Pukeko.Language.TypeResolver
-  ( Module
+  ( TR.Module
   , resolveModule
   )
 where
@@ -7,21 +7,20 @@ where
 import           Control.Lens
 import           Control.Monad.State
 import           Data.Foldable       (for_)
-import           Data.Map            (Map)
 import qualified Data.Map            as Map
 import           Data.Maybe          (isJust)
 import           Data.Traversable    (for)
 
 import           Pukeko.Error
-import           Pukeko.Language.Base.AST
-import           Pukeko.Language.TypeResolver.AST
+import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.TypeResolver.AST as TR
 import qualified Pukeko.Language.Renamer.AST      as Rn
 import qualified Pukeko.Language.Type             as Ty
 import qualified Pukeko.Language.Ident            as Id
 
 data TRState = MkTRState
-  { _typeCons :: Map Id.Con TypeCon
-  , _exprCons :: Map Id.Con ExprCon
+  { _typeCons :: Map.Map Id.Con TR.TypeCon
+  , _exprCons :: Map.Map Id.Con TR.ExprCon
   }
 makeLenses ''TRState
 
@@ -37,7 +36,7 @@ runTR tr =
   in  evalState (runExceptT (unTR tr)) st
 
 -- TODO: Use @typeApps . _1@ to do this.
-trType :: Pos -> Ty.Type Id.Con Ty.Closed -> TR (Ty.Type TypeCon Ty.Closed)
+trType :: Pos -> Ty.Type Id.Con Ty.Closed -> TR (Ty.Type TR.TypeCon Ty.Closed)
 trType posn typ = case typ of
     Ty.Var var -> return $ Ty.Var var
     Ty.Fun tx ty -> Ty.Fun <$> trType posn tx <*> trType posn ty
@@ -48,26 +47,26 @@ trType posn typ = case typ of
         Just adt -> Ty.App adt <$> traverse (trType posn) typs
 
 -- TODO: Have only one insert function.
-insertTypeCon :: Pos -> TypeCon -> TR ()
+insertTypeCon :: Pos -> TR.TypeCon -> TR ()
 insertTypeCon posn adt@Ty.MkADT{_name} = do
   old <- use (typeCons . at _name)
   when (isJust old) $ throwAt posn "duplicate type cons" _name
   typeCons . at _name ?= adt
 
-insertExprCon :: Pos -> ExprCon -> TR ()
+insertExprCon :: Pos -> TR.ExprCon -> TR ()
 insertExprCon posn con@Ty.MkConstructor{_name} = do
   old <- use (exprCons . at _name)
   when (isJust old) $ throwAt posn "duplicate term cons" _name
   exprCons . at _name ?= con
 
-findExprCon :: Pos -> Id.Con -> TR ExprCon
+findExprCon :: Pos -> Id.Con -> TR TR.ExprCon
 findExprCon posn name = do
   con_opt <- Map.lookup name <$> use exprCons
   case con_opt of
     Nothing -> throwAt posn "unknown term cons" name
     Just con -> return con
 
-trTopLevel :: Rn.TopLevel -> TR TopLevel
+trTopLevel :: Rn.TopLevel -> TR TR.TopLevel
 trTopLevel top = case top of
   Rn.TypDef w adts -> do
     for_ adts (insertTypeCon w)
@@ -78,38 +77,11 @@ trTopLevel top = case top of
         insertExprCon w con'
         return con'
       return _adt{Ty._constructors}
-    return (TypDef w adts)
-  Rn.Val w x t -> Val w x <$> trType w t
-  Rn.TopLet w ds -> TopLet w <$> itraverseOf (traverse . defnExprCons) findExprCon ds
-  Rn.TopRec w ds -> TopRec w <$> itraverseOf (traverse . defnExprCons) findExprCon ds
-  Rn.Asm w x a -> pure $ Asm w x a
+    return (TR.TypDef w adts)
+  Rn.Val w x t -> TR.Val w x <$> trType w t
+  Rn.TopLet w ds -> TR.TopLet w <$> itraverseOf (traverse . defn2exprCon) findExprCon ds
+  Rn.TopRec w ds -> TR.TopRec w <$> itraverseOf (traverse . defn2exprCon) findExprCon ds
+  Rn.Asm w x a -> pure $ TR.Asm w x a
 
-resolveModule :: MonadError String m => Rn.Module -> m Module
+resolveModule :: MonadError String m => Rn.Module -> m TR.Module
 resolveModule = runTR . traverse trTopLevel
-
-
--- * Optics
-
-defnExprCons :: IndexedTraversal Pos (Rn.Defn v) (Defn v) Id.Con ExprCon
-defnExprCons = rhs2 . exprExprCons
-
-exprExprCons :: IndexedTraversal Pos (Rn.Expr v) (Expr v) Id.Con ExprCon
-exprExprCons f = \case
-  Rn.Var w x       -> pure $ Var w x
-  Rn.Con w c       -> Con w <$> indexed f w c
-  Rn.Num w n       -> pure $ Num w n
-  Rn.App w t  us   -> App w <$> exprExprCons f t <*> (traverse . exprExprCons) f us
-  -- Rn.If  w t  u  v -> If  w <$> exprExprCons f t <*> exprExprCons f u <*> exprExprCons f v
-  Rn.Mat w ts as   -> Mat w <$> exprExprCons f ts <*> (traverse . altnExprCons) f as
-  Rn.Lam w bs t    -> Lam w bs <$> exprExprCons f t
-  Rn.Let w ds t    -> Let w <$> (traverse . defnExprCons) f ds <*> exprExprCons f t
-  Rn.Rec w ds t    -> Rec w <$> (traverse . defnExprCons) f ds <*> exprExprCons f t
-
-altnExprCons :: IndexedTraversal Pos (Rn.Altn v) (Altn v) Id.Con ExprCon
-altnExprCons f (MkAltn w p t) =
-  MkAltn w <$> patnExprCons f p <*> exprExprCons f t
-
-patnExprCons :: IndexedTraversal Pos Rn.Patn Patn Id.Con ExprCon
-patnExprCons f = \case
-  Bind   b    -> pure $ Bind b
-  Dest w c ps -> Dest w <$> indexed f w c <*> (traverse . patnExprCons) f ps

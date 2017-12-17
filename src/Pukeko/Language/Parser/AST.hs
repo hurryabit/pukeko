@@ -19,7 +19,7 @@ module Pukeko.Language.Parser.AST
 where
 
 import           Pukeko.Pos
-import           Pukeko.Language.Base.AST (StdDefn (..), StdPatn (..), Bind (..))
+import           Pukeko.Language.AST.Std (GenDefn (..), GenPatn (..), Bind (..))
 import qualified Pukeko.Language.Type     as Ty
 import qualified Pukeko.Language.Ident    as Id
 
@@ -35,7 +35,7 @@ data TopLevel
   | TopRec Pos [Defn Id.EVar]
   | Asm    Pos Id.EVar String
 
-type Defn = StdDefn Expr
+type Defn = GenDefn Expr
 
 data Expr v
   = Var Pos v
@@ -50,7 +50,7 @@ data Expr v
 
 data Altn v = MkAltn Pos Patn (Expr v)
 
-type Patn = StdPatn ExprCon
+type Patn = GenPatn ExprCon
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
 mkApp pos fun args

@@ -12,7 +12,7 @@ import qualified Text.Parsec.Token as Token
 
 import           Pukeko.Error
 import           Pukeko.Language.Operator   (Spec (..))
-import           Pukeko.Language.Base.AST   hiding (StdAltn (..))
+import           Pukeko.Language.AST.Std    hiding (StdExpr (..), StdAltn (..))
 import           Pukeko.Language.Parser.AST
 import qualified Pukeko.Language.Type       as Ty
 import qualified Pukeko.Language.Ident      as Id
