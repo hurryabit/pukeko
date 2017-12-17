@@ -11,7 +11,7 @@ import Pukeko.Error
 
 import qualified Pukeko.Language.CoreCompiler   as CoreCompiler
 import qualified Pukeko.Language.DeadCode       as DeadCode
-import qualified Pukeko.Language.DeBruijner     as DeBruijner
+import qualified Pukeko.Language.Renamer        as Renamer
 import qualified Pukeko.Language.KindChecker    as KindChecker
 import qualified Pukeko.Language.LambdaLifter   as LambdaLifter
 import qualified Pukeko.Language.Parser         as Parser
@@ -27,7 +27,7 @@ compileToCore
   => Parser.Module
   -> m (CoreCompiler.Module, LambdaLifter.Module)
 compileToCore module_ = do
-  module_ll <- return (DeBruijner.indexModule module_)
+  module_ll <- return (Renamer.renameModule module_)
                >>= TypeResolver.resolveModule
                >>= KindChecker.checkModule
                >>= TypeChecker.checkModule

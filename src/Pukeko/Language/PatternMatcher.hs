@@ -1,25 +1,26 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
 module Pukeko.Language.PatternMatcher
-  ( Module
+  ( PM.Module
   , compileModule
   )
 where
 
-import           Control.Lens     (Traversal, ifoldMap)
+import           Control.Lens
 import           Control.Monad.State
 import           Data.Bifunctor   (second)
 import           Data.Either      (partitionEithers)
 import           Data.Foldable    (foldlM, toList)
-import           Data.Forget      (Forget (..))
 import qualified Data.List.Sized  as LS
 import qualified Data.Map         as Map
 import           Data.Traversable (for)
+import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
-import           Pukeko.Language.Base.AST
-import           Pukeko.Language.PatternMatcher.AST
-import qualified Pukeko.Language.TypeChecker.AST    as In
+import           Pukeko.Language.AST.Classes
+import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.PatternMatcher.AST as PM
+import qualified Pukeko.Language.TypeChecker.AST    as TC
 import qualified Pukeko.Language.Type               as Ty
 import qualified Pukeko.Language.Ident              as Id
 
@@ -38,35 +39,34 @@ freshEVar = state (\(x:xs) -> (x, xs))
 name :: Ty.Constructor _ -> Id.Con
 name Ty.MkConstructor{_name} = _name
 
-pmExpr :: In.Expr v -> PM (Expr v)
+pmExpr :: TC.Expr v -> PM (PM.Expr v)
 pmExpr = \case
-  In.Var w x          -> pure $ Var w x
-  In.Con w c          -> pure $ Con w c
-  In.Num w n          -> pure $ Num w n
-  In.App w t  us      -> App w <$> pmExpr t <*> traverse pmExpr us
-  -- In.If  w t  u  v -> If  w <$> pmExpr t <*> pmExpr u <*> pmExpr v
-  In.Lam w bs t       -> Lam w bs <$> pmExpr t
-  In.Let w ds t       -> Let w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
-  In.Rec w ds t       -> Rec w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
-  In.Mat w t0 as0     -> LS.withList as0 $ \case
+  Var w x          -> pure $ Var w x
+  Con w c          -> pure $ Con w c
+  Num w n          -> pure $ Num w n
+  App w t  us      -> App w <$> pmExpr t <*> traverse pmExpr us
+  Lam w bs t       -> Lam w bs <$> pmExpr t
+  Let w ds t       -> Let w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
+  Rec w ds t       -> Rec w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
+  Mat w t0 as0     -> LS.withList as0 $ \case
     LS.Nil -> bug "pattern matcher" "no alternatives" Nothing
     as1@LS.Cons{} -> do
       t1 <- pmExpr t0
       pmMatch w (mkRowMatch1 t1 as1)
 
-pmTopLevel :: In.TopLevel -> PM TopLevel
+pmTopLevel :: TC.TopLevel -> PM PM.TopLevel
 pmTopLevel = \case
-  Def w f t -> do
+  TC.Def w f t -> do
     put $ Id.freshEVars "pm" f
-    Def w f <$> pmExpr t
-  asm@Asm{} -> pure asm
+    PM.Def w f <$> pmExpr t
+  TC.Asm w f a -> pure $ PM.Asm w f a
 
-compileModule :: MonadError String m => In.Module -> m Module
+compileModule :: MonadError String m => TC.Module -> m PM.Module
 compileModule = evalPM . traverse pmTopLevel
 
 pmMatch ::
   forall m m' n v. m ~ 'LS.Succ m' =>
-  Pos -> RowMatch m n v -> PM (Expr v)
+  Pos -> RowMatch m n v -> PM (PM.Expr v)
 pmMatch w rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBindCols w colMatch1 $ \case
@@ -79,21 +79,21 @@ pmMatch w rowMatch0 = do
       grpMatch <- groupDests w destCol rowMatch4
       grpMatchExpr w grpMatch
 
-type RhsExpr v = In.Expr (Scope Id.EVar v)
+type RhsExpr v = TC.Expr (Scope Id.EVar v)
 
-data Row n v = MkRow (LS.List n In.Patn) (RhsExpr v)
+data Row n v = MkRow (LS.List n TC.Patn) (RhsExpr v)
 
-data RowMatch m n v = MkRowMatch (LS.List n (Expr v)) (LS.List m (Row n v))
+data RowMatch m n v = MkRowMatch (LS.List n (PM.Expr v)) (LS.List m (Row n v))
 
-mkRow1 :: In.Altn v -> Row LS.One v
+mkRow1 :: TC.Altn v -> Row LS.One v
 mkRow1 (MkAltn _ p t) = MkRow (LS.Singleton p) t
 
-mkRowMatch1 :: Expr v -> LS.List m (In.Altn v) -> RowMatch m LS.One v
+mkRowMatch1 :: PM.Expr v -> LS.List m (TC.Altn v) -> RowMatch m LS.One v
 mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 
-data Col m v a = MkCol (Expr v) (LS.List m a)
+data Col m v a = MkCol (PM.Expr v) (LS.List m a)
 
-data ColMatch m n v = MkColMatch (LS.List n (Col m v In.Patn)) (LS.List m (RhsExpr v))
+data ColMatch m n v = MkColMatch (LS.List n (Col m v TC.Patn)) (LS.List m (RhsExpr v))
 
 colPatn :: Traversal (Col m v a) (Col m v b) a b
 colPatn f (MkCol t ps) = MkCol t <$> traverse f ps
@@ -116,7 +116,7 @@ elimBindCols w (MkColMatch cs0 us0) k = do
   us1 <- foldlM (applyBindCol w) us0 bcs
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
   where
-    isBindCol :: Col n v In.Patn -> Either (Col n v In.Patn) (Col n v Bind)
+    isBindCol :: Col n v TC.Patn -> Either (Col n v TC.Patn) (Col n v Bind)
     isBindCol (MkCol t ps) =
       case traverse patnToBind ps of
         Just bs -> Right (MkCol t bs)
@@ -124,7 +124,7 @@ elimBindCols w (MkColMatch cs0 us0) k = do
     applyBindCol ::
       Pos -> LS.List m (RhsExpr v) -> Col m v Bind -> PM (LS.List m (RhsExpr v))
     applyBindCol w rhss (MkCol t bs) = case t of
-      In.Var _ x ->
+      Var _ x ->
         let replacePatnWithX rhs = \case
               Wild _   -> rhs
               Name _ y ->
@@ -135,9 +135,9 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest = MkDest In.ExprCon [In.Patn]
+data Dest = MkDest TC.ExprCon [TC.Patn]
 
-patnToDest :: In.Patn -> Maybe Dest
+patnToDest :: TC.Patn -> Maybe Dest
 patnToDest = \case
   Bind   _    -> Nothing
   Dest _ c ps -> Just (MkDest c ps)
@@ -156,10 +156,10 @@ findDestCol w (MkColMatch cs0 us) =
       LS.Cons x             xs@LS.Cons{} -> fmap (second (LS.Cons x)) (find f xs)
 
 data GrpMatchItem v =
-  forall m m' n. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem In.ExprCon [Bind] (RowMatch m n (Scope Int v))
+  forall m m' n k. m ~ 'LS.Succ m' =>
+  MkGrpMatchItem TC.ExprCon (Vec.Vector k Bind) (RowMatch m n (FinScope k v))
 
-data GrpMatch v = MkGrpMatch (Expr v) [GrpMatchItem v]
+data GrpMatch v = MkGrpMatch (PM.Expr v) [GrpMatchItem v]
 
 groupDests ::
   forall m m' n v. m ~ 'LS.Succ m' =>
@@ -170,30 +170,27 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest con0 _) _)) (MkRowMatch ts rs) = do
     let drs1 = filter (\(MkDest con2 _, _)-> name con1 == name con2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" (name con1)
-      LS.Cons (MkDest con (traverse patnToBind -> Just bs), MkRow qs u) LS.Nil -> do
-        let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
-        let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
-        let ts1 = LS.map (fmap free) ts
-        pure $ MkGrpMatchItem con bs (MkRowMatch ts1 (LS.Singleton row))
-      drs2@(LS.Cons (MkDest con ps0, _) _) -> do
-        xs <- traverse (const freshEVar) ps0
-        LS.withList (zip [0..] xs)$ \ixs -> do
+      LS.Cons (MkDest con (traverse patnToBind -> Just bs0), MkRow qs u) LS.Nil ->
+        Vec.withList bs0 $ \bs -> do
+          let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
+          let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
+          let ts1 = LS.map (fmap weaken) ts
+          pure $ MkGrpMatchItem con bs (MkRowMatch ts1 (LS.Singleton row))
+      drs2@(LS.Cons (MkDest con ps0, _) _) -> Vec.withList ps0 $ \ps -> do
+        ixs0 <- itraverse (\i _ -> (,) i <$> freshEVar) ps
+        LS.withList (toList ixs0)$ \ixs -> do
           grpRows <- for drs2 $ \(MkDest _ ps, MkRow qs u) ->
             case LS.match ixs ps of
               Nothing  -> bug "pattern matcher" "wrong number of patterns" Nothing
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap weaken1 u)
-          let ts1 = LS.map (Var w . uncurry bound ) ixs LS.++ LS.map (fmap free) ts
-          pure $ MkGrpMatchItem con (map (Name w) xs) (MkRowMatch ts1 grpRows)
+          let ts1 = LS.map (Var w . uncurry bound) ixs LS.++ LS.map (fmap weaken) ts
+          pure $ MkGrpMatchItem con (fmap (Name w . snd) ixs0) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps
 
-grpMatchExpr :: Pos -> GrpMatch v -> PM (Expr v)
+grpMatchExpr :: Pos -> GrpMatch v -> PM (PM.Expr v)
 grpMatchExpr w (MkGrpMatch t is) =
-  Mat w t <$> traverse (grpMatchItemAltn w) is
+  Cas w t <$> traverse (grpMatchItemAltn w) is
 
-grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (Altn v)
+grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (PM.Case v)
 grpMatchItemAltn w (MkGrpMatchItem con bs rm) =
-  MkAltn w (Simp w con bs) <$> fmap (fmap f) (pmMatch w rm)
-  where
-    f = \case
-      Bound _ (Forget x) -> Bound x (Forget x)
-      Free x             -> Free x
+  MkCase w con bs <$> pmMatch w rm

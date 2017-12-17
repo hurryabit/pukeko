@@ -13,26 +13,26 @@ module Pukeko.Error
   )
   where
 
-import Control.Monad.Except hiding (runExcept, runExceptT)
-import Text.Parsec (SourcePos)
+import           Control.Monad.Except hiding (runExcept, runExceptT)
 import qualified Control.Monad.Except as Except
 
+import Pukeko.Pos
 import Pukeko.Pretty
 
 throwDoc :: MonadError String m => Doc -> m a
 throwDoc = throwError . render
 
-throwDocAt :: MonadError String m => SourcePos -> Doc -> m a
+throwDocAt :: MonadError String m => Pos -> Doc -> m a
 throwDocAt posn msg = throwDoc $ text (show posn) <> colon <+> msg
 
-throwErrorAt :: MonadError String m => SourcePos -> String -> m a
+throwErrorAt :: MonadError String m => Pos -> String -> m a
 throwErrorAt posn = throwDocAt posn . text
 
 throw :: (MonadError String m, Pretty a) => String -> a -> m b
 throw thing name = throwDoc $ text thing <+> quotes (pretty name)
 
 throwAt :: (MonadError String m, Pretty a)
-        => SourcePos -> String -> a -> m b
+        => Pos -> String -> a -> m b
 throwAt posn thing name = throwDocAt posn $ text thing <+> quotes (pretty name)
 
 bug :: String -> String -> Maybe String -> a

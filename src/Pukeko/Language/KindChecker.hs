@@ -1,7 +1,7 @@
 -- | Check that all type constructor are applied to the right number of
 -- variables and all variables are bound.
 module Pukeko.Language.KindChecker
-  ( Module
+  ( KC.Module
   , checkModule
   )
 where
@@ -14,12 +14,12 @@ import qualified Data.Set      as Set
 
 import           Pukeko.Error
 import           Pukeko.Pretty
-import           Pukeko.Language.Base.AST
-import qualified Pukeko.Language.TypeResolver.AST as R
-import           Pukeko.Language.KindChecker.AST
+import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.TypeResolver.AST as TR
+import qualified Pukeko.Language.KindChecker.AST  as KC
 import qualified Pukeko.Language.Type             as Ty
 
-type Type = Ty.Type TypeCon Ty.Closed
+type Type = Ty.Type KC.TypeCon Ty.Closed
 
 type KC a = Except String a
 
@@ -30,9 +30,9 @@ kcType w = itraverseOf_ Ty.typeCons $ \typs Ty.MkADT{_name, _params} -> do
     "type cons" <+> quotes (pretty _name) <+> "expects" <+>
     int (length _params) <+> "parameters"
 
-kcTopLevel :: R.TopLevel -> KC (Maybe TopLevel)
+kcTopLevel :: TR.TopLevel -> KC (Maybe KC.TopLevel)
 kcTopLevel = \case
-  R.TypDef w adts -> do
+  TR.TypDef w adts -> do
     for_ adts $ \Ty.MkADT{_params, _constructors} -> do
       for_ _constructors $ \Ty.MkConstructor{_name, _fields} -> do
         let unbound =
@@ -40,13 +40,13 @@ kcTopLevel = \case
         unless (Set.null unbound) $ throwAt w "unbound type vars in term cons" _name
         traverse_ (kcType w) _fields
     return Nothing
-  R.Val    w x  t -> Just <$> Val w x <$> (kcType w t *> pure t)
-  R.TopLet w ds   -> pure $ Just $ TopLet w ds
-  R.TopRec w ds   -> pure $ Just $ TopRec w ds
-  R.Asm    w x  a -> pure $ Just $ Asm w x a
+  TR.Val    w x  t -> Just <$> KC.Val w x <$> (kcType w t *> pure t)
+  TR.TopLet w ds   -> pure $ Just $ KC.TopLet w (fmap retagDefn ds)
+  TR.TopRec w ds   -> pure $ Just $ KC.TopRec w (fmap retagDefn ds)
+  TR.Asm    w x  a -> pure $ Just $ KC.Asm w x a
 
-kcModule ::R.Module -> KC Module
+kcModule ::TR.Module -> KC KC.Module
 kcModule module_ = catMaybes <$> traverse kcTopLevel module_
 
-checkModule :: MonadError String m => R.Module -> m Module
+checkModule :: MonadError String m => TR.Module -> m KC.Module
 checkModule = runExcept . kcModule

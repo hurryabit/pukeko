@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, TemplateHaskell #-}
 module Pukeko.Language.TypeChecker
-  ( Module
+  ( TC.Module
   , checkModule
   )
 where
@@ -15,19 +15,21 @@ import qualified Data.Map         as Map
 import           Data.Maybe       (isJust)
 import           Data.STRef
 import           Data.Traversable (for)
-import qualified Data.Vector.Sized as V
+import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
+import           Pukeko.Pos
 import           Pukeko.Pretty
-import           Pukeko.Language.Base.AST        hiding (Bound, Free)
-import           Pukeko.Language.TypeChecker.AST (TypeCon, Module, TopLevel (..))
-import qualified Pukeko.Language.KindChecker.AST as K
-import qualified Pukeko.Language.Ident           as Id
-import           Pukeko.Language.Type
+import           Pukeko.Language.AST.Classes
+import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.KindChecker.AST   as KC
+import qualified Pukeko.Language.TypeChecker.AST   as TC
+import qualified Pukeko.Language.Ident             as Id
+import qualified Pukeko.Language.Type              as Ty
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
-type TypeClosed = Type TypeCon Closed
-type TypeOpen s = Type TypeCon (Open s)
+type TypeClosed = Ty.Type TC.TypeCon  Ty.Closed
+type TypeOpen s = Ty.Type TC.TypeCon (Ty.Open s)
 
 data Environment v s = MkEnvironment
   { _locals :: Map v (TypeOpen s)
@@ -74,27 +76,27 @@ freshUVar :: TC v s (TypeOpen s)
 freshUVar = do
   _level <- view level
   _ident <- fresh %%= (\(x:xs) -> (x,xs))
-  UVar <$> liftST (newSTRef Free{_ident, _level})
+  Ty.UVar <$> liftST (newSTRef Ty.Free{Ty._ident, Ty._level})
 
 unify :: Pos -> TypeOpen s -> TypeOpen s -> TC v s ()
 unify w t1 t2 = TC $ lift $ lift $ U.unify w t1 t2
 
-defnName :: K.Defn v -> Maybe Id.EVar
+defnName :: KC.Defn v -> Maybe Id.EVar
 defnName = Just . view lhs
 
 localizeBinds
   :: (IsVar v)
   => (a -> Maybe Id.EVar)
-  -> Vector n a
-  -> Vector n (TypeOpen s)
+  -> Vec.Vector n a
+  -> Vec.Vector n (TypeOpen s)
   -> TC (FinScope n v) s b
   -> TC v s b
 localizeBinds name xs ts (TC tc) = TC $ withReaderT (locals %~ upd) tc
   where
     f i x = case name x of
       Nothing -> mempty
-      Just y  -> Map.singleton (bound i y) (ts V.! i)
-    upd old = ifoldMap f xs <> Map.mapKeysMonotonic free old
+      Just y  -> Map.singleton (bound i y) (ts Vec.! i)
+    upd old = ifoldMap f xs <> Map.mapKeysMonotonic weaken old
 
 localizePatn ::
   (IsVar v) =>
@@ -103,7 +105,7 @@ localizePatn ::
   TC v s a
 localizePatn mp (TC tc) = TC $ withReaderT (locals %~ upd) tc
   where
-    upd old = Map.mapKeysMonotonic (\x -> bound x x) mp <> Map.mapKeysMonotonic free old
+    upd old = Map.mapKeysMonotonic (\x -> bound x x) mp <> Map.mapKeysMonotonic weaken old
 
 lookupType :: (Ord v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
 lookupType w ident = do
@@ -114,96 +116,96 @@ lookupType w ident = do
 
 generalize :: TypeOpen s -> TC v s (TypeOpen s)
 generalize t = case t of
-  UVar uref -> do
+  Ty.UVar uref -> do
     uvar <- liftST $ readSTRef uref
     cur_level <- view level
     case uvar of
-      Free{_ident, _level}
-        | _level > cur_level -> return (Var _ident)
+      Ty.Free{Ty._ident, Ty._level}
+        | _level > cur_level -> return (Ty.Var _ident)
         | otherwise          -> return t
-      Link{ _type } -> generalize _type
-  Var _ -> return t
-  Fun tx ty -> Fun <$> generalize tx <*> generalize ty
-  App c  ts -> App c <$> traverse generalize ts
+      Ty.Link{Ty._type} -> generalize _type
+  Ty.Var _ -> return t
+  Ty.Fun tx ty -> Ty.Fun <$> generalize tx <*> generalize ty
+  Ty.App c  ts -> Ty.App c <$> traverse generalize ts
 
 instantiate :: TypeOpen s -> TC v s (TypeOpen s)
 instantiate t = do
-  vars <- liftST $ openVars t
+  vars <- liftST $ Ty.openVars t
   env <- sequence $ Map.fromSet (const freshUVar) vars
-  liftST $ openSubst env t
+  liftST $ Ty.openSubst env t
 
-instantiateADT :: TypeCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
-instantiateADT adt@MkADT{_params} = do
+instantiateADT :: TC.TypeCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
+instantiateADT adt@Ty.MkADT{Ty._params} = do
   t_params <- traverse (const freshUVar) _params
-  return (app adt t_params, Map.fromList $ zip _params t_params)
+  return (Ty.app adt t_params, Map.fromList $ zip _params t_params)
 
-inferPatn :: K.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
+inferPatn :: KC.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
   Bind (Wild _) -> return Map.empty
   Bind (Name _ ident) -> return (Map.singleton ident t_expr)
   Dest w con patns -> do
-    let MkConstructor{_name, _adt, _fields} = con
+    let Ty.MkConstructor{Ty._name, Ty._adt, Ty._fields} = con
     when (length patns /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _name) <+>
       "expects" <+> int (length _fields) <+> "arguments"
     (t_adt, env_adt) <- instantiateADT _adt
     unify w t_expr t_adt
-    t_fields <- liftST $ traverse (openSubst env_adt . open) _fields
+    t_fields <- liftST $ traverse (Ty.openSubst env_adt . Ty.open) _fields
     Map.unions <$> zipWithM inferPatn patns t_fields
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
   :: (IsVar v)
-  => Vector n (K.Defn v) -> TC v s (Vector n (TypeOpen s))
+  => Vec.Vector n (KC.Defn v) -> TC v s (Vec.Vector n (TypeOpen s))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
     t_rhss <- traverse (infer . view rhs) defns
     ifor_ defns $ \i defn ->
-      unify (defn^.pos) (t_lhss V.! i) (t_rhss V.! i)
+      unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
     return t_rhss
   traverse generalize t_rhss
 
 inferRec
   :: (IsVar v)
-  => Vector n (K.Defn (FinScope n v)) -> TC v s (Vector n (TypeOpen s))
+  => Vec.Vector n (KC.Defn (FinScope n v)) -> TC v s (Vec.Vector n (TypeOpen s))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
     t_rhss <- localizeBinds defnName defns t_lhss $ traverse (infer . view rhs) defns
     ifor_ defns $ \i defn ->
-      unify (defn^.pos) (t_lhss V.! i) (t_rhss V.! i)
+      unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
     return t_rhss
   traverse generalize t_rhss
 
-infer :: IsVar v => K.Expr v -> TC v s (TypeOpen s)
+infer :: IsVar v => KC.Expr v -> TC v s (TypeOpen s)
 infer expr = do
   let unifyHere t1 t2 = unify (expr^.pos) t1 t2
   case expr of
-    K.Var w ident -> do
+    Var w ident -> do
       t <- lookupType w ident
       instantiate t
-    K.Con _ con -> instantiate $ open (typeOf con)
-    K.Num _ _num -> return (open typeInt)
-    K.App _ fun args -> do
+    Con _ con -> instantiate $ Ty.open (Ty.typeOf con)
+    Num _ _num -> return (Ty.open Ty.typeInt)
+    App _ fun args -> do
       t_fun <- infer fun
       t_args <- traverse infer args
       t_res <- freshUVar
-      unifyHere t_fun (t_args *~> t_res)
+      unifyHere t_fun (t_args Ty.*~> t_res)
       return t_res
-    K.Lam _ binds rhs -> do
+    Lam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
       t_rhs <- localizeBinds bindName binds t_params (infer rhs)
-      return (toList t_params *~> t_rhs)
-    K.Let _ defns rhs -> do
+      return (toList t_params Ty.*~> t_rhs)
+    Let _ defns rhs -> do
       t_defns <- inferLet defns
       localizeBinds defnName defns t_defns (infer rhs)
-    K.Rec _ defns rhs -> do
+    Rec _ defns rhs -> do
       t_defns <- inferRec defns
       localizeBinds defnName defns t_defns (infer rhs)
-    -- K.If{} -> bug "type checker" "if-then-esle" Nothing
-    K.Mat _ expr altns -> do
+    -- KC.If{} -> bug "type checker" "if-then-esle" Nothing
+    Mat _ expr altns -> do
       t_expr <- infer expr
       t_res <- freshUVar
       for_ altns $ \(MkAltn w patn rhs) -> do
@@ -225,33 +227,33 @@ ensureDefinable w ident = do
 define :: Id.EVar -> TypeClosed -> TC v s ()
 define ident type_ = defined . at ident ?= type_
 
-checkTopLevel :: K.TopLevel -> TC Id.EVar s [TopLevel]
+checkTopLevel :: KC.TopLevel -> TC Id.EVar s [TC.TopLevel]
 checkTopLevel top = case top of
-  K.Val w ident type_ -> do
+  KC.Val w ident type_ -> do
     isDeclared <- uses declared (ident `Map.member`)
     when isDeclared $ throwAt w "duplicate declaration of function" ident
     declared . at ident ?= type_
     return []
-  K.TopLet _ defns -> handleLetOrRec inferLet id             defns
-  K.TopRec _ defns -> handleLetOrRec inferRec (fmap unscope) defns
-  K.Asm w ident asm -> do
+  KC.TopLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
+  KC.TopRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
+  KC.Asm w ident asm -> do
     t_decl <- ensureDefinable w ident
     define ident t_decl
-    return [Asm w ident asm]
+    return [TC.Asm w ident asm]
   where
     handleLetOrRec inferLetOrRec mkTopExpr defns = do
       t_decls <- for defns $ \defn -> ensureDefinable (defn^.pos) (defn^.lhs)
       resetFresh
-      env <- uses defined (fmap open)
+      env <- uses defined (fmap Ty.open)
       local (locals .~ env) $ do
         t_defns <- inferLetOrRec defns
         ifor_ defns $ \i defn -> do
           -- TODO: Check out if this is necessary.
-          t_defn <- instantiate (t_defns V.! i)
-          let t_decl = t_decls V.! i
-          unify (defn^.pos) (open t_decl) t_defn
+          t_defn <- instantiate (t_defns Vec.! i)
+          let t_decl = t_decls Vec.! i
+          unify (defn^.pos) (Ty.open t_decl) t_defn
           define (defn^.lhs) t_decl
-      return $ map (\(MkDefn w lhs rhs) -> Def w lhs (mkTopExpr rhs)) (toList defns)
+      return $ map (\(MkDefn w lhs rhs) -> TC.Def w lhs (mkTopExpr rhs)) (toList defns)
 
-checkModule :: MonadError String m => K.Module -> m Module
+checkModule :: MonadError String m => KC.Module -> m TC.Module
 checkModule module_ = evalTC $ concat <$> traverse checkTopLevel module_
