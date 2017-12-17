@@ -27,7 +27,7 @@ type Int
 let bad = Con
 
 -- TEST unknown in pattern
--- FAILURE (line 3, column 3): unknown term cons 'Con'
+-- FAILURE (line 3, column 5): unknown term cons 'Con'
 let f x =
   match x with
   | Con -> 1
@@ -227,14 +227,14 @@ val f : a -> Option a
 let f x = Some x x
 
 -- TEST underapplication in pattern
--- FAILURE (line 4, column 3): term cons 'Cons' expects 2 arguments
+-- FAILURE (line 4, column 5): term cons 'Cons' expects 2 arguments
 val f : List a -> a
 let f x =
   match x with
   | Cons y -> y
 
 -- TEST overapplication in pattern
--- FAILURE (line 4, column 3): term cons 'Some' expects 1 arguments
+-- FAILURE (line 4, column 5): term cons 'Some' expects 1 arguments
 val f : Option a -> a
 let f x =
   match x with
@@ -329,3 +329,91 @@ val f : A B -> A C -> A B
 external f = "f"
 val y : A B
 let y = f X X
+
+-- SUBSECTION pattern matching
+
+-- TEST ill-typed overlap
+-- FAILURE (line 2, column 5): mismatching types b and a
+val f : Pair a b -> a
+let f xy =
+  match xy with
+  | Pair x _ -> x
+  | Pair _ y -> y
+
+
+-- SECTION pattern matcher
+
+-- SUBSECTION successful
+
+-- TEST nested list pattern
+-- SUCCESS
+val last : a -> List a -> a
+let rec last x0 xs =
+  match xs with
+  | Nil                -> x0
+  | Cons x Nil         -> x
+  | Cons _ (Cons x xs) -> last x xs
+
+-- TEST allowed let abuse
+-- SUCCESS
+val f : a -> a
+let f x =
+  match x with
+  | y -> y
+
+-- SUBSECTION failing
+
+-- TEST forbidden let abuse
+-- FAILURE (line 3, column 3): pattern match too simple, use a let binding instead
+val f : a -> Option a
+let f x =
+  match Some x with
+  | y -> y
+
+-- TEST non-exhaustive top level
+-- FAILURE (line 3, column 3): unmatched constructor 'Second'
+val f : Choice a b -> a
+let f xy =
+  match xy with
+  | First x -> x
+
+-- TEST non-exhaustive nested
+-- FAILURE (line 3, column 3): unmatched constructor 'Second'
+val f : Pair (Choice a b) c -> a
+let f xyz =
+  match xyz with
+  | Pair (First x) z -> x
+
+-- TEST overlapping top level
+-- FAILURE (line 3, column 3): overlapping patterns
+val f : Pair a a -> a
+let f xy =
+  match xy with
+  | Pair x _ -> x
+  | Pair _ y -> y
+
+-- TEST overlapping nested
+-- FAILURE (line 3, column 3): overlapping patterns
+val f : Pair (Option a) a -> a
+let f xy =
+  match xy with
+  | Pair None     y -> y
+  | Pair (Some x) _ -> x
+  | Pair (Some _) y -> y
+
+-- TEST constructor rule top level
+-- FAILURE (line 3, column 3): cannot apply constructor rule
+val f : a -> Option a -> a
+let f x0 x_opt =
+  match x_opt with
+  | Some x -> x
+  | _      -> x0
+
+-- TEST constructor rule nested
+-- FAILURE (line 3, column 3): cannot apply constructor rule
+val f : a -> List (Option a) -> a
+let rec f x0 ys =
+  match ys with
+  | Nil              -> x0
+  | Cons (Some x) _  -> x
+  | Cons _        ys -> f x0 ys

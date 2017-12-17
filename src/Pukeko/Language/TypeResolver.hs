@@ -106,5 +106,10 @@ exprExprCons f = \case
   D.Rec w ds t    -> Rec w <$> (traverse . defnExprCons) f ds <*> exprExprCons f t
 
 altnExprCons :: IndexedTraversal Pos (D.Altn v) (Altn v) Id.Con ExprCon
-altnExprCons f (MkAltn w c bs t) =
-  MkAltn w <$> indexed f w c <*> pure bs <*> exprExprCons f t
+altnExprCons f (MkAltn w p t) =
+  MkAltn w <$> patnExprCons f p <*> exprExprCons f t
+
+patnExprCons :: IndexedTraversal Pos D.Patn Patn Id.Con ExprCon
+patnExprCons f = \case
+  Bind   b    -> pure $ Bind b
+  Dest w c ps -> Dest w <$> indexed f w c <*> (traverse . patnExprCons) f ps

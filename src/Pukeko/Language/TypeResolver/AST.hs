@@ -7,6 +7,7 @@ module Pukeko.Language.TypeResolver.AST
   , Defn
   , Expr (..)
   , Altn
+  , Patn
   , fvExpr
   )
 where
@@ -46,6 +47,8 @@ data Expr v
   | forall n. Rec Pos (Vector n (Defn (FinScope n v))) (Expr (FinScope n v))
 
 type Altn = StdAltn ExprCon Expr
+
+type Patn = StdPatn ExprCon
 
 -- * Functions
 

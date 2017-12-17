@@ -106,12 +106,12 @@ bind = Wild <$> getPosition <*  symbol "_" <|>
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
--- patn, apatn :: Parser Patn
--- patn  = Dest <$> getPosition <*> constructor <*> many apatn <|>
---         apatn
--- apatn = patn1 <|>
---         Dest <$> getPosition <*> constructor <*> pure [] <|>
---         parens patn
+patn, apatn :: Parser Patn
+patn  = Dest <$> getPosition <*> constructor <*> many apatn <|>
+        apatn
+apatn = Bind <$> bind <|>
+        Dest <$> getPosition <*> constructor <*> pure [] <|>
+        parens patn
 
 defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnValLhs = MkDefn <$> getPosition <*> evar
@@ -128,8 +128,7 @@ defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
 altn :: Parser (Altn Id.EVar)
 altn =
   MkAltn <$> getPosition
-         <*> (bar *> constructor)
-         <*> many bind
+         <*> (bar *> patn)
          <*> (arrow *> expr)
 
 let_ :: (Pos -> [Defn Id.EVar] -> a) -> (Pos -> [Defn Id.EVar] -> a) -> Parser a

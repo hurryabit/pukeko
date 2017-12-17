@@ -7,13 +7,13 @@ module Pukeko.Language.DeBruijner.AST
   , Defn
   , Expr (..)
   , Altn
+  , Patn
   , abstract
   , (//)
   )
 where
 
-import Control.Lens
-
+import           Control.Lens
 import           Pukeko.Language.Base.AST
 import           Pukeko.Language.Parser.AST (TypeCon, ExprCon)
 import qualified Pukeko.Language.Ident      as Id
@@ -42,6 +42,8 @@ data Expr v
   | forall n. Rec Pos (Vector n (Defn (FinScope n v))) (Expr (FinScope n v))
 
 type Altn = StdAltn ExprCon Expr
+
+type Patn = StdPatn ExprCon
 
 -- * Functions
 

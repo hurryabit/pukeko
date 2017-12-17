@@ -11,14 +11,14 @@ import           Data.Map (Map)
 import           Data.Vector.Sized (Vector)
 -- import qualified Data.Map as Map
 
--- import           Pukeko.Error
+import           Pukeko.Error
 -- import           Pukeko.Pretty
-import qualified Pukeko.Language.Type as Ty
+import qualified Pukeko.Language.Type             as Ty
 import           Pukeko.Core.Syntax
 import           Pukeko.Language.Base.AST         (IsVar (..))
 import qualified Pukeko.Language.Base.AST         as In
 import qualified Pukeko.Language.LambdaLifter.AST as In
-import qualified Pukeko.Language.Ident  as Id
+import qualified Pukeko.Language.Ident            as Id
 
 type CCState = Map Id.EVar Name
 
@@ -68,8 +68,12 @@ ccExpr = \case
   In.Mat _ t  as -> Match <$> ccExpr t <*> traverse ccAltn as
 
 ccAltn :: IsVar v => In.Altn v -> CC Altn
-ccAltn (In.MkAltn _ _ bs t) =
-  MkAltn (ccBinds bs) <$> ccExpr t
+ccAltn (In.MkAltn _ p t) = MkAltn (ccPatn p) <$> ccExpr t
+
+ccPatn :: In.Patn -> [Maybe Name]
+ccPatn = \case
+  In.Simp _ _ bs -> map (fmap name . In.bindName) bs
+  _ -> bug "core compiler" "expected simple pattern" Nothing
 
 ccBinds :: Vector n In.Bind -> [Maybe Name]
 ccBinds = map (fmap name . In.bindName) . toList

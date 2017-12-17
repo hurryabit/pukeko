@@ -41,10 +41,10 @@ let nats =
 let pair op xs1 =
       match xs1 with
       | Nil -> Nil
-      | Cons x1 xs2 ->
-        match xs2 with
+      | Cons pair$pm1 pair$pm2 ->
+        match pair$pm2 with
         | Nil -> xs1
-        | Cons x2 xs3 -> Cons (op x1 x2) (pair op xs3)
+        | Cons x2 xs3 -> Cons (op pair$pm1 x2) (pair op xs3)
 let single i x = RmqNode i i x RmqEmpty RmqEmpty
 let combine op t1 t2 =
       match t1 with
@@ -56,9 +56,9 @@ let combine op t1 t2 =
 let build$ll1 op run ts =
       match ts with
       | Nil -> abort
-      | Cons t1 ts2 ->
-        match ts2 with
-        | Nil -> t1
+      | Cons build$pm1 build$pm2 ->
+        match build$pm2 with
+        | Nil -> build$pm1
         | Cons _ _ -> run (pair (combine op) ts)
 let build op xs =
       let rec run = build$ll1 op run in

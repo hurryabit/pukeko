@@ -53,8 +53,17 @@ ixWithBinds mk bs0 t = V.withList bs0 $ \bs1 ->
   let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs1
   in  mk bs1 (ixExprAbs mp t)
 
+ixWithPatn ::
+  (Patn -> Expr (Scope Id.EVar Id.EVar) -> a) ->
+  P.Patn                                      ->
+  P.Expr Id.EVar                              ->
+  a
+ixWithPatn mk p t =
+  let mp = Map.fromList $ map (\x -> (x, x)) $ toListOf (patnBind . _Name . _2) p
+  in  mk p (ixExprAbs mp t)
+
 ixAltn :: P.Altn Id.EVar -> Altn Id.EVar
-ixAltn (P.MkAltn w c bs t) = ixWithBinds (MkAltn w c) bs t
+ixAltn (P.MkAltn w p t) = ixWithPatn (MkAltn w) p t
 
 ixDefns
   :: [P.Defn Id.EVar]

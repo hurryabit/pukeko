@@ -6,6 +6,7 @@ module Pukeko.Language.LambdaLifter.AST
   , Defn
   , Expr (..)
   , Altn
+  , Patn
   )
 where
 
@@ -37,6 +38,8 @@ data Expr v
   | forall n. Rec Pos (Vector n (Defn (FinScope n v))) (Expr (FinScope n v))
 
 type Altn = StdAltn ExprCon Expr
+
+type Patn = StdPatn ExprCon
 
 deriving instance Functor     Expr
 deriving instance Foldable    Expr
@@ -120,8 +123,8 @@ prettyBinds :: Vector n Bind -> Doc
 prettyBinds = hsep . map pretty . toList
 
 instance IsVar v => Pretty (Altn v) where
-  pPrintPrec lvl _ (MkAltn _ c bs t) =
-    hang ("|" <+> pretty c <+> prettyBinds bs <+> "->") 2 (pPrintPrec lvl 0 t)
+  pPrintPrec lvl _ (MkAltn _ p t) =
+    hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
 instance Pretty TopLevel where
   pPrintPrec _ _ = \case

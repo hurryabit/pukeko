@@ -8,6 +8,7 @@ module Pukeko.Language.Parser.AST
   , Defn
   , Expr (..)
   , Altn (..)
+  , Patn
 
     -- * Smart constructors
   , mkApp
@@ -46,8 +47,9 @@ data Expr v
   | Let Pos [Defn v] (Expr v)
   | Rec Pos [Defn v] (Expr v)
 
-data Altn v = MkAltn Pos ExprCon [Bind] (Expr v)
+data Altn v = MkAltn Pos Patn (Expr v)
 
+type Patn = StdPatn ExprCon
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
 mkApp pos fun args
@@ -61,8 +63,8 @@ mkAppOp sym pos arg1 arg2 =
 
 mkIf :: Pos -> Expr v -> Pos -> Expr v -> Pos -> Expr v -> Expr v
 mkIf wt t wu u wv v =
-  Mat wt t [ MkAltn wu (Id.constructor "True" ) [] u
-           , MkAltn wv (Id.constructor "False") [] v
+  Mat wt t [ MkAltn wu (Dest wu (Id.constructor "True") []) u
+           , MkAltn wv (Dest wv (Id.constructor "False") []) v
            ]
 
 mkLam :: Pos -> [Bind] -> Expr v -> Expr v

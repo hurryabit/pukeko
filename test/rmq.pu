@@ -7,10 +7,8 @@ val pair : (a -> a -> a) -> List a -> List a
 let rec pair op xs1 =
   match xs1 with
   | Nil -> Nil
-  | Cons x1 xs2 ->
-    match xs2 with
-    | Nil -> xs1
-    | Cons x2 xs3 -> Cons (op x1 x2) (pair op xs3)
+  | Cons x1 Nil -> xs1
+  | Cons x1 (Cons x2 xs3) -> Cons (op x1 x2) (pair op xs3)
 
 type RmqTree a =
   | RmqEmpty
@@ -34,10 +32,8 @@ let build op xs =
   let rec run ts =
     match ts with
     | Nil -> abort
-    | Cons t1 ts2 ->
-      match ts2 with
-      | Nil -> t1
-      | Cons _ _ -> run (pair (combine op) ts)
+    | Cons t1 Nil -> t1
+    | Cons t1 (Cons _ _) -> run (pair (combine op) ts)
   in
   run (zip_with single nats xs)
 

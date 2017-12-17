@@ -20,7 +20,7 @@ import qualified Data.Vector.Sized as V
 import           Pukeko.Error
 import           Pukeko.Pretty
 import           Pukeko.Language.Base.AST        hiding (Bound, Free)
-import           Pukeko.Language.TypeChecker.AST (TypeCon, ExprCon, Module, TopLevel (..))
+import           Pukeko.Language.TypeChecker.AST (TypeCon, Module, TopLevel (..))
 import qualified Pukeko.Language.KindChecker.AST as K
 import qualified Pukeko.Language.Ident           as Id
 import           Pukeko.Language.Type
@@ -82,19 +82,28 @@ unify w t1 t2 = TC $ lift $ lift $ U.unify w t1 t2
 defnName :: K.Defn v -> Maybe Id.EVar
 defnName = Just . view lhs
 
-localize
+localizeBinds
   :: (IsVar v)
   => (a -> Maybe Id.EVar)
   -> Vector n a
   -> Vector n (TypeOpen s)
   -> TC (FinScope n v) s b
   -> TC v s b
-localize name xs ts (TC tc) = TC $ withReaderT (locals %~ upd) tc
+localizeBinds name xs ts (TC tc) = TC $ withReaderT (locals %~ upd) tc
   where
     f i x = case name x of
       Nothing -> mempty
       Just y  -> Map.singleton (bound i y) (ts V.! i)
     upd old = ifoldMap f xs <> Map.mapKeysMonotonic free old
+
+localizePatn ::
+  (IsVar v) =>
+  Map Id.EVar (TypeOpen s) ->
+  TC (Scope Id.EVar v) s a ->
+  TC v s a
+localizePatn mp (TC tc) = TC $ withReaderT (locals %~ upd) tc
+  where
+    upd old = Map.mapKeysMonotonic (\x -> bound x x) mp <> Map.mapKeysMonotonic free old
 
 lookupType :: (Ord v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
 lookupType w ident = do
@@ -128,35 +137,19 @@ instantiateADT adt@MkADT{_params} = do
   t_params <- traverse (const freshUVar) _params
   return (app adt t_params, Map.fromList $ zip _params t_params)
 
--- inferPatn :: K.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
--- inferPatn patn t_expr = case patn of
---   Wild _ -> return Map.empty
---   Bind _ ident -> return (Map.singleton ident t_expr)
---   Dest w con patns -> do
---     let MkConstructor{_name, _adt, _fields} = con
---     when (length patns /= length _fields) $
---       throwDocAt w $ "term cons" <+> quotes (pretty _name) <+>
---       "expects" <+> int (length _fields) <+> "arguments"
---     (t_adt, env_adt) <- instantiateADT _adt
---     unify w t_expr t_adt
---     t_fields <- liftST $ traverse (openSubst env_adt . open) _fields
---     Map.unions <$> zipWithM inferPatn patns t_fields
-
-inferPatn
-  :: Pos
-  -> ExprCon
-  -> Vector n Bind
-  -> TypeOpen s
-  -> TC v s (Vector n (TypeOpen s))
-inferPatn w MkConstructor{_name, _adt, _fields} binds t_expr = do
-  case V.matchList binds _fields of
-    Nothing ->
+inferPatn :: K.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
+inferPatn patn t_expr = case patn of
+  Bind (Wild _) -> return Map.empty
+  Bind (Name _ ident) -> return (Map.singleton ident t_expr)
+  Dest w con patns -> do
+    let MkConstructor{_name, _adt, _fields} = con
+    when (length patns /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _name) <+>
       "expects" <+> int (length _fields) <+> "arguments"
-    Just fields ->  do
-      (t_adt, env_adt) <- instantiateADT _adt
-      unify w t_expr t_adt
-      liftST $ traverse (openSubst env_adt . open) fields
+    (t_adt, env_adt) <- instantiateADT _adt
+    unify w t_expr t_adt
+    t_fields <- liftST $ traverse (openSubst env_adt . open) _fields
+    Map.unions <$> zipWithM inferPatn patns t_fields
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
@@ -178,7 +171,7 @@ inferRec
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
-    t_rhss <- localize defnName defns t_lhss $ traverse (infer . view rhs) defns
+    t_rhss <- localizeBinds defnName defns t_lhss $ traverse (infer . view rhs) defns
     ifor_ defns $ \i defn ->
       unify (defn^.pos) (t_lhss V.! i) (t_rhss V.! i)
     return t_rhss
@@ -201,21 +194,21 @@ infer expr = do
       return t_res
     K.Lam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
-      t_rhs <- localize bindName binds t_params (infer rhs)
+      t_rhs <- localizeBinds bindName binds t_params (infer rhs)
       return (toList t_params *~> t_rhs)
     K.Let _ defns rhs -> do
       t_defns <- inferLet defns
-      localize defnName defns t_defns (infer rhs)
+      localizeBinds defnName defns t_defns (infer rhs)
     K.Rec _ defns rhs -> do
       t_defns <- inferRec defns
-      localize defnName defns t_defns (infer rhs)
+      localizeBinds defnName defns t_defns (infer rhs)
     -- K.If{} -> bug "type checker" "if-then-esle" Nothing
     K.Mat _ expr altns -> do
       t_expr <- infer expr
       t_res <- freshUVar
-      for_ altns $ \(MkAltn w con binds rhs) -> do
-        t_binds <- inferPatn w con binds t_expr
-        t_rhs <- localize bindName binds t_binds (infer rhs)
+      for_ altns $ \(MkAltn w patn rhs) -> do
+        t_binds <- inferPatn patn t_expr
+        t_rhs <- localizePatn t_binds (infer rhs)
         unify w t_res t_rhs
       return t_res
 

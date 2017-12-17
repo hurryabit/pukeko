@@ -1,4 +1,5 @@
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 -- | This module provides types and functions used by many ASTs.
 module Pukeko.Language.Base.AST
   ( -- * Position in the input file
@@ -16,7 +17,15 @@ module Pukeko.Language.Base.AST
   , StdAltn (MkAltn)
   , altnRhs
   , mapAltnRhs
+  , StdPatn (..)
+  , pattern Simp
+  , _Bind
+  , _Dest
+  , patnToBind
+  , patnBind
   , Bind (..)
+  , _Wild
+  , _Name
   , bindName
 
     -- * Type safe de Bruijn indices
@@ -26,6 +35,9 @@ module Pukeko.Language.Base.AST
   , _Free
   , bound
   , free
+  , strengthen
+  , weaken1
+  , abstract1
   , unscope
   , IsVar (..)
 
@@ -38,11 +50,13 @@ module Pukeko.Language.Base.AST
 
 import           Control.Lens
 import           Data.Finite       (Finite)
+import           Data.Foldable     (toList)
 import           Data.Forget
 import           Data.Vector.Sized (Vector)
 import           GHC.TypeLits      (KnownNat)
 import           Text.Parsec       (SourcePos)
 
+import           Pukeko.Error      (bug)
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
 
@@ -77,22 +91,37 @@ data StdDefn (expr :: * -> *) v = MkDefn
   }
   deriving (Functor, Foldable, Traversable)
 
-makeLenses ''StdDefn
-
-
 data StdAltn con (expr :: * -> *) v =
-  forall n. MkAltn Pos con (Vector n Bind) (expr (FinScope n v))
+  MkAltn Pos (StdPatn con) (expr (Scope Id.EVar v))
+
+data StdPatn con
+   = Bind     Bind
+   | Dest Pos con [StdPatn con]
+
+pattern Simp :: Pos -> con -> [Bind] -> StdPatn con
+pattern Simp w c bs <- Dest w c (traverse patnToBind -> Just bs)
+  where Simp w c bs = Dest w c (map Bind bs)
 
 altnRhs
   :: Functor f
   => (forall i. Ord i => expr1 (Scope i v1) -> f (expr2 (Scope i v2)))
   -> StdAltn con expr1 v1 -> f (StdAltn con expr2 v2)
-altnRhs f (MkAltn w c bs t) = MkAltn w c bs <$> f t
+altnRhs f (MkAltn w p t) = MkAltn w p <$> f t
 
 mapAltnRhs
   :: (forall i. expr (Scope i v1) -> expr (Scope i v2))
   -> StdAltn con expr v1 -> StdAltn con expr v2
 mapAltnRhs f = runIdentity . altnRhs (Identity . f)
+
+patnToBind :: StdPatn con -> Maybe Bind
+patnToBind = \case
+  Bind b -> Just b
+  Dest{} -> Nothing
+
+patnBind :: Traversal' (StdPatn con) Bind
+patnBind f = \case
+  Bind   b    -> Bind <$> f b
+  Dest w c ps -> Dest w c <$> (traverse . patnBind) f ps
 
 data Bind
   = Wild Pos
@@ -110,14 +139,27 @@ data Scope i v
 
 type FinScope n = Scope (Finite n)
 
-makePrisms ''Scope
-
-
 bound :: i -> Id.EVar -> Scope i v
 bound i x = Bound i (Forget x)
 
 free :: v -> Scope i v
 free = Free
+
+strengthen :: String -> Scope i v -> v
+strengthen component = \case
+  Bound _ (Forget x) -> bug component "cannot strengthen" (Just (show x))
+  Free  x            -> x
+
+weaken1 :: Scope j v -> Scope j (Scope i v)
+weaken1 = \case
+  Bound j x -> Bound j x
+  Free  x   -> Free  (Free x)
+
+abstract1 :: (j -> Maybe i) -> Scope j v -> Scope j (Scope i v)
+abstract1 f = \case
+  Bound (f -> Just i) x -> Free (Bound i x)
+  Bound j             x -> Bound j x
+  Free  x               -> Free (Free x)
 
 -- TODO: Find out where we use the inverse 'scope' without naming it like this.
 -- It's probably in the de Bruijn indexer.
@@ -145,8 +187,14 @@ instance (Ord i, IsVar v) => IsVar (Scope i v) where
     Free  v   -> isTotallyFree v
   mkTotallyFree = Free . mkTotallyFree
 
--- * Instances
+-- * Optics
+makeLenses ''StdDefn
 
+makePrisms ''Bind
+makePrisms ''Scope
+makePrisms ''StdPatn
+
+-- * Instances
 instance HasPos (StdDefn expr v) where
   pos = defnPos
 
@@ -166,13 +214,20 @@ instance HasRhs2 StdDefn where
   rhs2 = defnRhs
 
 instance HasPos (StdAltn con expr v) where
-  pos f (MkAltn w c bs t) = fmap (\w' -> MkAltn w' c bs t) (f w)
+  pos f (MkAltn w p t) = fmap (\w' -> MkAltn w' p t) (f w)
 
 
 instance Pretty v => Pretty (Scope i v) where
   pPrint = \case
     Bound _ (Forget x) -> pretty x
     Free v -> pretty v
+
+instance Pretty con => Pretty (StdPatn con) where
+  pPrintPrec lvl prec = \case
+    Bind   b    -> pretty b
+    Dest _ c ps ->
+      maybeParens (prec > 0 && not (null ps)) $
+      pretty c <+> hsep (map (pPrintPrec lvl 1) (toList ps))
 
 instance Pretty Bind where
   pPrint = \case
