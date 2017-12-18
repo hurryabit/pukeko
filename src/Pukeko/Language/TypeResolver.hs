@@ -37,14 +37,11 @@ runTR tr =
 
 -- TODO: Use @typeApps . _1@ to do this.
 trType :: Pos -> Ty.Type Id.Con Ty.Closed -> TR (Ty.Type TR.TypeCon Ty.Closed)
-trType posn typ = case typ of
-    Ty.Var var -> return $ Ty.Var var
-    Ty.Fun tx ty -> Ty.Fun <$> trType posn tx <*> trType posn ty
-    Ty.App con typs -> do
-      adt_opt <- Map.lookup con <$> use typeCons
-      case adt_opt of
-        Nothing -> throwAt posn "unknown type cons" con
-        Just adt -> Ty.App adt <$> traverse (trType posn) typs
+trType w = Ty.type2con $ \con -> do
+  adt_opt <- Map.lookup con <$> use typeCons
+  case adt_opt of
+    Nothing  -> throwAt w "unknown type cons" con
+    Just adt -> pure adt
 
 -- TODO: Have only one insert function.
 insertTypeCon :: Pos -> TR.TypeCon -> TR ()

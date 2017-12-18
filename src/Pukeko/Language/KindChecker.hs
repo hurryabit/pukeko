@@ -6,8 +6,7 @@ module Pukeko.Language.KindChecker
   )
 where
 
-import           Control.Lens
-import           Control.Monad (unless, when)
+import           Control.Monad (unless)
 import           Data.Foldable
 import           Data.Maybe    (catMaybes)
 import qualified Data.Set      as Set
@@ -24,11 +23,21 @@ type Type = Ty.Type KC.TypeCon Ty.Closed
 type KC a = Except String a
 
 kcType :: Pos -> Type -> KC ()
-kcType w = itraverseOf_ Ty.typeCons $ \typs Ty.MkADT{_name, _params} -> do
-  -- TODO: Check that params are mutually distinct.
-  when (length _params /= length typs) $ throwDocAt w $
-    "type cons" <+> quotes (pretty _name) <+> "expects" <+>
-    int (length _params) <+> "parameters"
+kcType w = go 0
+  where
+    go :: Int -> Type -> KC ()
+    go n = \case
+      Ty.Var _ | n == 0 -> pure ()
+      Ty.Arr   | n == 2 -> pure ()
+      Ty.Con Ty.MkADT{_name, _params}
+        -- TODO: Check that params are mutually distinct.
+        | length _params == n -> pure ()
+        | otherwise           ->
+            throwDocAt w $
+            "type cons" <+> quotes (pretty _name) <+> "expects" <+>
+            int (length _params) <+> "parameters"
+      Ty.App tf tp -> go (n+1) tf *> go 0 tp
+      _ -> bug "kind checker" "higher kinded polymorphism is not implemented yet" Nothing
 
 kcTopLevel :: TR.TopLevel -> KC (Maybe KC.TopLevel)
 kcTopLevel = \case

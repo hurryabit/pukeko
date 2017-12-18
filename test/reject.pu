@@ -217,12 +217,12 @@ and g x = f x
 -- SUBSECTION term cons
 
 -- TEST underapplication in expression
--- FAILURE (line 2, column 5): mismatching types Option a and _3 -> Option _3
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _3
 val bad : Option a
 let bad = Some
 
 -- TEST overapplication in expression
--- FAILURE (line 2, column 11): mismatching types Option _2 and _2 -> _4
+-- FAILURE (line 2, column 11): mismatching types Option and (->) _2
 val f : a -> Option a
 let f x = Some x x
 
@@ -248,7 +248,7 @@ val bad : Unit
 let bad = 1
 
 -- TEST type cons vs arrow
--- FAILURE (line 2, column 5): mismatching types Option a and _3 -> _3
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _3
 val bad : Option a
 let bad = fun y -> y
 

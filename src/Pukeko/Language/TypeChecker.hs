@@ -115,18 +115,19 @@ lookupType w ident = do
     Just t  -> return t
 
 generalize :: TypeOpen s -> TC v s (TypeOpen s)
-generalize t = case t of
-  Ty.UVar uref -> do
+generalize = \case
+  t@(Ty.UVar uref) -> do
     uvar <- liftST $ readSTRef uref
     cur_level <- view level
     case uvar of
       Ty.Free{Ty._ident, Ty._level}
-        | _level > cur_level -> return (Ty.Var _ident)
-        | otherwise          -> return t
+        | _level > cur_level -> pure (Ty.Var _ident)
+        | otherwise          -> pure t
       Ty.Link{Ty._type} -> generalize _type
-  Ty.Var _ -> return t
-  Ty.Fun tx ty -> Ty.Fun <$> generalize tx <*> generalize ty
-  Ty.App c  ts -> Ty.App c <$> traverse generalize ts
+  t@(Ty.Var _) -> pure t
+  t@Ty.Arr     -> pure t
+  t@(Ty.Con _) -> pure t
+  Ty.App tf tp -> Ty.App <$> generalize tf <*> generalize tp
 
 instantiate :: TypeOpen s -> TC v s (TypeOpen s)
 instantiate t = do
@@ -137,7 +138,7 @@ instantiate t = do
 instantiateADT :: TC.TypeCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
 instantiateADT adt@Ty.MkADT{Ty._params} = do
   t_params <- traverse (const freshUVar) _params
-  return (Ty.app adt t_params, Map.fromList $ zip _params t_params)
+  return (Ty.appADT adt t_params, Map.fromList $ zip _params t_params)
 
 inferPatn :: KC.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
