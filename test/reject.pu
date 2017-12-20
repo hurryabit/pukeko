@@ -97,6 +97,31 @@ type Typ a =
 type Typ a a =
   | Con a
 
+-- TEST self application of type variable
+-- FAILURE (line 1, column 1): occurs check
+type Typ f =
+  | Con (f f)
+
+-- TEST type variable of kinds * and * -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and _252 -> *
+type Typ f a =
+  | Con f (f a)
+
+-- TEST type variable of kinds * -> * and * -> * -> *
+-- FAILURE (line 1, column 1): cannot unify kinds _253 -> * and *
+type Typ f a b =
+  | Con (f a b) (f a)
+
+-- TEST phantom type variable has kind *
+-- FAILURE (line 5, column 1): cannot unify kinds * -> * and *
+type Typ1 a =
+  | Con1
+and Typ2 a b =
+  | Con2 (a b)
+type Typ3 f a =
+  | Con3 (Typ1 f) (Typ2 f a)
+
+
 -- SUBSECTION function declaration
 
 -- TEST underapplication
