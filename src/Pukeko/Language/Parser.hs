@@ -73,13 +73,11 @@ type_, atype :: Parser (Ty.Type TypeCon Ty.Closed)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (Ty.~>)) AssocRight ] ]
-    ( Ty.appADT <$> constructor <*> many atype
-      <|> atype
-    )
+    (Ty.app <$> atype <*> many atype)
   <?> "type"
 atype = choice
   [ Ty.var <$> tvar
-  , Ty.appADT <$> constructor <*> pure []
+  , Ty.con <$> constructor
   , parens type_
   ]
 

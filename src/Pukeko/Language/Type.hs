@@ -13,6 +13,7 @@ module Pukeko.Language.Type
   , Closed
   , open
   , var
+  , con
   , (~>)
   , (*~>)
   , app
@@ -94,6 +95,9 @@ pattern Fun tx ty = App (App Arr tx) ty
 
 var :: Ident.TVar -> Type con a
 var = Var
+
+con :: con -> Type con a
+con = Con
 
 (~>) :: Type con a -> Type con a -> Type con a
 (~>) = Fun
