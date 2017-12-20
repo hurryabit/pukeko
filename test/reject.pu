@@ -56,39 +56,39 @@ type Typ =
 -- SUBSECTION type definition
 
 -- TEST underapplication in one definition
--- FAILURE (line 1, column 1): type cons 'Typ1' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds _251 -> * and *
 type Typ1 a
 and Typ2 =
   | Con Typ1
 
 -- TEST underapplication in recursive definition
--- FAILURE (line 1, column 1): type cons 'Typ' expects 2 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds _251 -> * and *
 type Typ a b =
   | Con (Typ a)
 
 -- TEST underapplication in two definitions
--- FAILURE (line 1, column 1): type cons 'List' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * -> * and *
 type Typ =
   | Con List
 
 -- TEST overapplication in one definition
--- FAILURE (line 1, column 1): type cons 'Typ1' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and _254 -> *
 type Typ1 a
 and Typ2 a =
   | Con (Typ1 a a)
 
 -- TEST overapplication in recursive definition
--- FAILURE (line 1, column 1): type cons 'Typ' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and _252 -> *
 type Typ a =
   | Con (Typ a a)
 
 -- TEST overapplication in two definitions
--- FAILURE (line 1, column 1): type cons 'Int' expects 0 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and _251 -> *
 type Typ a =
   | Con (Int a)
 
 -- TEST unbound type variable
--- FAILURE (line 1, column 1): unbound type vars in term cons 'Con'
+-- FAILURE (line 1, column 1): unknown type variable: b
 type Typ a =
   | Con b
 
@@ -100,11 +100,11 @@ type Typ a a =
 -- SUBSECTION function declaration
 
 -- TEST underapplication
--- FAILURE (line 1, column 1): type cons 'List' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * -> * and *
 val bad : List
 
 -- TEST overapplication
--- FAILURE (line 1, column 1): type cons 'Unit' expects 0 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and * -> *
 val bad : Unit Int
 
 
