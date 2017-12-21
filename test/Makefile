@@ -22,6 +22,7 @@ SOURCES     = monad_io.pu \
 							catalan.pu \
 							wildcard.pu \
 							rmq.pu \
+							fix.pu \
 							sort_gen.pu \
 							rmq_gen.pu
 LAMBDAS     = $(SOURCES:.pu=.ll)

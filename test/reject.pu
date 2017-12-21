@@ -56,39 +56,39 @@ type Typ =
 -- SUBSECTION type definition
 
 -- TEST underapplication in one definition
--- FAILURE (line 1, column 1): type cons 'Typ1' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds _251 -> * and *
 type Typ1 a
 and Typ2 =
   | Con Typ1
 
 -- TEST underapplication in recursive definition
--- FAILURE (line 1, column 1): type cons 'Typ' expects 2 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds _251 -> * and *
 type Typ a b =
   | Con (Typ a)
 
 -- TEST underapplication in two definitions
--- FAILURE (line 1, column 1): type cons 'List' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * -> * and *
 type Typ =
   | Con List
 
 -- TEST overapplication in one definition
--- FAILURE (line 1, column 1): type cons 'Typ1' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and _254 -> *
 type Typ1 a
 and Typ2 a =
   | Con (Typ1 a a)
 
 -- TEST overapplication in recursive definition
--- FAILURE (line 1, column 1): type cons 'Typ' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and _252 -> *
 type Typ a =
   | Con (Typ a a)
 
 -- TEST overapplication in two definitions
--- FAILURE (line 1, column 1): type cons 'Int' expects 0 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and _251 -> *
 type Typ a =
   | Con (Int a)
 
 -- TEST unbound type variable
--- FAILURE (line 1, column 1): unbound type vars in term cons 'Con'
+-- FAILURE (line 1, column 1): unknown type variable: b
 type Typ a =
   | Con b
 
@@ -97,14 +97,39 @@ type Typ a =
 type Typ a a =
   | Con a
 
+-- TEST self application of type variable
+-- FAILURE (line 1, column 1): occurs check
+type Typ f =
+  | Con (f f)
+
+-- TEST type variable of kinds * and * -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and _252 -> *
+type Typ f a =
+  | Con f (f a)
+
+-- TEST type variable of kinds * -> * and * -> * -> *
+-- FAILURE (line 1, column 1): cannot unify kinds _253 -> * and *
+type Typ f a b =
+  | Con (f a b) (f a)
+
+-- TEST phantom type variable has kind *
+-- FAILURE (line 5, column 1): cannot unify kinds * -> * and *
+type Typ1 a =
+  | Con1
+and Typ2 a b =
+  | Con2 (a b)
+type Typ3 f a =
+  | Con3 (Typ1 f) (Typ2 f a)
+
+
 -- SUBSECTION function declaration
 
 -- TEST underapplication
--- FAILURE (line 1, column 1): type cons 'List' expects 1 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * -> * and *
 val bad : List
 
 -- TEST overapplication
--- FAILURE (line 1, column 1): type cons 'Unit' expects 0 parameters
+-- FAILURE (line 1, column 1): cannot unify kinds * and * -> *
 val bad : Unit Int
 
 
@@ -217,12 +242,12 @@ and g x = f x
 -- SUBSECTION term cons
 
 -- TEST underapplication in expression
--- FAILURE (line 2, column 5): mismatching types Option a and _3 -> Option _3
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _3
 val bad : Option a
 let bad = Some
 
 -- TEST overapplication in expression
--- FAILURE (line 2, column 11): mismatching types Option _2 and _2 -> _4
+-- FAILURE (line 2, column 11): mismatching types Option and (->) _2
 val f : a -> Option a
 let f x = Some x x
 
@@ -248,7 +273,7 @@ val bad : Unit
 let bad = 1
 
 -- TEST type cons vs arrow
--- FAILURE (line 2, column 5): mismatching types Option a and _3 -> _3
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _3
 val bad : Option a
 let bad = fun y -> y
 

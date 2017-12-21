@@ -109,6 +109,7 @@ main = hspec $ beforeAll_ compile $ do
   describe "test basics" $ do
     testBasic "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
     testBasic "wildcard" [7, 13] [7, 13]
+    testBasic "fix"      (10:[1 .. 10]) [2, 4 .. 20]
   describe "test sorting" $ mapM_ testSort
     [ "isort"
     , "qsort"

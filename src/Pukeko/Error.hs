@@ -10,6 +10,7 @@ module Pukeko.Error
   , runExcept
   , ExceptT (..)
   , runExceptT
+  , here
   )
   where
 
@@ -45,3 +46,6 @@ runExcept = either throwError return . Except.runExcept
 
 runExceptT :: (MonadError e m, Monad n) => ExceptT e n a -> n (m a)
 runExceptT = fmap (either throwError return) . Except.runExceptT
+
+here :: MonadError String m => Pos -> m a -> m a
+here pos act = act `catchError` throwErrorAt pos

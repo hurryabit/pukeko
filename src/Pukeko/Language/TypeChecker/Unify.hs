@@ -6,7 +6,6 @@ where
 
 import           Control.Monad.Except
 import           Control.Monad.ST
-import           Data.Foldable        (traverse_)
 import           Data.STRef
 
 import           Pukeko.Error
@@ -43,9 +42,10 @@ occursCheck uref1 t2 = case t2 of
                 lift $ writeSTRef uref2 Free{_ident, _level = min level1 level2}
               _ -> bug "type unifier" "bad case in occurs check" Nothing
           Link t2' -> occursCheck uref1 t2'
-  Var _ -> return ()
-  Fun tx ty -> occursCheck uref1 tx >> occursCheck uref1 ty
-  App _ ts -> traverse_ (occursCheck uref1) ts
+  Var _ -> pure ()
+  Con _ -> pure ()
+  Arr   -> pure ()
+  App tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
 unify :: Pos -> TypeOpen s -> TypeOpen s -> TU s ()
 unify pos t1 t2 = do
@@ -64,11 +64,14 @@ unify pos t1 t2 = do
         _ -> bug "type unifier" "bad pattern in unifier" Nothing
     (_, UVar _) -> unify pos t2 t1
     (Var name1, Var name2)
-      | name1 == name2 -> return ()
-    (Fun tx1 ty1, Fun tx2 ty2) -> unify pos tx1 tx2 >> unify pos ty1 ty2
+      | name1 == name2 -> pure ()
+    (Arr, Arr) -> pure ()
     -- TODO: Make ADT comparable itself.
-    (App MkADT{_name = c1} ts1, App MkADT{_name = c2} ts2)
-      | c1 == c2 -> zipWithM_ (unify pos) ts1 ts2
+    (Con MkADT{_name = c1}, Con MkADT{_name = c2})
+      | c1 == c2 -> pure ()
+    -- NOTE: The kind checker has ensured that @length ts == length us@.
+    (App tf1 tp1, App tf2 tp2) ->
+      unify pos tf1 tf2 *> unify pos tp1 tp2
     _ -> do
       p1 <- lift $ prettyType prettyNormal 0 t1
       p2 <- lift $ prettyType prettyNormal 0 t2
