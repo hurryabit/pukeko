@@ -1,4 +1,7 @@
-{-# LANGUAGE RankNTypes, TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 module Pukeko.Language.TypeChecker
   ( TC.Module
   , checkModule
@@ -22,6 +25,7 @@ import           Pukeko.Pos
 import           Pukeko.Pretty
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.KindChecker.AST   as KC
 import qualified Pukeko.Language.TypeChecker.AST   as TC
 import qualified Pukeko.Language.Ident             as Id
@@ -32,7 +36,7 @@ type TypeClosed = Ty.Type TC.TypeCon  Ty.Closed
 type TypeOpen s = Ty.Type TC.TypeCon (Ty.Open s)
 
 data Environment v s = MkEnvironment
-  { _locals :: Map v (TypeOpen s)
+  { _locals :: Sc.EnvOf v (TypeOpen s)
   , _level  :: Int
   }
 makeLenses ''Environment
@@ -46,7 +50,7 @@ data TCState = MkTCState
 makeLenses ''TCState
 
 newtype TC v s a =
-  TC {unTC :: ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s))) a}
+  TC{unTC :: ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s))) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment v s)
@@ -54,7 +58,7 @@ newtype TC v s a =
            )
 
 evalTC :: MonadError String m => (forall s. TC Id.EVar s a) -> m a
-evalTC tc =
+evalTC tc = runST $
   let env = MkEnvironment
         { _locals = mempty
         , _level  = 0
@@ -64,7 +68,7 @@ evalTC tc =
         , _defined  = mempty
         , _fresh    = []
         }
-  in  runST (runExceptT (evalStateT (runReaderT (unTC tc) env) st))
+  in  runExceptT (evalStateT (runReaderT (unTC tc) env) st)
 
 liftST :: ST s a -> TC v s a
 liftST = TC . lift . lift . lift
@@ -81,37 +85,19 @@ freshUVar = do
 unify :: Pos -> TypeOpen s -> TypeOpen s -> TC v s ()
 unify w t1 t2 = TC $ lift $ lift $ U.unify w t1 t2
 
-defnName :: KC.Defn v -> Maybe Id.EVar
-defnName = Just . view lhs
-
-localizeBinds
-  :: (IsVar v)
-  => (a -> Maybe Id.EVar)
-  -> Vec.Vector n a
-  -> Vec.Vector n (TypeOpen s)
-  -> TC (FinScope n v) s b
-  -> TC v s b
-localizeBinds name xs ts (TC tc) = TC $ withReaderT (locals %~ upd) tc
-  where
-    f i x = case name x of
-      Nothing -> mempty
-      Just y  -> Map.singleton (bound i y) (ts Vec.! i)
-    upd old = ifoldMap f xs <> Map.mapKeysMonotonic weaken old
-
-localizePatn ::
-  (IsVar v) =>
-  Map Id.EVar (TypeOpen s) ->
-  TC (Scope Id.EVar v) s a ->
+localize ::
+  forall i v s a.
+  (IsVarLevel i, IsVar v) =>
+  EnvLevelOf i (TypeOpen s) ->
+  TC (Scope i v) s a ->
   TC v s a
-localizePatn mp (TC tc) = TC $ withReaderT (locals %~ upd) tc
-  where
-    upd old = Map.mapKeysMonotonic (\x -> bound x x) mp <> Map.mapKeysMonotonic weaken old
+localize ts = TC . withReaderT (locals %~ Sc.extendEnv @i @v ts) . unTC
 
-lookupType :: (Ord v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
-lookupType w ident = do
-  t_local <- view (locals . at ident)
-  case t_local of
-    Nothing -> throwAt w "undefined function" ident
+lookupType :: (IsVar v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
+lookupType w x = do
+  env <- view locals
+  case Sc.lookupEnv env x of
+    Nothing -> throwAt w "undefined function" x
     Just t  -> return t
 
 generalize :: TypeOpen s -> TC v s (TypeOpen s)
@@ -174,7 +160,7 @@ inferRec
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
-    t_rhss <- localizeBinds defnName defns t_lhss $ traverse (infer . view rhs) defns
+    t_rhss <- localize t_lhss $ traverse (infer . view rhs) defns
     ifor_ defns $ \i defn ->
       unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
     return t_rhss
@@ -197,21 +183,21 @@ infer expr = do
       return t_res
     Lam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
-      t_rhs <- localizeBinds bindName binds t_params (infer rhs)
+      t_rhs <- localize t_params (infer rhs)
       return (toList t_params Ty.*~> t_rhs)
     Let _ defns rhs -> do
       t_defns <- inferLet defns
-      localizeBinds defnName defns t_defns (infer rhs)
+      localize t_defns (infer rhs)
     Rec _ defns rhs -> do
       t_defns <- inferRec defns
-      localizeBinds defnName defns t_defns (infer rhs)
+      localize t_defns (infer rhs)
     -- KC.If{} -> bug "type checker" "if-then-esle" Nothing
     Mat _ expr altns -> do
       t_expr <- infer expr
       t_res <- freshUVar
       for_ altns $ \(MkAltn w patn rhs) -> do
         t_binds <- inferPatn patn t_expr
-        t_rhs <- localizePatn t_binds (infer rhs)
+        t_rhs <- localize t_binds (infer rhs)
         unify w t_res t_rhs
       return t_res
 

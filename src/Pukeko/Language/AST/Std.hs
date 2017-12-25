@@ -192,13 +192,13 @@ over' l f = runIdentity . l (Identity . f)
 
 case2rhs
   :: (Functor f, ExprConOf st1 ~ ExprConOf st2)
-  => (forall i. Ord i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
+  => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
   -> StdCase st1 v1 -> f (StdCase st2 v2)
 case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
 
 altn2rhs
   :: (Functor f, ExprConOf st1 ~ ExprConOf st2)
-  => (forall i. Ord i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
+  => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
   -> StdAltn st1 v1 -> f (StdAltn st2 v2)
 altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
 

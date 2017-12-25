@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 -- | Type for encoding DeBruijn style scoping.
 module Pukeko.Language.AST.Scope
@@ -11,6 +12,8 @@ module Pukeko.Language.AST.Scope
   , weaken1
   , abstract1
   , unscope
+  , extendEnv
+  , IsVarLevel (..)
   , IsVar (..)
   )
   where
@@ -18,6 +21,8 @@ module Pukeko.Language.AST.Scope
 import           Control.Lens
 import           Data.Finite       (Finite)
 import           Data.Forget
+import qualified Data.Map          as Map
+import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error      (bug)
 import           Pukeko.Pretty
@@ -59,17 +64,46 @@ unscope = \case
   Bound _ (Forget x) -> x
   Free  x            -> x
 
-class (Eq v, Ord v, Pretty v) => IsVar v where
+data Pair f g a = Pair (f a) (g a)
+
+extendEnv ::
+  forall i v a.
+  (IsVarLevel i, IsVar v) =>
+  EnvLevelOf i a ->
+  EnvOf v a ->
+  EnvOf (Scope i v) a
+extendEnv env_i env_v = Pair env_i env_v
+
+-- TODO: Replace @Ord@ by @Eq@.
+class Ord i => IsVarLevel i where
+  type EnvLevelOf i :: * -> *
+  lookupEnvLevel :: EnvLevelOf i a -> i -> Maybe a
+
+instance IsVarLevel Id.EVar where
+  type EnvLevelOf Id.EVar = Map.Map Id.EVar
+  lookupEnvLevel = flip Map.lookup
+
+instance IsVarLevel (Finite n) where
+  type EnvLevelOf (Finite n) = Vec.Vector n
+  lookupEnvLevel vec = Just . (Vec.!) vec
+
+-- TODO: Replace @Ord@ by @Eq@.
+class (Ord v, Pretty v) => IsVar v where
+  type EnvOf v :: * -> *
   varName :: v -> Id.EVar
   isTotallyFree :: v -> Bool
   mkTotallyFree :: Id.EVar -> v
+  lookupEnv :: EnvOf v a -> v -> Maybe a
 
 instance IsVar Id.EVar where
+  type EnvOf Id.EVar = Map.Map Id.EVar
   varName = id
   isTotallyFree = const True
   mkTotallyFree = id
+  lookupEnv = flip Map.lookup
 
-instance (Ord i, IsVar v) => IsVar (Scope i v) where
+instance (IsVarLevel i, IsVar v) => IsVar (Scope i v) where
+  type EnvOf (Scope i v) = Pair (EnvLevelOf i) (EnvOf v)
   varName = \case
     Bound _ (Forget x) -> x
     Free  v            -> varName v
@@ -77,6 +111,9 @@ instance (Ord i, IsVar v) => IsVar (Scope i v) where
     Bound _ _ -> False
     Free  v   -> isTotallyFree v
   mkTotallyFree = Free . mkTotallyFree
+  lookupEnv (Pair env_i env_v) = \case
+    Bound i _ -> lookupEnvLevel env_i i
+    Free  v   -> lookupEnv env_v v
 
 makePrisms ''Scope
 
