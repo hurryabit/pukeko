@@ -80,10 +80,10 @@ kcType k = \case
       Nothing -> throwDoc $ "unknown type variable:" <+> pretty v
       Just kv -> unify kv k
   Ty.Arr -> unify (Arrow Star (Arrow Star Star)) k
-  Ty.Con Ty.MkADT{_name = con} -> do
-    kcon_opt <- use (typeCons . at con)
+  Ty.Con Ty.MkTConDecl{_tname} -> do
+    kcon_opt <- use (typeCons . at _tname)
     case kcon_opt of
-      Nothing -> bug "kind checker" "unknown type constructor" (Just (show con))
+      Nothing -> bug "kind checker" "unknown type constructor" (Just (show _tname))
       Just kcon -> unify kcon k
   Ty.App tf tp -> do
     ktp <- freshUVar
@@ -91,22 +91,22 @@ kcType k = \case
     kcType (Arrow ktp k) tf
 
 
-kcTypDef :: [Ty.ADT (Ty.ADT Id.TCon)] -> KC s ()
-kcTypDef adts = do
-  kinds <- for adts $ \Ty.MkADT{_name} -> do
+kcTypDef :: [Ty.TConDecl (Ty.TConDecl Id.TCon)] -> KC s ()
+kcTypDef tcons = do
+  kinds <- for tcons $ \Ty.MkTConDecl{_tname} -> do
     kind <- freshUVar
-    typeCons . at _name ?= kind
+    typeCons . at _tname ?= kind
     pure kind
-  for_ (zip adts kinds) $ \(Ty.MkADT{_params, _constructors}, adtKind) -> do
+  for_ (zip tcons kinds) $ \(Ty.MkTConDecl{_params, _dcons}, tconKind) -> do
     paramKinds <- traverse (const freshUVar) _params
-    unify adtKind (foldr Arrow Star paramKinds)
+    unify tconKind (foldr Arrow Star paramKinds)
     let env = Map.fromList (zip _params paramKinds)
     local (const env) $ do
-      for_ _constructors $ \Ty.MkConstructor{_fields} -> do
+      for_ _dcons $ \Ty.MkDConDecl{_fields} -> do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 
-kcVal :: Ty.Type (Ty.ADT Id.TCon) Ty.Closed ->KC s ()
+kcVal :: Ty.Type (Ty.TConDecl Id.TCon) Ty.Closed ->KC s ()
 kcVal t = do
   env <- sequence $ Map.fromSet (const freshUVar) (Ty.vars t)
   local (const env) $ kcType Star t
@@ -114,8 +114,8 @@ kcVal t = do
 
 kcTopLevel :: TR.TopLevel -> KC s (Maybe KC.TopLevel)
 kcTopLevel = \case
-  TR.TypDef w adts -> do
-    here w (kcTypDef adts)
+  TR.TypDef w tcons -> do
+    here w (kcTypDef tcons)
     pure Nothing
   TR.Val    w x  t -> do
     here w (kcVal t)

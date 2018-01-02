@@ -66,8 +66,8 @@ unify pos t1 t2 = do
     (Var name1, Var name2)
       | name1 == name2 -> pure ()
     (Arr, Arr) -> pure ()
-    -- TODO: Make ADT comparable itself.
-    (Con MkADT{_name = c1}, Con MkADT{_name = c2})
+    -- TODO: Make TConDecl comparable itself.
+    (Con MkTConDecl{_tname = c1}, Con MkTConDecl{_tname = c2})
       | c1 == c2 -> pure ()
     -- NOTE: The kind checker has ensured that @length ts == length us@.
     (App tf1 tp1, App tf2 tp2) ->

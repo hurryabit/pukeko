@@ -29,7 +29,7 @@ type DCon = Id.DCon
 type Module = [TopLevel]
 
 data TopLevel
-  = TypDef Pos [Ty.ADT TCon]
+  = TypDef Pos [Ty.TConDecl TCon]
   | Val    Pos Id.EVar (Ty.Type TCon Ty.Closed)
   | TopLet Pos [Defn Id.EVar]
   | TopRec Pos [Defn Id.EVar]

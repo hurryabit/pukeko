@@ -97,7 +97,7 @@ module_ = many1 $ choice
         <*> (reserved "val" *> evar)
         <*> asType
   , TypDef <$> getPosition
-           <*> (reserved "type" *> sepBy1 adt (reserved "and"))
+           <*> (reserved "type" *> sepBy1 tconDecl (reserved "and"))
   ]
 
 bind :: Parser Bind
@@ -170,11 +170,11 @@ operatorTable = map (map f) (reverse Op.table)
   where
     f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
 
-adt :: Parser (Ty.ADT Id.TCon)
-adt = mkADT' <$> tcon
+tconDecl :: Parser (Ty.TConDecl Id.TCon)
+tconDecl = mkTConDecl' <$> tcon
              <*> many tvar
-             <*> option [] (reservedOp "=" *> many1 adtConstructor)
-  where mkADT' con = Ty.mkADT con con
+             <*> option [] (reservedOp "=" *> many1 dconDecl)
+  where mkTConDecl' con = Ty.mkTConDecl con con
 
-adtConstructor :: Parser (Ty.Constructor Id.TCon)
-adtConstructor = Ty.mkConstructor <$> (reservedOp "|" *> dcon) <*> many atype
+dconDecl :: Parser (Ty.DConDecl Id.TCon)
+dconDecl = Ty.mkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype

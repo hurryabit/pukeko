@@ -32,7 +32,7 @@ instance Stage RENAMER where
 type Module = [TopLevel]
 
 data TopLevel
-  =           TypDef Pos [Ty.ADT TCon]
+  =           TypDef Pos [Ty.TConDecl TCon]
   |           Val    Pos Id.EVar (Ty.Type TCon Ty.Closed)
   | forall n. TopLet Pos (Vec.Vector n (Defn Id.EVar))
   | forall n. TopRec Pos (Vec.Vector n (Defn (FinScope n Id.EVar)))

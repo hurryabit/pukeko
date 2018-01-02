@@ -121,23 +121,23 @@ instantiate t = do
   env <- sequence $ Map.fromSet (const freshUVar) vars
   liftST $ Ty.openSubst env t
 
-instantiateADT :: TC.TCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
-instantiateADT adt@Ty.MkADT{Ty._params} = do
+instantiateTCon :: TC.TCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
+instantiateTCon tcon@Ty.MkTConDecl{Ty._params} = do
   t_params <- traverse (const freshUVar) _params
-  return (Ty.appADT adt t_params, Map.fromList $ zip _params t_params)
+  return (Ty.appTCon tcon t_params, Map.fromList $ zip _params t_params)
 
 inferPatn :: KC.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
   Bind (Wild _) -> return Map.empty
   Bind (Name _ ident) -> return (Map.singleton ident t_expr)
   Dest w con patns -> do
-    let Ty.MkConstructor{Ty._name, Ty._adt, Ty._fields} = con
+    let Ty.MkDConDecl{Ty._dname, Ty._tcon, Ty._fields} = con
     when (length patns /= length _fields) $
-      throwDocAt w $ "term cons" <+> quotes (pretty _name) <+>
+      throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
       "expects" <+> int (length _fields) <+> "arguments"
-    (t_adt, env_adt) <- instantiateADT _adt
-    unify w t_expr t_adt
-    t_fields <- liftST $ traverse (Ty.openSubst env_adt . Ty.open) _fields
+    (t_inst, env_inst) <- instantiateTCon _tcon
+    unify w t_expr t_inst
+    t_fields <- liftST $ traverse (Ty.openSubst env_inst . Ty.open) _fields
     Map.unions <$> zipWithM inferPatn patns t_fields
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'

@@ -37,24 +37,24 @@ runTR tr =
 
 -- TODO: Use @typeApps . _1@ to do this.
 trType :: Pos -> Ty.Type Id.TCon Ty.Closed -> TR (Ty.Type TR.TCon Ty.Closed)
-trType w = Ty.type2con $ \con -> do
-  adt_opt <- Map.lookup con <$> use st2tcons
-  case adt_opt of
-    Nothing  -> throwAt w "unknown type cons" con
-    Just adt -> pure adt
+trType w = Ty.type2tcon $ \tname -> do
+  tcon_mb <- use (st2tcons . at tname)
+  case tcon_mb of
+    Nothing   -> throwAt w "unknown type cons" tname
+    Just tcon -> pure tcon
 
 -- TODO: Have only one insert function.
 insertTCon :: Pos -> TR.TCon -> TR ()
-insertTCon posn adt@Ty.MkADT{_name} = do
-  old <- use (st2tcons . at _name)
-  when (isJust old) $ throwAt posn "duplicate type cons" _name
-  st2tcons . at _name ?= adt
+insertTCon posn tcon@Ty.MkTConDecl{_tname} = do
+  old <- use (st2tcons . at _tname)
+  when (isJust old) $ throwAt posn "duplicate type cons" _tname
+  st2tcons . at _tname ?= tcon
 
 insertDCon :: Pos -> TR.DCon -> TR ()
-insertDCon posn con@Ty.MkConstructor{_name} = do
-  old <- use (st2dcons . at _name)
-  when (isJust old) $ throwAt posn "duplicate term cons" _name
-  st2dcons . at _name ?= con
+insertDCon posn con@Ty.MkDConDecl{_dname} = do
+  old <- use (st2dcons . at _dname)
+  when (isJust old) $ throwAt posn "duplicate term cons" _dname
+  st2dcons . at _dname ?= con
 
 findDCon :: Pos -> Id.DCon -> TR TR.DCon
 findDCon posn name = do
@@ -65,16 +65,16 @@ findDCon posn name = do
 
 trTopLevel :: Rn.TopLevel -> TR TR.TopLevel
 trTopLevel top = case top of
-  Rn.TypDef w adts -> do
-    for_ adts (insertTCon w)
-    adts <- for adts $ \_adt@Ty.MkADT{_constructors} -> do
-      _constructors <- forM _constructors $ \con@Ty.MkConstructor{_fields} -> do
+  Rn.TypDef w tcons -> do
+    for_ tcons (insertTCon w)
+    tcons <- for tcons $ \_tcon@Ty.MkTConDecl{_dcons} -> do
+      _dcons <- forM _dcons $ \con@Ty.MkDConDecl{_fields} -> do
         _fields <- traverse (trType w) _fields
-        let con' = con{Ty._adt, Ty._fields}
+        let con' = con{Ty._tcon, Ty._fields}
         insertDCon w con'
         return con'
-      return _adt{Ty._constructors}
-    return (TR.TypDef w adts)
+      return _tcon{Ty._dcons}
+    return (TR.TypDef w tcons)
   Rn.Val w x t -> TR.Val w x <$> trType w t
   Rn.TopLet w ds -> TR.TopLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
   Rn.TopRec w ds -> TR.TopRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds

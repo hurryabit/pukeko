@@ -1,11 +1,11 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 module Pukeko.Language.Type
-  ( ADT (..)
-  , Constructor (..)
+  ( TConDecl (..)
+  , DConDecl (..)
   -- , constructors
-  , mkADT
-  , mkConstructor
+  , mkTConDecl
+  , mkDConDecl
   , typeOf
   , Type (..)
   , UVar (..)
@@ -17,12 +17,12 @@ module Pukeko.Language.Type
   , (~>)
   , (*~>)
   , app
-  , appADT
+  , appTCon
   , typeInt
   , vars
   , openVars
   , openSubst
-  , type2con
+  , type2tcon
   , prettyType
   )
   where
@@ -41,33 +41,33 @@ import qualified Pukeko.Language.Ident as Ident
 
 infixr 1 ~>, *~>
 
-data ADT tcon = MkADT
-  { _name         :: Ident.TCon
-  , _params       :: [Ident.TVar]
-  , _constructors :: [Constructor tcon]
+data TConDecl tcon = MkTConDecl
+  { _tname  :: Ident.TCon
+  , _params :: [Ident.TVar]
+  , _dcons  :: [DConDecl tcon]
   }
 
-mkADT :: Ident.TCon -> tcon -> [Ident.TVar] -> [Constructor tcon] -> ADT tcon
-mkADT _name tcon _params constructors = MkADT
-  { _name
+mkTConDecl :: Ident.TCon -> tcon -> [Ident.TVar] -> [DConDecl tcon] -> TConDecl tcon
+mkTConDecl _tname _tcon _params dcons = MkTConDecl
+  { _tname
   , _params
-  , _constructors = zipWith (\_tag constr -> constr { _adt = tcon, _tag }) [0..] constructors
+  , _dcons = zipWith (\_tag dcon -> dcon{_tcon, _tag}) [0..] dcons
   }
 
-data Constructor tcon = MkConstructor
-  { _adt    :: tcon
-  , _name   :: Ident.DCon
+data DConDecl tcon = MkDConDecl
+  { _tcon   :: tcon
+  , _dname  :: Ident.DCon
   , _tag    :: Int
   , _fields :: [Type tcon Closed]
   }
 
-mkConstructor :: Ident.DCon -> [Type tcon Closed] -> Constructor tcon
-mkConstructor _name _fields =
-  MkConstructor { _adt = undefined, _name, _tag = undefined, _fields }
+mkDConDecl :: Ident.DCon -> [Type tcon Closed] -> DConDecl tcon
+mkDConDecl _dname _fields =
+  MkDConDecl { _tcon = undefined, _dname, _tag = undefined, _fields }
 
-typeOf :: Constructor (ADT Ident.TCon) -> Type (ADT Ident.TCon) Closed
-typeOf MkConstructor{ _adt, _fields } =
-  foldr (~>) (appADT _adt $ map var $ _params _adt) _fields
+typeOf :: DConDecl (TConDecl Ident.TCon) -> Type (TConDecl Ident.TCon) Closed
+typeOf MkDConDecl{ _tcon, _fields } =
+  foldr (~>) (appTCon _tcon $ map var $ _params _tcon) _fields
 
 
 data Open s
@@ -102,12 +102,12 @@ t_args *~> t_res = foldr (~>) t_res t_args
 app :: Type tcon a -> [Type tcon a] -> Type tcon a
 app = foldl App
 
-appADT :: tcon -> [Type tcon a] -> Type tcon a
-appADT = app . Con
+appTCon :: tcon -> [Type tcon a] -> Type tcon a
+appTCon = app . Con
 
 -- TODO: Remove this undefined hack.
-typeInt :: Type (ADT Ident.TCon) Closed
-typeInt  = appADT (mkADT (Ident.tcon "Int") undefined [] []) []
+typeInt :: Type (TConDecl Ident.TCon) Closed
+typeInt  = appTCon (mkTConDecl (Ident.tcon "Int") undefined [] []) []
 
 open :: Type tcon Closed -> Type tcon (Open s)
 open = \case
@@ -153,12 +153,12 @@ openSubst env t = runReaderT (subst' t) env
 
 -- TODO: Change the order of the parameters of 'Type' and this becomes
 -- 'traverse'.
-type2con :: Traversal (Type con1 Closed) (Type con2 Closed) con1 con2
-type2con f = \case
+type2tcon :: Traversal (Type tcon1 Closed) (Type tcon2 Closed) tcon1 tcon2
+type2tcon f = \case
   Var v -> pure (Var v)
   Arr   -> pure Arr
   Con c -> Con <$> f c
-  App tf tp -> App <$> type2con f tf <*> type2con f tp
+  App tf tp -> App <$> type2tcon f tf <*> type2tcon f tp
 
 -- * Pretty printing
 prettyUVar :: Pretty tcon => PrettyLevel -> Rational -> UVar tcon s -> ST s Doc
@@ -184,11 +184,11 @@ prettyType lvl prec t = case t of
     prettyUVar lvl prec uvar
 
 
-instance Pretty (ADT Ident.TCon) where
-  pPrintPrec lvl prec MkADT{_name} = pPrintPrec lvl prec _name
+instance Pretty (TConDecl Ident.TCon) where
+  pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname
 
-instance Pretty (Constructor (ADT Ident.TCon)) where
-  pPrintPrec lvl prec MkConstructor{_name} = pPrintPrec lvl prec _name
+instance Pretty (DConDecl (TConDecl Ident.TCon)) where
+  pPrintPrec lvl prec MkDConDecl{_dname} = pPrintPrec lvl prec _dname
 
 instance Pretty tcon => Pretty (Type tcon Closed) where
   pPrintPrec lvl prec t = runST $ prettyType lvl prec (open t)

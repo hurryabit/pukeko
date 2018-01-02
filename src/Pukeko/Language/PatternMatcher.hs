@@ -36,8 +36,8 @@ evalPM pm = runExcept $ evalStateT (unPM pm) []
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
 
-name :: Ty.Constructor _ -> Id.DCon
-name Ty.MkConstructor{_name} = _name
+name :: Ty.DConDecl _ -> Id.DCon
+name Ty.MkDConDecl{_dname} = _dname
 
 pmExpr :: TC.Expr v -> PM (PM.Expr v)
 pmExpr = \case
@@ -166,7 +166,7 @@ groupDests ::
   Pos -> Col m v Dest -> RowMatch m n v -> PM (GrpMatch v)
 groupDests w (MkCol t ds@(LS.Cons (MkDest con0 _) _)) (MkRowMatch ts rs) = do
   let drs = toList (LS.zip ds rs)
-  grps <- for (Ty._constructors (Ty._adt con0)) $ \con1 -> do
+  grps <- for (Ty._dcons (Ty._tcon con0)) $ \con1 -> do
     let drs1 = filter (\(MkDest con2 _, _)-> name con1 == name con2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" (name con1)
