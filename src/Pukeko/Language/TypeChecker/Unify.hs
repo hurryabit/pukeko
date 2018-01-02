@@ -12,9 +12,8 @@ import           Pukeko.Error
 import           Pukeko.Pos
 import           Pukeko.Pretty
 import           Pukeko.Language.Type
-import           Pukeko.Language.TypeChecker.AST (TCon)
 
-type TypeOpen s = Type TCon (Open s)
+type TypeOpen s = Type (Open s)
 
 type TU s = ExceptT String (ST s)
 
@@ -28,7 +27,7 @@ unwind t = case t of
       Free{} -> return t
   _ -> return t
 
-occursCheck :: STRef s (UVar TCon s) -> TypeOpen s -> TU s ()
+occursCheck :: STRef s (UVar s) -> TypeOpen s -> TU s ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwError "occurs check"
@@ -67,8 +66,8 @@ unify pos t1 t2 = do
       | name1 == name2 -> pure ()
     (Arr, Arr) -> pure ()
     -- TODO: Make TConDecl comparable itself.
-    (Con MkTConDecl{_tname = c1}, Con MkTConDecl{_tname = c2})
-      | c1 == c2 -> pure ()
+    (Con tcon1, Con tcon2)
+      | tcon1 == tcon2 -> pure ()
     -- NOTE: The kind checker has ensured that @length ts == length us@.
     (App tf1 tp1, App tf2 tp2) ->
       unify pos tf1 tf2 *> unify pos tp1 tp2

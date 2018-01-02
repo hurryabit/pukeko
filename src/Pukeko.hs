@@ -1,5 +1,6 @@
 module Pukeko
   ( Parser.Module
+  , AST.StdModule (..)
   , parse
   , compileToCore
   -- , compileToCore
@@ -9,6 +10,7 @@ module Pukeko
 
 import Pukeko.Error
 
+import qualified Pukeko.Language.AST.Std        as AST
 import qualified Pukeko.Language.CoreCompiler   as CoreCompiler
 import qualified Pukeko.Language.DeadCode       as DeadCode
 import qualified Pukeko.Language.Renamer        as Renamer

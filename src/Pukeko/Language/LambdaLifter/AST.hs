@@ -1,8 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.LambdaLifter.AST
-  ( TCon
-  , DCon
-  , Module
+  ( Module
   , TopLevel (..)
   , Defn
   , Expr
@@ -14,20 +12,15 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
 import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.DeadCode.AST as DC
 import qualified Pukeko.Language.Ident        as Id
 
 data LAMBDALIFTER
 
-type TCon = DC.TCon
-type DCon = DC.DCon
-
 instance Stage LAMBDALIFTER where
-  type DConRef LAMBDALIFTER = DCon
   type HasLam    LAMBDALIFTER = 'False
   type HasMat    LAMBDALIFTER = 'False
 
-type Module = [TopLevel]
+type Module = StdModule TopLevel
 
 data TopLevel
   = forall n. Def Pos Id.EVar (Vec.Vector n Bind) (Expr (FinScope n Id.EVar))

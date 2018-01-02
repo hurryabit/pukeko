@@ -23,8 +23,10 @@ import qualified Data.Vector.Sized as Vec
 import           Pukeko.Error
 import           Pukeko.Pos
 import           Pukeko.Pretty
+import           Pukeko.Language.ConInfo
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.ConDecl       as Con
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.KindChecker.AST   as KC
 import qualified Pukeko.Language.TypeChecker.AST   as TC
@@ -32,8 +34,8 @@ import qualified Pukeko.Language.Ident             as Id
 import qualified Pukeko.Language.Type              as Ty
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
-type TypeClosed = Ty.Type TC.TCon  Ty.Closed
-type TypeOpen s = Ty.Type TC.TCon (Ty.Open s)
+type TypeClosed = Ty.Type Ty.Closed
+type TypeOpen s = Ty.Type (Ty.Open s)
 
 data Environment v s = MkEnvironment
   { _locals :: Sc.EnvOf v (TypeOpen s)
@@ -50,15 +52,16 @@ data TCState = MkTCState
 makeLenses ''TCState
 
 newtype TC v s a =
-  TC{unTC :: ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s))) a}
+  TC{unTC :: ConInfoT (ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s)))) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment v s)
            , MonadState TCState
+           , MonadConInfo
            )
 
-evalTC :: MonadError String m => (forall s. TC Id.EVar s a) -> m a
-evalTC tc = runST $
+evalTC :: MonadError String m => (forall s. TC Id.EVar s a) -> ConDecls -> m a
+evalTC tc decls = runST $
   let env = MkEnvironment
         { _locals = mempty
         , _level  = 0
@@ -68,10 +71,10 @@ evalTC tc = runST $
         , _defined  = mempty
         , _fresh    = []
         }
-  in  runExceptT (evalStateT (runReaderT (unTC tc) env) st)
+  in  runExceptT (evalStateT (runReaderT (runConInfoT (unTC tc) decls) env) st)
 
 liftST :: ST s a -> TC v s a
-liftST = TC . lift . lift . lift
+liftST = TC . lift . lift . lift . lift
 
 resetFresh :: TC v s ()
 resetFresh = fresh .= Id.freshTVars
@@ -80,10 +83,10 @@ freshUVar :: TC v s (TypeOpen s)
 freshUVar = do
   _level <- view level
   _ident <- fresh %%= (\(x:xs) -> (x,xs))
-  Ty.UVar <$> liftST (newSTRef Ty.Free{Ty._ident, Ty._level})
+  Ty.UVar <$> liftST (newSTRef Ty.Free{_ident, _level})
 
 unify :: Pos -> TypeOpen s -> TypeOpen s -> TC v s ()
-unify w t1 t2 = TC $ lift $ lift $ U.unify w t1 t2
+unify w t1 t2 = TC $ lift $ lift $ lift $ U.unify w t1 t2
 
 localize ::
   forall i v s a.
@@ -91,7 +94,7 @@ localize ::
   EnvLevelOf i (TypeOpen s) ->
   TC (Scope i v) s a ->
   TC v s a
-localize ts = TC . withReaderT (locals %~ Sc.extendEnv @i @v ts) . unTC
+localize ts = TC . mapConInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
 lookupType :: (IsVar v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
 lookupType w x = do
@@ -106,10 +109,10 @@ generalize = \case
     uvar <- liftST $ readSTRef uref
     cur_level <- view level
     case uvar of
-      Ty.Free{Ty._ident, Ty._level}
+      Ty.Free{_ident, _level}
         | _level > cur_level -> pure (Ty.Var _ident)
         | otherwise          -> pure t
-      Ty.Link{Ty._type} -> generalize _type
+      Ty.Link{_type} -> generalize _type
   t@(Ty.Var _) -> pure t
   t@Ty.Arr     -> pure t
   t@(Ty.Con _) -> pure t
@@ -121,8 +124,9 @@ instantiate t = do
   env <- sequence $ Map.fromSet (const freshUVar) vars
   liftST $ Ty.openSubst env t
 
-instantiateTCon :: TC.TCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
-instantiateTCon tcon@Ty.MkTConDecl{Ty._params} = do
+instantiateTCon :: Id.TCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
+instantiateTCon tcon = do
+  Con.MkTConDecl{_params} <- findTCon tcon
   t_params <- traverse (const freshUVar) _params
   return (Ty.appTCon tcon t_params, Map.fromList $ zip _params t_params)
 
@@ -130,8 +134,8 @@ inferPatn :: KC.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
   Bind (Wild _) -> return Map.empty
   Bind (Name _ ident) -> return (Map.singleton ident t_expr)
-  Dest w con patns -> do
-    let Ty.MkDConDecl{Ty._dname, Ty._tcon, Ty._fields} = con
+  Dest w dcon patns -> do
+    Con.MkDConDecl{_dname, _tcon, _fields} <- findDCon dcon
     when (length patns /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
       "expects" <+> int (length _fields) <+> "arguments"
@@ -173,7 +177,10 @@ infer expr = do
     Var w ident -> do
       t <- lookupType w ident
       instantiate t
-    Con _ con -> instantiate $ Ty.open (Ty.typeOf con)
+    Con _ dcon -> do
+      dconDecl <- findDCon dcon
+      tconDecl <- findTCon (Con._tcon dconDecl)
+      instantiate $ Ty.open (Con.typeOf tconDecl dconDecl)
     Num _ _num -> return (Ty.open Ty.typeInt)
     App _ fun args -> do
       t_fun <- infer fun
@@ -243,4 +250,5 @@ checkTopLevel top = case top of
       return $ map (\(MkDefn w lhs rhs) -> TC.Def w lhs (mkTopExpr rhs)) (toList defns)
 
 checkModule :: MonadError String m => KC.Module -> m TC.Module
-checkModule module_ = evalTC $ concat <$> traverse checkTopLevel module_
+checkModule (MkModule decls tops)=
+  MkModule decls <$> evalTC (concat <$> traverse checkTopLevel tops) decls

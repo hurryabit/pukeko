@@ -1,8 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.PatternMatcher.AST
-  ( TCon
-  , DCon
-  , Module
+  ( Module
   , StdTopLevel (..)
   , TopLevel
   , Defn
@@ -16,20 +14,15 @@ import           Control.Lens (IndexedTraversal, indexed)
 
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.TypeChecker.AST as TC
 import qualified Pukeko.Language.Ident           as Id
 
 data PATTERNMATCHER
 
-type TCon = TC.TCon
-type DCon = TC.DCon
-
 instance Stage PATTERNMATCHER where
-  type DConRef PATTERNMATCHER = DCon
   type HasLam    PATTERNMATCHER = 'True
   type HasMat    PATTERNMATCHER = 'False
 
-type Module = [TopLevel]
+type Module = StdModule TopLevel
 
 data StdTopLevel st
   = Def Pos Id.EVar (StdExpr st Id.EVar)

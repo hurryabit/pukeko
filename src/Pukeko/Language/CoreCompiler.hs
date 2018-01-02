@@ -11,24 +11,26 @@ import qualified Data.Map          as Map
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Core.Syntax
+import           Pukeko.Language.ConInfo
 import           Pukeko.Language.AST.Scope
 import qualified Pukeko.Language.AST.Std          as LL
 import qualified Pukeko.Language.LambdaLifter.AST as LL
 import qualified Pukeko.Language.Ident            as Id
-import qualified Pukeko.Language.Type             as Ty
+import qualified Pukeko.Language.AST.ConDecl      as Con
 
 type CCState = Map.Map Id.EVar Name
 
-newtype CC a = CC{unCC :: State CCState a}
+newtype CC a = CC{unCC :: ConInfoT (State CCState) a}
   deriving ( Functor, Applicative, Monad
+           , MonadConInfo
            , MonadState CCState
            )
 
-runCC :: CC a -> a
-runCC cc = evalState (unCC cc) mempty
+runCC :: CC a -> ConDecls -> a
+runCC cc decls = evalState (runConInfoT (unCC cc) decls) mempty
 
 compileModule :: LL.Module -> Module
-compileModule = runCC . traverse ccTopLevel
+compileModule (LL.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
 
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
@@ -57,7 +59,9 @@ ccExpr = \case
     where
       x = varName v
       _name = name x
-  LL.Con _ c     -> pure $ Pack (Ty._tag c) (length (Ty._fields c))
+  LL.Con _ dcon  -> do
+    Con.MkDConDecl{_tag, _fields} <- findDCon dcon
+    pure $ Pack _tag (length _fields)
   LL.Num _ n     -> pure $ Num n
   LL.App _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us
   LL.Let _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> ccExpr t

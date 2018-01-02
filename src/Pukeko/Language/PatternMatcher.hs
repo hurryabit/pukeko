@@ -17,27 +17,26 @@ import           Data.Traversable (for)
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
+import           Pukeko.Language.ConInfo
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.PatternMatcher.AST as PM
 import qualified Pukeko.Language.TypeChecker.AST    as TC
-import qualified Pukeko.Language.Type               as Ty
 import qualified Pukeko.Language.Ident              as Id
 
-newtype PM a = PM{unPM :: StateT [Id.EVar] (Except String) a}
+newtype PM a = PM{unPM :: ConInfoT (StateT [Id.EVar] (Except String)) a}
   deriving ( Functor, Applicative, Monad
+           , MonadConInfo
            , MonadState [Id.EVar]
            , MonadError String
            )
 
-evalPM :: MonadError String m => PM a -> m a
-evalPM pm = runExcept $ evalStateT (unPM pm) []
+evalPM :: MonadError String m => PM a -> ConDecls -> m a
+evalPM pm decls = runExcept $ evalStateT (runConInfoT (unPM pm) decls) []
 
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
-
-name :: Ty.DConDecl _ -> Id.DCon
-name Ty.MkDConDecl{_dname} = _dname
 
 pmExpr :: TC.Expr v -> PM (PM.Expr v)
 pmExpr = \case
@@ -62,7 +61,8 @@ pmTopLevel = \case
   TC.Asm w f a -> pure $ PM.Asm w f a
 
 compileModule :: MonadError String m => TC.Module -> m PM.Module
-compileModule = evalPM . traverse pmTopLevel
+compileModule (MkModule decls tops) =
+  MkModule decls <$> evalPM (traverse pmTopLevel tops) decls
 
 pmMatch ::
   forall m m' n v. m ~ 'LS.Succ m' =>
@@ -135,7 +135,7 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest = MkDest TC.DCon [TC.Patn]
+data Dest = MkDest Id.DCon [TC.Patn]
 
 patnToDest :: TC.Patn -> Maybe Dest
 patnToDest = \case
@@ -157,19 +157,21 @@ findDestCol w (MkColMatch cs0 us) =
 
 data GrpMatchItem v =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem TC.DCon (Vec.Vector k Bind) (RowMatch m n (FinScope k v))
+  MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n (FinScope k v))
 
 data GrpMatch v = MkGrpMatch (PM.Expr v) [GrpMatchItem v]
 
 groupDests ::
   forall m m' n v. m ~ 'LS.Succ m' =>
   Pos -> Col m v Dest -> RowMatch m n v -> PM (GrpMatch v)
-groupDests w (MkCol t ds@(LS.Cons (MkDest con0 _) _)) (MkRowMatch ts rs) = do
+groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
   let drs = toList (LS.zip ds rs)
-  grps <- for (Ty._dcons (Ty._tcon con0)) $ \con1 -> do
-    let drs1 = filter (\(MkDest con2 _, _)-> name con1 == name con2) drs
+  dconDecl0 <- findDCon dcon0
+  tconDecl <- findTCon (Con._tcon dconDecl0)
+  grps <- for (Con._dcons tconDecl) $ \Con.MkDConDecl{_dname = dcon1} -> do
+    let drs1 = filter (\(MkDest dcon2 _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
-      LS.Nil -> throwAt w "unmatched constructor" (name con1)
+      LS.Nil -> throwAt w "unmatched constructor" dcon1
       LS.Cons (MkDest con (traverse patnToBind -> Just bs0), MkRow qs u) LS.Nil ->
         Vec.withList bs0 $ \bs -> do
           let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs

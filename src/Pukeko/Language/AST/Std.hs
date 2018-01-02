@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.AST.Std
   ( Stage (..)
+  , StdModule (..)
   , GenDefn (..)
   , StdDefn
   , StdExpr (..)
@@ -16,6 +17,8 @@ module Pukeko.Language.AST.Std
   , bindName
   , patnToBind
 
+  , module2decls
+  , module2tops
   , defn2dcon
   , patn2bind
   , case2rhs
@@ -44,16 +47,19 @@ import           Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Op
 import qualified Pukeko.Language.Ident    as Id
 import           Pukeko.Language.AST.Classes
+import           Pukeko.Language.AST.ConDecl (ConDecls)
 import           Pukeko.Language.AST.Scope
 
 class Stage st where
-  type DConRef st :: *
   type HasLam  st :: Bool
   type HasMat  st :: Bool
 
-type PrettyStage st = (Pretty (DConRef st))
-
 type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
+
+data StdModule top = MkModule
+  { _module2decls :: ConDecls
+  , _module2tops  :: [top]
+  }
 
 data GenDefn expr v = MkDefn
   { _defnPos :: Pos
@@ -66,7 +72,7 @@ type StdDefn st = GenDefn (StdExpr st)
 
 data StdExpr st v
   =           Var Pos v
-  |           Con Pos (DConRef st)
+  |           Con Pos Id.DCon
   |           Num Pos Int
   |           App Pos (StdExpr st v) [StdExpr st v]
   | forall n. HasLam st ~ 'True => Lam Pos (Vector n Bind)   (StdExpr st (FinScope n v))
@@ -77,7 +83,7 @@ data StdExpr st v
 
 data StdCase st v = forall n. MkCase
   { _casePos   :: Pos
-  , _caseCon   :: DConRef st
+  , _caseCon   :: Id.DCon
   , _caseBinds :: Vector n Bind
   , _caseRhs   :: StdExpr st (FinScope n v)
   }
@@ -88,11 +94,12 @@ data StdAltn st v = MkAltn
   , _altnRhs  :: StdExpr st (Scope Id.EVar v)
   }
 
+-- TODO: Remove useless parameter.
 data GenPatn dcon
   = Bind     Bind
   | Dest Pos dcon [GenPatn dcon]
 
-type StdPatn st = GenPatn (DConRef st)
+type StdPatn st = GenPatn Id.DCon
 
 data Bind
   = Wild Pos
@@ -100,6 +107,7 @@ data Bind
 
 
 -- * Derived optics
+makeLenses ''StdModule
 makeLenses ''GenDefn
 makePrisms ''Bind
 
@@ -148,7 +156,7 @@ patnToBind = \case
 -- * Deep traversals
 type ExprConTraversal t =
   forall st1 st2 v. SameNodes st1 st2 =>
-  IndexedTraversal Pos (t st1 v) (t st2 v) (DConRef st1) (DConRef st2)
+  IndexedTraversal Pos (t st1 v) (t st2 v) Id.DCon Id.DCon
 
 defn2dcon :: ExprConTraversal StdDefn
 defn2dcon = rhs2 . expr2dcon
@@ -191,25 +199,25 @@ over' ::
 over' l f = runIdentity . l (Identity . f)
 
 case2rhs
-  :: (Functor f, DConRef st1 ~ DConRef st2)
+  :: (Functor f)
   => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
   -> StdCase st1 v1 -> f (StdCase st2 v2)
 case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
 
 altn2rhs
-  :: (Functor f, DConRef st1 ~ DConRef st2)
+  :: (Functor f)
   => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
   -> StdAltn st1 v1 -> f (StdAltn st2 v2)
 altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
 
 -- * Retagging
 retagDefn ::
-  (DConRef st1 ~ DConRef st2, SameNodes st1 st2) =>
+  (SameNodes st1 st2) =>
   StdDefn st1 v -> StdDefn st2 v
 retagDefn = over defn2dcon id
 
 retagExpr ::
-  (DConRef st1 ~ DConRef st2, SameNodes st1 st2) =>
+  (SameNodes st1 st2) =>
   StdExpr st1 v -> StdExpr st2 v
 retagExpr = over expr2dcon id
 
@@ -250,11 +258,11 @@ instance HasPos Bind where
     Name w x -> fmap (\w' -> Name w' x) (f w)
 
 -- * Pretty printing
-instance (PrettyStage st, IsVar v) => Pretty (StdDefn st v) where
+instance (IsVar v) => Pretty (StdDefn st v) where
   pPrintPrec lvl _ (MkDefn _ x t) =
     hang (pPrintPrec lvl 0 x <+> equals) 2 (pPrintPrec lvl 0 t)
 
-instance (PrettyStage st, IsVar v) => Pretty (StdExpr st v) where
+instance (IsVar v) => Pretty (StdExpr st v) where
   pPrintPrec lvl prec = \case
     Var _ x -> pretty (varName x)
     Con _ c -> pretty c
@@ -316,11 +324,11 @@ instance (PrettyStage st, IsVar v) => Pretty (StdExpr st v) where
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) cs
 
-instance (PrettyStage st, IsVar v) => Pretty (StdCase st v) where
+instance (IsVar v) => Pretty (StdCase st v) where
   pPrintPrec lvl _ (MkCase _ c bs t) =
     hang ("|" <+> pretty c <+> prettyBinds bs <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance (PrettyStage st, IsVar v) => Pretty (StdAltn st v) where
+instance (IsVar v) => Pretty (StdAltn st v) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 

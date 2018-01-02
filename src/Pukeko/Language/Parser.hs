@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 -- | Implementation of the parser.
 module Pukeko.Language.Parser
   ( Module
@@ -11,12 +12,13 @@ import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
 import           Pukeko.Error
-import           Pukeko.Language.Operator   (Spec (..))
-import           Pukeko.Language.AST.Std    hiding (StdExpr (..), StdAltn (..))
+import           Pukeko.Language.Operator    (Spec (..))
+import           Pukeko.Language.AST.Std     hiding (StdExpr (..), StdAltn (..))
+import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Parser.AST
-import qualified Pukeko.Language.Type       as Ty
-import qualified Pukeko.Language.Ident      as Id
-import qualified Pukeko.Language.Operator   as Op
+import qualified Pukeko.Language.Type        as Ty
+import qualified Pukeko.Language.Ident       as Id
+import qualified Pukeko.Language.Operator    as Op
 
 parseModule :: MonadError String m => String -> String -> m Module
 parseModule file code =
@@ -72,7 +74,7 @@ tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
 dcon :: Parser Id.DCon
 dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
 
-type_, atype :: Parser (Ty.Type TCon Ty.Closed)
+type_, atype :: Parser (Ty.Type Ty.Closed)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (Ty.~>)) AssocRight ] ]
@@ -84,7 +86,7 @@ atype = choice
   , parens type_
   ]
 
-asType :: Parser (Ty.Type TCon Ty.Closed)
+asType :: Parser (Ty.Type Ty.Closed)
 asType = reservedOp ":" *> type_
 
 module_ :: Parser Module
@@ -170,11 +172,11 @@ operatorTable = map (map f) (reverse Op.table)
   where
     f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
 
-tconDecl :: Parser (Ty.TConDecl Id.TCon)
-tconDecl = mkTConDecl' <$> tcon
-             <*> many tvar
-             <*> option [] (reservedOp "=" *> many1 dconDecl)
-  where mkTConDecl' con = Ty.mkTConDecl con con
+tconDecl :: Parser Con.TConDecl
+tconDecl = Con.mkTConDecl
+  <$> tcon
+  <*> many tvar
+  <*> option [] (reservedOp "=" *> many1 dconDecl)
 
-dconDecl :: Parser (Ty.DConDecl Id.TCon)
-dconDecl = Ty.mkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype
+dconDecl :: Parser Con.DConDecl
+dconDecl = Con.mkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype

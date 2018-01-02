@@ -1,13 +1,8 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
 module Pukeko.Language.Type
-  ( TConDecl (..)
-  , DConDecl (..)
-  -- , constructors
-  , mkTConDecl
-  , mkDConDecl
-  , typeOf
-  , Type (..)
+  ( Type (..)
   , UVar (..)
   , Open
   , Closed
@@ -27,7 +22,7 @@ module Pukeko.Language.Type
   )
   where
 
-import           Control.Lens         (Traversal)
+import           Control.Lens         (Traversal')
 import           Control.Monad.Reader
 import           Control.Monad.ST
 import           Data.Ratio () -- for precedences in pretty printer
@@ -37,89 +32,59 @@ import qualified Data.Set as Set
 
 import           Pukeko.Error
 import           Pukeko.Pretty
-import qualified Pukeko.Language.Ident as Ident
+import qualified Pukeko.Language.Ident as Id
 
 infixr 1 ~>, *~>
-
-data TConDecl tcon = MkTConDecl
-  { _tname  :: Ident.TCon
-  , _params :: [Ident.TVar]
-  , _dcons  :: [DConDecl tcon]
-  }
-
-mkTConDecl :: Ident.TCon -> tcon -> [Ident.TVar] -> [DConDecl tcon] -> TConDecl tcon
-mkTConDecl _tname _tcon _params dcons = MkTConDecl
-  { _tname
-  , _params
-  , _dcons = zipWith (\_tag dcon -> dcon{_tcon, _tag}) [0..] dcons
-  }
-
-data DConDecl tcon = MkDConDecl
-  { _tcon   :: tcon
-  , _dname  :: Ident.DCon
-  , _tag    :: Int
-  , _fields :: [Type tcon Closed]
-  }
-
-mkDConDecl :: Ident.DCon -> [Type tcon Closed] -> DConDecl tcon
-mkDConDecl _dname _fields =
-  MkDConDecl { _tcon = undefined, _dname, _tag = undefined, _fields }
-
-typeOf :: DConDecl (TConDecl Ident.TCon) -> Type (TConDecl Ident.TCon) Closed
-typeOf MkDConDecl{ _tcon, _fields } =
-  foldr (~>) (appTCon _tcon $ map var $ _params _tcon) _fields
-
 
 data Open s
 data Closed
 
-data UVar tcon s
-  = Free{_ident :: Ident.TVar, _level :: Int}
-  | Link{_type  :: Type tcon (Open s)}
+data UVar s
+  = Free{_ident :: Id.TVar, _level :: Int}
+  | Link{_type  :: Type (Open s)}
 
-data Type tcon a where
-  Var  :: Ident.TVar                 -> Type tcon a
-  Arr  ::                               Type tcon a
-  Con  :: tcon                       -> Type tcon a
-  App  :: Type tcon a -> Type tcon a -> Type tcon a
-  UVar :: STRef s (UVar tcon s)      -> Type tcon (Open s)
+data Type a where
+  Var  :: Id.TVar          -> Type a
+  Arr  ::                     Type a
+  Con  :: Id.TCon          -> Type a
+  App  :: Type a -> Type a -> Type a
+  UVar :: STRef s (UVar s) -> Type (Open s)
 
-pattern Fun :: Type tcon a -> Type tcon a -> Type tcon a
+pattern Fun :: Type a -> Type a -> Type a
 pattern Fun tx ty = App (App Arr tx) ty
 
-var :: Ident.TVar -> Type tcon a
+var :: Id.TVar -> Type a
 var = Var
 
-con :: tcon -> Type tcon a
+con :: Id.TCon -> Type a
 con = Con
 
-(~>) :: Type tcon a -> Type tcon a -> Type tcon a
+(~>) :: Type a -> Type a -> Type a
 (~>) = Fun
 
-(*~>) :: [Type tcon a] -> Type tcon a -> Type tcon a
+(*~>) :: [Type a] -> Type a -> Type a
 t_args *~> t_res = foldr (~>) t_res t_args
 
-app :: Type tcon a -> [Type tcon a] -> Type tcon a
+app :: Type a -> [Type a] -> Type a
 app = foldl App
 
-appTCon :: tcon -> [Type tcon a] -> Type tcon a
+appTCon :: Id.TCon -> [Type a] -> Type a
 appTCon = app . Con
 
--- TODO: Remove this undefined hack.
-typeInt :: Type (TConDecl Ident.TCon) Closed
-typeInt  = appTCon (mkTConDecl (Ident.tcon "Int") undefined [] []) []
+typeInt :: Type Closed
+typeInt  = appTCon (Id.tcon "Int") []
 
-open :: Type tcon Closed -> Type tcon (Open s)
+open :: Type Closed -> Type (Open s)
 open = \case
   Var name  -> Var name
   Arr       -> Arr
   Con c     -> Con c
   App tf tp -> App (open tf) (open tp)
 
-vars :: Type tcon Closed -> Set.Set Ident.TVar
+vars :: Type Closed -> Set.Set Id.TVar
 vars t = runST $ openVars (open t)
 
-openVars :: Type tcon (Open s) -> ST s (Set.Set Ident.TVar)
+openVars :: Type (Open s) -> ST s (Set.Set Id.TVar)
 openVars = \case
   Var v -> pure (Set.singleton v)
   Arr   -> pure Set.empty
@@ -131,11 +96,11 @@ openVars = \case
       Free{}      -> pure Set.empty
       Link{_type} -> openVars _type
 
-openSubst :: Map.Map Ident.TVar (Type tcon (Open s)) -> Type tcon (Open s) -> ST s (Type tcon (Open s))
+openSubst :: Map.Map Id.TVar (Type (Open s)) -> Type (Open s) -> ST s (Type (Open s))
 openSubst env t = runReaderT (subst' t) env
   where
-    subst' :: Type tcon (Open s)
-           -> ReaderT (Map.Map Ident.TVar (Type tcon (Open s))) (ST s) (Type tcon (Open s))
+    subst' :: Type (Open s)
+           -> ReaderT (Map.Map Id.TVar (Type (Open s))) (ST s) (Type (Open s))
     subst' = \case
       Var v -> do
         let e = bug "type instantiation" "unknown variable" (Just $ show v)
@@ -153,7 +118,7 @@ openSubst env t = runReaderT (subst' t) env
 
 -- TODO: Change the order of the parameters of 'Type' and this becomes
 -- 'traverse'.
-type2tcon :: Traversal (Type tcon1 Closed) (Type tcon2 Closed) tcon1 tcon2
+type2tcon :: Traversal' (Type Closed) Id.TCon
 type2tcon f = \case
   Var v -> pure (Var v)
   Arr   -> pure Arr
@@ -161,12 +126,12 @@ type2tcon f = \case
   App tf tp -> App <$> type2tcon f tf <*> type2tcon f tp
 
 -- * Pretty printing
-prettyUVar :: Pretty tcon => PrettyLevel -> Rational -> UVar tcon s -> ST s Doc
+prettyUVar :: PrettyLevel -> Rational -> UVar s -> ST s Doc
 prettyUVar lvl prec uvar = case uvar of
   Free{_ident} -> return $ pretty _ident
   Link{_type}  -> prettyType lvl prec _type
 
-prettyType :: Pretty tcon => PrettyLevel -> Rational -> Type tcon (Open s) -> ST s Doc
+prettyType :: PrettyLevel -> Rational -> Type (Open s) -> ST s Doc
 prettyType lvl prec t = case t of
   Var v -> pure (pretty v)
   Arr   -> pure "(->)"
@@ -184,14 +149,8 @@ prettyType lvl prec t = case t of
     prettyUVar lvl prec uvar
 
 
-instance Pretty (TConDecl Ident.TCon) where
-  pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname
-
-instance Pretty (DConDecl (TConDecl Ident.TCon)) where
-  pPrintPrec lvl prec MkDConDecl{_dname} = pPrintPrec lvl prec _dname
-
-instance Pretty tcon => Pretty (Type tcon Closed) where
+instance Pretty (Type Closed) where
   pPrintPrec lvl prec t = runST $ prettyType lvl prec (open t)
 
-instance Pretty tcon => Show (Type tcon Closed) where
+instance Show (Type Closed) where
   show = prettyShow

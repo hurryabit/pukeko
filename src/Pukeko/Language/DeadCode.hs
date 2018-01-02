@@ -16,11 +16,11 @@ import qualified Pukeko.Language.PatternMatcher.AST as PM
 import qualified Pukeko.Language.Ident              as Id
 
 cleanModule :: PM.Module -> DC.Module
-cleanModule module_ =
-  let (g, out, in_) = G.graphFromEdges $ map (\t -> (t, t^.lhs, deps t)) module_
+cleanModule = over module2tops $ \tops0 ->
+  let (g, out, in_) = G.graphFromEdges $ map (\t -> (t, t^.lhs, deps t)) tops0
       reach = Set.fromList
               $ map (view _2 . out) $ maybe [] (G.reachable g) (in_ Id.main)
       keep t = (t^.lhs) `Set.member` reach
-  in  map (over PM.topLevel2expr retagExpr) $ filter keep module_
+  in  map (over PM.topLevel2expr retagExpr) $ filter keep tops0
   where
     deps = Set.toList . Set.setOf (PM.topLevel2expr . traverse)

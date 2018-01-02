@@ -20,8 +20,9 @@ where
 
 import           Pukeko.Pos
 import           Pukeko.Language.AST.Std (GenDefn (..), GenPatn (..), Bind (..))
-import qualified Pukeko.Language.Type     as Ty
-import qualified Pukeko.Language.Ident    as Id
+import qualified Pukeko.Language.AST.ConDecl as Con
+import qualified Pukeko.Language.Type        as Ty
+import qualified Pukeko.Language.Ident       as Id
 
 type TCon = Id.TCon
 type DCon = Id.DCon
@@ -29,8 +30,8 @@ type DCon = Id.DCon
 type Module = [TopLevel]
 
 data TopLevel
-  = TypDef Pos [Ty.TConDecl TCon]
-  | Val    Pos Id.EVar (Ty.Type TCon Ty.Closed)
+  = TypDef Pos [Con.TConDecl]
+  | Val    Pos Id.EVar (Ty.Type Ty.Closed)
   | TopLet Pos [Defn Id.EVar]
   | TopRec Pos [Defn Id.EVar]
   | Asm    Pos Id.EVar String

@@ -21,12 +21,13 @@ import           Data.Traversable
 import           Pukeko.Error
 import           Pukeko.Pretty
 import           Pukeko.Language.AST.Std          hiding (Free)
+import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.Ident            as Id
 import qualified Pukeko.Language.TypeResolver.AST as TR
 import qualified Pukeko.Language.KindChecker.AST  as KC
 import qualified Pukeko.Language.Type             as Ty
 
-type Type = Ty.Type KC.TCon Ty.Closed
+type Type = Ty.Type Ty.Closed
 
 data Open s
 
@@ -80,10 +81,10 @@ kcType k = \case
       Nothing -> throwDoc $ "unknown type variable:" <+> pretty v
       Just kv -> unify kv k
   Ty.Arr -> unify (Arrow Star (Arrow Star Star)) k
-  Ty.Con Ty.MkTConDecl{_tname} -> do
-    kcon_opt <- use (typeCons . at _tname)
+  Ty.Con tcon -> do
+    kcon_opt <- use (typeCons . at tcon)
     case kcon_opt of
-      Nothing -> bug "kind checker" "unknown type constructor" (Just (show _tname))
+      Nothing -> bug "kind checker" "unknown type constructor" (Just (show tcon))
       Just kcon -> unify kcon k
   Ty.App tf tp -> do
     ktp <- freshUVar
@@ -91,22 +92,22 @@ kcType k = \case
     kcType (Arrow ktp k) tf
 
 
-kcTypDef :: [Ty.TConDecl (Ty.TConDecl Id.TCon)] -> KC s ()
+kcTypDef :: [Con.TConDecl] -> KC s ()
 kcTypDef tcons = do
-  kinds <- for tcons $ \Ty.MkTConDecl{_tname} -> do
+  kinds <- for tcons $ \Con.MkTConDecl{_tname} -> do
     kind <- freshUVar
     typeCons . at _tname ?= kind
     pure kind
-  for_ (zip tcons kinds) $ \(Ty.MkTConDecl{_params, _dcons}, tconKind) -> do
+  for_ (zip tcons kinds) $ \(Con.MkTConDecl{_params, _dcons}, tconKind) -> do
     paramKinds <- traverse (const freshUVar) _params
     unify tconKind (foldr Arrow Star paramKinds)
     let env = Map.fromList (zip _params paramKinds)
     local (const env) $ do
-      for_ _dcons $ \Ty.MkDConDecl{_fields} -> do
+      for_ _dcons $ \Con.MkDConDecl{_fields} -> do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 
-kcVal :: Ty.Type (Ty.TConDecl Id.TCon) Ty.Closed ->KC s ()
+kcVal :: Ty.Type Ty.Closed ->KC s ()
 kcVal t = do
   env <- sequence $ Map.fromSet (const freshUVar) (Ty.vars t)
   local (const env) $ kcType Star t
@@ -125,7 +126,7 @@ kcTopLevel = \case
   TR.Asm    w x  a -> pure $ Just $ KC.Asm w x a
 
 kcModule ::TR.Module -> KC s KC.Module
-kcModule module_ = catMaybes <$> traverse kcTopLevel module_
+kcModule = module2tops (fmap catMaybes . traverse kcTopLevel)
 
 checkModule :: MonadError String m => TR.Module -> m KC.Module
 checkModule module_ = runKC (kcModule module_)

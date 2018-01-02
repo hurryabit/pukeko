@@ -30,7 +30,7 @@ newtype LL a = LL{unLL :: RWS () [LL.TopLevel] State a}
            , MonadState State
            )
 
-execLL :: LL () -> LL.Module
+execLL :: LL () -> [LL.TopLevel]
 execLL ll =
   let state = []
       ((), defns) = evalRWS (unLL ll) () state
@@ -87,4 +87,4 @@ llTopLevel = \case
   DC.Asm w lhs asm -> tell [LL.Asm w lhs asm]
 
 liftModule :: DC.Module -> LL.Module
-liftModule = execLL . traverse_ llTopLevel
+liftModule = over module2tops (execLL . traverse_ llTopLevel)

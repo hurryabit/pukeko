@@ -37,7 +37,7 @@ compile write_ll write_gm no_prelude file_user = do
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (module_ll, module_cc, program, nasm) -> do
+    Right (Pukeko.MkModule _decls module_ll, module_cc, program, nasm) -> do
       when write_ll $ do
         writeFile (file_user `replaceExtension` ".ll") $
           (render $ vcat $ map pretty module_ll) ++ "\n"
