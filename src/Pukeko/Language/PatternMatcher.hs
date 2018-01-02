@@ -36,7 +36,7 @@ evalPM pm = runExcept $ evalStateT (unPM pm) []
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
 
-name :: Ty.Constructor _ -> Id.Con
+name :: Ty.Constructor _ -> Id.DCon
 name Ty.MkConstructor{_name} = _name
 
 pmExpr :: TC.Expr v -> PM (PM.Expr v)
@@ -135,7 +135,7 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest = MkDest TC.ExprCon [TC.Patn]
+data Dest = MkDest TC.DCon [TC.Patn]
 
 patnToDest :: TC.Patn -> Maybe Dest
 patnToDest = \case
@@ -157,7 +157,7 @@ findDestCol w (MkColMatch cs0 us) =
 
 data GrpMatchItem v =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem TC.ExprCon (Vec.Vector k Bind) (RowMatch m n (FinScope k v))
+  MkGrpMatchItem TC.DCon (Vec.Vector k Bind) (RowMatch m n (FinScope k v))
 
 data GrpMatch v = MkGrpMatch (PM.Expr v) [GrpMatchItem v]
 

@@ -66,10 +66,13 @@ evar = Id.evar <$> (lookAhead lower *> identifier)
 tvar :: Parser Id.TVar
 tvar = Id.tvar <$> (lookAhead lower *> identifier)
 
-constructor :: Parser Id.Con
-constructor = Id.constructor <$> (lookAhead upper *> Token.identifier pukeko)
+tcon :: Parser Id.TCon
+tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
 
-type_, atype :: Parser (Ty.Type TypeCon Ty.Closed)
+dcon :: Parser Id.DCon
+dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
+
+type_, atype :: Parser (Ty.Type TCon Ty.Closed)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (Ty.~>)) AssocRight ] ]
@@ -77,11 +80,11 @@ type_ =
   <?> "type"
 atype = choice
   [ Ty.var <$> tvar
-  , Ty.con <$> constructor
+  , Ty.con <$> tcon
   , parens type_
   ]
 
-asType :: Parser (Ty.Type TypeCon Ty.Closed)
+asType :: Parser (Ty.Type TCon Ty.Closed)
 asType = reservedOp ":" *> type_
 
 module_ :: Parser Module
@@ -105,10 +108,10 @@ bind = Wild <$> getPosition <*  symbol "_" <|>
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
 patn, apatn :: Parser Patn
-patn  = Dest <$> getPosition <*> constructor <*> many apatn <|>
+patn  = Dest <$> getPosition <*> dcon <*> many apatn <|>
         apatn
 apatn = Bind <$> bind <|>
-        Dest <$> getPosition <*> constructor <*> pure [] <|>
+        Dest <$> getPosition <*> dcon <*> pure [] <|>
         parens patn
 
 defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
@@ -158,7 +161,7 @@ expr =
   <?> "expression"
 aexpr = choice
   [ Var <$> getPosition <*> evar
-  , Con <$> getPosition <*> constructor
+  , Con <$> getPosition <*> dcon
   , Num <$> getPosition <*> nat
   , parens expr
   ]
@@ -167,11 +170,11 @@ operatorTable = map (map f) (reverse Op.table)
   where
     f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
 
-adt :: Parser (Ty.ADT Id.Con)
-adt = mkADT' <$> constructor
+adt :: Parser (Ty.ADT Id.TCon)
+adt = mkADT' <$> tcon
              <*> many tvar
              <*> option [] (reservedOp "=" *> many1 adtConstructor)
   where mkADT' con = Ty.mkADT con con
 
-adtConstructor :: Parser (Ty.Constructor Id.Con)
-adtConstructor = Ty.mkConstructor <$> (reservedOp "|" *> constructor) <*> many atype
+adtConstructor :: Parser (Ty.Constructor Id.TCon)
+adtConstructor = Ty.mkConstructor <$> (reservedOp "|" *> dcon) <*> many atype

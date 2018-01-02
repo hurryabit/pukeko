@@ -16,7 +16,7 @@ module Pukeko.Language.AST.Std
   , bindName
   , patnToBind
 
-  , defn2exprCon
+  , defn2dcon
   , patn2bind
   , case2rhs
   , altn2rhs
@@ -47,11 +47,11 @@ import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Scope
 
 class Stage st where
-  type ExprConOf st :: *
-  type HasLam    st :: Bool
-  type HasMat    st :: Bool
+  type DConRef st :: *
+  type HasLam  st :: Bool
+  type HasMat  st :: Bool
 
-type PrettyStage st = (Pretty (ExprConOf st))
+type PrettyStage st = (Pretty (DConRef st))
 
 type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
 
@@ -66,7 +66,7 @@ type StdDefn st = GenDefn (StdExpr st)
 
 data StdExpr st v
   =           Var Pos v
-  |           Con Pos (ExprConOf st)
+  |           Con Pos (DConRef st)
   |           Num Pos Int
   |           App Pos (StdExpr st v) [StdExpr st v]
   | forall n. HasLam st ~ 'True => Lam Pos (Vector n Bind)   (StdExpr st (FinScope n v))
@@ -77,7 +77,7 @@ data StdExpr st v
 
 data StdCase st v = forall n. MkCase
   { _casePos   :: Pos
-  , _caseCon   :: ExprConOf st
+  , _caseCon   :: DConRef st
   , _caseBinds :: Vector n Bind
   , _caseRhs   :: StdExpr st (FinScope n v)
   }
@@ -88,11 +88,11 @@ data StdAltn st v = MkAltn
   , _altnRhs  :: StdExpr st (Scope Id.EVar v)
   }
 
-data GenPatn con
+data GenPatn dcon
   = Bind     Bind
-  | Dest Pos con [GenPatn con]
+  | Dest Pos dcon [GenPatn dcon]
 
-type StdPatn st = GenPatn (ExprConOf st)
+type StdPatn st = GenPatn (DConRef st)
 
 data Bind
   = Wild Pos
@@ -140,7 +140,7 @@ bindName = \case
   Wild _   -> Nothing
   Name _ x -> Just x
 
-patnToBind :: GenPatn con -> Maybe Bind
+patnToBind :: GenPatn dcon -> Maybe Bind
 patnToBind = \case
   Bind b -> Just b
   Dest{} -> Nothing
@@ -148,38 +148,38 @@ patnToBind = \case
 -- * Deep traversals
 type ExprConTraversal t =
   forall st1 st2 v. SameNodes st1 st2 =>
-  IndexedTraversal Pos (t st1 v) (t st2 v) (ExprConOf st1) (ExprConOf st2)
+  IndexedTraversal Pos (t st1 v) (t st2 v) (DConRef st1) (DConRef st2)
 
-defn2exprCon :: ExprConTraversal StdDefn
-defn2exprCon = rhs2 . expr2exprCon
+defn2dcon :: ExprConTraversal StdDefn
+defn2dcon = rhs2 . expr2dcon
 
-expr2exprCon :: ExprConTraversal StdExpr
-expr2exprCon f = \case
+expr2dcon :: ExprConTraversal StdExpr
+expr2dcon f = \case
   Var w x       -> pure $ Var w x
   Con w c       -> Con w <$> indexed f w c
   Num w n       -> pure $ Num w n
-  App w t  us   -> App w <$> expr2exprCon f t <*> (traverse . expr2exprCon) f us
-  Cas w t  cs   -> Cas w <$> expr2exprCon f t <*> (traverse . case2exprCon) f cs
-  Lam w bs t    -> Lam w bs <$> expr2exprCon f t
-  Let w ds t    -> Let w <$> (traverse . defn2exprCon) f ds <*> expr2exprCon f t
-  Rec w ds t    -> Rec w <$> (traverse . defn2exprCon) f ds <*> expr2exprCon f t
-  Mat w t  as   -> Mat w <$> expr2exprCon f t <*> (traverse . altn2exprCon) f as
+  App w t  us   -> App w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
+  Cas w t  cs   -> Cas w <$> expr2dcon f t <*> (traverse . case2dcon) f cs
+  Lam w bs t    -> Lam w bs <$> expr2dcon f t
+  Let w ds t    -> Let w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
+  Rec w ds t    -> Rec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
+  Mat w t  as   -> Mat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
 
-case2exprCon :: ExprConTraversal StdCase
-case2exprCon f (MkCase w c bs t) =
-  MkCase w <$> indexed f w c <*> pure bs <*> expr2exprCon f t
+case2dcon :: ExprConTraversal StdCase
+case2dcon f (MkCase w c bs t) =
+  MkCase w <$> indexed f w c <*> pure bs <*> expr2dcon f t
 
-altn2exprCon :: ExprConTraversal StdAltn
-altn2exprCon f (MkAltn w p t) =
-  MkAltn w <$> patn2exprCon f p <*> expr2exprCon f t
+altn2dcon :: ExprConTraversal StdAltn
+altn2dcon f (MkAltn w p t) =
+  MkAltn w <$> patn2dcon f p <*> expr2dcon f t
 
-patn2exprCon ::
+patn2dcon ::
   IndexedTraversal Pos (GenPatn con1) (GenPatn con2) con1 con2
-patn2exprCon f = \case
+patn2dcon f = \case
   Bind   b    -> pure $ Bind b
-  Dest w c ps -> Dest w <$> indexed f w c <*> (traverse . patn2exprCon) f ps
+  Dest w c ps -> Dest w <$> indexed f w c <*> (traverse . patn2dcon) f ps
 
-patn2bind :: IndexedTraversal' Pos (GenPatn con) Bind
+patn2bind :: IndexedTraversal' Pos (GenPatn dcon) Bind
 patn2bind f = \case
   Bind   b    -> Bind <$> indexed f (b^.pos) b
   Dest w c ps -> Dest w c <$> (traverse . patn2bind) f ps
@@ -191,27 +191,27 @@ over' ::
 over' l f = runIdentity . l (Identity . f)
 
 case2rhs
-  :: (Functor f, ExprConOf st1 ~ ExprConOf st2)
+  :: (Functor f, DConRef st1 ~ DConRef st2)
   => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
   -> StdCase st1 v1 -> f (StdCase st2 v2)
 case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
 
 altn2rhs
-  :: (Functor f, ExprConOf st1 ~ ExprConOf st2)
+  :: (Functor f, DConRef st1 ~ DConRef st2)
   => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
   -> StdAltn st1 v1 -> f (StdAltn st2 v2)
 altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
 
 -- * Retagging
 retagDefn ::
-  (ExprConOf st1 ~ ExprConOf st2, SameNodes st1 st2) =>
+  (DConRef st1 ~ DConRef st2, SameNodes st1 st2) =>
   StdDefn st1 v -> StdDefn st2 v
-retagDefn = over defn2exprCon id
+retagDefn = over defn2dcon id
 
 retagExpr ::
-  (ExprConOf st1 ~ ExprConOf st2, SameNodes st1 st2) =>
+  (DConRef st1 ~ DConRef st2, SameNodes st1 st2) =>
   StdExpr st1 v -> StdExpr st2 v
-retagExpr = over expr2exprCon id
+retagExpr = over expr2dcon id
 
 -- * Manual instances
 instance HasPos (GenDefn expr v) where
@@ -324,7 +324,7 @@ instance (PrettyStage st, IsVar v) => Pretty (StdAltn st v) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance Pretty con => Pretty (GenPatn con) where
+instance Pretty dcon => Pretty (GenPatn dcon) where
   pPrintPrec lvl prec = \case
     Bind   b    -> pretty b
     Dest _ c ps ->

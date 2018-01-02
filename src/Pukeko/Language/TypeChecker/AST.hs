@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.TypeChecker.AST
-  ( TypeCon
-  , ExprCon
+  ( TCon
+  , DCon
   , Module
   , TopLevel (..)
   , Defn
@@ -19,13 +19,13 @@ import qualified Pukeko.Language.Ident           as Id
 
 data TYPECHECKER
 
-type TypeCon = KC.TypeCon
-type ExprCon = KC.ExprCon
+type TCon = KC.TCon
+type DCon = KC.DCon
 
 instance Stage TYPECHECKER where
-  type ExprConOf TYPECHECKER = ExprCon
-  type HasLam    TYPECHECKER = 'True
-  type HasMat    TYPECHECKER = 'True
+  type DConRef TYPECHECKER = DCon
+  type HasLam  TYPECHECKER = 'True
+  type HasMat  TYPECHECKER = 'True
 
 type Module = [TopLevel]
 

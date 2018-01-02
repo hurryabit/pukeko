@@ -12,9 +12,9 @@ import           Pukeko.Error
 import           Pukeko.Pos
 import           Pukeko.Pretty
 import           Pukeko.Language.Type
-import           Pukeko.Language.TypeChecker.AST (TypeCon)
+import           Pukeko.Language.TypeChecker.AST (TCon)
 
-type TypeOpen s = Type TypeCon (Open s)
+type TypeOpen s = Type TCon (Open s)
 
 type TU s = ExceptT String (ST s)
 
@@ -28,7 +28,7 @@ unwind t = case t of
       Free{} -> return t
   _ -> return t
 
-occursCheck :: STRef s (UVar TypeCon s) -> TypeOpen s -> TU s ()
+occursCheck :: STRef s (UVar TCon s) -> TypeOpen s -> TU s ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwError "occurs check"

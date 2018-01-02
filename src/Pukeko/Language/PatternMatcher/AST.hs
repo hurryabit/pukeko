@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.PatternMatcher.AST
-  ( TypeCon
-  , ExprCon
+  ( TCon
+  , DCon
   , Module
   , StdTopLevel (..)
   , TopLevel
@@ -21,11 +21,11 @@ import qualified Pukeko.Language.Ident           as Id
 
 data PATTERNMATCHER
 
-type TypeCon = TC.TypeCon
-type ExprCon = TC.ExprCon
+type TCon = TC.TCon
+type DCon = TC.DCon
 
 instance Stage PATTERNMATCHER where
-  type ExprConOf PATTERNMATCHER = ExprCon
+  type DConRef PATTERNMATCHER = DCon
   type HasLam    PATTERNMATCHER = 'True
   type HasMat    PATTERNMATCHER = 'False
 

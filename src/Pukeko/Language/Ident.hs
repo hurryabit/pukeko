@@ -10,8 +10,10 @@ module Pukeko.Language.Ident
   , TVar
   , tvar
   , freshTVars
-  , Con
-  , constructor
+  , TCon
+  , tcon
+  , DCon
+  , dcon
   )
 where
 
@@ -78,16 +80,30 @@ instance Pretty TVar where
 instance Show TVar where
   show = prettyShow
 
-data Con = Con String
+data TCon = TCon String
   deriving (Eq, Ord)
 
-constructor :: String -> Con
-constructor name@(first:_)
-  | isUpper first = Con name
-constructor name = bug "ident" "invalid constructor name" (Just name)
+tcon :: String -> TCon
+tcon name@(first:_)
+  | isUpper first = TCon name
+tcon name = bug "ident" "invalid type constructor name" (Just name)
 
-instance Pretty Con where
-  pPrint (Con name) = text name
+instance Pretty TCon where
+  pPrint (TCon name) = text name
 
-instance Show Con where
+instance Show TCon where
+  show = prettyShow
+
+data DCon = DCon String
+  deriving (Eq, Ord)
+
+dcon :: String -> DCon
+dcon name@(first:_)
+  | isUpper first = DCon name
+dcon name = bug "ident" "invalid type constructor name" (Just name)
+
+instance Pretty DCon where
+  pPrint (DCon name) = text name
+
+instance Show DCon where
   show = prettyShow

@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.LambdaLifter.AST
-  ( TypeCon
-  , ExprCon
+  ( TCon
+  , DCon
   , Module
   , TopLevel (..)
   , Defn
@@ -19,11 +19,11 @@ import qualified Pukeko.Language.Ident        as Id
 
 data LAMBDALIFTER
 
-type TypeCon = DC.TypeCon
-type ExprCon = DC.ExprCon
+type TCon = DC.TCon
+type DCon = DC.DCon
 
 instance Stage LAMBDALIFTER where
-  type ExprConOf LAMBDALIFTER = ExprCon
+  type DConRef LAMBDALIFTER = DCon
   type HasLam    LAMBDALIFTER = 'False
   type HasMat    LAMBDALIFTER = 'False
 

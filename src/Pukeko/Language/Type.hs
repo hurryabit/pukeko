@@ -41,37 +41,31 @@ import qualified Pukeko.Language.Ident as Ident
 
 infixr 1 ~>, *~>
 
-data ADT con = MkADT
-  { _name         :: Ident.Con
+data ADT tcon = MkADT
+  { _name         :: Ident.TCon
   , _params       :: [Ident.TVar]
-  , _constructors :: [Constructor con]
+  , _constructors :: [Constructor tcon]
   }
 
-mkADT :: Ident.Con -> con -> [Ident.TVar] -> [Constructor con] -> ADT con
-mkADT _name con _params constructors = MkADT
+mkADT :: Ident.TCon -> tcon -> [Ident.TVar] -> [Constructor tcon] -> ADT tcon
+mkADT _name tcon _params constructors = MkADT
   { _name
   , _params
-  , _constructors = zipWith (\_tag constr -> constr { _adt = con, _tag }) [0..] constructors
+  , _constructors = zipWith (\_tag constr -> constr { _adt = tcon, _tag }) [0..] constructors
   }
 
-data Constructor con = MkConstructor
-  { _adt    :: con
-  , _name   :: Ident.Con
+data Constructor tcon = MkConstructor
+  { _adt    :: tcon
+  , _name   :: Ident.DCon
   , _tag    :: Int
-  , _fields :: [Type con Closed]
+  , _fields :: [Type tcon Closed]
   }
 
-mkConstructor :: Ident.Con -> [Type con Closed] -> Constructor con
+mkConstructor :: Ident.DCon -> [Type tcon Closed] -> Constructor tcon
 mkConstructor _name _fields =
   MkConstructor { _adt = undefined, _name, _tag = undefined, _fields }
 
--- constructors :: ADT con -> [(Ident.Con, Type con Closed)]
--- constructors t@MkADT{ _params, _constructors } = map f _constructors
---   where
---     f MkConstructor{ _name, _fields } =
---       (_name, foldr (~>) (adt t $ map var _params) _fields)
-
-typeOf :: Constructor (ADT Ident.Con) -> Type (ADT Ident.Con) Closed
+typeOf :: Constructor (ADT Ident.TCon) -> Type (ADT Ident.TCon) Closed
 typeOf MkConstructor{ _adt, _fields } =
   foldr (~>) (appADT _adt $ map var $ _params _adt) _fields
 
@@ -79,53 +73,53 @@ typeOf MkConstructor{ _adt, _fields } =
 data Open s
 data Closed
 
-data UVar con s
+data UVar tcon s
   = Free{_ident :: Ident.TVar, _level :: Int}
-  | Link{_type  :: Type con (Open s)}
+  | Link{_type  :: Type tcon (Open s)}
 
-data Type con a where
-  Var  :: Ident.TVar               -> Type con a
-  Arr  ::                             Type con a
-  Con  :: con                      -> Type con a
-  App  :: Type con a -> Type con a -> Type con a
-  UVar :: STRef s (UVar con s)     -> Type con (Open s)
+data Type tcon a where
+  Var  :: Ident.TVar                 -> Type tcon a
+  Arr  ::                               Type tcon a
+  Con  :: tcon                       -> Type tcon a
+  App  :: Type tcon a -> Type tcon a -> Type tcon a
+  UVar :: STRef s (UVar tcon s)      -> Type tcon (Open s)
 
-pattern Fun :: Type con a -> Type con a -> Type con a
+pattern Fun :: Type tcon a -> Type tcon a -> Type tcon a
 pattern Fun tx ty = App (App Arr tx) ty
 
-var :: Ident.TVar -> Type con a
+var :: Ident.TVar -> Type tcon a
 var = Var
 
-con :: con -> Type con a
+con :: tcon -> Type tcon a
 con = Con
 
-(~>) :: Type con a -> Type con a -> Type con a
+(~>) :: Type tcon a -> Type tcon a -> Type tcon a
 (~>) = Fun
 
-(*~>) :: [Type con a] -> Type con a -> Type con a
+(*~>) :: [Type tcon a] -> Type tcon a -> Type tcon a
 t_args *~> t_res = foldr (~>) t_res t_args
 
-app :: Type con a -> [Type con a] -> Type con a
+app :: Type tcon a -> [Type tcon a] -> Type tcon a
 app = foldl App
 
-appADT :: con -> [Type con a] -> Type con a
+appADT :: tcon -> [Type tcon a] -> Type tcon a
 appADT = app . Con
 
 -- TODO: Remove this undefined hack.
-typeInt :: Type (ADT Ident.Con) Closed
-typeInt  = appADT (mkADT (Ident.constructor "Int") undefined [] []) []
+typeInt :: Type (ADT Ident.TCon) Closed
+typeInt  = appADT (mkADT (Ident.tcon "Int") undefined [] []) []
 
-open :: Type con Closed -> Type con (Open s)
+open :: Type tcon Closed -> Type tcon (Open s)
 open = \case
   Var name  -> Var name
   Arr       -> Arr
   Con c     -> Con c
   App tf tp -> App (open tf) (open tp)
 
-vars :: Type con Closed -> Set.Set Ident.TVar
+vars :: Type tcon Closed -> Set.Set Ident.TVar
 vars t = runST $ openVars (open t)
 
-openVars :: Type con (Open s) -> ST s (Set.Set Ident.TVar)
+openVars :: Type tcon (Open s) -> ST s (Set.Set Ident.TVar)
 openVars = \case
   Var v -> pure (Set.singleton v)
   Arr   -> pure Set.empty
@@ -137,11 +131,11 @@ openVars = \case
       Free{}      -> pure Set.empty
       Link{_type} -> openVars _type
 
-openSubst :: Map.Map Ident.TVar (Type con (Open s)) -> Type con (Open s) -> ST s (Type con (Open s))
+openSubst :: Map.Map Ident.TVar (Type tcon (Open s)) -> Type tcon (Open s) -> ST s (Type tcon (Open s))
 openSubst env t = runReaderT (subst' t) env
   where
-    subst' :: Type con (Open s)
-           -> ReaderT (Map.Map Ident.TVar (Type con (Open s))) (ST s) (Type con (Open s))
+    subst' :: Type tcon (Open s)
+           -> ReaderT (Map.Map Ident.TVar (Type tcon (Open s))) (ST s) (Type tcon (Open s))
     subst' = \case
       Var v -> do
         let e = bug "type instantiation" "unknown variable" (Just $ show v)
@@ -167,12 +161,12 @@ type2con f = \case
   App tf tp -> App <$> type2con f tf <*> type2con f tp
 
 -- * Pretty printing
-prettyUVar :: Pretty con => PrettyLevel -> Rational -> UVar con s -> ST s Doc
+prettyUVar :: Pretty tcon => PrettyLevel -> Rational -> UVar tcon s -> ST s Doc
 prettyUVar lvl prec uvar = case uvar of
   Free{_ident} -> return $ pretty _ident
   Link{_type}  -> prettyType lvl prec _type
 
-prettyType :: Pretty con => PrettyLevel -> Rational -> Type con (Open s) -> ST s Doc
+prettyType :: Pretty tcon => PrettyLevel -> Rational -> Type tcon (Open s) -> ST s Doc
 prettyType lvl prec t = case t of
   Var v -> pure (pretty v)
   Arr   -> pure "(->)"
@@ -190,14 +184,14 @@ prettyType lvl prec t = case t of
     prettyUVar lvl prec uvar
 
 
-instance Pretty (ADT Ident.Con) where
+instance Pretty (ADT Ident.TCon) where
   pPrintPrec lvl prec MkADT{_name} = pPrintPrec lvl prec _name
 
-instance Pretty (Constructor (ADT Ident.Con)) where
+instance Pretty (Constructor (ADT Ident.TCon)) where
   pPrintPrec lvl prec MkConstructor{_name} = pPrintPrec lvl prec _name
 
-instance Pretty con => Pretty (Type con Closed) where
+instance Pretty tcon => Pretty (Type tcon Closed) where
   pPrintPrec lvl prec t = runST $ prettyType lvl prec (open t)
 
-instance Pretty con => Show (Type con Closed) where
+instance Pretty tcon => Show (Type tcon Closed) where
   show = prettyShow

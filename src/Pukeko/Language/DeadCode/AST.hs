@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.DeadCode.AST
-  ( TypeCon
-  , ExprCon
+  ( TCon
+  , DCon
   , Module
   , PM.StdTopLevel (..)
   , TopLevel
@@ -15,13 +15,13 @@ import qualified Pukeko.Language.PatternMatcher.AST as PM
 
 data DEADCODE
 
-type TypeCon = PM.TypeCon
-type ExprCon = PM.ExprCon
+type TCon = PM.TCon
+type DCon = PM.DCon
 
 instance Stage DEADCODE where
-  type ExprConOf DEADCODE = ExprCon
-  type HasLam    DEADCODE = 'True
-  type HasMat    DEADCODE = 'False
+  type DConRef DEADCODE = DCon
+  type HasLam  DEADCODE = 'True
+  type HasMat  DEADCODE = 'False
 
 type Module = [TopLevel]
 

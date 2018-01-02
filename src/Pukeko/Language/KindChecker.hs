@@ -26,7 +26,7 @@ import qualified Pukeko.Language.TypeResolver.AST as TR
 import qualified Pukeko.Language.KindChecker.AST  as KC
 import qualified Pukeko.Language.Type             as Ty
 
-type Type = Ty.Type KC.TypeCon Ty.Closed
+type Type = Ty.Type KC.TCon Ty.Closed
 
 data Open s
 
@@ -42,7 +42,7 @@ data Kind a where
 type KCEnv s = Map.Map Id.TVar (Kind (Open s))
 
 data KCState s = MkKCState
-  { _typeCons :: Map.Map Id.Con (Kind (Open s))
+  { _typeCons :: Map.Map Id.TCon (Kind (Open s))
   , _fresh    :: [Id.TVar]
   }
 makeLenses ''KCState
@@ -91,7 +91,7 @@ kcType k = \case
     kcType (Arrow ktp k) tf
 
 
-kcTypDef :: [Ty.ADT (Ty.ADT Id.Con)] -> KC s ()
+kcTypDef :: [Ty.ADT (Ty.ADT Id.TCon)] -> KC s ()
 kcTypDef adts = do
   kinds <- for adts $ \Ty.MkADT{_name} -> do
     kind <- freshUVar
@@ -106,7 +106,7 @@ kcTypDef adts = do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 
-kcVal :: Ty.Type (Ty.ADT Id.Con) Ty.Closed ->KC s ()
+kcVal :: Ty.Type (Ty.ADT Id.TCon) Ty.Closed ->KC s ()
 kcVal t = do
   env <- sequence $ Map.fromSet (const freshUVar) (Ty.vars t)
   local (const env) $ kcType Star t

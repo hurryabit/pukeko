@@ -19,8 +19,8 @@ import qualified Pukeko.Language.Type             as Ty
 import qualified Pukeko.Language.Ident            as Id
 
 data TRState = MkTRState
-  { _typeCons :: Map.Map Id.Con TR.TypeCon
-  , _exprCons :: Map.Map Id.Con TR.ExprCon
+  { _st2tcons :: Map.Map Id.TCon TR.TCon
+  , _st2dcons :: Map.Map Id.DCon TR.DCon
   }
 makeLenses ''TRState
 
@@ -32,33 +32,33 @@ newtype TR a = TR {unTR :: ExceptT String (State TRState) a}
 
 runTR :: MonadError String m => TR a -> m a
 runTR tr =
-  let st = MkTRState{_typeCons = mempty, _exprCons = mempty}
+  let st = MkTRState mempty mempty
   in  evalState (runExceptT (unTR tr)) st
 
 -- TODO: Use @typeApps . _1@ to do this.
-trType :: Pos -> Ty.Type Id.Con Ty.Closed -> TR (Ty.Type TR.TypeCon Ty.Closed)
+trType :: Pos -> Ty.Type Id.TCon Ty.Closed -> TR (Ty.Type TR.TCon Ty.Closed)
 trType w = Ty.type2con $ \con -> do
-  adt_opt <- Map.lookup con <$> use typeCons
+  adt_opt <- Map.lookup con <$> use st2tcons
   case adt_opt of
     Nothing  -> throwAt w "unknown type cons" con
     Just adt -> pure adt
 
 -- TODO: Have only one insert function.
-insertTypeCon :: Pos -> TR.TypeCon -> TR ()
-insertTypeCon posn adt@Ty.MkADT{_name} = do
-  old <- use (typeCons . at _name)
+insertTCon :: Pos -> TR.TCon -> TR ()
+insertTCon posn adt@Ty.MkADT{_name} = do
+  old <- use (st2tcons . at _name)
   when (isJust old) $ throwAt posn "duplicate type cons" _name
-  typeCons . at _name ?= adt
+  st2tcons . at _name ?= adt
 
-insertExprCon :: Pos -> TR.ExprCon -> TR ()
-insertExprCon posn con@Ty.MkConstructor{_name} = do
-  old <- use (exprCons . at _name)
+insertDCon :: Pos -> TR.DCon -> TR ()
+insertDCon posn con@Ty.MkConstructor{_name} = do
+  old <- use (st2dcons . at _name)
   when (isJust old) $ throwAt posn "duplicate term cons" _name
-  exprCons . at _name ?= con
+  st2dcons . at _name ?= con
 
-findExprCon :: Pos -> Id.Con -> TR TR.ExprCon
-findExprCon posn name = do
-  con_opt <- Map.lookup name <$> use exprCons
+findDCon :: Pos -> Id.DCon -> TR TR.DCon
+findDCon posn name = do
+  con_opt <- Map.lookup name <$> use st2dcons
   case con_opt of
     Nothing -> throwAt posn "unknown term cons" name
     Just con -> return con
@@ -66,18 +66,18 @@ findExprCon posn name = do
 trTopLevel :: Rn.TopLevel -> TR TR.TopLevel
 trTopLevel top = case top of
   Rn.TypDef w adts -> do
-    for_ adts (insertTypeCon w)
+    for_ adts (insertTCon w)
     adts <- for adts $ \_adt@Ty.MkADT{_constructors} -> do
       _constructors <- forM _constructors $ \con@Ty.MkConstructor{_fields} -> do
         _fields <- traverse (trType w) _fields
         let con' = con{Ty._adt, Ty._fields}
-        insertExprCon w con'
+        insertDCon w con'
         return con'
       return _adt{Ty._constructors}
     return (TR.TypDef w adts)
   Rn.Val w x t -> TR.Val w x <$> trType w t
-  Rn.TopLet w ds -> TR.TopLet w <$> itraverseOf (traverse . defn2exprCon) findExprCon ds
-  Rn.TopRec w ds -> TR.TopRec w <$> itraverseOf (traverse . defn2exprCon) findExprCon ds
+  Rn.TopLet w ds -> TR.TopLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
+  Rn.TopRec w ds -> TR.TopRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
   Rn.Asm w x a -> pure $ TR.Asm w x a
 
 resolveModule :: MonadError String m => Rn.Module -> m TR.Module

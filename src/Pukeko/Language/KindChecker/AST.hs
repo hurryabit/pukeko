@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.KindChecker.AST
-  ( TypeCon
-  , ExprCon
+  ( TCon
+  , DCon
   , Module
   , TopLevel (..)
   , Defn
@@ -20,18 +20,18 @@ import qualified Pukeko.Language.Type             as Ty
 
 data KINDCHECKER
 
-type TypeCon = TR.TypeCon
-type ExprCon = TR.ExprCon
+type TCon = TR.TCon
+type DCon = TR.DCon
 
 instance Stage KINDCHECKER where
-  type ExprConOf KINDCHECKER = ExprCon
-  type HasLam    KINDCHECKER = 'True
-  type HasMat    KINDCHECKER = 'True
+  type DConRef KINDCHECKER = DCon
+  type HasLam  KINDCHECKER = 'True
+  type HasMat  KINDCHECKER = 'True
 
 type Module = [TopLevel]
 
 data TopLevel
-  =           Val    Pos Id.EVar (Ty.Type TypeCon Ty.Closed)
+  =           Val    Pos Id.EVar (Ty.Type TCon Ty.Closed)
   | forall n. TopLet Pos (Vec.Vector n (Defn Id.EVar))
   | forall n. TopRec Pos (Vec.Vector n (Defn (FinScope n Id.EVar)))
   |           Asm    Pos Id.EVar String

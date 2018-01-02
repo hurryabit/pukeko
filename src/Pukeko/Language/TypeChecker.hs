@@ -32,8 +32,8 @@ import qualified Pukeko.Language.Ident             as Id
 import qualified Pukeko.Language.Type              as Ty
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
-type TypeClosed = Ty.Type TC.TypeCon  Ty.Closed
-type TypeOpen s = Ty.Type TC.TypeCon (Ty.Open s)
+type TypeClosed = Ty.Type TC.TCon  Ty.Closed
+type TypeOpen s = Ty.Type TC.TCon (Ty.Open s)
 
 data Environment v s = MkEnvironment
   { _locals :: Sc.EnvOf v (TypeOpen s)
@@ -121,7 +121,7 @@ instantiate t = do
   env <- sequence $ Map.fromSet (const freshUVar) vars
   liftST $ Ty.openSubst env t
 
-instantiateADT :: TC.TypeCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
+instantiateADT :: TC.TCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
 instantiateADT adt@Ty.MkADT{Ty._params} = do
   t_params <- traverse (const freshUVar) _params
   return (Ty.appADT adt t_params, Map.fromList $ zip _params t_params)
