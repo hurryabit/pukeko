@@ -7,7 +7,9 @@ module Pukeko.Language.Renamer
   where
 
 import           Control.Lens
+import           Control.Monad.Reader
 import qualified Data.Map          as Map
+import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Language.AST.Classes
@@ -17,60 +19,58 @@ import qualified Pukeko.Language.Renamer.AST    as Rn
 import qualified Pukeko.Language.Ident          as Id
 
 renameModule :: Ps.Module -> Rn.Module
-renameModule = map ixTopLevel
+renameModule = runRn . traverse rnTopLevel
 
-ixTopLevel :: Ps.TopLevel -> Rn.TopLevel
-ixTopLevel top = case top of
-  Ps.TypDef p ts  -> Rn.TypDef p ts
-  Ps.Val    p x t -> Rn.Val    p x t
-  Ps.TopLet p ds  -> ixDefns ds $ \ds1 _   -> Rn.TopLet p (fmap (rhs2 %~ ixExpr) ds1)
-  Ps.TopRec p ds  -> ixDefns ds $ \ds1 abs -> Rn.TopRec p (fmap (rhs2 %~ abs)    ds1)
-  Ps.Asm    p x a -> Rn.Asm    p x a
+data Env tv = MkEnv (Map.Map Id.EVar tv) (Id.EVar -> tv)
 
-ixExpr :: Ps.Expr Id.EVar -> Rn.Expr Id.EVar
-ixExpr expr = case expr of
-  Ps.Var p x      -> Var p x
-  Ps.Con p c      -> Con p c
-  Ps.Num p n      -> Num p n
-  Ps.App p t  us  -> App p (ixExpr t) (map ixExpr us)
-  -- Ps.If  p t  u v -> If  p (ixExpr t) (ixExpr u) (ixExpr v)
-  Ps.Mat p ts as  -> Mat p (ixExpr ts) (map ixAltn as)
-  Ps.Lam p bs t   -> ixWithBinds (Lam p) bs t
-  Ps.Let w ds t -> ixDefns ds $ \ds1 abs -> Let w (fmap (rhs2 %~ ixExpr) ds1) (abs t)
-  Ps.Rec w ds t -> ixDefns ds $ \ds1 abs -> Rec w (fmap (rhs2 %~ abs)    ds1) (abs t)
+newtype Rn tv a = Rn{unRn :: Reader (Env tv) a}
+  deriving ( Functor, Applicative, Monad
+           , MonadReader (Env tv)
+           )
 
-ixExprAbs :: Map.Map Id.EVar i -> Ps.Expr Id.EVar -> Rn.Expr (Scope i Id.EVar)
-ixExprAbs mp =
-  let f x = fmap (,x) (x `Map.lookup` mp)
-  in  abstract f . ixExpr
+runRn :: Rn Id.EVar a -> a
+runRn ix = runReader (unRn ix) (MkEnv mempty id)
 
-ixWithBinds
-  :: (forall n. Vec.Vector n Bind -> Rn.Expr (FinScope n Id.EVar) -> a)
-  -> [Bind]
-  -> Ps.Expr Id.EVar
-  -> a
-ixWithBinds mk bs0 t = Vec.withList bs0 $ \bs1 ->
-  let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs1
-  in  mk bs1 (ixExprAbs mp t)
+localize :: Map.Map Id.EVar i -> Rn (Scope i tv) a -> Rn tv a
+localize bs = Rn . withReader upd . unRn
+  where
+    upd (MkEnv bound0 mkFree) =
+      let bound1 = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free bound0
+      in  MkEnv bound1 (Free . mkFree)
 
-ixWithPatn ::
-  (Rn.Patn -> Rn.Expr (Scope Id.EVar Id.EVar) -> a) ->
-  Ps.Patn                                      ->
-  Ps.Expr Id.EVar                              ->
-  a
-ixWithPatn mk p t =
-  let mp = Map.fromList $ map (\x -> (x, x)) $ toListOf (patn2bind . _Name . _2) p
-  in  mk p (ixExprAbs mp t)
+localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (FinScope n tv) a -> Rn tv a
+localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
 
-ixAltn :: Ps.Altn Id.EVar -> Rn.Altn Id.EVar
-ixAltn (Ps.MkAltn w p t) = ixWithPatn (MkAltn w) p t
+rnTopLevel :: Ps.TopLevel -> Rn Id.EVar Rn.TopLevel
+rnTopLevel top = case top of
+  Ps.TypDef w ts  -> pure (Rn.TypDef w ts)
+  Ps.Val    w x t -> pure (Rn.Val    w x t)
+  Ps.TopLet w ds0 -> Vec.withList ds0 $ \ds1 ->
+    Rn.TopLet w <$> traverse rnDefn ds1
+  Ps.TopRec w ds0 -> Vec.withList ds0 $ \ds1 ->
+    localizeDefns ds1 $ Rn.TopRec w <$> traverse rnDefn ds1
+  Ps.Asm    w x a -> pure (Rn.Asm    w x a)
 
-ixDefns
-  :: [Ps.Defn Id.EVar]
-  -> (forall n. Vec.Vector n (Ps.Defn Id.EVar)
-             -> (Ps.Expr Id.EVar -> Rn.Expr (FinScope n Id.EVar))
-             -> a)
-  -> a
-ixDefns ds0 mk = Vec.withList ds0 $ \ds1 ->
-  let mp = ifoldMap (\i d -> Map.singleton (d^.lhs) i) ds1
-  in  mk ds1 (ixExprAbs mp)
+rnDefn :: Ps.Defn Id.EVar -> Rn tv (Rn.Defn tv)
+rnDefn = rhs2 rnExpr
+
+rnExpr :: Ps.Expr Id.EVar -> Rn tv (Rn.Expr tv)
+rnExpr = \case
+  Ps.Var w x ->
+    asks $ \(MkEnv bound mkFree) -> Var w (Map.findWithDefault (mkFree x) x bound)
+  Ps.Con w c -> pure (Con w c)
+  Ps.Num w n -> pure (Num w n)
+  Ps.App w e0  es -> App w <$> rnExpr e0 <*> traverse rnExpr es
+  Ps.Mat w e0  as -> Mat w <$> rnExpr e0 <*> traverse rnAltn as
+  Ps.Lam w bs0 e0 -> Vec.withList bs0 $ \bs1 -> do
+    let bs2 = ifoldMapOf (itraversed . _Name) (\i (_w, x) -> Map.singleton x i) bs1
+    Lam w bs1 <$> localize bs2 (rnExpr e0)
+  Ps.Let w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
+    Let w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
+  Ps.Rec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
+    localizeDefns ds1 $ Rec w <$> traverse rnDefn ds1 <*> rnExpr e0
+
+rnAltn :: Ps.Altn Id.EVar -> Rn tv (Rn.Altn tv)
+rnAltn (Ps.MkAltn w p e) = do
+  let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p)
+  MkAltn w p <$> localize bs (rnExpr e)
