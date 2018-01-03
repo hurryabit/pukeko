@@ -6,7 +6,7 @@ module Pukeko.Language.AST.Scope
   , FinScope
   , _Bound
   , _Free
-  , bound
+  , mkBound
   , strengthen
   , weaken
   , weaken1
@@ -35,8 +35,8 @@ data Scope i v
 
 type FinScope n = Scope (Finite n)
 
-bound :: i -> Id.EVar -> Scope i v
-bound i x = Bound i (Forget x)
+mkBound :: i -> Id.EVar -> Scope i v
+mkBound i x = Bound i (Forget x)
 
 strengthen :: String -> Scope i v -> v
 strengthen component = \case

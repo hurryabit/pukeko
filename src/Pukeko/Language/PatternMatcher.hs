@@ -185,7 +185,7 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
             case LS.match ixs ps of
               Nothing  -> bug "pattern matcher" "wrong number of patterns" Nothing
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap weaken1 u)
-          let ts1 = LS.map (Var w . uncurry bound) ixs LS.++ LS.map (fmap weaken) ts
+          let ts1 = LS.map (Var w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) ts
           pure $ MkGrpMatchItem con (fmap (Name w . snd) ixs0) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps
 

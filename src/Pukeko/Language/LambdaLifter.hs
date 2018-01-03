@@ -61,7 +61,7 @@ llExpr = \case
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
             Free  v   -> Free  (varName v)
-      let renameCaptured i v = Map.singleton v (bound (Fin.weaken i) (varName v))
+      let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (varName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
       tell [LL.Def w lhs newBinds (fmap (rename Map.!) rhs)]
       let unfree = \case

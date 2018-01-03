@@ -19,6 +19,7 @@ module Pukeko.Language.AST.Std
 
   , module2decls
   , module2tops
+  , bind2evar
   , defn2dcon
   , patn2bind
   , case2rhs
@@ -119,7 +120,7 @@ abstract :: (v -> Maybe (i, Id.EVar)) -> StdExpr st v -> StdExpr st (Scope i v)
 abstract f = fmap (match f)
   where
     match :: (v -> Maybe (i, Id.EVar)) -> v -> Scope i v
-    match f v = maybe (Free v) (uncurry bound) (f v)
+    match f v = maybe (Free v) (uncurry mkBound) (f v)
 
 -- | Replace subexpressions.
 (//) :: StdExpr st v -> (Pos -> v -> StdExpr st w) -> StdExpr st w
@@ -152,6 +153,14 @@ patnToBind :: GenPatn dcon -> Maybe Bind
 patnToBind = \case
   Bind b -> Just b
   Dest{} -> Nothing
+
+-- * Traversals
+
+-- TODO: Make this indexed if possible.
+bind2evar :: Traversal' Bind Id.EVar
+bind2evar f = \case
+  Wild w   -> pure (Wild w)
+  Name w x -> Name w <$> f x
 
 -- * Deep traversals
 type ExprConTraversal t =
