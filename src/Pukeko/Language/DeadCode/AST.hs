@@ -14,8 +14,7 @@ import qualified Pukeko.Language.PatternMatcher.AST as PM
 data DEADCODE
 
 instance Stage DEADCODE where
-  type HasLam  DEADCODE = 'True
-  type HasMat  DEADCODE = 'False
+  type StageId DEADCODE = 600
 
 type Module = StdModule TopLevel
 

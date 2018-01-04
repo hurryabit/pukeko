@@ -17,8 +17,7 @@ import qualified Pukeko.Language.Ident           as Id
 data TYPECHECKER
 
 instance Stage TYPECHECKER where
-  type HasLam  TYPECHECKER = 'True
-  type HasMat  TYPECHECKER = 'True
+  type StageId TYPECHECKER = 400
 
 type Module = StdModule TopLevel
 

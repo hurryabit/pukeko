@@ -20,8 +20,7 @@ import qualified Pukeko.Language.Type        as Ty
 data RENAMER
 
 instance Stage RENAMER where
-  type HasLam  RENAMER = 'True
-  type HasMat  RENAMER = 'True
+  type StageId RENAMER = 100
 
 type Module = [TopLevel]
 

@@ -17,8 +17,7 @@ import qualified Pukeko.Language.Ident        as Id
 data LAMBDALIFTER
 
 instance Stage LAMBDALIFTER where
-  type HasLam    LAMBDALIFTER = 'False
-  type HasMat    LAMBDALIFTER = 'False
+  type StageId LAMBDALIFTER = 700
 
 type Module = StdModule TopLevel
 

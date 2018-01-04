@@ -18,8 +18,7 @@ import qualified Pukeko.Language.Type             as Ty
 data KINDCHECKER
 
 instance Stage KINDCHECKER where
-  type HasLam  KINDCHECKER = 'True
-  type HasMat  KINDCHECKER = 'True
+  type StageId KINDCHECKER = 300
 
 type Module = StdModule TopLevel
 

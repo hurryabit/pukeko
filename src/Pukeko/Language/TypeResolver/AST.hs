@@ -20,8 +20,7 @@ import qualified Pukeko.Language.Type        as Ty
 data TYPERESOLVER
 
 instance Stage TYPERESOLVER where
-  type HasLam  TYPERESOLVER = 'True
-  type HasMat  TYPERESOLVER = 'True
+  type StageId TYPERESOLVER = 200
 
 type Module = StdModule TopLevel
 

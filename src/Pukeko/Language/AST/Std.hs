@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.AST.Std
@@ -41,6 +42,7 @@ module Pukeko.Language.AST.Std
 import Control.Lens
 import Data.Vector.Sized (Vector)
 import Data.Foldable
+import GHC.TypeLits
 
 
 import           Pukeko.Pos
@@ -51,9 +53,22 @@ import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.ConDecl (ConDecls)
 import           Pukeko.Language.AST.Scope
 
+-- StageIds
+-- Parser         =   0
+-- Renamer        = 100
+-- TypeResolver   = 200
+-- KindChecker    = 300
+-- TypeChecker    = 400
+-- PatternMatcher = 500
+-- DeadCode       = 600
+-- LambdaLifter   = 700
+-- CoreCompiler   = 999
+
 class Stage st where
-  type HasLam  st :: Bool
-  type HasMat  st :: Bool
+  type StageId st :: Nat
+
+type HasLam st = StageId st <=? 600
+type HasMat st = StageId st <=? 400
 
 type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
 

@@ -19,8 +19,7 @@ import qualified Pukeko.Language.Ident           as Id
 data PATTERNMATCHER
 
 instance Stage PATTERNMATCHER where
-  type HasLam    PATTERNMATCHER = 'True
-  type HasMat    PATTERNMATCHER = 'False
+  type StageId PATTERNMATCHER = 500
 
 type Module = StdModule TopLevel
 
