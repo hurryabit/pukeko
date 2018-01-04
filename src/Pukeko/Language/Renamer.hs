@@ -14,12 +14,15 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Parser.AST     as Ps
 import qualified Pukeko.Language.Renamer.AST    as Rn
 import qualified Pukeko.Language.Ident          as Id
 
 renameModule :: Ps.Module -> Rn.Module
-renameModule = runRn . traverse rnTopLevel
+renameModule = MkModule info . runRn . traverse rnTopLevel
+  where
+    info = MI.MkModuleInfo MI.Absent MI.Absent
 
 data Env tv = MkEnv (Map.Map Id.EVar tv) (Id.EVar -> tv)
 

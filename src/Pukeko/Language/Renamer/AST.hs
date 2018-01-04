@@ -20,9 +20,8 @@ import qualified Pukeko.Language.Type        as Ty
 data RENAMER
 
 instance Stage RENAMER where
-  type StageId RENAMER = 100
-
-type Module = [TopLevel]
+  type StageId     RENAMER = 100
+  type StdTopLevel RENAMER = TopLevel
 
 data TopLevel
   =           TypDef Pos [Con.TConDecl]
@@ -31,6 +30,7 @@ data TopLevel
   | forall n. TopRec Pos (Vec.Vector n (Defn (FinScope n Id.EVar)))
   |           Asm    Pos Id.EVar String
 
+type Module = StdModule RENAMER
 type Defn = StdDefn RENAMER
 type Expr = StdExpr RENAMER
 type Altn = StdAltn RENAMER

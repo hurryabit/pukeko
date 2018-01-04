@@ -12,6 +12,7 @@ import           Data.Maybe          (isJust)
 
 import           Pukeko.Error
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.ModuleInfo   as MI
 import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.TypeResolver.AST as TR
 import qualified Pukeko.Language.Renamer.AST      as Rn
@@ -76,6 +77,7 @@ trTopLevel top = case top of
   Rn.Asm w x a -> pure $ TR.Asm w x a
 
 resolveModule :: MonadError String m => Rn.Module -> m TR.Module
-resolveModule tops0 = do
+resolveModule (MkModule _info0 tops0) = do
   (tops1, MkTRState tcons1 dcons1) <- runTR (traverse trTopLevel tops0)
-  pure (MkModule (Con.mkConDecls tcons1 dcons1) tops1)
+  let info1 = MI.MkModuleInfo (MI.Present tcons1) (MI.Present dcons1)
+  pure (MkModule info1 tops1)

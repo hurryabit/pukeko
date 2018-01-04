@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.LambdaLifter.AST
-  ( Module
+  ( ModuleInfo
+  , Module
   , TopLevel (..)
   , Defn
   , Expr
@@ -17,15 +18,16 @@ import qualified Pukeko.Language.Ident        as Id
 data LAMBDALIFTER
 
 instance Stage LAMBDALIFTER where
-  type StageId LAMBDALIFTER = 700
-
-type Module = StdModule TopLevel
+  type StageId     LAMBDALIFTER = 700
+  type StdTopLevel LAMBDALIFTER = TopLevel
 
 data TopLevel
   = forall n. Def Pos Id.EVar (Vec.Vector n Bind) (Expr (FinScope n Id.EVar))
   |           Caf Pos Id.EVar (Expr Id.EVar)
   |           Asm Pos Id.EVar String
 
+type ModuleInfo = GenModuleInfo 'True
+type Module = StdModule LAMBDALIFTER
 type Defn = StdDefn LAMBDALIFTER
 type Expr = StdExpr LAMBDALIFTER
 type Case = StdCase LAMBDALIFTER

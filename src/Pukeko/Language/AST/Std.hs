@@ -3,6 +3,9 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.AST.Std
   ( Stage (..)
+  , HasCons
+  , GenModuleInfo (..)
+  , StdModuleInfo
   , StdModule (..)
   , GenDefn (..)
   , StdDefn
@@ -18,7 +21,6 @@ module Pukeko.Language.AST.Std
   , bindName
   , patnToBind
 
-  , module2decls
   , module2tops
   , bind2evar
   , defn2dcon
@@ -50,8 +52,8 @@ import           Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Op
 import qualified Pukeko.Language.Ident    as Id
 import           Pukeko.Language.AST.Classes
-import           Pukeko.Language.AST.ConDecl (ConDecls)
 import           Pukeko.Language.AST.Scope
+import           Pukeko.Language.AST.ModuleInfo
 
 -- StageIds
 -- Parser         =   0
@@ -65,16 +67,23 @@ import           Pukeko.Language.AST.Scope
 -- CoreCompiler   = 999
 
 class Stage st where
-  type StageId st :: Nat
+  type StageId     st :: Nat
+  type StdTopLevel st :: *
 
 type HasLam st = StageId st <=? 600
 type HasMat st = StageId st <=? 400
 
+type HasCons st = 200 <=? StageId st
+
 type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
 
-data StdModule top = MkModule
-  { _module2decls :: ConDecls
-  , _module2tops  :: [top]
+type SameModuleInfo st1 st2 = HasCons st1 ~ HasCons st2
+
+type StdModuleInfo st = GenModuleInfo (HasCons st)
+
+data StdModule st = MkModule
+  { _moduleInfo :: GenModuleInfo (HasCons st)
+  , _moduleTops :: [StdTopLevel st]
   }
 
 data GenDefn expr v = MkDefn
@@ -123,7 +132,6 @@ data Bind
 
 
 -- * Derived optics
-makeLenses ''StdModule
 makeLenses ''GenDefn
 makePrisms ''Bind
 
@@ -170,6 +178,10 @@ patnToBind = \case
   Dest{} -> Nothing
 
 -- * Traversals
+module2tops ::
+  SameModuleInfo st1 st2 =>
+  Lens (StdModule st1) (StdModule st2) [StdTopLevel st1] [StdTopLevel st2]
+module2tops f (MkModule info tops) = MkModule info <$> f tops
 
 -- TODO: Make this indexed if possible.
 bind2evar :: Traversal' Bind Id.EVar
@@ -241,7 +253,7 @@ retagDefn ::
 retagDefn = over defn2dcon id
 
 retagExpr ::
-  (SameNodes st1 st2) =>
+  forall st1 st2 v. (SameNodes st1 st2) =>
   StdExpr st1 v -> StdExpr st2 v
 retagExpr = over expr2dcon id
 

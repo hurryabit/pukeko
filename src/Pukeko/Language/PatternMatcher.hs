@@ -17,7 +17,7 @@ import           Data.Traversable (for)
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
-import           Pukeko.Language.ConInfo
+import           Pukeko.Language.Info
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.ConDecl        as Con
@@ -25,15 +25,15 @@ import qualified Pukeko.Language.PatternMatcher.AST as PM
 import qualified Pukeko.Language.TypeChecker.AST    as TC
 import qualified Pukeko.Language.Ident              as Id
 
-newtype PM a = PM{unPM :: ConInfoT (StateT [Id.EVar] (Except String)) a}
+newtype PM a = PM{unPM :: InfoT TC.ModuleInfo (StateT [Id.EVar] (Except String)) a}
   deriving ( Functor, Applicative, Monad
-           , MonadConInfo
+           , MonadInfo TC.ModuleInfo
            , MonadState [Id.EVar]
            , MonadError String
            )
 
-evalPM :: MonadError String m => PM a -> ConDecls -> m a
-evalPM pm decls = runExcept $ evalStateT (runConInfoT (unPM pm) decls) []
+evalPM :: MonadError String m => PM a -> TC.ModuleInfo -> m a
+evalPM pm decls = runExcept $ evalStateT (runInfoT (unPM pm) decls) []
 
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))

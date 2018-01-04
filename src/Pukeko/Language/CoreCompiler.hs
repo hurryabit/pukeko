@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 module Pukeko.Language.CoreCompiler
   ( Module
   , compileModule
@@ -11,23 +12,23 @@ import qualified Data.Map          as Map
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Core.Syntax
-import           Pukeko.Language.ConInfo
 import           Pukeko.Language.AST.Scope
+import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.AST.Std          as LL
 import qualified Pukeko.Language.LambdaLifter.AST as LL
 import qualified Pukeko.Language.Ident            as Id
-import qualified Pukeko.Language.AST.ConDecl      as Con
+import           Pukeko.Language.Info
 
 type CCState = Map.Map Id.EVar Name
 
-newtype CC a = CC{unCC :: ConInfoT (State CCState) a}
+newtype CC a = CC{unCC :: InfoT LL.ModuleInfo (State CCState) a}
   deriving ( Functor, Applicative, Monad
-           , MonadConInfo
+           , MonadInfo LL.ModuleInfo
            , MonadState CCState
            )
 
-runCC :: CC a -> ConDecls -> a
-runCC cc decls = evalState (runConInfoT (unCC cc) decls) mempty
+runCC :: CC a -> LL.ModuleInfo -> a
+runCC cc decls = evalState (runInfoT (unCC cc) decls) mempty
 
 compileModule :: LL.Module -> Module
 compileModule (LL.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls

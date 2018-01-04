@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.TypeChecker.AST
-  ( Module
+  ( ModuleInfo
+  , Module
   , TopLevel (..)
   , Defn
   , Expr
@@ -12,19 +13,21 @@ import           Control.Lens
 
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.Ident           as Id
+import qualified Pukeko.Language.Ident          as Id
 
 data TYPECHECKER
 
 instance Stage TYPECHECKER where
-  type StageId TYPECHECKER = 400
+  type StageId     TYPECHECKER = 400
+  type StdTopLevel TYPECHECKER = TopLevel
 
-type Module = StdModule TopLevel
 
 data TopLevel
   = Def Pos Id.EVar (Expr Id.EVar)
   | Asm Pos Id.EVar String
 
+type ModuleInfo = GenModuleInfo 'True
+type Module = StdModule TYPECHECKER
 type Defn = StdDefn TYPECHECKER
 type Expr = StdExpr TYPECHECKER
 type Altn = StdAltn TYPECHECKER

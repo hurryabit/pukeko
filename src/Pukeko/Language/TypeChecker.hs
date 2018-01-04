@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -23,7 +24,7 @@ import qualified Data.Vector.Sized as Vec
 import           Pukeko.Error
 import           Pukeko.Pos
 import           Pukeko.Pretty
-import           Pukeko.Language.ConInfo
+import           Pukeko.Language.Info
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.ConDecl       as Con
@@ -52,15 +53,17 @@ data TCState = MkTCState
 makeLenses ''TCState
 
 newtype TC v s a =
-  TC{unTC :: ConInfoT (ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s)))) a}
+  TC{unTC :: InfoT KC.ModuleInfo (ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s)))) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment v s)
            , MonadState TCState
-           , MonadConInfo
+           , MonadInfo KC.ModuleInfo
            )
 
-evalTC :: MonadError String m => (forall s. TC Id.EVar s a) -> ConDecls -> m a
+evalTC ::
+  MonadError String m =>
+  (forall s. TC Id.EVar s a) -> KC.ModuleInfo -> m a
 evalTC tc decls = runST $
   let env = MkEnvironment
         { _locals = mempty
@@ -71,7 +74,7 @@ evalTC tc decls = runST $
         , _defined  = mempty
         , _fresh    = []
         }
-  in  runExceptT (evalStateT (runReaderT (runConInfoT (unTC tc) decls) env) st)
+  in  runExceptT (evalStateT (runReaderT (runInfoT (unTC tc) decls) env) st)
 
 liftST :: ST s a -> TC v s a
 liftST = TC . lift . lift . lift . lift
@@ -94,7 +97,7 @@ localize ::
   EnvLevelOf i (TypeOpen s) ->
   TC (Scope i v) s a ->
   TC v s a
-localize ts = TC . mapConInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
+localize ts = TC . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
 lookupType :: (IsVar v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
 lookupType w x = do

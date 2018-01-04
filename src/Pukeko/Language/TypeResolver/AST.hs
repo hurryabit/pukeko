@@ -20,9 +20,8 @@ import qualified Pukeko.Language.Type        as Ty
 data TYPERESOLVER
 
 instance Stage TYPERESOLVER where
-  type StageId TYPERESOLVER = 200
-
-type Module = StdModule TopLevel
+  type StageId     TYPERESOLVER = 200
+  type StdTopLevel TYPERESOLVER = TopLevel
 
 data TopLevel
   =           TypDef Pos [Con.TConDecl]
@@ -31,6 +30,7 @@ data TopLevel
   | forall n. TopRec Pos (Vec.Vector n (Defn (FinScope n Id.EVar)))
   |           Asm    Pos Id.EVar String
 
+type Module = StdModule TYPERESOLVER
 type Defn = StdDefn TYPERESOLVER
 type Expr = StdExpr TYPERESOLVER
 type Altn = StdAltn TYPERESOLVER
