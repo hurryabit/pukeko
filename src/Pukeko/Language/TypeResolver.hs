@@ -79,5 +79,5 @@ trTopLevel top = case top of
 resolveModule :: MonadError String m => Module In -> m (Module Out)
 resolveModule (MkModule _info0 tops0) = do
   (tops1, MkTRState tcons1 dcons1) <- runTR (traverse trTopLevel tops0)
-  let info1 = MI.MkModuleInfo (MI.Present tcons1) (MI.Present dcons1)
+  let info1 = MI.MkModuleInfo (MI.Present tcons1) (MI.Present dcons1) MI.Absent
   pure (MkModule info1 tops1)

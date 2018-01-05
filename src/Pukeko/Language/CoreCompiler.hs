@@ -25,7 +25,7 @@ type CCState = Map.Map Id.EVar Name
 
 newtype CC a = CC{unCC :: InfoT (In.ModuleInfo In) (State CCState) a}
   deriving ( Functor, Applicative, Monad
-           , MonadInfo (In.GenModuleInfo 'True)
+           , MonadInfo (In.GenModuleInfo 'True 'True)
            , MonadState CCState
            )
 

@@ -64,6 +64,9 @@ unscope = \case
   Bound _ (Forget x) -> x
   Free  x            -> x
 
+lookupMap :: (Ord i, Pretty i) => i -> Map.Map i a -> a
+lookupMap i = Map.findWithDefault (bug "scope" "lookup failed" (Just (prettyShow i))) i
+
 data Pair f g a = Pair (f a) (g a)
 
 extendEnv ::
@@ -77,15 +80,15 @@ extendEnv env_i env_v = Pair env_i env_v
 -- TODO: Replace @Ord@ by @Eq@.
 class Ord i => IsVarLevel i where
   type EnvLevelOf i :: * -> *
-  lookupEnvLevel :: EnvLevelOf i a -> i -> Maybe a
+  lookupEnvLevel :: i -> EnvLevelOf i a -> a
 
 instance IsVarLevel Id.EVar where
   type EnvLevelOf Id.EVar = Map.Map Id.EVar
-  lookupEnvLevel = flip Map.lookup
+  lookupEnvLevel = lookupMap
 
 instance IsVarLevel (Finite n) where
   type EnvLevelOf (Finite n) = Vec.Vector n
-  lookupEnvLevel vec = Just . (Vec.!) vec
+  lookupEnvLevel = flip (Vec.!)
 
 -- TODO: Replace @Ord@ by @Eq@.
 class (Ord v, Pretty v) => IsVar v where
@@ -93,14 +96,14 @@ class (Ord v, Pretty v) => IsVar v where
   varName :: v -> Id.EVar
   isTotallyFree :: v -> Bool
   mkTotallyFree :: Id.EVar -> v
-  lookupEnv :: EnvOf v a -> v -> Maybe a
+  lookupEnv :: v -> EnvOf v a -> a
 
 instance IsVar Id.EVar where
   type EnvOf Id.EVar = Map.Map Id.EVar
   varName = id
   isTotallyFree = const True
   mkTotallyFree = id
-  lookupEnv = flip Map.lookup
+  lookupEnv = lookupMap
 
 instance (IsVarLevel i, IsVar v) => IsVar (Scope i v) where
   type EnvOf (Scope i v) = Pair (EnvLevelOf i) (EnvOf v)
@@ -111,9 +114,9 @@ instance (IsVarLevel i, IsVar v) => IsVar (Scope i v) where
     Bound _ _ -> False
     Free  v   -> isTotallyFree v
   mkTotallyFree = Free . mkTotallyFree
-  lookupEnv (Pair env_i env_v) = \case
-    Bound i _ -> lookupEnvLevel env_i i
-    Free  v   -> lookupEnv env_v v
+  lookupEnv i (Pair env_j env_v) = case i of
+    Bound j _ -> lookupEnvLevel j env_j
+    Free  v   -> lookupEnv v env_v
 
 makePrisms ''Scope
 

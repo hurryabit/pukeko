@@ -13,11 +13,9 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.ST
 import           Data.Foldable    (for_, toList)
-import           Data.Map         (Map)
 import qualified Data.Map         as Map
-import           Data.Maybe       (isJust)
 import           Data.STRef
-import           Data.Traversable (for)
+import           Data.Traversable
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
@@ -28,15 +26,15 @@ import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage         as St
 import qualified Pukeko.Language.AST.ConDecl       as Con
+import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
 import qualified Pukeko.Language.Type              as Ty
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
-type In  = St.KindChecker
+type In  = St.FunResolver
 type Out = St.TypeChecker
 
-type TypeClosed = Ty.Type Ty.Closed
 type TypeOpen s = Ty.Type (Ty.Open s)
 
 data Environment v s = MkEnvironment
@@ -45,12 +43,7 @@ data Environment v s = MkEnvironment
   }
 makeLenses ''Environment
 
-data TCState = MkTCState
-  { _declared :: Map Id.EVar TypeClosed
-    -- TODO: Store open types in _defined.
-  , _defined  :: Map Id.EVar TypeClosed
-  , _fresh    :: [Id.TVar]
-  }
+newtype TCState = MkTCState{_fresh :: [Id.TVar]}
 makeLenses ''TCState
 
 newtype TC v s a =
@@ -59,23 +52,17 @@ newtype TC v s a =
            , MonadError String
            , MonadReader (Environment v s)
            , MonadState TCState
-           , MonadInfo (GenModuleInfo 'True)
+           , MonadInfo (GenModuleInfo 'True 'True)
            )
 
 evalTC ::
   MonadError String m =>
   (forall s. TC Id.EVar s a) -> ModuleInfo In -> m a
-evalTC tc decls = runST $
-  let env = MkEnvironment
-        { _locals = mempty
-        , _level  = 0
-        }
-      st = MkTCState
-        { _declared = mempty
-        , _defined  = mempty
-        , _fresh    = []
-        }
-  in  runExceptT (evalStateT (runReaderT (runInfoT (unTC tc) decls) env) st)
+evalTC tc info = runST $
+  let locals0 = Map.map (Ty.open . snd) (MI.funs info)
+      env0 = MkEnvironment locals0 0
+      st0 = MkTCState []
+  in  runExceptT (evalStateT (runReaderT (runInfoT (unTC tc) info) env0) st0)
 
 liftST :: ST s a -> TC v s a
 liftST = TC . lift . lift . lift . lift
@@ -100,12 +87,8 @@ localize ::
   TC v s a
 localize ts = TC . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
-lookupType :: (IsVar v, Pretty v) => Pos -> v -> TC v s (TypeOpen s)
-lookupType w x = do
-  env <- view locals
-  case Sc.lookupEnv env x of
-    Nothing -> throwAt w "undefined function" x
-    Just t  -> return t
+lookupType :: (IsVar v, Pretty v) => v -> TC v s (TypeOpen s)
+lookupType = views locals . Sc.lookupEnv
 
 generalize :: TypeOpen s -> TC v s (TypeOpen s)
 generalize = \case
@@ -128,13 +111,13 @@ instantiate t = do
   env <- sequence $ Map.fromSet (const freshUVar) vars
   liftST $ Ty.openSubst env t
 
-instantiateTCon :: Id.TCon -> TC v s (TypeOpen s, Map Id.TVar (TypeOpen s))
+instantiateTCon :: Id.TCon -> TC v s (TypeOpen s, Map.Map Id.TVar (TypeOpen s))
 instantiateTCon tcon = do
   Con.MkTConDecl{_params} <- findTCon tcon
   t_params <- traverse (const freshUVar) _params
   return (Ty.appTCon tcon t_params, Map.fromList $ zip _params t_params)
 
-inferPatn :: Patn In -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
+inferPatn :: Patn In -> TypeOpen s -> TC v s (Map.Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
   Bind (Wild _) -> return Map.empty
   Bind (Name _ ident) -> return (Map.singleton ident t_expr)
@@ -175,22 +158,20 @@ inferRec defns = do
   traverse generalize t_rhss
 
 infer :: IsVar v => Expr In v -> TC v s (TypeOpen s)
-infer expr = do
-  let unifyHere t1 t2 = unify (expr^.pos) t1 t2
-  case expr of
-    Var w ident -> do
-      t <- lookupType w ident
+infer = \case
+    Var _ ident -> do
+      t <- lookupType ident
       instantiate t
     Con _ dcon -> do
       dconDecl <- findDCon dcon
       tconDecl <- findTCon (Con._tcon dconDecl)
       instantiate $ Ty.open (Con.typeOf tconDecl dconDecl)
     Num _ _num -> return (Ty.open Ty.typeInt)
-    App _ fun args -> do
+    App w fun args -> do
       t_fun <- infer fun
       t_args <- traverse infer args
       t_res <- freshUVar
-      unifyHere t_fun (t_args Ty.*~> t_res)
+      unify w t_fun (t_args Ty.*~> t_res)
       return t_res
     Lam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
@@ -202,7 +183,6 @@ infer expr = do
     Rec _ defns rhs -> do
       t_defns <- inferRec defns
       localize t_defns (infer rhs)
-    -- KC.If{} -> bug "type checker" "if-then-esle" Nothing
     Mat _ expr altns -> do
       t_expr <- infer expr
       t_res <- freshUVar
@@ -212,46 +192,20 @@ infer expr = do
         unify w t_res t_rhs
       return t_res
 
-ensureDefinable :: Pos -> Id.EVar -> TC v s TypeClosed
-ensureDefinable w ident = do
-  mbt_decl <- use (declared . at ident)
-  case mbt_decl of
-    Nothing -> throwAt w "undeclared function" ident
-    Just t_decl -> do
-      mbt_defn  <- use (defined . at ident)
-      when (isJust mbt_defn) $ throwAt w "duplicate definition of function" ident
-      return t_decl
-
-define :: Id.EVar -> TypeClosed -> TC v s ()
-define ident type_ = defined . at ident ?= type_
-
 checkTopLevel :: TopLevel In -> TC Id.EVar s [TopLevel Out]
-checkTopLevel top = case top of
-  Val w ident type_ -> do
-    isDeclared <- uses declared (ident `Map.member`)
-    when isDeclared $ throwAt w "duplicate declaration of function" ident
-    declared . at ident ?= type_
-    return []
+checkTopLevel = \case
   TopLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
   TopRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
-  Asm w ident asm -> do
-    t_decl <- ensureDefinable w ident
-    define ident t_decl
-    return [Asm w ident asm]
+  Asm w ident asm -> pure [Asm w ident asm]
   where
     handleLetOrRec inferLetOrRec mkTopExpr defns = do
-      t_decls <- for defns $ \defn -> ensureDefinable (defn^.pos) (defn^.lhs)
       resetFresh
-      env <- uses defined (fmap Ty.open)
-      local (locals .~ env) $ do
-        t_defns <- inferLetOrRec defns
-        ifor_ defns $ \i defn -> do
-          -- TODO: Check out if this is necessary.
-          t_defn <- instantiate (t_defns Vec.! i)
-          let t_decl = t_decls Vec.! i
-          unify (defn^.pos) (Ty.open t_decl) t_defn
-          define (defn^.lhs) t_decl
-      return $ map (\(MkDefn w lhs rhs) -> Def w lhs (mkTopExpr rhs)) (toList defns)
+      t_defns <- inferLetOrRec defns
+      for (toList (Vec.zip defns t_defns)) $ \(MkDefn w x e, t_defn0) -> do
+        t_defn <- instantiate t_defn0
+        t_decl <- lookupType x
+        unify w t_decl t_defn
+        pure (Def w x (mkTopExpr e))
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule (MkModule decls tops)=

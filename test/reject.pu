@@ -146,8 +146,8 @@ val f : a -> a
 -- FAILURE (line 1, column 1): duplicate declaration of function 'not'
 val not : Bool -> Bool
 
--- XTEST missing definition
--- FAILURE
+-- TEST missing definition
+-- FAILURE (line 1, column 1): declared but undefined function 'f'
 val f : a -> a
 
 -- SUBSECTION duplicate definition
@@ -156,14 +156,14 @@ val f : a -> a
 -- FAILURE (line 1, column 5): duplicate definition of function 'not'
 let not x = x
 
--- XTEST parallel definition
--- FAILURE (line 2, column 1): duplicate definition of function 'f'
+-- TEST parallel definition
+-- FAILURE (line 3, column 5): duplicate definition of function 'f'
 val f : a -> a
 let f x = x
 and f x = x
 
--- XTEST mutually recursive definition
--- FAILURE (line 2, column 1): duplicate definition of function 'f'
+-- TEST mutually recursive definition
+-- FAILURE (line 3, column 5): duplicate definition of function 'f'
 val f : a -> a
 let rec f x = x
 and f x = x

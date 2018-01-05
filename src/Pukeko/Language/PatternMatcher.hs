@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ViewPatterns #-}
 module Pukeko.Language.PatternMatcher
   ( compileModule
@@ -28,7 +29,7 @@ type Out = St.PatternMatcher
 
 newtype PM a = PM{unPM :: InfoT (ModuleInfo In) (StateT [Id.EVar] (Except String)) a}
   deriving ( Functor, Applicative, Monad
-           , MonadInfo (GenModuleInfo 'True)
+           , MonadInfo (GenModuleInfo 'True 'True)
            , MonadState [Id.EVar]
            , MonadError String
            )

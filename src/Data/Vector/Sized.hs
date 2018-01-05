@@ -11,10 +11,11 @@ module Data.Vector.Sized
   , (++)
   , withList
   , matchList
+  , zip
   )
 where
 
-import           Prelude hiding ((++))
+import           Prelude hiding ((++), zip)
 
 import           Control.Lens.Indexed
 import           Data.Finite
@@ -44,6 +45,8 @@ matchList (MkVector v0) xs
   | otherwise                 = Nothing
   where v = V.fromList xs
 
+zip :: Vector n a -> Vector n b -> Vector n (a, b)
+zip (MkVector xs) (MkVector ys) = MkVector (V.zip xs ys)
 
 instance FunctorWithIndex (Finite n) (Vector n)
 instance FoldableWithIndex (Finite n) (Vector n)

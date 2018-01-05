@@ -9,6 +9,7 @@ data Parser
 data Renamer
 data TypeResolver
 data KindChecker
+data FunResolver
 data TypeChecker
 data PatternMatcher
 data DeadCode
@@ -20,6 +21,7 @@ type family StageId st where
   StageId Renamer        = 100
   StageId TypeResolver   = 200
   StageId KindChecker    = 300
+  StageId FunResolver    = 350
   StageId TypeChecker    = 400
   StageId PatternMatcher = 500
   StageId DeadCode       = 600
@@ -31,11 +33,12 @@ type HasMat st = StageId st <=? 400
 
 type HasTypDef st = StageId st <=? 200
 type HasVal    st = StageId st <=? 300
-type HasTopLet st = StageId st <=? 300
+type HasTopLet st = StageId st <=? 350
 type HasDef    st = (400 <=? StageId st) && (StageId st <=? 600)
 type HasSupCom st = 700 <=? StageId st
 
 type HasCons st = 200 <=? StageId st
+type HasVals st = 350 <=? StageId st
 
 type SameTopNodes st1 st2 =
   ( HasTypDef st1 ~ HasTypDef st2
@@ -46,7 +49,7 @@ type SameTopNodes st1 st2 =
   )
 type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
 
-type SameModuleInfo st1 st2 = HasCons st1 ~ HasCons st2
+type SameModuleInfo st1 st2 = (HasCons st1 ~ HasCons st2, HasVals st1 ~ HasVals st2)
 
 type family (&&) (x :: Bool) (y :: Bool) where
   'True  && 'True  = 'True

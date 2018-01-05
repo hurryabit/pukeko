@@ -22,7 +22,7 @@ type Out = St.Renamer
 renameModule :: Ps.Module -> Module Out
 renameModule = MkModule info . runRn . traverse rnTopLevel
   where
-    info = MI.MkModuleInfo MI.Absent MI.Absent
+    info = MI.MkModuleInfo MI.Absent MI.Absent MI.Absent
 
 data Env tv = MkEnv (Map.Map Id.EVar tv) (Id.EVar -> tv)
 

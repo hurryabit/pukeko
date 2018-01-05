@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Pukeko.Language.AST.Std
   ( GenModuleInfo (..)
   , ModuleInfo
@@ -55,10 +55,10 @@ import           Pukeko.Language.AST.Scope
 import           Pukeko.Language.AST.ModuleInfo
 import qualified Pukeko.Language.AST.ConDecl as Con
 
-type ModuleInfo st = GenModuleInfo (HasCons st)
+type ModuleInfo st = GenModuleInfo (HasCons st) (HasVals st)
 
 data Module st = MkModule
-  { _moduleInfo :: GenModuleInfo (HasCons st)
+  { _moduleInfo :: GenModuleInfo (HasCons st) (HasVals st)
   , _moduleTops :: [TopLevel st]
   }
 
@@ -247,6 +247,41 @@ retagExpr ::
 retagExpr = over expr2dcon id
 
 -- * Manual instances
+instance TraversableWithIndex Pos expr => FunctorWithIndex     Pos (GenDefn expr) where
+instance TraversableWithIndex Pos expr => FoldableWithIndex    Pos (GenDefn expr) where
+instance TraversableWithIndex Pos expr => TraversableWithIndex Pos (GenDefn expr) where
+  itraverse f (MkDefn w x e) = MkDefn w x <$> itraverse f e
+
+instance FunctorWithIndex     Pos (Expr st) where
+instance FoldableWithIndex    Pos (Expr st) where
+instance TraversableWithIndex Pos (Expr st) where
+  itraverse f = \case
+    Var w x -> Var w <$> f w x
+    Con w c -> pure (Con w c)
+    Num w n -> pure (Num w n)
+    App w e0 es -> App w <$> itraverse f e0 <*> (traverse . itraverse) f es
+    Lam w bs e0 -> Lam w bs <$> itraverse (traverse . f) e0
+    Let w ds e0 ->
+      Let w <$> (traverse . itraverse) f ds <*> itraverse (traverse . f) e0
+    Rec w ds e0 ->
+      Rec w
+      <$> (traverse . itraverse) (traverse . f) ds
+      <*> itraverse (traverse . f) e0
+    Cas w e0 cs -> Cas w <$> itraverse f e0 <*> (traverse . itraverse) f cs
+    Mat w e0 as -> Mat w <$> itraverse f e0 <*> (traverse . itraverse) f as
+
+instance FunctorWithIndex     Pos (Case st) where
+instance FoldableWithIndex    Pos (Case st) where
+instance TraversableWithIndex Pos (Case st) where
+  itraverse f (MkCase w c bs e0) = MkCase w c bs <$> itraverse (traverse . f) e0
+
+instance FunctorWithIndex     Pos (Altn st) where
+instance FoldableWithIndex    Pos (Altn st) where
+instance TraversableWithIndex Pos (Altn st) where
+  itraverse f (MkAltn w p e0) = MkAltn w p <$> itraverse (traverse . f) e0
+
+
+
 instance HasPos (GenDefn expr v) where
   pos = defnPos
 
