@@ -330,9 +330,31 @@ instance HasPos Bind where
     Name w x -> fmap (\w' -> Name w' x) (f w)
 
 -- * Pretty printing
+instance (HasTypDef st ~ 'False) => Pretty (StdTopLevel st) where
+  pPrintPrec _ _ = \case
+    Val _ x t ->
+      "val" <+> pretty x <+> colon <+> pretty t
+    TopLet _ ds -> prettyDefns False ds
+    TopRec _ ds -> prettyDefns True  ds
+    Def    w x e -> "let" <+> pretty (MkDefn w x e)
+    SupCom _ x bs e ->
+      "let" <+> hang (pretty x <+> prettyBinds bs <+> equals) 2 (pretty e)
+    Caf _ x t ->
+      "let" <+> hang (pretty x <+> equals) 2 (pretty t)
+    Asm _ x s ->
+      hsep ["external", pretty x, equals, text (show s)]
+
 instance (IsVar v) => Pretty (StdDefn st v) where
   pPrintPrec lvl _ (MkDefn _ x t) =
     hang (pPrintPrec lvl 0 x <+> equals) 2 (pPrintPrec lvl 0 t)
+
+prettyDefns :: (IsVar v) => Bool -> Vector n (StdDefn st v) -> Doc
+prettyDefns isrec ds = case toList ds of
+    [] -> mempty
+    d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
+    where
+      let_ | isrec     = "let rec"
+           | otherwise = "let"
 
 instance (IsVar v) => Pretty (StdExpr st v) where
   pPrintPrec lvl prec = \case
@@ -353,30 +375,8 @@ instance (IsVar v) => Pretty (StdExpr st v) where
     --   in  maybeParens (prec > _prec) $
     --         pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
     -- TODO: Avoid this code duplication.
-    Let _ ds t ->
-      case toList ds of
-        [] -> pPrintPrec lvl 0 t
-        d0:ds -> vcat
-          [ sep
-            [ vcat $
-              ("let" <+> pPrintPrec lvl 0 d0) :
-                map (\d -> "and" <+> pPrintPrec lvl 0 d) ds
-            , "in"
-            ]
-          , pPrintPrec lvl 0 t
-          ]
-    Rec _ ds t ->
-      case toList ds of
-        [] -> pPrintPrec lvl 0 t
-        d0:ds -> vcat
-          [ sep
-            [ vcat $
-              ("let rec" <+> pPrintPrec lvl 0 d0) :
-                map (\d -> "and" <+> pPrintPrec lvl 0 d) ds
-            , "in"
-            ]
-          , pPrintPrec lvl 0 t
-          ]
+    Let _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
+    Rec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
     Lam _ bs t ->
       maybeParens (prec > 0) $ hsep
         [ "fun", prettyBinds bs
