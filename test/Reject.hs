@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, NamedFieldPuns #-}
+{-# LANGUAGE ImplicitParams #-}
 import Data.Char (isSpace)
 import Data.List
 import GHC.Stack

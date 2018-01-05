@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Pukeko.Language.AST.Std
   ( GenModuleInfo (..)
   , ModuleInfo

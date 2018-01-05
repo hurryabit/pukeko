@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor, DeriveTraversable #-}
 module Pukeko.GMachine.GCode
   ( Name (..)
   , GInst (..)

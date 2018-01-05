@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds #-}
 module Pukeko.Language.DeadCode
   ( cleanModule
   )

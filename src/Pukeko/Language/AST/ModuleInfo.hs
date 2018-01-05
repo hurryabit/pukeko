@@ -1,5 +1,4 @@
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 module Pukeko.Language.AST.ModuleInfo
   ( Present (..)

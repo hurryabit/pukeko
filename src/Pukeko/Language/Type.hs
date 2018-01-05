@@ -1,6 +1,6 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Language.Type
   ( Type (..)
   , UVar (..)

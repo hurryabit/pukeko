@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.GMachine.Compiler
   ( compile
   , Program
