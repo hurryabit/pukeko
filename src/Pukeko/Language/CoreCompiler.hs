@@ -41,7 +41,7 @@ compileModule (In.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
 
-scoped :: CC (Scope i v) a -> CC v a
+scoped :: CC (EScope i v) a -> CC v a
 scoped = CC . mapInfoT (withReaderT (scope (const Nothing))) . unCC
 
 ccTopLevel :: In.TopLevel In -> CC Id.EVar TopLevel
@@ -53,15 +53,15 @@ ccTopLevel = \case
     at x ?= n
     pure (Asm n)
 
-ccDefn :: IsVar v => In.Defn In v -> CC v Defn
+ccDefn :: IsEVar v => In.Defn In v -> CC v Defn
 ccDefn (In.MkDefn _ v t) = MkDefn (name v) <$> ccExpr t
 
-ccExpr :: IsVar v => In.Expr In v -> CC v Expr
+ccExpr :: IsEVar v => In.Expr In v -> CC v Expr
 ccExpr = \case
   In.EVar _ x0 -> do
     global <- asks ($ x0)
     case global of
-      Nothing -> pure (Local (name (varName x0)))
+      Nothing -> pure (Local (name (baseName x0)))
       Just x1 -> do
         external <- use (at x1)
         case external of
@@ -76,7 +76,7 @@ ccExpr = \case
   In.ERec _ ds t  -> scoped $ Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
-ccCase :: IsVar v => In.Case In v -> CC v Altn
+ccCase :: IsEVar v => In.Case In v -> CC v Altn
 ccCase (In.MkCase _ _ bs t) = MkAltn (ccBinds bs) <$> scoped (ccExpr t)
 
 ccBinds :: Vec.Vector n In.Bind -> [Maybe Name]

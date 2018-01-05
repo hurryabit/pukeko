@@ -78,7 +78,7 @@ localize ::
   forall i v s a.
   (IsVarLevel i, IsVar v) =>
   EnvLevelOf i (UType s Id.TVar) ->
-  TC (Scope i v) s a ->
+  TC (EScope i v) s a ->
   TC v s a
 localize ts = TC . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
@@ -129,7 +129,7 @@ inferPatn patn t_expr = case patn of
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
-  :: (IsVar v)
+  :: (IsEVar v)
   => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UType s Id.TVar))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
@@ -141,8 +141,8 @@ inferLet defns = do
   traverse generalize t_rhss
 
 inferRec
-  :: (IsVar v)
-  => Vec.Vector n (Defn In (FinScope n v)) -> TC v s (Vec.Vector n (UType s Id.TVar))
+  :: (IsEVar v)
+  => Vec.Vector n (Defn In (EFinScope n v)) -> TC v s (Vec.Vector n (UType s Id.TVar))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -152,7 +152,7 @@ inferRec defns = do
     return t_rhss
   traverse generalize t_rhss
 
-infer :: IsVar v => Expr In v -> TC v s (UType s Id.TVar)
+infer :: IsEVar v => Expr In v -> TC v s (UType s Id.TVar)
 infer = \case
     EVar _ ident -> do
       t <- lookupType ident

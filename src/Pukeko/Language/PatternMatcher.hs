@@ -81,7 +81,7 @@ pmMatch w rowMatch0 = do
       grpMatch <- groupDests w destCol rowMatch4
       grpMatchExpr w grpMatch
 
-type RhsExpr v = Expr In (Scope Id.EVar v)
+type RhsExpr v = Expr In (EScope Id.EVar v)
 
 data Row n v = MkRow (LS.List n Patn) (RhsExpr v)
 
@@ -159,7 +159,7 @@ findDestCol w (MkColMatch cs0 us) =
 
 data GrpMatchItem v =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n (FinScope k v))
+  MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n (EFinScope k v))
 
 data GrpMatch v = MkGrpMatch (Expr Out v) [GrpMatchItem v]
 

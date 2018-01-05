@@ -68,10 +68,10 @@ data TopLevel st
   | forall n.
     HasTLLet st ~ 'True => TLLet Pos (Vector n (Defn st Id.EVar))
   | forall n.
-    HasTLLet st ~ 'True => TLRec Pos (Vector n (Defn st (FinScope n Id.EVar)))
+    HasTLLet st ~ 'True => TLRec Pos (Vector n (Defn st (EFinScope n Id.EVar)))
   | HasTLDef st ~ 'True => TLDef Pos Id.EVar (Expr st Id.EVar)
   | forall n.
-    HasTLSup st ~ 'True => TLSup Pos Id.EVar (Vector n Bind) (Expr st (FinScope n Id.EVar))
+    HasTLSup st ~ 'True => TLSup Pos Id.EVar (Vector n Bind) (Expr st (EFinScope n Id.EVar))
   | HasTLSup st ~ 'True => TLCaf Pos Id.EVar (Expr st Id.EVar)
   |                         TLAsm Pos Id.EVar String
 
@@ -89,9 +89,9 @@ data Expr st v
   |           ECon Pos Id.DCon
   |           ENum Pos Int
   |           EApp Pos (Expr st v) [Expr st v]
-  | forall n. HasELam st ~ 'True => ELam Pos (Vector n Bind)   (Expr st (FinScope n v))
-  | forall n. ELet Pos (Vector n (Defn st v))              (Expr st (FinScope n v))
-  | forall n. ERec Pos (Vector n (Defn st (FinScope n v))) (Expr st (FinScope n v))
+  | forall n. HasELam st ~ 'True => ELam Pos (Vector n Bind)   (Expr st (EFinScope n v))
+  | forall n. ELet Pos (Vector n (Defn st v))              (Expr st (EFinScope n v))
+  | forall n. ERec Pos (Vector n (Defn st (EFinScope n v))) (Expr st (EFinScope n v))
   | HasEMat st ~ 'False => ECas Pos (Expr st v) [Case st v]
   | HasEMat st ~ 'True => EMat Pos (Expr st v) [Altn st v]
 
@@ -99,13 +99,13 @@ data Case st v = forall n. MkCase
   { _casePos   :: Pos
   , _caseCon   :: Id.DCon
   , _caseBinds :: Vector n Bind
-  , _caseRhs   :: Expr st (FinScope n v)
+  , _caseRhs   :: Expr st (EFinScope n v)
   }
 
 data Altn st v = MkAltn
   { _altnPos  :: Pos
   , _altnPatn :: Patn
-  , _altnRhs  :: Expr st (Scope Id.EVar v)
+  , _altnRhs  :: Expr st (EScope Id.EVar v)
   }
 
 data Patn
@@ -125,10 +125,10 @@ makePrisms ''Bind
 -- * Abstraction and substition
 
 -- | Abstract all variables which are mapped to @Just@.
-abstract :: (v -> Maybe (i, Id.EVar)) -> Expr st v -> Expr st (Scope i v)
+abstract :: (v -> Maybe (i, Id.EVar)) -> Expr st v -> Expr st (EScope i v)
 abstract f = fmap (match f)
   where
-    match :: (v -> Maybe (i, Id.EVar)) -> v -> Scope i v
+    match :: (v -> Maybe (i, Id.EVar)) -> v -> EScope i v
     match f v = maybe (Free v) (uncurry mkBound) (f v)
 
 -- | Replace subexpressions.
@@ -144,10 +144,10 @@ expr // f = case expr of
   ERec w ds t    -> ERec w (over (traverse . rhs1) (/// f) ds) (t /// f)
   EMat w t  as   -> EMat w (t // f) (map (over' altn2rhs (/// f)) as)
 
-(///) :: Expr st (Scope i v) -> (Pos -> v -> Expr st w) -> Expr st (Scope i w)
+(///) :: Expr st (EScope i v) -> (Pos -> v -> Expr st w) -> Expr st (EScope i w)
 t /// f = t // (\w x -> dist w (fmap (f w) x))
 
-dist :: Pos -> Scope i (Expr st v) -> Expr st (Scope i v)
+dist :: Pos -> EScope i (Expr st v) -> Expr st (EScope i v)
 dist w (Bound i x) = EVar w (Bound i x)
 dist _ (Free t)    = fmap Free t
 
@@ -220,13 +220,13 @@ over' l f = runIdentity . l (Identity . f)
 
 case2rhs
   :: (Functor f)
-  => (forall i. IsVarLevel i => Expr st1 (Scope i v1) -> f (Expr st2 (Scope i v2)))
+  => (forall i. IsVarLevel i => Expr st1 (EScope i v1) -> f (Expr st2 (EScope i v2)))
   -> Case st1 v1 -> f (Case st2 v2)
 case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
 
 altn2rhs
   :: (Functor f)
-  => (forall i. IsVarLevel i => Expr st1 (Scope i v1) -> f (Expr st2 (Scope i v2)))
+  => (forall i. IsVarLevel i => Expr st1 (EScope i v1) -> f (Expr st2 (EScope i v2)))
   -> Altn st1 v1 -> f (Altn st2 v2)
 altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
 
@@ -327,11 +327,11 @@ instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
     TLAsm _ x s ->
       hsep ["external", pretty x, equals, text (show s)]
 
-instance (IsVar v) => Pretty (Defn st v) where
+instance (IsEVar v) => Pretty (Defn st v) where
   pPrintPrec lvl _ (MkDefn _ x t) =
     hang (pPrintPrec lvl 0 x <+> equals) 2 (pPrintPrec lvl 0 t)
 
-prettyDefns :: (IsVar v) => Bool -> Vector n (Defn st v) -> Doc
+prettyDefns :: (IsEVar v) => Bool -> Vector n (Defn st v) -> Doc
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
     d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
@@ -339,9 +339,9 @@ prettyDefns isrec ds = case toList ds of
       let_ | isrec     = "let rec"
            | otherwise = "let"
 
-instance (IsVar v) => Pretty (Expr st v) where
+instance (IsEVar v) => Pretty (Expr st v) where
   pPrintPrec lvl prec = \case
-    EVar _ x -> pretty (varName x)
+    EVar _ x -> pretty (baseName x)
     ECon _ c -> pretty c
     ENum _ n -> int n
     EApp _ t us ->
@@ -379,11 +379,11 @@ instance (IsVar v) => Pretty (Expr st v) where
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) cs
 
-instance (IsVar v) => Pretty (Case st v) where
+instance (IsEVar v) => Pretty (Case st v) where
   pPrintPrec lvl _ (MkCase _ c bs t) =
     hang ("|" <+> pretty c <+> prettyBinds bs <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance (IsVar v) => Pretty (Altn st v) where
+instance (IsEVar v) => Pretty (Altn st v) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 

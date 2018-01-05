@@ -52,11 +52,11 @@ execLL ll =
 freshIdent :: LL v Id.EVar
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-scoped :: LL (Scope i v) a -> LL v a
+scoped :: LL (EScope i v) a -> LL v a
 scoped =
   LL . withRWST(\(MkEnv mk is) s -> (MkEnv (Free . mk) (scope (const False) is), s)) . unLL
 
-llExpr :: forall v. (IsVar v) => Expr In v -> LL v (Expr Out v)
+llExpr :: forall v. (IsEVar v) => Expr In v -> LL v (Expr Out v)
 llExpr = \case
   EVar w x -> pure (EVar w x)
   ECon w c -> pure (ECon w c)
@@ -72,13 +72,13 @@ llExpr = \case
     let (capturedS, others) = Set.partition isCaptured $ Set.setOf traverse rhs
     -- TODO: Arrange 'captured' in a clever way. The @sortOn varName@ is just to
     -- not break the tests right now.
-    let capturedL = sortOn varName $ Set.toList capturedS
-    Vec.withList capturedL $ \(capturedV :: Vec.Vector m (FinScope n v)) -> do
-      let newBinds = fmap (BName w . varName) capturedV Vec.++ oldBinds
+    let capturedL = sortOn baseName $ Set.toList capturedS
+    Vec.withList capturedL $ \(capturedV :: Vec.Vector m (EFinScope n v)) -> do
+      let newBinds = fmap (BName w . baseName) capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
-            Free  v   -> Free  (varName v)
-      let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (varName v))
+            Free  v   -> Free  (baseName v)
+      let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (baseName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
       tell [TLSup w lhs newBinds (fmap (rename Map.!) rhs)]
       let unfree = \case
@@ -90,7 +90,7 @@ llExpr = \case
         []  -> return fun
         _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
 
-llCase :: (IsVar v) => Case In v -> LL v (Case Out v)
+llCase :: (IsEVar v) => Case In v -> LL v (Case Out v)
 llCase (MkCase w c bs e) = MkCase w c bs <$> scoped (llExpr e)
 
 llTopLevel :: TopLevel In -> LL Id.EVar ()

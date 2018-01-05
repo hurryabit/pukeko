@@ -1,9 +1,11 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ViewPatterns #-}
 -- | Type for encoding DeBruijn style scoping.
 module Pukeko.Language.AST.Scope
   ( Scope (..)
-  , FinScope
+  , EScope
+  , EFinScope
   , scope
   , _Bound
   , _Free
@@ -16,6 +18,7 @@ module Pukeko.Language.AST.Scope
   , extendEnv
   , IsVarLevel (..)
   , IsVar (..)
+  , IsEVar
   )
   where
 
@@ -29,45 +32,47 @@ import           Pukeko.Error      (bug)
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
 
-data Scope i v
-  = Bound i (Forget Id.EVar)
+data Scope b i v
+  = Bound i (Forget b)
   | Free v
   deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
 
-type FinScope n = Scope (Finite n)
+type EScope = Scope Id.EVar
 
-scope :: (i -> a) -> (v -> a) -> Scope i v -> a
+type EFinScope n = EScope (Finite n)
+
+scope :: (i -> a) -> (v -> a) -> Scope b i v -> a
 scope f g = \case
   Bound i _ -> f i
   Free  x   -> g x
 
-mkBound :: i -> Id.EVar -> Scope i v
-mkBound i x = Bound i (Forget x)
+mkBound :: i -> b -> Scope b i v
+mkBound i b = Bound i (Forget b)
 
-strengthen :: String -> Scope i v -> v
+strengthen :: Show b => String -> Scope b i v -> v
 strengthen component = \case
-  Bound _ (Forget x) -> bug component "cannot strengthen" (Just (show x))
+  Bound _ (Forget b) -> bug component "cannot strengthen" (Just (show b))
   Free  x            -> x
 
-weaken :: v -> Scope i v
+weaken :: v -> Scope b i v
 weaken = Free
 
-weaken1 :: Scope j v -> Scope j (Scope i v)
+weaken1 :: Scope b j v -> Scope b j (Scope b i v)
 weaken1 = \case
-  Bound j x -> Bound j x
+  Bound j b -> Bound j b
   Free  x   -> Free  (Free x)
 
-abstract1 :: (j -> Maybe i) -> Scope j v -> Scope j (Scope i v)
+abstract1 :: (j -> Maybe i) -> Scope b j v -> Scope b j (Scope b i v)
 abstract1 f = \case
-  Bound (f -> Just i) x -> Free (Bound i x)
-  Bound j             x -> Bound j x
+  Bound (f -> Just i) b -> Free (Bound i b)
+  Bound j             b -> Bound j b
   Free  x               -> Free (Free x)
 
 -- TODO: Find out where we use the inverse 'scope' without naming it like this.
 -- It's probably in the de Bruijn indexer.
-unscope :: Scope i Id.EVar -> Id.EVar
+unscope :: Scope Id.EVar i Id.EVar -> Id.EVar
 unscope = \case
-  Bound _ (Forget x) -> x
+  Bound _ (Forget b) -> b
   Free  x            -> x
 
 lookupMap :: (Ord i, Pretty i) => i -> Map.Map i a -> a
@@ -80,7 +85,7 @@ extendEnv ::
   (IsVarLevel i, IsVar v) =>
   EnvLevelOf i a ->
   EnvOf v a ->
-  EnvOf (Scope i v) a
+  EnvOf (Scope (BaseName v) i v) a
 extendEnv env_i env_v = Pair env_i env_v
 
 -- TODO: Replace @Ord@ by @Eq@.
@@ -97,28 +102,33 @@ instance IsVarLevel (Finite n) where
   lookupEnvLevel = flip (Vec.!)
 
 -- TODO: Replace @Ord@ by @Eq@.
-class (Ord v, Pretty v) => IsVar v where
+class (Ord v, Pretty v, Pretty (BaseName v)) => IsVar v where
+  type BaseName v :: *
   type EnvOf v :: * -> *
-  varName :: v -> Id.EVar
+  baseName :: v -> BaseName v
   lookupEnv :: v -> EnvOf v a -> a
 
+type IsEVar v = (IsVar v, BaseName v ~ Id.EVar)
+
 instance IsVar Id.EVar where
+  type BaseName Id.EVar = Id.EVar
   type EnvOf Id.EVar = Map.Map Id.EVar
-  varName = id
+  baseName = id
   lookupEnv = lookupMap
 
-instance (IsVarLevel i, IsVar v) => IsVar (Scope i v) where
-  type EnvOf (Scope i v) = Pair (EnvLevelOf i) (EnvOf v)
-  varName = \case
-    Bound _ (Forget x) -> x
-    Free  v            -> varName v
+instance (Pretty b, IsVarLevel i, IsVar v, BaseName v ~ b) => IsVar (Scope b i v) where
+  type BaseName (Scope b i v) = b
+  type EnvOf (Scope b i v) = Pair (EnvLevelOf i) (EnvOf v)
+  baseName = \case
+    Bound _ (Forget b) -> b
+    Free  v            -> baseName v
   lookupEnv i (Pair env_j env_v) = case i of
     Bound j _ -> lookupEnvLevel j env_j
     Free  v   -> lookupEnv v env_v
 
 makePrisms ''Scope
 
-instance Pretty v => Pretty (Scope i v) where
+instance (Pretty b, Pretty v) => Pretty (Scope b i v) where
   pPrint = \case
-    Bound _ (Forget x) -> pretty x
+    Bound _ (Forget b) -> pretty b
     Free v -> pretty v

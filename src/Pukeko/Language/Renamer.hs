@@ -34,14 +34,14 @@ newtype Rn tv a = Rn{unRn :: Reader (Env tv) a}
 runRn :: Rn Id.EVar a -> a
 runRn ix = runReader (unRn ix) (MkEnv mempty id)
 
-localize :: Map.Map Id.EVar i -> Rn (Scope i tv) a -> Rn tv a
+localize :: Map.Map Id.EVar i -> Rn (EScope i tv) a -> Rn tv a
 localize bs = Rn . withReader upd . unRn
   where
     upd (MkEnv bound0 mkFree) =
       let bound1 = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free bound0
       in  MkEnv bound1 (Free . mkFree)
 
-localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (FinScope n tv) a -> Rn tv a
+localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (EFinScope n tv) a -> Rn tv a
 localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
 
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
