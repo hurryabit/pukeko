@@ -113,11 +113,11 @@ instantiateTCon tcon = do
   t_params <- traverse (const freshUVar) _params
   return (Ty.appTCon tcon t_params, Map.fromList $ zip _params t_params)
 
-inferPatn :: Patn In -> TypeOpen s -> TC v s (Map.Map Id.EVar (TypeOpen s))
+inferPatn :: Patn -> TypeOpen s -> TC v s (Map.Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
-  Bind (Wild _) -> return Map.empty
-  Bind (Name _ ident) -> return (Map.singleton ident t_expr)
-  Dest w dcon patns -> do
+  PVar (BWild _) -> return Map.empty
+  PVar (BName _ ident) -> return (Map.singleton ident t_expr)
+  PCon w dcon patns -> do
     Con.MkDConDecl{_dname, _tcon, _fields} <- findDCon dcon
     when (length patns /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
@@ -155,31 +155,31 @@ inferRec defns = do
 
 infer :: IsVar v => Expr In v -> TC v s (TypeOpen s)
 infer = \case
-    Var _ ident -> do
+    EVar _ ident -> do
       t <- lookupType ident
       instantiate t
-    Con _ dcon -> do
+    ECon _ dcon -> do
       dconDecl <- findDCon dcon
       tconDecl <- findTCon (Con._tcon dconDecl)
       instantiate $ Ty.open (Con.typeOf tconDecl dconDecl)
-    Num _ _num -> return (Ty.open Ty.typeInt)
-    App w fun args -> do
+    ENum _ _num -> return (Ty.open Ty.typeInt)
+    EApp w fun args -> do
       t_fun <- infer fun
       t_args <- traverse infer args
       t_res <- freshUVar
       unify w t_fun (t_args Ty.*~> t_res)
       return t_res
-    Lam _ binds rhs -> do
+    ELam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
       t_rhs <- localize t_params (infer rhs)
       return (toList t_params Ty.*~> t_rhs)
-    Let _ defns rhs -> do
+    ELet _ defns rhs -> do
       t_defns <- inferLet defns
       localize t_defns (infer rhs)
-    Rec _ defns rhs -> do
+    ERec _ defns rhs -> do
       t_defns <- inferRec defns
       localize t_defns (infer rhs)
-    Mat _ expr altns -> do
+    EMat _ expr altns -> do
       t_expr <- infer expr
       t_res <- freshUVar
       for_ altns $ \(MkAltn w patn rhs) -> do
@@ -190,9 +190,9 @@ infer = \case
 
 checkTopLevel :: TopLevel In -> TC Id.EVar s [TopLevel Out]
 checkTopLevel = \case
-  TopLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
-  TopRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
-  Asm w ident asm -> pure [Asm w ident asm]
+  TLLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
+  TLRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
+  TLAsm w ident asm -> pure [TLAsm w ident asm]
   where
     handleLetOrRec inferLetOrRec mkTopExpr defns = do
       resetFresh
@@ -201,7 +201,7 @@ checkTopLevel = \case
         t_defn <- instantiate t_defn0
         t_decl <- lookupType x
         unify w t_decl t_defn
-        pure (Def w x (mkTopExpr e))
+        pure (TLDef w x (mkTopExpr e))
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule (MkModule decls tops)=

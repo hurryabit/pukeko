@@ -27,29 +27,32 @@ type family StageId st where
   StageId LambdaLifter   = 700
   StageId CoreCompiler   = 999
 
-type HasLam st = StageId st <=? 600
-type HasMat st = StageId st <=? 400
+type HasELam st = StageId st <=? 600
+type HasEMat st = StageId st <=? 400
 
-type HasTypDef st = StageId st <=? 250
-type HasVal    st = StageId st <=? 275  -- NOTE: This odd number is a hack for
+type HasTLTyp st = StageId st <=? 250
+type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
                                         -- the pretty printer
-type HasTopLet st = StageId st <=? 350
-type HasDef    st = (400 <=? StageId st) && (StageId st <=? 600)
-type HasSupCom st = 700 <=? StageId st
+type HasTLLet st = StageId st <=? 350
+type HasTLDef st = (400 <=? StageId st) && (StageId st <=? 600)
+type HasTLSup st = 700 <=? StageId st
 
-type HasCons st = 200 <=? StageId st
-type HasVals st = 250 <=? StageId st
+type HasMICons st = 200 <=? StageId st
+type HasMIFuns st = 250 <=? StageId st
 
 type SameTopNodes st1 st2 =
-  ( HasTypDef st1 ~ HasTypDef st2
-  , HasVal    st1 ~ HasVal    st2
-  , HasTopLet st1 ~ HasTopLet st2
-  , HasDef    st1 ~ HasDef    st2
-  , HasSupCom st1 ~ HasSupCom st2
+  ( HasTLTyp st1 ~ HasTLTyp st2
+  , HasTLVal st1 ~ HasTLVal st2
+  , HasTLLet st1 ~ HasTLLet st2
+  , HasTLDef st1 ~ HasTLDef st2
+  , HasTLSup st1 ~ HasTLSup st2
   )
-type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
+type SameNodes st1 st2 = (HasELam st1 ~ HasELam st2, HasEMat st1 ~ HasEMat st2)
 
-type SameModuleInfo st1 st2 = (HasCons st1 ~ HasCons st2, HasVals st1 ~ HasVals st2)
+type SameModuleInfo st1 st2 =
+  ( HasMICons st1 ~ HasMICons st2
+  , HasMIFuns st1 ~ HasMIFuns st2
+  )
 
 type family (&&) (x :: Bool) (y :: Bool) where
   'True  && 'True  = 'True

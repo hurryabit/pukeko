@@ -12,8 +12,7 @@ module Pukeko.Language.AST.Std
   , Expr (..)
   , Case (..)
   , Altn (..)
-  , GenPatn (..)
-  , Patn
+  , Patn (..)
   , Bind (..)
 
   , abstract
@@ -31,8 +30,8 @@ module Pukeko.Language.AST.Std
   , retagDefn
   , retagExpr
 
-  , _Wild
-  , _Name
+  , _BWild
+  , _BName
 
   , prettyBinds
 
@@ -56,25 +55,25 @@ import           Pukeko.Language.AST.Scope
 import           Pukeko.Language.AST.ModuleInfo
 import qualified Pukeko.Language.AST.ConDecl as Con
 
-type ModuleInfo st = GenModuleInfo (HasCons st) (HasVals st)
+type ModuleInfo st = GenModuleInfo (HasMICons st) (HasMIFuns st)
 
 data Module st = MkModule
-  { _moduleInfo :: GenModuleInfo (HasCons st) (HasVals st)
+  { _moduleInfo :: GenModuleInfo (HasMICons st) (HasMIFuns st)
   , _moduleTops :: [TopLevel st]
   }
 
 data TopLevel st
-  = HasTypDef st ~ 'True => TypDef Pos [Con.TConDecl]
-  | HasVal    st ~ 'True => Val    Pos Id.EVar (Ty.Type Ty.Closed)
+  = HasTLTyp st ~ 'True => TLTyp Pos [Con.TConDecl]
+  | HasTLVal st ~ 'True => TLVal Pos Id.EVar (Ty.Type Ty.Closed)
   | forall n.
-    HasTopLet st ~ 'True => TopLet Pos (Vector n (Defn st Id.EVar))
+    HasTLLet st ~ 'True => TLLet Pos (Vector n (Defn st Id.EVar))
   | forall n.
-    HasTopLet st ~ 'True => TopRec Pos (Vector n (Defn st (FinScope n Id.EVar)))
-  | HasDef    st ~ 'True => Def    Pos Id.EVar (Expr st Id.EVar)
+    HasTLLet st ~ 'True => TLRec Pos (Vector n (Defn st (FinScope n Id.EVar)))
+  | HasTLDef st ~ 'True => TLDef Pos Id.EVar (Expr st Id.EVar)
   | forall n.
-    HasSupCom st ~ 'True => SupCom Pos Id.EVar (Vector n Bind) (Expr st (FinScope n Id.EVar))
-  | HasSupCom st ~ 'True => Caf    Pos Id.EVar (Expr st Id.EVar)
-  |                         Asm    Pos Id.EVar String
+    HasTLSup st ~ 'True => TLSup Pos Id.EVar (Vector n Bind) (Expr st (FinScope n Id.EVar))
+  | HasTLSup st ~ 'True => TLCaf Pos Id.EVar (Expr st Id.EVar)
+  |                         TLAsm Pos Id.EVar String
 
 data GenDefn expr v = MkDefn
   { _defnPos :: Pos
@@ -86,15 +85,15 @@ data GenDefn expr v = MkDefn
 type Defn st = GenDefn (Expr st)
 
 data Expr st v
-  =           Var Pos v
-  |           Con Pos Id.DCon
-  |           Num Pos Int
-  |           App Pos (Expr st v) [Expr st v]
-  | forall n. HasLam st ~ 'True => Lam Pos (Vector n Bind)   (Expr st (FinScope n v))
-  | forall n. Let Pos (Vector n (Defn st v))              (Expr st (FinScope n v))
-  | forall n. Rec Pos (Vector n (Defn st (FinScope n v))) (Expr st (FinScope n v))
-  | HasMat st ~ 'False => Cas Pos (Expr st v) [Case st v]
-  | HasMat st ~ 'True => Mat Pos (Expr st v) [Altn st v]
+  =           EVar Pos v
+  |           ECon Pos Id.DCon
+  |           ENum Pos Int
+  |           EApp Pos (Expr st v) [Expr st v]
+  | forall n. HasELam st ~ 'True => ELam Pos (Vector n Bind)   (Expr st (FinScope n v))
+  | forall n. ELet Pos (Vector n (Defn st v))              (Expr st (FinScope n v))
+  | forall n. ERec Pos (Vector n (Defn st (FinScope n v))) (Expr st (FinScope n v))
+  | HasEMat st ~ 'False => ECas Pos (Expr st v) [Case st v]
+  | HasEMat st ~ 'True => EMat Pos (Expr st v) [Altn st v]
 
 data Case st v = forall n. MkCase
   { _casePos   :: Pos
@@ -105,20 +104,17 @@ data Case st v = forall n. MkCase
 
 data Altn st v = MkAltn
   { _altnPos  :: Pos
-  , _altnPatn :: Patn st
+  , _altnPatn :: Patn
   , _altnRhs  :: Expr st (Scope Id.EVar v)
   }
 
--- TODO: Remove useless parameter.
-data GenPatn dcon
-  = Bind     Bind
-  | Dest Pos dcon [GenPatn dcon]
-
-type Patn st = GenPatn Id.DCon
+data Patn
+  = PVar     Bind
+  | PCon Pos Id.DCon [Patn]
 
 data Bind
-  = Wild Pos
-  | Name Pos Id.EVar
+  = BWild Pos
+  | BName Pos Id.EVar
 
 
 -- * Derived optics
@@ -138,34 +134,33 @@ abstract f = fmap (match f)
 -- | Replace subexpressions.
 (//) :: Expr st v -> (Pos -> v -> Expr st w) -> Expr st w
 expr // f = case expr of
-  Var w x       -> f w x
-  Con w c       -> Con w c
-  Num w n       -> Num w n
-  App w t  us   -> App w (t // f) (map (// f) us)
-  -- If  w t  u  v -> If  w (t // f) (u // f) (v // f)
-  Cas w t  cs   -> Cas w (t // f) (map (over' case2rhs (/// f)) cs)
-  Lam w ps t    -> Lam w ps (t /// f)
-  Let w ds t    -> Let w (over (traverse . rhs1) (//  f) ds) (t /// f)
-  Rec w ds t    -> Rec w (over (traverse . rhs1) (/// f) ds) (t /// f)
-  Mat w t  as   -> Mat w (t // f) (map (over' altn2rhs (/// f)) as)
+  EVar w x       -> f w x
+  ECon w c       -> ECon w c
+  ENum w n       -> ENum w n
+  EApp w t  us   -> EApp w (t // f) (map (// f) us)
+  ECas w t  cs   -> ECas w (t // f) (map (over' case2rhs (/// f)) cs)
+  ELam w ps t    -> ELam w ps (t /// f)
+  ELet w ds t    -> ELet w (over (traverse . rhs1) (//  f) ds) (t /// f)
+  ERec w ds t    -> ERec w (over (traverse . rhs1) (/// f) ds) (t /// f)
+  EMat w t  as   -> EMat w (t // f) (map (over' altn2rhs (/// f)) as)
 
 (///) :: Expr st (Scope i v) -> (Pos -> v -> Expr st w) -> Expr st (Scope i w)
 t /// f = t // (\w x -> dist w (fmap (f w) x))
 
 dist :: Pos -> Scope i (Expr st v) -> Expr st (Scope i v)
-dist w (Bound i x) = Var w (Bound i x)
+dist w (Bound i x) = EVar w (Bound i x)
 dist _ (Free t)    = fmap Free t
 
 -- * Getters
 bindName :: Bind -> Maybe Id.EVar
 bindName = \case
-  Wild _   -> Nothing
-  Name _ x -> Just x
+  BWild _   -> Nothing
+  BName _ x -> Just x
 
-patnToBind :: GenPatn dcon -> Maybe Bind
+patnToBind :: Patn -> Maybe Bind
 patnToBind = \case
-  Bind b -> Just b
-  Dest{} -> Nothing
+  PVar b -> Just b
+  PCon{} -> Nothing
 
 -- * Traversals
 module2tops ::
@@ -176,8 +171,8 @@ module2tops f (MkModule info tops) = MkModule info <$> f tops
 -- TODO: Make this indexed if possible.
 bind2evar :: Traversal' Bind Id.EVar
 bind2evar f = \case
-  Wild w   -> pure (Wild w)
-  Name w x -> Name w <$> f x
+  BWild w   -> pure (BWild w)
+  BName w x -> BName w <$> f x
 
 -- * Deep traversals
 type ExprConTraversal t =
@@ -189,15 +184,15 @@ defn2dcon = rhs2 . expr2dcon
 
 expr2dcon :: ExprConTraversal Expr
 expr2dcon f = \case
-  Var w x       -> pure $ Var w x
-  Con w c       -> Con w <$> indexed f w c
-  Num w n       -> pure $ Num w n
-  App w t  us   -> App w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
-  Cas w t  cs   -> Cas w <$> expr2dcon f t <*> (traverse . case2dcon) f cs
-  Lam w bs t    -> Lam w bs <$> expr2dcon f t
-  Let w ds t    -> Let w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
-  Rec w ds t    -> Rec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
-  Mat w t  as   -> Mat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
+  EVar w x       -> pure (EVar w x)
+  ECon w c       -> ECon w <$> indexed f w c
+  ENum w n       -> pure (ENum w n)
+  EApp w t  us   -> EApp w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
+  ECas w t  cs   -> ECas w <$> expr2dcon f t <*> (traverse . case2dcon) f cs
+  ELam w bs t    -> ELam w bs <$> expr2dcon f t
+  ELet w ds t    -> ELet w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
+  ERec w ds t    -> ERec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
+  EMat w t  as   -> EMat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
 
 case2dcon :: ExprConTraversal Case
 case2dcon f (MkCase w c bs t) =
@@ -207,16 +202,15 @@ altn2dcon :: ExprConTraversal Altn
 altn2dcon f (MkAltn w p t) =
   MkAltn w <$> patn2dcon f p <*> expr2dcon f t
 
-patn2dcon ::
-  IndexedTraversal Pos (GenPatn con1) (GenPatn con2) con1 con2
+patn2dcon :: IndexedTraversal' Pos Patn Id.DCon
 patn2dcon f = \case
-  Bind   b    -> pure $ Bind b
-  Dest w c ps -> Dest w <$> indexed f w c <*> (traverse . patn2dcon) f ps
+  PVar   b    -> pure $ PVar b
+  PCon w c ps -> PCon w <$> indexed f w c <*> (traverse . patn2dcon) f ps
 
-patn2bind :: IndexedTraversal' Pos (GenPatn dcon) Bind
+patn2bind :: IndexedTraversal' Pos Patn Bind
 patn2bind f = \case
-  Bind   b    -> Bind <$> indexed f (b^.pos) b
-  Dest w c ps -> Dest w c <$> (traverse . patn2bind) f ps
+  PVar   b    -> PVar <$> indexed f (b^.pos) b
+  PCon w c ps -> PCon w c <$> (traverse . patn2bind) f ps
 
 -- * Highly polymorphic lenses
 over' ::
@@ -257,19 +251,19 @@ instance FunctorWithIndex     Pos (Expr st) where
 instance FoldableWithIndex    Pos (Expr st) where
 instance TraversableWithIndex Pos (Expr st) where
   itraverse f = \case
-    Var w x -> Var w <$> f w x
-    Con w c -> pure (Con w c)
-    Num w n -> pure (Num w n)
-    App w e0 es -> App w <$> itraverse f e0 <*> (traverse . itraverse) f es
-    Lam w bs e0 -> Lam w bs <$> itraverse (traverse . f) e0
-    Let w ds e0 ->
-      Let w <$> (traverse . itraverse) f ds <*> itraverse (traverse . f) e0
-    Rec w ds e0 ->
-      Rec w
+    EVar w x -> EVar w <$> f w x
+    ECon w c -> pure (ECon w c)
+    ENum w n -> pure (ENum w n)
+    EApp w e0 es -> EApp w <$> itraverse f e0 <*> (traverse . itraverse) f es
+    ELam w bs e0 -> ELam w bs <$> itraverse (traverse . f) e0
+    ELet w ds e0 ->
+      ELet w <$> (traverse . itraverse) f ds <*> itraverse (traverse . f) e0
+    ERec w ds e0 ->
+      ERec w
       <$> (traverse . itraverse) (traverse . f) ds
       <*> itraverse (traverse . f) e0
-    Cas w e0 cs -> Cas w <$> itraverse f e0 <*> (traverse . itraverse) f cs
-    Mat w e0 as -> Mat w <$> itraverse f e0 <*> (traverse . itraverse) f as
+    ECas w e0 cs -> ECas w <$> itraverse f e0 <*> (traverse . itraverse) f cs
+    EMat w e0 as -> EMat w <$> itraverse f e0 <*> (traverse . itraverse) f as
 
 instance FunctorWithIndex     Pos (Case st) where
 instance FoldableWithIndex    Pos (Case st) where
@@ -303,34 +297,34 @@ instance HasRhs2 GenDefn where
 
 instance HasPos (Expr std v) where
   pos f = \case
-    Var w x       -> fmap (\w' -> Var w' x      ) (f w)
-    Con w c       -> fmap (\w' -> Con w' c      ) (f w)
-    Num w n       -> fmap (\w' -> Num w' n      ) (f w)
-    App w t  us   -> fmap (\w' -> App w' t  us  ) (f w)
-    Cas w t  cs   -> fmap (\w' -> Cas w' t  cs  ) (f w)
-    Lam w ps t    -> fmap (\w' -> Lam w' ps t   ) (f w)
-    Let w ds t    -> fmap (\w' -> Let w' ds t   ) (f w)
-    Rec w ds t    -> fmap (\w' -> Rec w' ds t   ) (f w)
-    Mat w ts as   -> fmap (\w' -> Mat w' ts as  ) (f w)
+    EVar w x       -> fmap (\w' -> EVar w' x      ) (f w)
+    ECon w c       -> fmap (\w' -> ECon w' c      ) (f w)
+    ENum w n       -> fmap (\w' -> ENum w' n      ) (f w)
+    EApp w t  us   -> fmap (\w' -> EApp w' t  us  ) (f w)
+    ECas w t  cs   -> fmap (\w' -> ECas w' t  cs  ) (f w)
+    ELam w ps t    -> fmap (\w' -> ELam w' ps t   ) (f w)
+    ELet w ds t    -> fmap (\w' -> ELet w' ds t   ) (f w)
+    ERec w ds t    -> fmap (\w' -> ERec w' ds t   ) (f w)
+    EMat w ts as   -> fmap (\w' -> EMat w' ts as  ) (f w)
 
 instance HasPos Bind where
   pos f = \case
-    Wild w   -> fmap         Wild       (f w)
-    Name w x -> fmap (\w' -> Name w' x) (f w)
+    BWild w   -> fmap         BWild       (f w)
+    BName w x -> fmap (\w' -> BName w' x) (f w)
 
 -- * Pretty printing
-instance (HasTypDef st ~ 'False) => Pretty (TopLevel st) where
+instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
   pPrintPrec _ _ = \case
-    Val _ x t ->
+    TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
-    TopLet _ ds -> prettyDefns False ds
-    TopRec _ ds -> prettyDefns True  ds
-    Def    w x e -> "let" <+> pretty (MkDefn w x e)
-    SupCom _ x bs e ->
+    TLLet _ ds -> prettyDefns False ds
+    TLRec _ ds -> prettyDefns True  ds
+    TLDef w x e -> "let" <+> pretty (MkDefn w x e)
+    TLSup _ x bs e ->
       "let" <+> hang (pretty x <+> prettyBinds bs <+> equals) 2 (pretty e)
-    Caf _ x t ->
+    TLCaf _ x t ->
       "let" <+> hang (pretty x <+> equals) 2 (pretty t)
-    Asm _ x s ->
+    TLAsm _ x s ->
       hsep ["external", pretty x, equals, text (show s)]
 
 instance (IsVar v) => Pretty (Defn st v) where
@@ -347,10 +341,10 @@ prettyDefns isrec ds = case toList ds of
 
 instance (IsVar v) => Pretty (Expr st v) where
   pPrintPrec lvl prec = \case
-    Var _ x -> pretty (varName x)
-    Con _ c -> pretty c
-    Num _ n -> int n
-    App _ t us ->
+    EVar _ x -> pretty (varName x)
+    ECon _ c -> pretty c
+    ENum _ n -> int n
+    EApp _ t us ->
       maybeParens (prec > Op.aprec) $ hsep
       $ pPrintPrec lvl Op.aprec t : map (pPrintPrec lvl (Op.aprec+1)) us
     -- TODO: Bring this back in Ap when _fun is an operator.
@@ -364,9 +358,9 @@ instance (IsVar v) => Pretty (Expr st v) where
     --   in  maybeParens (prec > _prec) $
     --         pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
     -- TODO: Avoid this code duplication.
-    Let _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
-    Rec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
-    Lam _ bs t ->
+    ELet _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
+    ERec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
+    ELam _ bs t ->
       maybeParens (prec > 0) $ hsep
         [ "fun", prettyBinds bs
         , "->" , pPrintPrec lvl 0 t
@@ -378,10 +372,10 @@ instance (IsVar v) => Pretty (Expr st v) where
     --     , "else"
     --     , nest 2 (pPrintPrec lvl 0 _else)
     --     ]
-    Mat _ t as ->
+    EMat _ t as ->
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) as
-    Cas _ t cs ->
+    ECas _ t cs ->
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) cs
 
@@ -393,17 +387,17 @@ instance (IsVar v) => Pretty (Altn st v) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance Pretty dcon => Pretty (GenPatn dcon) where
+instance Pretty Patn where
   pPrintPrec lvl prec = \case
-    Bind   b    -> pretty b
-    Dest _ c ps ->
+    PVar   b    -> pretty b
+    PCon _ c ps ->
       maybeParens (prec > 0 && not (null ps)) $
       pretty c <+> hsep (map (pPrintPrec lvl 1) (toList ps))
 
 instance Pretty Bind where
   pPrint = \case
-    Wild _   -> "_"
-    Name _ x -> pretty x
+    BWild _   -> "_"
+    BName _ x -> pretty x
 
 prettyBinds :: Vector n Bind -> Doc
 prettyBinds = hsep . map pretty . toList

@@ -13,7 +13,7 @@ import qualified Text.Parsec.Token as Token
 
 import           Pukeko.Error
 import           Pukeko.Language.Operator    (Spec (..))
-import           Pukeko.Language.AST.Std     (GenDefn (..), GenPatn (..), Bind (..), Pos)
+import           Pukeko.Language.AST.Std     (GenDefn (..), Patn (..), Bind (..), Pos)
 import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Parser.AST
 import qualified Pukeko.Language.Type        as Ty
@@ -91,29 +91,32 @@ asType = reservedOp ":" *> type_
 
 module_ :: Parser Module
 module_ = many1 $ choice
-  [ let_ TopLet TopRec
-  , Asm <$> getPosition
-        <*> (reserved "external" *> evar)
-        <*> (equals *> Token.stringLiteral pukeko)
-  , Val <$> getPosition
-        <*> (reserved "val" *> evar)
-        <*> asType
-  , TypDef <$> getPosition
-           <*> (reserved "type" *> sepBy1 tconDecl (reserved "and"))
+  [ let_ TLLet TLRec
+  , TLAsm
+    <$> getPosition
+    <*> (reserved "external" *> evar)
+    <*> (equals *> Token.stringLiteral pukeko)
+  , TLVal
+    <$> getPosition
+    <*> (reserved "val" *> evar)
+    <*> asType
+  , TLTyp
+    <$> getPosition
+    <*> (reserved "type" *> sepBy1 tconDecl (reserved "and"))
   ]
 
 bind :: Parser Bind
-bind = Wild <$> getPosition <*  symbol "_" <|>
-       Name <$> getPosition <*> evar
+bind = BWild <$> getPosition <*  symbol "_" <|>
+       BName <$> getPosition <*> evar
 
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
 patn, apatn :: Parser Patn
-patn  = Dest <$> getPosition <*> dcon <*> many apatn <|>
+patn  = PCon <$> getPosition <*> dcon <*> many apatn <|>
         apatn
-apatn = Bind <$> bind <|>
-        Dest <$> getPosition <*> dcon <*> pure [] <|>
+apatn = PVar <$> bind <|>
+        PCon <$> getPosition <*> dcon <*> pure [] <|>
         parens patn
 
 defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
@@ -122,7 +125,7 @@ defnValLhs = MkDefn <$> getPosition <*> evar
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
   (.) <$> (MkDefn <$> getPosition <*> evar)
-      <*> (Lam <$> getPosition <*> many1 bind)
+      <*> (ELam <$> getPosition <*> many1 bind)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
@@ -152,19 +155,21 @@ expr =
           <*> (reserved "then" *> expr)
           <*> getPosition
           <*> (reserved "else" *> expr)
-  , Mat <$> getPosition
-        <*> (reserved "match" *> expr)
-        <*> (reserved "with"  *> many1 altn)
-  , Lam <$> getPosition
-        <*> (reserved "fun" *> many1 bind)
-        <*> (arrow *> expr)
-  , let_ Let Rec <*> (reserved "in" *> expr)
+  , EMat
+    <$> getPosition
+    <*> (reserved "match" *> expr)
+    <*> (reserved "with"  *> many1 altn)
+  , ELam
+    <$> getPosition
+    <*> (reserved "fun" *> many1 bind)
+    <*> (arrow *> expr)
+  , let_ ELet ERec <*> (reserved "in" *> expr)
   ]
   <?> "expression"
 aexpr = choice
-  [ Var <$> getPosition <*> evar
-  , Con <$> getPosition <*> dcon
-  , Num <$> getPosition <*> nat
+  [ EVar <$> getPosition <*> evar
+  , ECon <$> getPosition <*> dcon
+  , ENum <$> getPosition <*> nat
   , parens expr
   ]
 

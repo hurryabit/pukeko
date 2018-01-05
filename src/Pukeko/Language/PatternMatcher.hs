@@ -42,14 +42,14 @@ freshEVar = state (\(x:xs) -> (x, xs))
 
 pmExpr :: Expr In v -> PM (Expr Out v)
 pmExpr = \case
-  Var w x          -> pure $ Var w x
-  Con w c          -> pure $ Con w c
-  Num w n          -> pure $ Num w n
-  App w t  us      -> App w <$> pmExpr t <*> traverse pmExpr us
-  Lam w bs t       -> Lam w bs <$> pmExpr t
-  Let w ds t       -> Let w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
-  Rec w ds t       -> Rec w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
-  Mat w t0 as0     -> LS.withList as0 $ \case
+  EVar w x          -> pure (EVar w x)
+  ECon w c          -> pure (ECon w c)
+  ENum w n          -> pure (ENum w n)
+  EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
+  ELam w bs t       -> ELam w bs <$> pmExpr t
+  ELet w ds t       -> ELet w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
+  ERec w ds t       -> ERec w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
+  EMat w t0 as0     -> LS.withList as0 $ \case
     LS.Nil -> bug "pattern matcher" "no alternatives" Nothing
     as1@LS.Cons{} -> do
       t1 <- pmExpr t0
@@ -57,10 +57,10 @@ pmExpr = \case
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
-  Def w f t -> do
+  TLDef w f t -> do
     put (Id.freshEVars "pm" f)
-    Def w f <$> pmExpr t
-  Asm w f a -> pure (Asm w f a)
+    TLDef w f <$> pmExpr t
+  TLAsm w f a -> pure (TLAsm w f a)
 
 compileModule :: MonadError String m => Module In -> m (Module Out)
 compileModule (MkModule decls tops) =
@@ -83,7 +83,7 @@ pmMatch w rowMatch0 = do
 
 type RhsExpr v = Expr In (Scope Id.EVar v)
 
-data Row n v = MkRow (LS.List n (Patn In)) (RhsExpr v)
+data Row n v = MkRow (LS.List n Patn) (RhsExpr v)
 
 data RowMatch m n v = MkRowMatch (LS.List n (Expr Out v)) (LS.List m (Row n v))
 
@@ -95,7 +95,7 @@ mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 
 data Col m v a = MkCol (Expr Out v) (LS.List m a)
 
-data ColMatch m n v = MkColMatch (LS.List n (Col m v (Patn In))) (LS.List m (RhsExpr v))
+data ColMatch m n v = MkColMatch (LS.List n (Col m v Patn)) (LS.List m (RhsExpr v))
 
 colPatn :: Traversal (Col m v a) (Col m v b) a b
 colPatn f (MkCol t ps) = MkCol t <$> traverse f ps
@@ -118,7 +118,7 @@ elimBindCols w (MkColMatch cs0 us0) k = do
   us1 <- foldlM (applyBindCol w) us0 bcs
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
   where
-    isBindCol :: Col n v (Patn In) -> Either (Col n v (Patn In)) (Col n v Bind)
+    isBindCol :: Col n v Patn -> Either (Col n v Patn) (Col n v Bind)
     isBindCol (MkCol t ps) =
       case traverse patnToBind ps of
         Just bs -> Right (MkCol t bs)
@@ -126,10 +126,10 @@ elimBindCols w (MkColMatch cs0 us0) k = do
     applyBindCol ::
       Pos -> LS.List m (RhsExpr v) -> Col m v Bind -> PM (LS.List m (RhsExpr v))
     applyBindCol w rhss (MkCol t bs) = case t of
-      Var _ x ->
+      EVar _ x ->
         let replacePatnWithX rhs = \case
-              Wild _   -> rhs
-              Name _ y ->
+              BWild _   -> rhs
+              BName _ y ->
                 let replaceYwithX = \case
                       Bound z _ | y == z -> Free x
                       b                  -> b
@@ -137,12 +137,12 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest = MkDest Id.DCon [Patn In]
+data Dest = MkDest Id.DCon [Patn]
 
-patnToDest :: Patn In -> Maybe Dest
+patnToDest :: Patn -> Maybe Dest
 patnToDest = \case
-  Bind   _    -> Nothing
-  Dest _ c ps -> Just (MkDest c ps)
+  PVar   _    -> Nothing
+  PCon _ c ps -> Just (MkDest c ps)
 
 findDestCol ::
   Pos -> ColMatch m ('LS.Succ n) v -> PM (Col m v Dest, ColMatch m n v)
@@ -187,13 +187,13 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
             case LS.match ixs ps of
               Nothing  -> bug "pattern matcher" "wrong number of patterns" Nothing
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap weaken1 u)
-          let ts1 = LS.map (Var w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) ts
-          pure $ MkGrpMatchItem con (fmap (Name w . snd) ixs0) (MkRowMatch ts1 grpRows)
+          let ts1 = LS.map (EVar w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) ts
+          pure $ MkGrpMatchItem con (fmap (BName w . snd) ixs0) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps
 
 grpMatchExpr :: Pos -> GrpMatch v -> PM (Expr Out v)
 grpMatchExpr w (MkGrpMatch t is) =
-  Cas w t <$> traverse (grpMatchItemAltn w) is
+  ECas w t <$> traverse (grpMatchItemAltn w) is
 
 grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (Case Out v)
 grpMatchItemAltn w (MkGrpMatchItem con bs rm) =

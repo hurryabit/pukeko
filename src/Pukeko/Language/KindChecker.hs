@@ -115,15 +115,15 @@ kcVal t = do
 
 kcTopLevel :: TopLevel In -> KC s (Maybe (TopLevel Out))
 kcTopLevel = \case
-  TypDef w tcons -> do
+  TLTyp w tcons -> do
     here w (kcTypDef tcons)
     pure Nothing
-  Val    w _ t -> do
+  TLVal w _ t -> do
     here w (kcVal t)
     pure Nothing
-  TopLet w ds   -> yield (TopLet w (fmap retagDefn ds))
-  TopRec w ds   -> yield (TopRec w (fmap retagDefn ds))
-  Asm    w x  a -> yield (Asm w x a)
+  TLLet w ds  -> yield (TLLet w (fmap retagDefn ds))
+  TLRec w ds  -> yield (TLRec w (fmap retagDefn ds))
+  TLAsm w x a -> yield (TLAsm w x a)
   where
     yield = pure . Just
 

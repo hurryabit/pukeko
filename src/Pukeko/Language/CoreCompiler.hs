@@ -39,9 +39,9 @@ name = MkName . Id.mangled
 
 ccTopLevel :: In.TopLevel In -> CC TopLevel
 ccTopLevel = \case
-  In.SupCom _ x bs t -> Def (name x) (ccBinds bs) <$> ccExpr t
-  In.Caf    _ x    t -> Def (name x) []           <$> ccExpr t
-  In.Asm    _ x    s -> do
+  In.TLSup _ x bs t -> Def (name x) (ccBinds bs) <$> ccExpr t
+  In.TLCaf _ x    t -> Def (name x) []           <$> ccExpr t
+  In.TLAsm _ x    s -> do
     let n = MkName s
     at x ?= n
     pure (Asm n)
@@ -51,7 +51,7 @@ ccDefn (In.MkDefn _ v t) = MkDefn (name v) <$> ccExpr t
 
 ccExpr :: IsVar v => In.Expr In v -> CC Expr
 ccExpr = \case
-  In.Var _ v
+  In.EVar _ v
     | not (isTotallyFree v) -> return Local{_name}
     | otherwise -> do
         external <- use (at x)
@@ -61,14 +61,14 @@ ccExpr = \case
     where
       x = varName v
       _name = name x
-  In.Con _ dcon  -> do
+  In.ECon _ dcon  -> do
     Con.MkDConDecl{_tag, _fields} <- findDCon dcon
     pure $ Pack _tag (length _fields)
-  In.Num _ n     -> pure $ Num n
-  In.App _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us
-  In.Let _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> ccExpr t
-  In.Rec _ ds t  -> Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
-  In.Cas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
+  In.ENum _ n     -> pure $ Num n
+  In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us
+  In.ELet _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> ccExpr t
+  In.ERec _ ds t  -> Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
+  In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
 ccCase :: IsVar v => In.Case In v -> CC Altn
 ccCase (In.MkCase _ _ bs t) = MkAltn (ccBinds bs) <$> ccExpr t

@@ -69,20 +69,20 @@ useFun w fun = do
 
 frTopLevel :: TopLevel In -> FR (TopLevel Out)
 frTopLevel = \case
-  TypDef w tcs -> pure (TypDef w tcs)
-  Val w x t -> do
+  TLTyp w tcs -> pure (TLTyp w tcs)
+  TLVal w x t -> do
     declareFun w x t
-    pure (Val w x t)
-  TopLet w ds0 -> do
+    pure (TLVal w x t)
+  TLLet w ds0 -> do
     ds1 <- traverse (itraverse useFun) ds0
     traverse_ defineFun' ds1
-    pure (TopLet w (fmap retagDefn ds1))
-  TopRec w ds0 -> do
+    pure (TLLet w (fmap retagDefn ds1))
+  TLRec w ds0 -> do
     traverse_ defineFun' ds0
     ds1 <- traverse (itraverse (traverse . useFun)) ds0
-    pure (TopRec w (fmap retagDefn ds1))
-  Asm w x s -> do
+    pure (TLRec w (fmap retagDefn ds1))
+  TLAsm w x s -> do
     defineFun w x
-    pure (Asm w x s)
+    pure (TLAsm w x s)
   where
     defineFun' (MkDefn w fun _) = defineFun w fun

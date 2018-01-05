@@ -19,7 +19,7 @@ module Pukeko.Language.Parser.AST
 where
 
 import           Pukeko.Pos
-import           Pukeko.Language.AST.Std (GenDefn (..), GenPatn (..), Bind (..))
+import           Pukeko.Language.AST.Std (GenDefn (..), Patn (..), Bind (..))
 import qualified Pukeko.Language.AST.ConDecl as Con
 import qualified Pukeko.Language.Type        as Ty
 import qualified Pukeko.Language.Ident       as Id
@@ -30,46 +30,43 @@ type DCon = Id.DCon
 type Module = [TopLevel]
 
 data TopLevel
-  = TypDef Pos [Con.TConDecl]
-  | Val    Pos Id.EVar (Ty.Type Ty.Closed)
-  | TopLet Pos [Defn Id.EVar]
-  | TopRec Pos [Defn Id.EVar]
-  | Asm    Pos Id.EVar String
+  = TLTyp Pos [Con.TConDecl]
+  | TLVal Pos Id.EVar (Ty.Type Ty.Closed)
+  | TLLet Pos [Defn Id.EVar]
+  | TLRec Pos [Defn Id.EVar]
+  | TLAsm Pos Id.EVar String
 
 type Defn = GenDefn Expr
 
 data Expr v
-  = Var Pos v
-  | Con Pos DCon
-  | Num Pos Int
-  | App Pos (Expr v) [Expr v]
-  -- | If  Pos (Expr v) (Expr v) (Expr v)
-  | Mat Pos (Expr v) [Altn v]
-  | Lam Pos [Bind]   (Expr v)
-  | Let Pos [Defn v] (Expr v)
-  | Rec Pos [Defn v] (Expr v)
+  = EVar Pos v
+  | ECon Pos DCon
+  | ENum Pos Int
+  | EApp Pos (Expr v) [Expr v]
+  | EMat Pos (Expr v) [Altn v]
+  | ELam Pos [Bind]   (Expr v)
+  | ELet Pos [Defn v] (Expr v)
+  | ERec Pos [Defn v] (Expr v)
 
 data Altn v = MkAltn Pos Patn (Expr v)
-
-type Patn = GenPatn DCon
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
 mkApp pos fun args
   | null args = fun
-  | otherwise = App pos fun args
+  | otherwise = EApp pos fun args
 
 mkAppOp :: String -> Pos -> Expr Id.EVar -> Expr Id.EVar -> Expr Id.EVar
 mkAppOp sym pos arg1 arg2 =
-  let fun = Var pos (Id.op sym)
-  in  App pos fun [arg1, arg2]
+  let fun = EVar pos (Id.op sym)
+  in  EApp pos fun [arg1, arg2]
 
 mkIf :: Pos -> Expr v -> Pos -> Expr v -> Pos -> Expr v -> Expr v
 mkIf wt t wu u wv v =
-  Mat wt t [ MkAltn wu (Dest wu (Id.dcon "True") []) u
-           , MkAltn wv (Dest wv (Id.dcon "False") []) v
-           ]
+  EMat wt t [ MkAltn wu (PCon wu (Id.dcon "True") []) u
+            , MkAltn wv (PCon wv (Id.dcon "False") []) v
+            ]
 
 mkLam :: Pos -> [Bind] -> Expr v -> Expr v
 mkLam pos patns expr
   | null patns = expr
-  | otherwise  = Lam pos patns expr
+  | otherwise  = ELam pos patns expr

@@ -27,12 +27,12 @@ cleanModule = over module2tops $ \tops0 ->
 
 topLevelLhs :: TopLevel In -> Id.EVar
 topLevelLhs = \case
-  Def _ x _ -> x
-  Asm _ x _ -> x
+  TLDef _ x _ -> x
+  TLAsm _ x _ -> x
 
 topLevel2expr ::
-  St.HasDef st ~ 'True =>
+  St.HasTLDef st ~ 'True =>
   Traversal (TopLevel In) (TopLevel st) (Expr In Id.EVar) (Expr st Id.EVar)
 topLevel2expr f = \case
-  Def w x e -> Def w x <$> f e
-  Asm w x s -> pure (Asm w x s)
+  TLDef w x e -> TLDef w x <$> f e
+  TLAsm w x s -> pure (TLAsm w x s)

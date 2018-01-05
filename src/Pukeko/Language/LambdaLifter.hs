@@ -46,14 +46,14 @@ freshIdent = state $ \(ident:idents) -> (ident, idents)
 
 llExpr :: forall v. (IsVar v) => Expr In v -> LL (Expr Out v)
 llExpr = \case
-  Var w x -> pure $ Var w x
-  Con w c -> pure $ Con w c
-  Num w n -> pure $ Num w n
-  App w t  us -> App w <$> llExpr t <*> traverse llExpr us
-  Cas w t  cs -> Cas w <$> llExpr t <*> traverse (case2rhs llExpr) cs
-  Let w ds t -> Let w <$> (traverse . rhs2) llExpr ds <*> llExpr t
-  Rec w ds t -> Rec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
-  Lam w oldBinds rhs -> do
+  EVar w x -> pure (EVar w x)
+  ECon w c -> pure (ECon w c)
+  ENum w n -> pure (ENum w n)
+  EApp w t  us -> EApp w <$> llExpr t <*> traverse llExpr us
+  ECas w t  cs -> ECas w <$> llExpr t <*> traverse (case2rhs llExpr) cs
+  ELet w ds t -> ELet w <$> (traverse . rhs2) llExpr ds <*> llExpr t
+  ERec w ds t -> ERec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
+  ELam w oldBinds rhs -> do
     lhs <- freshIdent
     rhs <- llExpr rhs
     let isCaptured v = is _Free v && not (isTotallyFree v)
@@ -62,34 +62,34 @@ llExpr = \case
     -- not break the tests right now.
     let capturedL = sortOn varName $ Set.toList capturedS
     Vec.withList capturedL $ \capturedV -> do
-      let newBinds = fmap (Name w . varName) capturedV Vec.++ oldBinds
+      let newBinds = fmap (BName w . varName) capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
             Free  v   -> Free  (varName v)
       let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (varName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
-      tell [SupCom w lhs newBinds (fmap (rename Map.!) rhs)]
+      tell [TLSup w lhs newBinds (fmap (rename Map.!) rhs)]
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
-      let fun = Var w (mkTotallyFree lhs)
+      let fun = EVar w (mkTotallyFree lhs)
       case capturedL of
         []  -> return fun
-        _:_ -> return $ App w fun (map (Var w . unfree) capturedL)
+        _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
 
 llTopLevel :: TopLevel In -> LL ()
 llTopLevel = \case
-  Def w lhs rhs -> do
+  TLDef w lhs rhs -> do
     put $ Id.freshEVars "ll" lhs
     case rhs of
-      Lam{} -> do
+      ELam{} -> do
         -- NOTE: Make sure this lambda gets lifted to the name it is defining.
         modify (lhs:)
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [Caf w lhs rhs]
-  Asm w lhs asm -> tell [Asm w lhs asm]
+        tell [TLCaf w lhs rhs]
+  TLAsm w lhs asm -> tell [TLAsm w lhs asm]
 
 liftModule :: Std.Module In -> Std.Module Out
 liftModule = over module2tops (execLL . traverse_ llTopLevel)

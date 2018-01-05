@@ -46,32 +46,32 @@ localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
 
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
 rnTopLevel top = case top of
-  Ps.TypDef w ts  -> pure (TypDef w ts)
-  Ps.Val    w x t -> pure (Val    w x t)
-  Ps.TopLet w ds0 -> Vec.withList ds0 $ \ds1 ->
-    TopLet w <$> traverse rnDefn ds1
-  Ps.TopRec w ds0 -> Vec.withList ds0 $ \ds1 ->
-    localizeDefns ds1 $ TopRec w <$> traverse rnDefn ds1
-  Ps.Asm    w x a -> pure (Asm w x a)
+  Ps.TLTyp w ts  -> pure (TLTyp w ts)
+  Ps.TLVal w x t -> pure (TLVal w x t)
+  Ps.TLLet w ds0 -> Vec.withList ds0 $ \ds1 ->
+    TLLet w <$> traverse rnDefn ds1
+  Ps.TLRec w ds0 -> Vec.withList ds0 $ \ds1 ->
+    localizeDefns ds1 $ TLRec w <$> traverse rnDefn ds1
+  Ps.TLAsm w x a -> pure (TLAsm w x a)
 
 rnDefn :: Ps.Defn Id.EVar -> Rn tv (Defn Out tv)
 rnDefn = rhs2 rnExpr
 
 rnExpr :: Ps.Expr Id.EVar -> Rn tv (Expr Out tv)
 rnExpr = \case
-  Ps.Var w x ->
-    asks $ \(MkEnv bound mkFree) -> Var w (Map.findWithDefault (mkFree x) x bound)
-  Ps.Con w c -> pure (Con w c)
-  Ps.Num w n -> pure (Num w n)
-  Ps.App w e0  es -> App w <$> rnExpr e0 <*> traverse rnExpr es
-  Ps.Mat w e0  as -> Mat w <$> rnExpr e0 <*> traverse rnAltn as
-  Ps.Lam w bs0 e0 -> Vec.withList bs0 $ \bs1 -> do
-    let bs2 = ifoldMapOf (itraversed . _Name) (\i (_w, x) -> Map.singleton x i) bs1
-    Lam w bs1 <$> localize bs2 (rnExpr e0)
-  Ps.Let w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
-    Let w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
-  Ps.Rec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
-    localizeDefns ds1 $ Rec w <$> traverse rnDefn ds1 <*> rnExpr e0
+  Ps.EVar w x ->
+    asks $ \(MkEnv bound mkFree) -> EVar w (Map.findWithDefault (mkFree x) x bound)
+  Ps.ECon w c -> pure (ECon w c)
+  Ps.ENum w n -> pure (ENum w n)
+  Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es
+  Ps.EMat w e0  as -> EMat w <$> rnExpr e0 <*> traverse rnAltn as
+  Ps.ELam w bs0 e0 -> Vec.withList bs0 $ \bs1 -> do
+    let bs2 = ifoldMapOf (itraversed . _BName) (\i (_w, x) -> Map.singleton x i) bs1
+    ELam w bs1 <$> localize bs2 (rnExpr e0)
+  Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
+    ELet w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
+  Ps.ERec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
+    localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
 rnAltn :: Ps.Altn Id.EVar -> Rn tv (Altn Out tv)
 rnAltn (Ps.MkAltn w p e) = do
