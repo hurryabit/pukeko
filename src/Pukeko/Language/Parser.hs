@@ -16,7 +16,7 @@ import           Pukeko.Language.Operator    (Spec (..))
 import           Pukeko.Language.AST.Std     (GenDefn (..), Patn (..), Bind (..), Pos)
 import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Parser.AST
-import qualified Pukeko.Language.Type        as Ty
+import           Pukeko.Language.Type
 import qualified Pukeko.Language.Ident       as Id
 import qualified Pukeko.Language.Operator    as Op
 
@@ -74,19 +74,19 @@ tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
 dcon :: Parser Id.DCon
 dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
 
-type_, atype :: Parser (Ty.Type Ty.Closed)
+type_, atype :: Parser (Type Id.TVar)
 type_ =
   buildExpressionParser
-    [ [ Infix (arrow *> pure (Ty.~>)) AssocRight ] ]
-    (Ty.app <$> atype <*> many atype)
+    [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
+    (appN <$> atype <*> many atype)
   <?> "type"
 atype = choice
-  [ Ty.var <$> tvar
-  , Ty.con <$> tcon
+  [ TVar <$> tvar
+  , TCon <$> tcon
   , parens type_
   ]
 
-asType :: Parser (Ty.Type Ty.Closed)
+asType :: Parser (Type Id.TVar)
 asType = reservedOp ":" *> type_
 
 module_ :: Parser Module

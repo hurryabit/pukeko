@@ -13,15 +13,13 @@ import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage      as St
 import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Ident          as Id
-import qualified Pukeko.Language.Type           as Ty
+import           Pukeko.Language.Type
 
 type In  = St.TypeResolver
 type Out = St.FunResolver
 
-type TypeClosed = Ty.Type Ty.Closed
-
 data FRState = MkFRState
-  { _declared :: Map.Map Id.EVar (Pos, TypeClosed)
+  { _declared :: Map.Map Id.EVar (Pos, Type Id.TVar)
   , _defined  :: Set.Set Id.EVar
   }
 makeLenses ''FRState
@@ -47,7 +45,7 @@ resolveModule (MkModule info0 tops0) = do
       let info1 = info0{MI._funs = MI.Present decld}
       pure (MkModule info1 tops1)
 
-declareFun :: Pos -> Id.EVar -> TypeClosed -> FR ()
+declareFun :: Pos -> Id.EVar -> Type Id.TVar -> FR ()
 declareFun w fun typ = do
   dup <- uses declared (has (ix fun))
   when dup (throwAt w "duplicate declaration of function" fun)

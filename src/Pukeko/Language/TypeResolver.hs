@@ -13,7 +13,7 @@ import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage        as St
 import qualified Pukeko.Language.AST.ModuleInfo   as MI
 import qualified Pukeko.Language.AST.ConDecl      as Con
-import qualified Pukeko.Language.Type             as Ty
+import           Pukeko.Language.Type
 import qualified Pukeko.Language.Ident            as Id
 
 type In  = St.Renamer
@@ -36,9 +36,8 @@ runTR tr =
   let st = MkTRState mempty mempty
   in  runExcept (runStateT (unTR tr) st)
 
--- TODO: Use @typeApps . _1@ to do this.
-trType :: Pos -> Ty.Type Ty.Closed -> TR (Ty.Type Ty.Closed)
-trType w = Ty.type2tcon $ \tcon -> do
+trType :: Pos -> Type Id.TVar -> TR (Type Id.TVar)
+trType w = type2tcon $ \tcon -> do
   ex <- uses st2tcons (has (ix tcon))
   unless ex (throwAt w "unknown type cons" tcon)
   pure tcon

@@ -22,14 +22,12 @@ import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.ConDecl    as Con
 import           Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Ident          as Id
-import qualified Pukeko.Language.Type           as Ty
-
-type Type = Ty.Type Ty.Closed
+import           Pukeko.Language.Type
 
 class Monad m => MonadInfo i m | m -> i where
   allTCons :: (i ~ GenModuleInfo 'True funs) => m (Map.Map Id.TCon Con.TConDecl)
   allDCons :: (i ~ GenModuleInfo 'True funs) => m (Map.Map Id.DCon Con.DConDecl)
-  allFuns  :: (i ~ GenModuleInfo cons 'True) => m (Map.Map Id.EVar (Pos, Type))
+  allFuns  :: (i ~ GenModuleInfo cons 'True) => m (Map.Map Id.EVar (Pos, Type Id.TVar))
 
 newtype InfoT i m a = InfoT{unInfoT :: ReaderT i m a}
   deriving (Functor, Applicative, Monad, MonadTrans)
@@ -49,7 +47,7 @@ findTCon tcon = (Map.! tcon) <$> allTCons
 findDCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.DCon -> m Con.DConDecl
 findDCon tcon = (Map.! tcon) <$> allDCons
 
-findFun :: MonadInfo (GenModuleInfo cons 'True) m => Id.EVar -> m (Pos, Type)
+findFun :: MonadInfo (GenModuleInfo cons 'True) m => Id.EVar -> m (Pos, Type Id.TVar)
 findFun fun = (Map.! fun) <$> allFuns
 
 liftCatch :: Catch e m a -> Catch e (InfoT i m) a

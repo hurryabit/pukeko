@@ -22,12 +22,10 @@ import           Pukeko.Language.AST.Std          hiding (Free)
 import qualified Pukeko.Language.AST.Stage        as St
 import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.Ident            as Id
-import qualified Pukeko.Language.Type             as Ty
+import           Pukeko.Language.Type
 
 type In  = St.FunResolver
 type Out = St.KindChecker
-
-type Type = Ty.Type Ty.Closed
 
 data Open s
 
@@ -73,20 +71,20 @@ freshUVar = do
   v <- fresh %%= (\(v:vs) -> (v, vs))
   UVar <$> liftST (newSTRef (Free (Forget v)))
 
-kcType :: Kind (Open s) -> Type -> KC s ()
+kcType :: Kind (Open s) -> Type Id.TVar -> KC s ()
 kcType k = \case
-  Ty.Var v -> do
+  TVar v -> do
     kv_opt <- view (at v)
     case kv_opt of
       Nothing -> throwDoc $ "unknown type variable:" <+> pretty v
       Just kv -> unify kv k
-  Ty.Arr -> unify (Arrow Star (Arrow Star Star)) k
-  Ty.Con tcon -> do
+  TArr -> unify (Arrow Star (Arrow Star Star)) k
+  TCon tcon -> do
     kcon_opt <- use (typeCons . at tcon)
     case kcon_opt of
       Nothing -> bug "kind checker" "unknown type constructor" (Just (show tcon))
       Just kcon -> unify kcon k
-  Ty.App tf tp -> do
+  TApp tf tp -> do
     ktp <- freshUVar
     kcType ktp tp
     kcType (Arrow ktp k) tf
@@ -107,9 +105,9 @@ kcTypDef tcons = do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 
-kcVal :: Ty.Type Ty.Closed ->KC s ()
+kcVal :: Type Id.TVar ->KC s ()
 kcVal t = do
-  env <- sequence $ Map.fromSet (const freshUVar) (Ty.vars t)
+  env <- sequence $ Map.fromSet (const freshUVar) (vars t)
   local (const env) $ kcType Star t
 
 

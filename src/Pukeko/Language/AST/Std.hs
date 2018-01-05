@@ -48,7 +48,7 @@ import           Pukeko.Pos
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Op
 import qualified Pukeko.Language.Ident    as Id
-import qualified Pukeko.Language.Type     as Ty
+import           Pukeko.Language.Type
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Stage
 import           Pukeko.Language.AST.Scope
@@ -64,7 +64,7 @@ data Module st = MkModule
 
 data TopLevel st
   = HasTLTyp st ~ 'True => TLTyp Pos [Con.TConDecl]
-  | HasTLVal st ~ 'True => TLVal Pos Id.EVar (Ty.Type Ty.Closed)
+  | HasTLVal st ~ 'True => TLVal Pos Id.EVar (Type Id.TVar)
   | forall n.
     HasTLLet st ~ 'True => TLLet Pos (Vector n (Defn st Id.EVar))
   | forall n.

@@ -25,16 +25,15 @@ import qualified Pukeko.Language.AST.ConDecl       as Con
 import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
-import qualified Pukeko.Language.Type              as Ty
+import           Pukeko.Language.Type              (typeInt)
+import           Pukeko.Language.TypeChecker.Type
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
 type In  = St.KindChecker
 type Out = St.TypeChecker
 
-type TypeOpen s = Ty.Type (Ty.Open s)
-
 data Environment v s = MkEnvironment
-  { _locals :: Sc.EnvOf v (TypeOpen s)
+  { _locals :: Sc.EnvOf v (UType s Id.TVar)
   , _level  :: Int
   }
 makeLenses ''Environment
@@ -55,7 +54,7 @@ evalTC ::
   MonadError String m =>
   (forall s. TC Id.EVar s a) -> ModuleInfo In -> m a
 evalTC tc info = runST $
-  let locals0 = Map.map (Ty.open . snd) (MI.funs info)
+  let locals0 = Map.map (open . snd) (MI.funs info)
       env0 = MkEnvironment locals0 0
       st0 = MkTCState []
   in  runExceptT (evalStateT (runReaderT (runInfoT (unTC tc) info) env0) st0)
@@ -66,54 +65,54 @@ liftST = TC . lift . lift . lift . lift
 resetFresh :: TC v s ()
 resetFresh = fresh .= Id.freshTVars
 
-freshUVar :: TC v s (TypeOpen s)
+freshUVar :: TC v s (UType s Id.TVar)
 freshUVar = do
-  _level <- view level
-  _ident <- fresh %%= (\(x:xs) -> (x,xs))
-  Ty.UVar <$> liftST (newSTRef Ty.Free{_ident, _level})
+  x <- fresh %%= (\(x:xs) -> (x,xs))
+  l <- view level
+  UVar <$> liftST (newSTRef (UFree x l))
 
-unify :: Pos -> TypeOpen s -> TypeOpen s -> TC v s ()
+unify :: Pos -> UType s Id.TVar -> UType s Id.TVar -> TC v s ()
 unify w t1 t2 = TC $ lift $ lift $ lift $ U.unify w t1 t2
 
 localize ::
   forall i v s a.
   (IsVarLevel i, IsVar v) =>
-  EnvLevelOf i (TypeOpen s) ->
+  EnvLevelOf i (UType s Id.TVar) ->
   TC (Scope i v) s a ->
   TC v s a
 localize ts = TC . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
-lookupType :: (IsVar v, Pretty v) => v -> TC v s (TypeOpen s)
+lookupType :: (IsVar v, Pretty v) => v -> TC v s (UType s Id.TVar)
 lookupType = views locals . Sc.lookupEnv
 
-generalize :: TypeOpen s -> TC v s (TypeOpen s)
-generalize = \case
-  t@(Ty.UVar uref) -> do
+generalize :: UType s Id.TVar -> TC v s (UType s Id.TVar)
+generalize t0 = case t0 of
+  (UVar uref) -> do
     uvar <- liftST $ readSTRef uref
     cur_level <- view level
     case uvar of
-      Ty.Free{_ident, _level}
-        | _level > cur_level -> pure (Ty.Var _ident)
-        | otherwise          -> pure t
-      Ty.Link{_type} -> generalize _type
-  t@(Ty.Var _) -> pure t
-  t@Ty.Arr     -> pure t
-  t@(Ty.Con _) -> pure t
-  Ty.App tf tp -> Ty.App <$> generalize tf <*> generalize tp
+      UFree x l
+        | l > cur_level -> pure (UTVar x)
+        | otherwise     -> pure t0
+      ULink t1 -> generalize t1
+  UTVar{} -> pure t0
+  UTArr{} -> pure t0
+  UTCon{} -> pure t0
+  UTApp tf tp -> UTApp <$> generalize tf <*> generalize tp
 
-instantiate :: TypeOpen s -> TC v s (TypeOpen s)
+instantiate :: UType s Id.TVar -> TC v s (UType s Id.TVar)
 instantiate t = do
-  vars <- liftST $ Ty.openVars t
-  env <- sequence $ Map.fromSet (const freshUVar) vars
-  liftST $ Ty.openSubst env t
+  xs <- liftST $ vars t
+  env <- sequence $ Map.fromSet (const freshUVar) xs
+  liftST $ subst env t
 
-instantiateTCon :: Id.TCon -> TC v s (TypeOpen s, Map.Map Id.TVar (TypeOpen s))
+instantiateTCon :: Id.TCon -> TC v s (UType s Id.TVar, Map.Map Id.TVar (UType s Id.TVar))
 instantiateTCon tcon = do
   Con.MkTConDecl{_params} <- findTCon tcon
   t_params <- traverse (const freshUVar) _params
-  return (Ty.appTCon tcon t_params, Map.fromList $ zip _params t_params)
+  return (appTCon tcon t_params, Map.fromList (zip _params t_params))
 
-inferPatn :: Patn -> TypeOpen s -> TC v s (Map.Map Id.EVar (TypeOpen s))
+inferPatn :: Patn -> UType s Id.TVar -> TC v s (Map.Map Id.EVar (UType s Id.TVar))
 inferPatn patn t_expr = case patn of
   PVar (BWild _) -> return Map.empty
   PVar (BName _ ident) -> return (Map.singleton ident t_expr)
@@ -124,14 +123,14 @@ inferPatn patn t_expr = case patn of
       "expects" <+> int (length _fields) <+> "arguments"
     (t_inst, env_inst) <- instantiateTCon _tcon
     unify w t_expr t_inst
-    t_fields <- liftST $ traverse (Ty.openSubst env_inst . Ty.open) _fields
+    t_fields <- liftST $ traverse (subst env_inst . open) _fields
     Map.unions <$> zipWithM inferPatn patns t_fields
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
   :: (IsVar v)
-  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (TypeOpen s))
+  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UType s Id.TVar))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -143,7 +142,7 @@ inferLet defns = do
 
 inferRec
   :: (IsVar v)
-  => Vec.Vector n (Defn In (FinScope n v)) -> TC v s (Vec.Vector n (TypeOpen s))
+  => Vec.Vector n (Defn In (FinScope n v)) -> TC v s (Vec.Vector n (UType s Id.TVar))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -153,7 +152,7 @@ inferRec defns = do
     return t_rhss
   traverse generalize t_rhss
 
-infer :: IsVar v => Expr In v -> TC v s (TypeOpen s)
+infer :: IsVar v => Expr In v -> TC v s (UType s Id.TVar)
 infer = \case
     EVar _ ident -> do
       t <- lookupType ident
@@ -161,18 +160,18 @@ infer = \case
     ECon _ dcon -> do
       dconDecl <- findDCon dcon
       tconDecl <- findTCon (Con._tcon dconDecl)
-      instantiate $ Ty.open (Con.typeOf tconDecl dconDecl)
-    ENum _ _num -> return (Ty.open Ty.typeInt)
+      instantiate $ open (Con.typeOf tconDecl dconDecl)
+    ENum _ _num -> return (open typeInt)
     EApp w fun args -> do
       t_fun <- infer fun
       t_args <- traverse infer args
       t_res <- freshUVar
-      unify w t_fun (t_args Ty.*~> t_res)
+      unify w t_fun (t_args *~> t_res)
       return t_res
     ELam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
       t_rhs <- localize t_params (infer rhs)
-      return (toList t_params Ty.*~> t_rhs)
+      return (toList t_params *~> t_rhs)
     ELet _ defns rhs -> do
       t_defns <- inferLet defns
       localize t_defns (infer rhs)
