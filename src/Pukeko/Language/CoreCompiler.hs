@@ -5,6 +5,7 @@ module Pukeko.Language.CoreCompiler
 where
 
 import           Control.Lens
+import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Foldable     (toList)
 import qualified Data.Map          as Map
@@ -20,16 +21,19 @@ import           Pukeko.Language.Info
 
 type In = St.LambdaLifter
 
+type CCEnv v = v -> Maybe Id.EVar
+
 type CCState = Map.Map Id.EVar Name
 
-newtype CC a = CC{unCC :: InfoT (In.ModuleInfo In) (State CCState) a}
+newtype CC v a = CC{unCC :: InfoT (In.ModuleInfo In) (ReaderT (CCEnv v) (State CCState)) a}
   deriving ( Functor, Applicative, Monad
            , MonadInfo (In.GenModuleInfo 'True 'True)
+           , MonadReader (CCEnv v)
            , MonadState CCState
            )
 
-runCC :: CC a -> In.ModuleInfo In -> a
-runCC cc decls = evalState (runInfoT (unCC cc) decls) mempty
+runCC :: CC Id.EVar a -> In.ModuleInfo In -> a
+runCC cc decls = evalState (runReaderT (runInfoT (unCC cc) decls) Just) mempty
 
 compileModule :: In.Module In -> Module
 compileModule (In.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
@@ -37,41 +41,43 @@ compileModule (In.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
 
-ccTopLevel :: In.TopLevel In -> CC TopLevel
+scoped :: CC (Scope i v) a -> CC v a
+scoped = CC . mapInfoT (withReaderT (scope (const Nothing))) . unCC
+
+ccTopLevel :: In.TopLevel In -> CC Id.EVar TopLevel
 ccTopLevel = \case
-  In.TLSup _ x bs t -> Def (name x) (ccBinds bs) <$> ccExpr t
+  In.TLSup _ x bs t -> Def (name x) (ccBinds bs) <$> scoped (ccExpr t)
   In.TLCaf _ x    t -> Def (name x) []           <$> ccExpr t
   In.TLAsm _ x    s -> do
     let n = MkName s
     at x ?= n
     pure (Asm n)
 
-ccDefn :: IsVar v => In.Defn In v -> CC Defn
+ccDefn :: IsVar v => In.Defn In v -> CC v Defn
 ccDefn (In.MkDefn _ v t) = MkDefn (name v) <$> ccExpr t
 
-ccExpr :: IsVar v => In.Expr In v -> CC Expr
+ccExpr :: IsVar v => In.Expr In v -> CC v Expr
 ccExpr = \case
-  In.EVar _ v
-    | not (isTotallyFree v) -> return Local{_name}
-    | otherwise -> do
-        external <- use (at x)
+  In.EVar _ x0 -> do
+    global <- asks ($ x0)
+    case global of
+      Nothing -> pure (Local (name (varName x0)))
+      Just x1 -> do
+        external <- use (at x1)
         case external of
-          Nothing    -> return Global  {_name}
-          Just _name -> return External{_name}
-    where
-      x = varName v
-      _name = name x
+          Nothing -> pure (Global (name x1))
+          Just y2 -> pure (External y2)
   In.ECon _ dcon  -> do
     Con.MkDConDecl{_tag, _fields} <- findDCon dcon
     pure $ Pack _tag (length _fields)
   In.ENum _ n     -> pure $ Num n
   In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us
-  In.ELet _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> ccExpr t
-  In.ERec _ ds t  -> Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
+  In.ELet _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> scoped (ccExpr t)
+  In.ERec _ ds t  -> scoped $ Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
-ccCase :: IsVar v => In.Case In v -> CC Altn
-ccCase (In.MkCase _ _ bs t) = MkAltn (ccBinds bs) <$> ccExpr t
+ccCase :: IsVar v => In.Case In v -> CC v Altn
+ccCase (In.MkCase _ _ bs t) = MkAltn (ccBinds bs) <$> scoped (ccExpr t)
 
 ccBinds :: Vec.Vector n In.Bind -> [Maybe Name]
 ccBinds = map (fmap name . In.bindName) . toList

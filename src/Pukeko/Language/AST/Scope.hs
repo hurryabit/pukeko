@@ -4,6 +4,7 @@
 module Pukeko.Language.AST.Scope
   ( Scope (..)
   , FinScope
+  , scope
   , _Bound
   , _Free
   , mkBound
@@ -34,6 +35,11 @@ data Scope i v
   deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
 
 type FinScope n = Scope (Finite n)
+
+scope :: (i -> a) -> (v -> a) -> Scope i v -> a
+scope f g = \case
+  Bound i _ -> f i
+  Free  x   -> g x
 
 mkBound :: i -> Id.EVar -> Scope i v
 mkBound i x = Bound i (Forget x)
@@ -94,15 +100,11 @@ instance IsVarLevel (Finite n) where
 class (Ord v, Pretty v) => IsVar v where
   type EnvOf v :: * -> *
   varName :: v -> Id.EVar
-  isTotallyFree :: v -> Bool
-  mkTotallyFree :: Id.EVar -> v
   lookupEnv :: v -> EnvOf v a -> a
 
 instance IsVar Id.EVar where
   type EnvOf Id.EVar = Map.Map Id.EVar
   varName = id
-  isTotallyFree = const True
-  mkTotallyFree = id
   lookupEnv = lookupMap
 
 instance (IsVarLevel i, IsVar v) => IsVar (Scope i v) where
@@ -110,10 +112,6 @@ instance (IsVarLevel i, IsVar v) => IsVar (Scope i v) where
   varName = \case
     Bound _ (Forget x) -> x
     Free  v            -> varName v
-  isTotallyFree = \case
-    Bound _ _ -> False
-    Free  v   -> isTotallyFree v
-  mkTotallyFree = Free . mkTotallyFree
   lookupEnv i (Pair env_j env_v) = case i of
     Bound j _ -> lookupEnvLevel j env_j
     Free  v   -> lookupEnv v env_v

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 module Pukeko.Language.LambdaLifter
   ( Module
   , liftModule
@@ -29,39 +30,50 @@ type Module = Std.Module Out
 
 type State = [Id.EVar]
 
-newtype LL a = LL{unLL :: RWS () [TopLevel Out] State a}
+data Env v = MkEnv
+  { _mkGlobal :: Id.EVar -> v
+  , _isGlobal :: v -> Bool
+  }
+
+newtype LL v a = LL{unLL :: RWS (Env v) [TopLevel Out] State a}
   deriving ( Functor, Applicative, Monad
+           , MonadReader (Env v)
            , MonadWriter [TopLevel Out]
            , MonadState State
            )
 
-execLL :: LL () -> [TopLevel Out]
+execLL :: LL Id.EVar () -> [TopLevel Out]
 execLL ll =
-  let state = []
-      ((), defns) = evalRWS (unLL ll) () state
+  let env = MkEnv id (const True)
+      state = []
+      ((), defns) = evalRWS (unLL ll) env state
   in  defns
 
-freshIdent :: LL Id.EVar
+freshIdent :: LL v Id.EVar
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-llExpr :: forall v. (IsVar v) => Expr In v -> LL (Expr Out v)
+scoped :: LL (Scope i v) a -> LL v a
+scoped =
+  LL . withRWST(\(MkEnv mk is) s -> (MkEnv (Free . mk) (scope (const False) is), s)) . unLL
+
+llExpr :: forall v. (IsVar v) => Expr In v -> LL v (Expr Out v)
 llExpr = \case
   EVar w x -> pure (EVar w x)
   ECon w c -> pure (ECon w c)
   ENum w n -> pure (ENum w n)
   EApp w t  us -> EApp w <$> llExpr t <*> traverse llExpr us
-  ECas w t  cs -> ECas w <$> llExpr t <*> traverse (case2rhs llExpr) cs
-  ELet w ds t -> ELet w <$> (traverse . rhs2) llExpr ds <*> llExpr t
-  ERec w ds t -> ERec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
+  ECas w t  cs -> ECas w <$> llExpr t <*> traverse llCase cs
+  ELet w ds t -> ELet w <$> (traverse . rhs2) llExpr ds <*> scoped (llExpr t)
+  ERec w ds t -> scoped $ ERec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
   ELam w oldBinds rhs -> do
     lhs <- freshIdent
-    rhs <- llExpr rhs
-    let isCaptured v = is _Free v && not (isTotallyFree v)
+    (rhs, isGlobal) <- scoped ((,) <$> llExpr rhs <*> asks _isGlobal)
+    let isCaptured v = is _Free v && not (isGlobal v)
     let (capturedS, others) = Set.partition isCaptured $ Set.setOf traverse rhs
     -- TODO: Arrange 'captured' in a clever way. The @sortOn varName@ is just to
     -- not break the tests right now.
     let capturedL = sortOn varName $ Set.toList capturedS
-    Vec.withList capturedL $ \capturedV -> do
+    Vec.withList capturedL $ \(capturedV :: Vec.Vector m (FinScope n v)) -> do
       let newBinds = fmap (BName w . varName) capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
@@ -72,12 +84,16 @@ llExpr = \case
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
-      let fun = EVar w (mkTotallyFree lhs)
+      mkGlobal <- asks _mkGlobal
+      let fun = EVar w (mkGlobal lhs)
       case capturedL of
         []  -> return fun
         _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
 
-llTopLevel :: TopLevel In -> LL ()
+llCase :: (IsVar v) => Case In v -> LL v (Case Out v)
+llCase (MkCase w c bs e) = MkCase w c bs <$> scoped (llExpr e)
+
+llTopLevel :: TopLevel In -> LL Id.EVar ()
 llTopLevel = \case
   TLDef w lhs rhs -> do
     put $ Id.freshEVars "ll" lhs
