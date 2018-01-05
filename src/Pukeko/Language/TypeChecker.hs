@@ -32,7 +32,7 @@ import qualified Pukeko.Language.Ident             as Id
 import qualified Pukeko.Language.Type              as Ty
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
-type In  = St.FunResolver
+type In  = St.KindChecker
 type Out = St.TypeChecker
 
 type TypeOpen s = Ty.Type (Ty.Open s)

@@ -24,7 +24,7 @@ import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.Ident            as Id
 import qualified Pukeko.Language.Type             as Ty
 
-type In  = St.TypeResolver
+type In  = St.FunResolver
 type Out = St.KindChecker
 
 type Type = Ty.Type Ty.Closed
@@ -118,9 +118,9 @@ kcTopLevel = \case
   TypDef w tcons -> do
     here w (kcTypDef tcons)
     pure Nothing
-  Val    w x  t -> do
+  Val    w _ t -> do
     here w (kcVal t)
-    yield (Val w x t)
+    pure Nothing
   TopLet w ds   -> yield (TopLet w (fmap retagDefn ds))
   TopRec w ds   -> yield (TopRec w (fmap retagDefn ds))
   Asm    w x  a -> yield (Asm w x a)

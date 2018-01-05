@@ -6,7 +6,6 @@ import           Control.Lens
 import           Control.Monad.State
 import           Data.Foldable (traverse_)
 import qualified Data.Map      as Map
-import           Data.Maybe    (catMaybes)
 import qualified Data.Set      as Set
 
 import           Pukeko.Error
@@ -16,7 +15,7 @@ import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Ident          as Id
 import qualified Pukeko.Language.Type           as Ty
 
-type In  = St.KindChecker
+type In  = St.TypeResolver
 type Out = St.FunResolver
 
 type TypeClosed = Ty.Type Ty.Closed
@@ -40,7 +39,7 @@ runFR fr = runExcept (runStateT (unFR fr) st0)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
 resolveModule (MkModule info0 tops0) = do
-  (tops1, MkFRState decld defnd) <- runFR (catMaybes <$> traverse frTopLevel tops0)
+  (tops1, MkFRState decld defnd) <- runFR (traverse frTopLevel tops0)
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   case Map.minViewWithKey undefnd of
     Just ((fun, (w, _)), _) -> throwAt w "declared but undefined function" fun
@@ -68,18 +67,22 @@ useFun w fun = do
   unless ex (throwAt w "undefined function" fun)
   pure fun
 
-frTopLevel :: TopLevel In -> FR (Maybe (TopLevel Out))
+frTopLevel :: TopLevel In -> FR (TopLevel Out)
 frTopLevel = \case
-  Val w x t -> declareFun w x t *> pure Nothing
+  TypDef w tcs -> pure (TypDef w tcs)
+  Val w x t -> do
+    declareFun w x t
+    pure (Val w x t)
   TopLet w ds0 -> do
     ds1 <- traverse (itraverse useFun) ds0
     traverse_ defineFun' ds1
-    yield (TopLet w (fmap retagDefn ds1))
+    pure (TopLet w (fmap retagDefn ds1))
   TopRec w ds0 -> do
     traverse_ defineFun' ds0
     ds1 <- traverse (itraverse (traverse . useFun)) ds0
-    yield (TopRec w (fmap retagDefn ds1))
-  Asm w x s -> defineFun w x *> yield (Asm w x s)
+    pure (TopRec w (fmap retagDefn ds1))
+  Asm w x s -> do
+    defineFun w x
+    pure (Asm w x s)
   where
-    yield = pure . Just
     defineFun' (MkDefn w fun _) = defineFun w fun

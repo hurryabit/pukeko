@@ -20,8 +20,8 @@ type family StageId st where
   StageId Parser         =   0
   StageId Renamer        = 100
   StageId TypeResolver   = 200
+  StageId FunResolver    = 250
   StageId KindChecker    = 300
-  StageId FunResolver    = 350
   StageId TypeChecker    = 400
   StageId PatternMatcher = 500
   StageId DeadCode       = 600
@@ -31,14 +31,15 @@ type family StageId st where
 type HasLam st = StageId st <=? 600
 type HasMat st = StageId st <=? 400
 
-type HasTypDef st = StageId st <=? 200
-type HasVal    st = StageId st <=? 300
+type HasTypDef st = StageId st <=? 250
+type HasVal    st = StageId st <=? 275  -- NOTE: This odd number is a hack for
+                                        -- the pretty printer
 type HasTopLet st = StageId st <=? 350
 type HasDef    st = (400 <=? StageId st) && (StageId st <=? 600)
 type HasSupCom st = 700 <=? StageId st
 
 type HasCons st = 200 <=? StageId st
-type HasVals st = 350 <=? StageId st
+type HasVals st = 250 <=? StageId st
 
 type SameTopNodes st1 st2 =
   ( HasTypDef st1 ~ HasTypDef st2

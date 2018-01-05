@@ -127,10 +127,12 @@ type Typ3 f a =
 -- TEST underapplication
 -- FAILURE (line 1, column 1): cannot unify kinds * -> * and *
 val bad : List
+let bad = abort
 
 -- TEST overapplication
 -- FAILURE (line 1, column 1): cannot unify kinds * and * -> *
 val bad : Unit Int
+let bad = abort
 
 
 -- SECTION declaration/definition checker

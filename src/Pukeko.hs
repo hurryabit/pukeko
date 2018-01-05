@@ -25,8 +25,8 @@ compileToCore
 compileToCore module_ = do
   module_ll <- return (Renamer.renameModule module_)
                >>= TypeResolver.resolveModule
-               >>= KindChecker.checkModule
                >>= FunResolver.resolveModule
+               >>= KindChecker.checkModule
                >>= TypeChecker.checkModule
                >>= PatternMatcher.compileModule
                >>= return . DeadCode.cleanModule
