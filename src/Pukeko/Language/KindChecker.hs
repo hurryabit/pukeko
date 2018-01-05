@@ -115,15 +115,17 @@ kcVal t = do
 
 kcTopLevel :: TR.TopLevel -> KC s (Maybe KC.TopLevel)
 kcTopLevel = \case
-  TR.TypDef w tcons -> do
+  TypDef w tcons -> do
     here w (kcTypDef tcons)
     pure Nothing
-  TR.Val    w x  t -> do
+  Val    w x  t -> do
     here w (kcVal t)
-    pure $ Just (KC.Val w x t)
-  TR.TopLet w ds   -> pure $ Just $ KC.TopLet w (fmap retagDefn ds)
-  TR.TopRec w ds   -> pure $ Just $ KC.TopRec w (fmap retagDefn ds)
-  TR.Asm    w x  a -> pure $ Just $ KC.Asm w x a
+    yield (Val w x t)
+  TopLet w ds   -> yield (TopLet w (fmap retagDefn ds))
+  TopRec w ds   -> yield (TopRec w (fmap retagDefn ds))
+  Asm    w x  a -> yield (Asm w x a)
+  where
+    yield = pure . Just
 
 kcModule ::TR.Module -> KC s KC.Module
 kcModule = module2tops (fmap catMaybes . traverse kcTopLevel)

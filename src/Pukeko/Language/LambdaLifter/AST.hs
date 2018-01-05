@@ -2,39 +2,33 @@
 module Pukeko.Language.LambdaLifter.AST
   ( ModuleInfo
   , Module
-  , TopLevel (..)
+  , TopLevel
   , Defn
   , Expr
   , Case
   )
 where
 
-import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
 import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.Ident        as Id
 
 data LAMBDALIFTER
 
 instance Stage LAMBDALIFTER where
-  type StageId     LAMBDALIFTER = 700
-  type StdTopLevel LAMBDALIFTER = TopLevel
-
-data TopLevel
-  = forall n. Def Pos Id.EVar (Vec.Vector n Bind) (Expr (FinScope n Id.EVar))
-  |           Caf Pos Id.EVar (Expr Id.EVar)
-  |           Asm Pos Id.EVar String
+  type StageId LAMBDALIFTER = 700
 
 type ModuleInfo = GenModuleInfo 'True
 type Module = StdModule LAMBDALIFTER
+type TopLevel = StdTopLevel LAMBDALIFTER
 type Defn = StdDefn LAMBDALIFTER
 type Expr = StdExpr LAMBDALIFTER
 type Case = StdCase LAMBDALIFTER
 
+-- TODO: Move to Pukeko.Language.AST.Std
 instance Pretty TopLevel where
   pPrintPrec _ _ = \case
-    Def _ x bs t ->
+    SupCom _ x bs t ->
       "let" <+> hang (pretty x <+> prettyBinds bs <+> equals) 2 (pretty t)
     Caf _ x t ->
       "let" <+> hang (pretty x <+> equals) 2 (pretty t)

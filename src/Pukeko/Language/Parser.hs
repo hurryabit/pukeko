@@ -13,7 +13,7 @@ import qualified Text.Parsec.Token as Token
 
 import           Pukeko.Error
 import           Pukeko.Language.Operator    (Spec (..))
-import           Pukeko.Language.AST.Std     hiding (StdExpr (..), StdAltn (..))
+import           Pukeko.Language.AST.Std     (GenDefn (..), GenPatn (..), Bind (..), Pos)
 import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Parser.AST
 import qualified Pukeko.Language.Type        as Ty

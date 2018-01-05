@@ -64,17 +64,17 @@ findDCon w dcon = do
 
 trTopLevel :: Rn.TopLevel -> TR TR.TopLevel
 trTopLevel top = case top of
-  Rn.TypDef w tconDecls -> do
+  TypDef w tconDecls -> do
     for_ tconDecls (insertTCon w)
     for_ tconDecls $ \Con.MkTConDecl{_dcons = dconDecls} -> do
       for_ dconDecls $ \dconDecl@Con.MkDConDecl{_fields} -> do
         for_ _fields (trType w)
         insertDCon w dconDecl
-    pure (TR.TypDef w tconDecls)
-  Rn.Val w x t -> TR.Val w x <$> trType w t
-  Rn.TopLet w ds -> TR.TopLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
-  Rn.TopRec w ds -> TR.TopRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
-  Rn.Asm w x a -> pure $ TR.Asm w x a
+    pure (TypDef w tconDecls)
+  Val w x t -> Val w x <$> trType w t
+  TopLet w ds -> TopLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
+  TopRec w ds -> TopRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
+  Asm w x a -> pure (Asm w x a)
 
 resolveModule :: MonadError String m => Rn.Module -> m TR.Module
 resolveModule (MkModule _info0 tops0) = do

@@ -2,7 +2,7 @@
 module Pukeko.Language.KindChecker.AST
   ( ModuleInfo
   , Module
-  , TopLevel (..)
+  , TopLevel
   , Defn
   , Expr
   , Altn
@@ -10,25 +10,15 @@ module Pukeko.Language.KindChecker.AST
   )
 where
 
-import qualified Data.Vector.Sized as Vec
-
 import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.Ident            as Id
-import qualified Pukeko.Language.Type             as Ty
 
 data KINDCHECKER
 
 instance Stage KINDCHECKER where
-  type StageId     KINDCHECKER = 300
-  type StdTopLevel KINDCHECKER = TopLevel
-
-data TopLevel
-  =           Val    Pos Id.EVar (Ty.Type Ty.Closed)
-  | forall n. TopLet Pos (Vec.Vector n (Defn Id.EVar))
-  | forall n. TopRec Pos (Vec.Vector n (Defn (FinScope n Id.EVar)))
-  |           Asm    Pos Id.EVar String
+  type StageId KINDCHECKER = 300
 
 type ModuleInfo = GenModuleInfo 'True
+type TopLevel = StdTopLevel KINDCHECKER
 type Module = StdModule KINDCHECKER
 type Defn = StdDefn KINDCHECKER
 type Expr = StdExpr KINDCHECKER

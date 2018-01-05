@@ -4,9 +4,12 @@
 module Pukeko.Language.AST.Std
   ( Stage (..)
   , HasCons
+  , HasDef
+  , SameTopNodes
   , GenModuleInfo (..)
   , StdModuleInfo
   , StdModule (..)
+  , StdTopLevel (..)
   , GenDefn (..)
   , StdDefn
   , StdExpr (..)
@@ -51,9 +54,11 @@ import           Pukeko.Pos
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Operator as Op
 import qualified Pukeko.Language.Ident    as Id
+import qualified Pukeko.Language.Type     as Ty
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Scope
 import           Pukeko.Language.AST.ModuleInfo
+import qualified Pukeko.Language.AST.ConDecl as Con
 
 -- StageIds
 -- Parser         =   0
@@ -66,15 +71,33 @@ import           Pukeko.Language.AST.ModuleInfo
 -- LambdaLifter   = 700
 -- CoreCompiler   = 999
 
+type family (&&) (x :: Bool) (y :: Bool) where
+  'True  && 'True  = 'True
+  'True  && 'False = 'False
+  'False && 'True  = 'False
+  'False && 'False = 'False
+
 class Stage st where
-  type StageId     st :: Nat
-  type StdTopLevel st :: *
+  type StageId st :: Nat
 
 type HasLam st = StageId st <=? 600
 type HasMat st = StageId st <=? 400
 
+type HasTypDef st = StageId st <=? 200
+type HasVal    st = StageId st <=? 300
+type HasTopLet st = StageId st <=? 300
+type HasDef    st = (400 <=? StageId st) && (StageId st <=? 600)
+type HasSupCom st = 700 <=? StageId st
+
 type HasCons st = 200 <=? StageId st
 
+type SameTopNodes st1 st2 =
+  ( HasTypDef st1 ~ HasTypDef st2
+  , HasVal    st1 ~ HasVal    st2
+  , HasTopLet st1 ~ HasTopLet st2
+  , HasDef    st1 ~ HasDef    st2
+  , HasSupCom st1 ~ HasSupCom st2
+  )
 type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
 
 type SameModuleInfo st1 st2 = HasCons st1 ~ HasCons st2
@@ -85,6 +108,19 @@ data StdModule st = MkModule
   { _moduleInfo :: GenModuleInfo (HasCons st)
   , _moduleTops :: [StdTopLevel st]
   }
+
+data StdTopLevel st
+  = HasTypDef st ~ 'True => TypDef Pos [Con.TConDecl]
+  | HasVal    st ~ 'True => Val    Pos Id.EVar (Ty.Type Ty.Closed)
+  | forall n.
+    HasTopLet st ~ 'True => TopLet Pos (Vector n (StdDefn st Id.EVar))
+  | forall n.
+    HasTopLet st ~ 'True => TopRec Pos (Vector n (StdDefn st (FinScope n Id.EVar)))
+  | HasDef    st ~ 'True => Def    Pos Id.EVar (StdExpr st Id.EVar)
+  | forall n.
+    HasSupCom st ~ 'True => SupCom Pos Id.EVar (Vector n Bind) (StdExpr st (FinScope n Id.EVar))
+  | HasSupCom st ~ 'True => Caf    Pos Id.EVar (StdExpr st Id.EVar)
+  |                         Asm    Pos Id.EVar String
 
 data GenDefn expr v = MkDefn
   { _defnPos :: Pos

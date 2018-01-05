@@ -226,17 +226,17 @@ define ident type_ = defined . at ident ?= type_
 
 checkTopLevel :: KC.TopLevel -> TC Id.EVar s [TC.TopLevel]
 checkTopLevel top = case top of
-  KC.Val w ident type_ -> do
+  Val w ident type_ -> do
     isDeclared <- uses declared (ident `Map.member`)
     when isDeclared $ throwAt w "duplicate declaration of function" ident
     declared . at ident ?= type_
     return []
-  KC.TopLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
-  KC.TopRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
-  KC.Asm w ident asm -> do
+  TopLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
+  TopRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
+  Asm w ident asm -> do
     t_decl <- ensureDefinable w ident
     define ident t_decl
-    return [TC.Asm w ident asm]
+    return [Asm w ident asm]
   where
     handleLetOrRec inferLetOrRec mkTopExpr defns = do
       t_decls <- for defns $ \defn -> ensureDefinable (defn^.pos) (defn^.lhs)
@@ -250,7 +250,7 @@ checkTopLevel top = case top of
           let t_decl = t_decls Vec.! i
           unify (defn^.pos) (Ty.open t_decl) t_defn
           define (defn^.lhs) t_decl
-      return $ map (\(MkDefn w lhs rhs) -> TC.Def w lhs (mkTopExpr rhs)) (toList defns)
+      return $ map (\(MkDefn w lhs rhs) -> Def w lhs (mkTopExpr rhs)) (toList defns)
 
 checkModule :: MonadError String m => KC.Module -> m TC.Module
 checkModule (MkModule decls tops)=

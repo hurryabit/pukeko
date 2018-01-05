@@ -46,13 +46,13 @@ localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
 
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar Rn.TopLevel
 rnTopLevel top = case top of
-  Ps.TypDef w ts  -> pure (Rn.TypDef w ts)
-  Ps.Val    w x t -> pure (Rn.Val    w x t)
+  Ps.TypDef w ts  -> pure (TypDef w ts)
+  Ps.Val    w x t -> pure (Val    w x t)
   Ps.TopLet w ds0 -> Vec.withList ds0 $ \ds1 ->
-    Rn.TopLet w <$> traverse rnDefn ds1
+    TopLet w <$> traverse rnDefn ds1
   Ps.TopRec w ds0 -> Vec.withList ds0 $ \ds1 ->
-    localizeDefns ds1 $ Rn.TopRec w <$> traverse rnDefn ds1
-  Ps.Asm    w x a -> pure (Rn.Asm    w x a)
+    localizeDefns ds1 $ TopRec w <$> traverse rnDefn ds1
+  Ps.Asm    w x a -> pure (Asm w x a)
 
 rnDefn :: Ps.Defn Id.EVar -> Rn tv (Rn.Defn tv)
 rnDefn = rhs2 rnExpr

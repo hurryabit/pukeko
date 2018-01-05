@@ -38,12 +38,12 @@ name = MkName . Id.mangled
 
 ccTopLevel :: LL.TopLevel -> CC TopLevel
 ccTopLevel = \case
-  LL.Def _ x bs t -> Def (name x) (ccBinds bs) <$> ccExpr t
-  LL.Caf _ x    t -> Def (name x) []           <$> ccExpr t
-  LL.Asm _ x    s -> do
+  LL.SupCom _ x bs t -> Def (name x) (ccBinds bs) <$> ccExpr t
+  LL.Caf    _ x    t -> Def (name x) []           <$> ccExpr t
+  LL.Asm    _ x    s -> do
     let n = MkName s
     at x ?= n
-    pure $ Asm n
+    pure (Asm n)
 
 ccDefn :: IsVar v => LL.Defn v -> CC Defn
 ccDefn (LL.MkDefn _ v t) = MkDefn (name v) <$> ccExpr t

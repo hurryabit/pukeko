@@ -55,10 +55,10 @@ pmExpr = \case
 
 pmTopLevel :: TC.TopLevel -> PM PM.TopLevel
 pmTopLevel = \case
-  TC.Def w f t -> do
-    put $ Id.freshEVars "pm" f
-    PM.Def w f <$> pmExpr t
-  TC.Asm w f a -> pure $ PM.Asm w f a
+  Def w f t -> do
+    put (Id.freshEVars "pm" f)
+    Def w f <$> pmExpr t
+  Asm w f a -> pure (Asm w f a)
 
 compileModule :: MonadError String m => TC.Module -> m PM.Module
 compileModule (MkModule decls tops) =

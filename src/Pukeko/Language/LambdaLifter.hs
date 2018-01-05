@@ -63,7 +63,7 @@ llExpr = \case
             Free  v   -> Free  (varName v)
       let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (varName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
-      tell [LL.Def w lhs newBinds (fmap (rename Map.!) rhs)]
+      tell [SupCom w lhs newBinds (fmap (rename Map.!) rhs)]
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
@@ -74,7 +74,7 @@ llExpr = \case
 
 llTopLevel :: DC.TopLevel -> LL ()
 llTopLevel = \case
-  DC.Def w lhs rhs -> do
+  Def w lhs rhs -> do
     put $ Id.freshEVars "ll" lhs
     case rhs of
       Lam{} -> do
@@ -83,8 +83,8 @@ llTopLevel = \case
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [LL.Caf w lhs rhs]
-  DC.Asm w lhs asm -> tell [LL.Asm w lhs asm]
+        tell [Caf w lhs rhs]
+  Asm w lhs asm -> tell [Asm w lhs asm]
 
 liftModule :: DC.Module -> LL.Module
 liftModule = over module2tops (execLL . traverse_ llTopLevel)
