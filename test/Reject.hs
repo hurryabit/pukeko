@@ -6,13 +6,13 @@ import Test.Hspec
 import Test.Hspec.Core.Spec
 import Text.Parsec
 
-import Pukeko (Module)
 import qualified Pukeko
+import qualified Pukeko.Language.Parser as Parser
 
-shouldFail :: Module -> String -> String -> Expectation
+shouldFail :: Parser.Module -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
-        module_ <- Pukeko.parse "<input>" code
+        module_ <- Parser.parseModule "<input>" code
         Pukeko.compileToCore (prelude ++ module_)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
@@ -21,10 +21,10 @@ shouldFail prelude expect code = do
       Nothing -> expectationFailure "error does not start with \"<input>\""
       Just actual -> actual `shouldBe` expect
 
-shouldSucceed :: Module -> String -> Expectation
+shouldSucceed :: Parser.Module -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
-        module_ <- Pukeko.parse "<input>" code
+        module_ <- Parser.parseModule "<input>" code
         Pukeko.compileToCore (prelude ++ module_)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
@@ -32,7 +32,7 @@ shouldSucceed prelude code = do
     Left error ->
       expectationFailure $ "should succeed, but failed: " ++ error
 
-type Parser a = Parsec [String] Module a
+type Parser a = Parsec [String] Parser.Module a
 
 line :: (String -> Maybe a) -> Parser a
 line f = tokenPrim id (\pos _ _ -> incSourceLine pos 1) f
@@ -86,5 +86,5 @@ main = do
       testFile = "test/reject.pu"
   prel <- readFile prelFile
   cont <- lines <$> readFile testFile
-  prelude <- either fail return $ Pukeko.parse prelFile prel
+  prelude <- either fail return $ Parser.parseModule prelFile prel
   either (fail . show) hspec $ runParser spec prelude testFile cont

@@ -9,6 +9,7 @@ import System.Exit
 import Pukeko.Pretty
 
 import qualified Pukeko
+import qualified Pukeko.Language.Parser   as Parser
 import qualified Pukeko.GMachine.Compiler as Compiler
 import qualified Pukeko.GMachine.NASM     as NASM
 import qualified Pukeko.GMachine.PeepHole as PeepHole
@@ -22,11 +23,11 @@ compile write_ll write_gm no_prelude file_user = do
     then return ""
     else readFile file_prel
   let gprog_or_error = do
-        mod_user <- Pukeko.parse file_user code_user
+        mod_user <- Parser.parseModule file_user code_user
         mod_prel <-
           if no_prelude
           then return []
-          else Pukeko.parse file_prel code_prel
+          else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
         (module_cc, module_ll) <- Pukeko.compileToCore module_
         program <- Compiler.compile module_cc

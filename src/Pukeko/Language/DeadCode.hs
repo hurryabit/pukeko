@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.DeadCode
-  ( DC.Module
-  , cleanModule
+  ( cleanModule
   )
 where
 
@@ -11,11 +10,13 @@ import qualified Data.Set      as Set
 import qualified Data.Set.Lens as Set
 
 import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.DeadCode.AST       as DC
-import qualified Pukeko.Language.PatternMatcher.AST as PM
+import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.Ident              as Id
 
-cleanModule :: PM.Module -> DC.Module
+type In  = St.PatternMatcher
+type Out = St.DeadCode
+
+cleanModule :: Module In -> Module Out
 cleanModule = over module2tops $ \tops0 ->
   let (g, out, in_) = G.graphFromEdges $ map (\t -> (t, topLevelLhs t, deps t)) tops0
       reach = Set.fromList
@@ -25,14 +26,14 @@ cleanModule = over module2tops $ \tops0 ->
   where
     deps = Set.toList . Set.setOf (topLevel2expr . traverse)
 
-topLevelLhs :: PM.TopLevel -> Id.EVar
+topLevelLhs :: TopLevel In -> Id.EVar
 topLevelLhs = \case
   Def _ x _ -> x
   Asm _ x _ -> x
 
 topLevel2expr ::
-  HasDef st ~ 'True =>
-  Traversal PM.TopLevel (StdTopLevel st) (PM.Expr Id.EVar) (StdExpr st Id.EVar)
+  St.HasDef st ~ 'True =>
+  Traversal (TopLevel In) (TopLevel st) (Expr In Id.EVar) (Expr st Id.EVar)
 topLevel2expr f = \case
   Def w x e -> Def w x <$> f e
   Asm w x s -> pure (Asm w x s)

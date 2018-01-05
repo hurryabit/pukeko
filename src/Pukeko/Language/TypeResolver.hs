@@ -1,8 +1,6 @@
 module Pukeko.Language.TypeResolver
-  ( TR.Module
-  , resolveModule
-  )
-where
+  ( resolveModule
+  ) where
 
 import           Control.Lens
 import           Control.Monad.State
@@ -12,12 +10,14 @@ import           Data.Maybe          (isJust)
 
 import           Pukeko.Error
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.Stage        as St
 import qualified Pukeko.Language.AST.ModuleInfo   as MI
 import qualified Pukeko.Language.AST.ConDecl      as Con
-import qualified Pukeko.Language.TypeResolver.AST as TR
-import qualified Pukeko.Language.Renamer.AST      as Rn
 import qualified Pukeko.Language.Type             as Ty
 import qualified Pukeko.Language.Ident            as Id
+
+type In  = St.Renamer
+type Out = St.TypeResolver
 
 data TRState = MkTRState
   { _st2tcons :: Map.Map Id.TCon Con.TConDecl
@@ -62,7 +62,7 @@ findDCon w dcon = do
   unless ex (throwAt w "unknown term cons" dcon)
   pure dcon
 
-trTopLevel :: Rn.TopLevel -> TR TR.TopLevel
+trTopLevel :: TopLevel In -> TR (TopLevel Out)
 trTopLevel top = case top of
   TypDef w tconDecls -> do
     for_ tconDecls (insertTCon w)
@@ -76,7 +76,7 @@ trTopLevel top = case top of
   TopRec w ds -> TopRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
   Asm w x a -> pure (Asm w x a)
 
-resolveModule :: MonadError String m => Rn.Module -> m TR.Module
+resolveModule :: MonadError String m => Module In -> m (Module Out)
 resolveModule (MkModule _info0 tops0) = do
   (tops1, MkTRState tcons1 dcons1) <- runTR (traverse trTopLevel tops0)
   let info1 = MI.MkModuleInfo (MI.Present tcons1) (MI.Present dcons1)

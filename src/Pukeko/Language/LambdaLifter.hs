@@ -1,5 +1,5 @@
 module Pukeko.Language.LambdaLifter
-  ( LL.Module
+  ( Module
   , liftModule
   )
 where
@@ -17,20 +17,25 @@ import qualified Data.Vector.Sized as Vec
 -- import           GHC.TypeLits
 
 import           Pukeko.Language.AST.Classes
-import           Pukeko.Language.AST.Std
-import qualified Pukeko.Language.LambdaLifter.AST as LL
-import qualified Pukeko.Language.DeadCode.AST     as DC
-import qualified Pukeko.Language.Ident            as Id
+import           Pukeko.Language.AST.Std     hiding (Module)
+import qualified Pukeko.Language.AST.Std     as Std
+import qualified Pukeko.Language.AST.Stage   as St
+import qualified Pukeko.Language.Ident       as Id
+
+type In  = St.DeadCode
+type Out = St.LambdaLifter
+
+type Module = Std.Module Out
 
 type State = [Id.EVar]
 
-newtype LL a = LL{unLL :: RWS () [LL.TopLevel] State a}
+newtype LL a = LL{unLL :: RWS () [TopLevel Out] State a}
   deriving ( Functor, Applicative, Monad
-           , MonadWriter [LL.TopLevel]
+           , MonadWriter [TopLevel Out]
            , MonadState State
            )
 
-execLL :: LL () -> [LL.TopLevel]
+execLL :: LL () -> [TopLevel Out]
 execLL ll =
   let state = []
       ((), defns) = evalRWS (unLL ll) () state
@@ -39,7 +44,7 @@ execLL ll =
 freshIdent :: LL Id.EVar
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-llExpr :: forall v. (IsVar v) => DC.Expr v -> LL (LL.Expr v)
+llExpr :: forall v. (IsVar v) => Expr In v -> LL (Expr Out v)
 llExpr = \case
   Var w x -> pure $ Var w x
   Con w c -> pure $ Con w c
@@ -72,7 +77,7 @@ llExpr = \case
         []  -> return fun
         _:_ -> return $ App w fun (map (Var w . unfree) capturedL)
 
-llTopLevel :: DC.TopLevel -> LL ()
+llTopLevel :: TopLevel In -> LL ()
 llTopLevel = \case
   Def w lhs rhs -> do
     put $ Id.freshEVars "ll" lhs
@@ -86,5 +91,5 @@ llTopLevel = \case
         tell [Caf w lhs rhs]
   Asm w lhs asm -> tell [Asm w lhs asm]
 
-liftModule :: DC.Module -> LL.Module
+liftModule :: Std.Module In -> Std.Module Out
 liftModule = over module2tops (execLL . traverse_ llTopLevel)

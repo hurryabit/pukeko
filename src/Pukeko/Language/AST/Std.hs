@@ -2,21 +2,17 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 module Pukeko.Language.AST.Std
-  ( Stage (..)
-  , HasCons
-  , HasDef
-  , SameTopNodes
-  , GenModuleInfo (..)
-  , StdModuleInfo
-  , StdModule (..)
-  , StdTopLevel (..)
+  ( GenModuleInfo (..)
+  , ModuleInfo
+  , Module (..)
+  , TopLevel (..)
   , GenDefn (..)
-  , StdDefn
-  , StdExpr (..)
-  , StdCase (..)
-  , StdAltn (..)
+  , Defn
+  , Expr (..)
+  , Case (..)
+  , Altn (..)
   , GenPatn (..)
-  , StdPatn
+  , Patn
   , Bind (..)
 
   , abstract
@@ -47,8 +43,6 @@ module Pukeko.Language.AST.Std
 import Control.Lens
 import Data.Vector.Sized (Vector)
 import Data.Foldable
-import GHC.TypeLits
-
 
 import           Pukeko.Pos
 import           Pukeko.Pretty
@@ -56,70 +50,29 @@ import qualified Pukeko.Language.Operator as Op
 import qualified Pukeko.Language.Ident    as Id
 import qualified Pukeko.Language.Type     as Ty
 import           Pukeko.Language.AST.Classes
+import           Pukeko.Language.AST.Stage
 import           Pukeko.Language.AST.Scope
 import           Pukeko.Language.AST.ModuleInfo
 import qualified Pukeko.Language.AST.ConDecl as Con
 
--- StageIds
--- Parser         =   0
--- Renamer        = 100
--- TypeResolver   = 200
--- KindChecker    = 300
--- TypeChecker    = 400
--- PatternMatcher = 500
--- DeadCode       = 600
--- LambdaLifter   = 700
--- CoreCompiler   = 999
+type ModuleInfo st = GenModuleInfo (HasCons st)
 
-type family (&&) (x :: Bool) (y :: Bool) where
-  'True  && 'True  = 'True
-  'True  && 'False = 'False
-  'False && 'True  = 'False
-  'False && 'False = 'False
-
-class Stage st where
-  type StageId st :: Nat
-
-type HasLam st = StageId st <=? 600
-type HasMat st = StageId st <=? 400
-
-type HasTypDef st = StageId st <=? 200
-type HasVal    st = StageId st <=? 300
-type HasTopLet st = StageId st <=? 300
-type HasDef    st = (400 <=? StageId st) && (StageId st <=? 600)
-type HasSupCom st = 700 <=? StageId st
-
-type HasCons st = 200 <=? StageId st
-
-type SameTopNodes st1 st2 =
-  ( HasTypDef st1 ~ HasTypDef st2
-  , HasVal    st1 ~ HasVal    st2
-  , HasTopLet st1 ~ HasTopLet st2
-  , HasDef    st1 ~ HasDef    st2
-  , HasSupCom st1 ~ HasSupCom st2
-  )
-type SameNodes st1 st2 = (HasLam st1 ~ HasLam st2, HasMat st1 ~ HasMat st2)
-
-type SameModuleInfo st1 st2 = HasCons st1 ~ HasCons st2
-
-type StdModuleInfo st = GenModuleInfo (HasCons st)
-
-data StdModule st = MkModule
+data Module st = MkModule
   { _moduleInfo :: GenModuleInfo (HasCons st)
-  , _moduleTops :: [StdTopLevel st]
+  , _moduleTops :: [TopLevel st]
   }
 
-data StdTopLevel st
+data TopLevel st
   = HasTypDef st ~ 'True => TypDef Pos [Con.TConDecl]
   | HasVal    st ~ 'True => Val    Pos Id.EVar (Ty.Type Ty.Closed)
   | forall n.
-    HasTopLet st ~ 'True => TopLet Pos (Vector n (StdDefn st Id.EVar))
+    HasTopLet st ~ 'True => TopLet Pos (Vector n (Defn st Id.EVar))
   | forall n.
-    HasTopLet st ~ 'True => TopRec Pos (Vector n (StdDefn st (FinScope n Id.EVar)))
-  | HasDef    st ~ 'True => Def    Pos Id.EVar (StdExpr st Id.EVar)
+    HasTopLet st ~ 'True => TopRec Pos (Vector n (Defn st (FinScope n Id.EVar)))
+  | HasDef    st ~ 'True => Def    Pos Id.EVar (Expr st Id.EVar)
   | forall n.
-    HasSupCom st ~ 'True => SupCom Pos Id.EVar (Vector n Bind) (StdExpr st (FinScope n Id.EVar))
-  | HasSupCom st ~ 'True => Caf    Pos Id.EVar (StdExpr st Id.EVar)
+    HasSupCom st ~ 'True => SupCom Pos Id.EVar (Vector n Bind) (Expr st (FinScope n Id.EVar))
+  | HasSupCom st ~ 'True => Caf    Pos Id.EVar (Expr st Id.EVar)
   |                         Asm    Pos Id.EVar String
 
 data GenDefn expr v = MkDefn
@@ -129,30 +82,30 @@ data GenDefn expr v = MkDefn
   }
   deriving (Functor, Foldable, Traversable)
 
-type StdDefn st = GenDefn (StdExpr st)
+type Defn st = GenDefn (Expr st)
 
-data StdExpr st v
+data Expr st v
   =           Var Pos v
   |           Con Pos Id.DCon
   |           Num Pos Int
-  |           App Pos (StdExpr st v) [StdExpr st v]
-  | forall n. HasLam st ~ 'True => Lam Pos (Vector n Bind)   (StdExpr st (FinScope n v))
-  | forall n. Let Pos (Vector n (StdDefn st v))              (StdExpr st (FinScope n v))
-  | forall n. Rec Pos (Vector n (StdDefn st (FinScope n v))) (StdExpr st (FinScope n v))
-  | HasMat st ~ 'False => Cas Pos (StdExpr st v) [StdCase st v]
-  | HasMat st ~ 'True => Mat Pos (StdExpr st v) [StdAltn st v]
+  |           App Pos (Expr st v) [Expr st v]
+  | forall n. HasLam st ~ 'True => Lam Pos (Vector n Bind)   (Expr st (FinScope n v))
+  | forall n. Let Pos (Vector n (Defn st v))              (Expr st (FinScope n v))
+  | forall n. Rec Pos (Vector n (Defn st (FinScope n v))) (Expr st (FinScope n v))
+  | HasMat st ~ 'False => Cas Pos (Expr st v) [Case st v]
+  | HasMat st ~ 'True => Mat Pos (Expr st v) [Altn st v]
 
-data StdCase st v = forall n. MkCase
+data Case st v = forall n. MkCase
   { _casePos   :: Pos
   , _caseCon   :: Id.DCon
   , _caseBinds :: Vector n Bind
-  , _caseRhs   :: StdExpr st (FinScope n v)
+  , _caseRhs   :: Expr st (FinScope n v)
   }
 
-data StdAltn st v = MkAltn
+data Altn st v = MkAltn
   { _altnPos  :: Pos
-  , _altnPatn :: StdPatn st
-  , _altnRhs  :: StdExpr st (Scope Id.EVar v)
+  , _altnPatn :: Patn st
+  , _altnRhs  :: Expr st (Scope Id.EVar v)
   }
 
 -- TODO: Remove useless parameter.
@@ -160,7 +113,7 @@ data GenPatn dcon
   = Bind     Bind
   | Dest Pos dcon [GenPatn dcon]
 
-type StdPatn st = GenPatn Id.DCon
+type Patn st = GenPatn Id.DCon
 
 data Bind
   = Wild Pos
@@ -175,14 +128,14 @@ makePrisms ''Bind
 -- * Abstraction and substition
 
 -- | Abstract all variables which are mapped to @Just@.
-abstract :: (v -> Maybe (i, Id.EVar)) -> StdExpr st v -> StdExpr st (Scope i v)
+abstract :: (v -> Maybe (i, Id.EVar)) -> Expr st v -> Expr st (Scope i v)
 abstract f = fmap (match f)
   where
     match :: (v -> Maybe (i, Id.EVar)) -> v -> Scope i v
     match f v = maybe (Free v) (uncurry mkBound) (f v)
 
 -- | Replace subexpressions.
-(//) :: StdExpr st v -> (Pos -> v -> StdExpr st w) -> StdExpr st w
+(//) :: Expr st v -> (Pos -> v -> Expr st w) -> Expr st w
 expr // f = case expr of
   Var w x       -> f w x
   Con w c       -> Con w c
@@ -195,10 +148,10 @@ expr // f = case expr of
   Rec w ds t    -> Rec w (over (traverse . rhs1) (/// f) ds) (t /// f)
   Mat w t  as   -> Mat w (t // f) (map (over' altn2rhs (/// f)) as)
 
-(///) :: StdExpr st (Scope i v) -> (Pos -> v -> StdExpr st w) -> StdExpr st (Scope i w)
+(///) :: Expr st (Scope i v) -> (Pos -> v -> Expr st w) -> Expr st (Scope i w)
 t /// f = t // (\w x -> dist w (fmap (f w) x))
 
-dist :: Pos -> Scope i (StdExpr st v) -> StdExpr st (Scope i v)
+dist :: Pos -> Scope i (Expr st v) -> Expr st (Scope i v)
 dist w (Bound i x) = Var w (Bound i x)
 dist _ (Free t)    = fmap Free t
 
@@ -216,7 +169,7 @@ patnToBind = \case
 -- * Traversals
 module2tops ::
   SameModuleInfo st1 st2 =>
-  Lens (StdModule st1) (StdModule st2) [StdTopLevel st1] [StdTopLevel st2]
+  Lens (Module st1) (Module st2) [TopLevel st1] [TopLevel st2]
 module2tops f (MkModule info tops) = MkModule info <$> f tops
 
 -- TODO: Make this indexed if possible.
@@ -230,10 +183,10 @@ type ExprConTraversal t =
   forall st1 st2 v. SameNodes st1 st2 =>
   IndexedTraversal Pos (t st1 v) (t st2 v) Id.DCon Id.DCon
 
-defn2dcon :: ExprConTraversal StdDefn
+defn2dcon :: ExprConTraversal Defn
 defn2dcon = rhs2 . expr2dcon
 
-expr2dcon :: ExprConTraversal StdExpr
+expr2dcon :: ExprConTraversal Expr
 expr2dcon f = \case
   Var w x       -> pure $ Var w x
   Con w c       -> Con w <$> indexed f w c
@@ -245,11 +198,11 @@ expr2dcon f = \case
   Rec w ds t    -> Rec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   Mat w t  as   -> Mat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
 
-case2dcon :: ExprConTraversal StdCase
+case2dcon :: ExprConTraversal Case
 case2dcon f (MkCase w c bs t) =
   MkCase w <$> indexed f w c <*> pure bs <*> expr2dcon f t
 
-altn2dcon :: ExprConTraversal StdAltn
+altn2dcon :: ExprConTraversal Altn
 altn2dcon f (MkAltn w p t) =
   MkAltn w <$> patn2dcon f p <*> expr2dcon f t
 
@@ -272,25 +225,25 @@ over' l f = runIdentity . l (Identity . f)
 
 case2rhs
   :: (Functor f)
-  => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
-  -> StdCase st1 v1 -> f (StdCase st2 v2)
+  => (forall i. IsVarLevel i => Expr st1 (Scope i v1) -> f (Expr st2 (Scope i v2)))
+  -> Case st1 v1 -> f (Case st2 v2)
 case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
 
 altn2rhs
   :: (Functor f)
-  => (forall i. IsVarLevel i => StdExpr st1 (Scope i v1) -> f (StdExpr st2 (Scope i v2)))
-  -> StdAltn st1 v1 -> f (StdAltn st2 v2)
+  => (forall i. IsVarLevel i => Expr st1 (Scope i v1) -> f (Expr st2 (Scope i v2)))
+  -> Altn st1 v1 -> f (Altn st2 v2)
 altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
 
 -- * Retagging
 retagDefn ::
   (SameNodes st1 st2) =>
-  StdDefn st1 v -> StdDefn st2 v
+  Defn st1 v -> Defn st2 v
 retagDefn = over defn2dcon id
 
 retagExpr ::
   forall st1 st2 v. (SameNodes st1 st2) =>
-  StdExpr st1 v -> StdExpr st2 v
+  Expr st1 v -> Expr st2 v
 retagExpr = over expr2dcon id
 
 -- * Manual instances
@@ -312,7 +265,7 @@ instance HasRhs1 (GenDefn expr) where
 instance HasRhs2 GenDefn where
   rhs2 = defnRhs
 
-instance HasPos (StdExpr std v) where
+instance HasPos (Expr std v) where
   pos f = \case
     Var w x       -> fmap (\w' -> Var w' x      ) (f w)
     Con w c       -> fmap (\w' -> Con w' c      ) (f w)
@@ -330,7 +283,7 @@ instance HasPos Bind where
     Name w x -> fmap (\w' -> Name w' x) (f w)
 
 -- * Pretty printing
-instance (HasTypDef st ~ 'False) => Pretty (StdTopLevel st) where
+instance (HasTypDef st ~ 'False) => Pretty (TopLevel st) where
   pPrintPrec _ _ = \case
     Val _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
@@ -344,11 +297,11 @@ instance (HasTypDef st ~ 'False) => Pretty (StdTopLevel st) where
     Asm _ x s ->
       hsep ["external", pretty x, equals, text (show s)]
 
-instance (IsVar v) => Pretty (StdDefn st v) where
+instance (IsVar v) => Pretty (Defn st v) where
   pPrintPrec lvl _ (MkDefn _ x t) =
     hang (pPrintPrec lvl 0 x <+> equals) 2 (pPrintPrec lvl 0 t)
 
-prettyDefns :: (IsVar v) => Bool -> Vector n (StdDefn st v) -> Doc
+prettyDefns :: (IsVar v) => Bool -> Vector n (Defn st v) -> Doc
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
     d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
@@ -356,7 +309,7 @@ prettyDefns isrec ds = case toList ds of
       let_ | isrec     = "let rec"
            | otherwise = "let"
 
-instance (IsVar v) => Pretty (StdExpr st v) where
+instance (IsVar v) => Pretty (Expr st v) where
   pPrintPrec lvl prec = \case
     Var _ x -> pretty (varName x)
     Con _ c -> pretty c
@@ -396,11 +349,11 @@ instance (IsVar v) => Pretty (StdExpr st v) where
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) cs
 
-instance (IsVar v) => Pretty (StdCase st v) where
+instance (IsVar v) => Pretty (Case st v) where
   pPrintPrec lvl _ (MkCase _ c bs t) =
     hang ("|" <+> pretty c <+> prettyBinds bs <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance (IsVar v) => Pretty (StdAltn st v) where
+instance (IsVar v) => Pretty (Altn st v) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
@@ -420,14 +373,14 @@ prettyBinds :: Vector n Bind -> Doc
 prettyBinds = hsep . map pretty . toList
 
 -- * Derived instances
-deriving instance Functor     (StdExpr st)
-deriving instance Foldable    (StdExpr st)
-deriving instance Traversable (StdExpr st)
+deriving instance Functor     (Expr st)
+deriving instance Foldable    (Expr st)
+deriving instance Traversable (Expr st)
 
-deriving instance Functor     (StdCase st)
-deriving instance Foldable    (StdCase st)
-deriving instance Traversable (StdCase st)
+deriving instance Functor     (Case st)
+deriving instance Foldable    (Case st)
+deriving instance Traversable (Case st)
 
-deriving instance Functor     (StdAltn st)
-deriving instance Foldable    (StdAltn st)
-deriving instance Traversable (StdAltn st)
+deriving instance Functor     (Altn st)
+deriving instance Foldable    (Altn st)
+deriving instance Traversable (Altn st)

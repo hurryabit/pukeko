@@ -1,10 +1,6 @@
 module Pukeko
-  ( Parser.Module
-  , AST.StdModule (..)
-  , parse
+  ( AST.Module (..)
   , compileToCore
-  -- , compileToCore
-  -- , parse
   )
   where
 
@@ -20,9 +16,6 @@ import qualified Pukeko.Language.Parser         as Parser
 import qualified Pukeko.Language.PatternMatcher as PatternMatcher
 import qualified Pukeko.Language.TypeChecker    as TypeChecker
 import qualified Pukeko.Language.TypeResolver   as TypeResolver
-
-parse :: MonadError String m => String -> String -> m Parser.Module
-parse = Parser.parseModule
 
 compileToCore
   :: MonadError String m

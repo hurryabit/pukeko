@@ -4,8 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 module Pukeko.Language.TypeChecker
-  ( TC.Module
-  , checkModule
+  ( checkModule
   )
 where
 
@@ -27,13 +26,15 @@ import           Pukeko.Pretty
 import           Pukeko.Language.Info
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.Stage         as St
 import qualified Pukeko.Language.AST.ConDecl       as Con
 import qualified Pukeko.Language.AST.Scope         as Sc
-import qualified Pukeko.Language.KindChecker.AST   as KC
-import qualified Pukeko.Language.TypeChecker.AST   as TC
 import qualified Pukeko.Language.Ident             as Id
 import qualified Pukeko.Language.Type              as Ty
 import qualified Pukeko.Language.TypeChecker.Unify as U
+
+type In  = St.KindChecker
+type Out = St.TypeChecker
 
 type TypeClosed = Ty.Type Ty.Closed
 type TypeOpen s = Ty.Type (Ty.Open s)
@@ -53,17 +54,17 @@ data TCState = MkTCState
 makeLenses ''TCState
 
 newtype TC v s a =
-  TC{unTC :: InfoT KC.ModuleInfo (ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s)))) a}
+  TC{unTC :: InfoT (ModuleInfo In) (ReaderT (Environment v s) (StateT TCState (ExceptT String (ST s)))) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment v s)
            , MonadState TCState
-           , MonadInfo KC.ModuleInfo
+           , MonadInfo (GenModuleInfo 'True)
            )
 
 evalTC ::
   MonadError String m =>
-  (forall s. TC Id.EVar s a) -> KC.ModuleInfo -> m a
+  (forall s. TC Id.EVar s a) -> ModuleInfo In -> m a
 evalTC tc decls = runST $
   let env = MkEnvironment
         { _locals = mempty
@@ -133,7 +134,7 @@ instantiateTCon tcon = do
   t_params <- traverse (const freshUVar) _params
   return (Ty.appTCon tcon t_params, Map.fromList $ zip _params t_params)
 
-inferPatn :: KC.Patn -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
+inferPatn :: Patn In -> TypeOpen s -> TC v s (Map Id.EVar (TypeOpen s))
 inferPatn patn t_expr = case patn of
   Bind (Wild _) -> return Map.empty
   Bind (Name _ ident) -> return (Map.singleton ident t_expr)
@@ -151,7 +152,7 @@ inferPatn patn t_expr = case patn of
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
   :: (IsVar v)
-  => Vec.Vector n (KC.Defn v) -> TC v s (Vec.Vector n (TypeOpen s))
+  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (TypeOpen s))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -163,7 +164,7 @@ inferLet defns = do
 
 inferRec
   :: (IsVar v)
-  => Vec.Vector n (KC.Defn (FinScope n v)) -> TC v s (Vec.Vector n (TypeOpen s))
+  => Vec.Vector n (Defn In (FinScope n v)) -> TC v s (Vec.Vector n (TypeOpen s))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -173,7 +174,7 @@ inferRec defns = do
     return t_rhss
   traverse generalize t_rhss
 
-infer :: IsVar v => KC.Expr v -> TC v s (TypeOpen s)
+infer :: IsVar v => Expr In v -> TC v s (TypeOpen s)
 infer expr = do
   let unifyHere t1 t2 = unify (expr^.pos) t1 t2
   case expr of
@@ -224,7 +225,7 @@ ensureDefinable w ident = do
 define :: Id.EVar -> TypeClosed -> TC v s ()
 define ident type_ = defined . at ident ?= type_
 
-checkTopLevel :: KC.TopLevel -> TC Id.EVar s [TC.TopLevel]
+checkTopLevel :: TopLevel In -> TC Id.EVar s [TopLevel Out]
 checkTopLevel top = case top of
   Val w ident type_ -> do
     isDeclared <- uses declared (ident `Map.member`)
@@ -252,6 +253,6 @@ checkTopLevel top = case top of
           define (defn^.lhs) t_decl
       return $ map (\(MkDefn w lhs rhs) -> Def w lhs (mkTopExpr rhs)) (toList defns)
 
-checkModule :: MonadError String m => KC.Module -> m TC.Module
+checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule (MkModule decls tops)=
   MkModule decls <$> evalTC (concat <$> traverse checkTopLevel tops) decls

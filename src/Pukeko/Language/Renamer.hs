@@ -1,10 +1,8 @@
 {-# LANGUAGE TupleSections #-}
 -- | Transform AST to use type safe de Bruijn indices.
 module Pukeko.Language.Renamer
-  ( Rn.Module
-  , renameModule
-  )
-  where
+  ( renameModule
+  ) where
 
 import           Control.Lens
 import           Control.Monad.Reader
@@ -14,12 +12,14 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
+import qualified Pukeko.Language.AST.Stage      as St
 import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Parser.AST     as Ps
-import qualified Pukeko.Language.Renamer.AST    as Rn
 import qualified Pukeko.Language.Ident          as Id
 
-renameModule :: Ps.Module -> Rn.Module
+type Out = St.Renamer
+
+renameModule :: Ps.Module -> Module Out
 renameModule = MkModule info . runRn . traverse rnTopLevel
   where
     info = MI.MkModuleInfo MI.Absent MI.Absent
@@ -44,7 +44,7 @@ localize bs = Rn . withReader upd . unRn
 localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (FinScope n tv) a -> Rn tv a
 localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
 
-rnTopLevel :: Ps.TopLevel -> Rn Id.EVar Rn.TopLevel
+rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
 rnTopLevel top = case top of
   Ps.TypDef w ts  -> pure (TypDef w ts)
   Ps.Val    w x t -> pure (Val    w x t)
@@ -54,10 +54,10 @@ rnTopLevel top = case top of
     localizeDefns ds1 $ TopRec w <$> traverse rnDefn ds1
   Ps.Asm    w x a -> pure (Asm w x a)
 
-rnDefn :: Ps.Defn Id.EVar -> Rn tv (Rn.Defn tv)
+rnDefn :: Ps.Defn Id.EVar -> Rn tv (Defn Out tv)
 rnDefn = rhs2 rnExpr
 
-rnExpr :: Ps.Expr Id.EVar -> Rn tv (Rn.Expr tv)
+rnExpr :: Ps.Expr Id.EVar -> Rn tv (Expr Out tv)
 rnExpr = \case
   Ps.Var w x ->
     asks $ \(MkEnv bound mkFree) -> Var w (Map.findWithDefault (mkFree x) x bound)
@@ -73,7 +73,7 @@ rnExpr = \case
   Ps.Rec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     localizeDefns ds1 $ Rec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
-rnAltn :: Ps.Altn Id.EVar -> Rn tv (Rn.Altn tv)
+rnAltn :: Ps.Altn Id.EVar -> Rn tv (Altn Out tv)
 rnAltn (Ps.MkAltn w p e) = do
   let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p)
   MkAltn w p <$> localize bs (rnExpr e)

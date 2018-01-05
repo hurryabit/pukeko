@@ -2,10 +2,8 @@
 -- | Check that all type constructor are applied to the right number of
 -- variables and all variables are bound.
 module Pukeko.Language.KindChecker
-  ( KC.Module
-  , checkModule
-  )
-where
+  ( checkModule
+  ) where
 
 import           Control.Lens
 import           Control.Monad.Reader
@@ -21,11 +19,13 @@ import           Data.Traversable
 import           Pukeko.Error
 import           Pukeko.Pretty
 import           Pukeko.Language.AST.Std          hiding (Free)
+import qualified Pukeko.Language.AST.Stage        as St
 import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.Ident            as Id
-import qualified Pukeko.Language.TypeResolver.AST as TR
-import qualified Pukeko.Language.KindChecker.AST  as KC
 import qualified Pukeko.Language.Type             as Ty
+
+type In  = St.TypeResolver
+type Out = St.KindChecker
 
 type Type = Ty.Type Ty.Closed
 
@@ -113,7 +113,7 @@ kcVal t = do
   local (const env) $ kcType Star t
 
 
-kcTopLevel :: TR.TopLevel -> KC s (Maybe KC.TopLevel)
+kcTopLevel :: TopLevel In -> KC s (Maybe (TopLevel Out))
 kcTopLevel = \case
   TypDef w tcons -> do
     here w (kcTypDef tcons)
@@ -127,10 +127,10 @@ kcTopLevel = \case
   where
     yield = pure . Just
 
-kcModule ::TR.Module -> KC s KC.Module
+kcModule ::Module In -> KC s (Module Out)
 kcModule = module2tops (fmap catMaybes . traverse kcTopLevel)
 
-checkModule :: MonadError String m => TR.Module -> m KC.Module
+checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule module_ = runKC (kcModule module_)
 
 
