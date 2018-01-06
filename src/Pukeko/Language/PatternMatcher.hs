@@ -39,18 +39,15 @@ evalPM pm decls = runExcept $ evalStateT (runInfoT (unPM pm) decls) []
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
 
-pmDefn :: Defn In v -> PM (Defn Out v)
-pmDefn (MkDefn w x e) = MkDefn w x <$> pmExpr e
-
-pmExpr :: Expr In v -> PM (Expr Out v)
+pmExpr :: Expr In Void v -> PM (Expr Out Void v)
 pmExpr = \case
   EVar w x          -> pure (EVar w x)
   ECon w c          -> pure (ECon w c)
   ENum w n          -> pure (ENum w n)
   EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
   ELam w bs t       -> ELam w bs <$> pmExpr t
-  ELet w ds t       -> ELet w <$> traverse pmDefn ds <*> pmExpr t
-  ERec w ds t       -> ERec w <$> traverse pmDefn ds <*> pmExpr t
+  ELet w ds t       -> ELet w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
+  ERec w ds t       -> ERec w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
   EMat w t0 as0     -> LS.withList as0 $ \case
     LS.Nil -> bug "pattern matcher" "no alternatives" Nothing
     as1@LS.Cons{} -> do
@@ -70,7 +67,7 @@ compileModule (MkModule decls tops) =
 
 pmMatch ::
   forall m m' n v. m ~ 'LS.Succ m' =>
-  Pos -> RowMatch m n v -> PM (Expr Out v)
+  Pos -> RowMatch m n v -> PM (Expr Out Void v)
 pmMatch w rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBindCols w colMatch1 $ \case
@@ -83,19 +80,19 @@ pmMatch w rowMatch0 = do
       grpMatch <- groupDests w destCol rowMatch4
       grpMatchExpr w grpMatch
 
-type RhsExpr v = Expr In (EScope Id.EVar v)
+type RhsExpr v = Expr In Void (EScope Id.EVar v)
 
 data Row n v = MkRow (LS.List n Patn) (RhsExpr v)
 
-data RowMatch m n v = MkRowMatch (LS.List n (Expr Out v)) (LS.List m (Row n v))
+data RowMatch m n v = MkRowMatch (LS.List n (Expr Out Void v)) (LS.List m (Row n v))
 
-mkRow1 :: Altn In v -> Row LS.One v
+mkRow1 :: Altn In Void v -> Row LS.One v
 mkRow1 (MkAltn _ p t) = MkRow (LS.Singleton p) t
 
-mkRowMatch1 :: Expr Out v -> LS.List m (Altn In v) -> RowMatch m LS.One v
+mkRowMatch1 :: Expr Out Void v -> LS.List m (Altn In Void v) -> RowMatch m LS.One v
 mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 
-data Col m v a = MkCol (Expr Out v) (LS.List m a)
+data Col m v a = MkCol (Expr Out Void v) (LS.List m a)
 
 data ColMatch m n v = MkColMatch (LS.List n (Col m v Patn)) (LS.List m (RhsExpr v))
 
@@ -163,7 +160,7 @@ data GrpMatchItem v =
   forall m m' n k. m ~ 'LS.Succ m' =>
   MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n (EFinScope k v))
 
-data GrpMatch v = MkGrpMatch (Expr Out v) [GrpMatchItem v]
+data GrpMatch v = MkGrpMatch (Expr Out Void v) [GrpMatchItem v]
 
 groupDests ::
   forall m m' n v. m ~ 'LS.Succ m' =>
@@ -193,10 +190,10 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
           pure $ MkGrpMatchItem con (fmap (BName w . snd) ixs0) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps
 
-grpMatchExpr :: Pos -> GrpMatch v -> PM (Expr Out v)
+grpMatchExpr :: Pos -> GrpMatch v -> PM (Expr Out Void v)
 grpMatchExpr w (MkGrpMatch t is) =
   ECas w t <$> traverse (grpMatchItemAltn w) is
 
-grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (Case Out v)
+grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (Case Out Void v)
 grpMatchItemAltn w (MkGrpMatchItem con bs rm) =
   MkCase w con bs <$> pmMatch w rm

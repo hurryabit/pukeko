@@ -53,10 +53,10 @@ ccTopLevel = \case
     at x ?= n
     pure (Asm n)
 
-ccDefn :: IsEVar v => In.Defn In v -> CC v Defn
+ccDefn :: IsEVar v => In.Defn In Void v -> CC v Defn
 ccDefn (In.MkDefn _ v t) = MkDefn (name v) <$> ccExpr t
 
-ccExpr :: IsEVar v => In.Expr In v -> CC v Expr
+ccExpr :: IsEVar v => In.Expr In Void v -> CC v Expr
 ccExpr = \case
   In.EVar _ x0 -> do
     global <- asks ($ x0)
@@ -76,7 +76,7 @@ ccExpr = \case
   In.ERec _ ds t  -> scoped $ Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
-ccCase :: IsEVar v => In.Case In v -> CC v Altn
+ccCase :: IsEVar v => In.Case In Void v -> CC v Altn
 ccCase (In.MkCase _ _ bs t) = MkAltn (ccBinds bs) <$> scoped (ccExpr t)
 
 ccBinds :: Vec.Vector n In.Bind -> [Maybe Name]

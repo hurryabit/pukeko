@@ -32,7 +32,7 @@ topLevelLhs = \case
 
 topLevel2expr ::
   St.HasTLDef st ~ 'True =>
-  Traversal (TopLevel In) (TopLevel st) (Expr In Id.EVar) (Expr st Id.EVar)
+  Traversal (TopLevel In) (TopLevel st) (Expr In Void Id.EVar) (Expr st Void Id.EVar)
 topLevel2expr f = \case
   TLDef w x e -> TLDef w x <$> f e
   TLAsm w x s -> pure (TLAsm w x s)

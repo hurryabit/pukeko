@@ -73,10 +73,10 @@ rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
       Just i  -> pure (mkBound i x)
       Nothing -> throw "unknown type variable" x
 
-rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out ev)
+rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out Void ev)
 rnDefn (Ps.MkDefn w x e) = MkDefn w x <$> rnExpr e
 
-rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out ev)
+rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out Void ev)
 rnExpr = \case
   Ps.EVar w x ->
     asks $ \(MkEnv bound mkFree) -> EVar w (Map.findWithDefault (mkFree x) x bound)
@@ -92,7 +92,7 @@ rnExpr = \case
   Ps.ERec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
-rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out ev)
+rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
 rnAltn (Ps.MkAltn w p0 e) = do
   let p1 = rnPatn p0
   let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p1)

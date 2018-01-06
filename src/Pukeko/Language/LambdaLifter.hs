@@ -54,18 +54,16 @@ scoped :: LL (EScope i v) a -> LL v a
 scoped =
   LL . withRWST(\(MkEnv mk is) s -> (MkEnv (Free . mk) (scope (const False) is), s)) . unLL
 
-llDefn :: (IsEVar v) => Defn In v -> LL v (Defn Out v)
-llDefn (MkDefn w x e) = MkDefn w x <$> llExpr e
-
-llExpr :: (IsEVar v) => Expr In v -> LL v (Expr Out v)
+llExpr :: forall v. (IsEVar v) => Expr In Void v -> LL v (Expr Out Void v)
 llExpr = \case
   EVar w x -> pure (EVar w x)
   ECon w c -> pure (ECon w c)
   ENum w n -> pure (ENum w n)
   EApp w t  us -> EApp w <$> llExpr t <*> traverse llExpr us
-  ECas w t  cs -> ECas w <$> llExpr t <*> traverse llCase cs
-  ELet w ds t -> ELet w <$> traverse llDefn ds <*> scoped (llExpr t)
-  ERec w ds t -> scoped $ ERec w <$> traverse llDefn ds <*> llExpr t
+  ECas w t  cs ->
+    ECas w <$> llExpr t <*> traverse (case2rhs (scoped . llExpr)) cs
+  ELet w ds t -> ELet w <$> (traverse . defn2rhs) llExpr ds <*> scoped (llExpr t)
+  ERec w ds t -> scoped $ ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
   ELam w oldBinds rhs -> do
     lhs <- freshIdent
     (rhs, isGlobal) <- scoped ((,) <$> llExpr rhs <*> asks _isGlobal)
@@ -90,9 +88,6 @@ llExpr = \case
       case capturedL of
         []  -> return fun
         _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
-
-llCase :: (IsEVar v) => Case In v -> LL v (Case Out v)
-llCase (MkCase w c bs e) = MkCase w c bs <$> scoped (llExpr e)
 
 llTopLevel :: TopLevel In -> LL Id.EVar ()
 llTopLevel = \case

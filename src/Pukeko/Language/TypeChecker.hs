@@ -148,7 +148,7 @@ inferPatn patn t_expr = case patn of
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
   :: (IsEVar v)
-  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UTypeSchema s))
+  => Vec.Vector n (Defn In Void v) -> TC v s (Vec.Vector n (UTypeSchema s))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -158,9 +158,10 @@ inferLet defns = do
     return t_rhss
   traverse generalize t_rhss
 
-inferRec
-  :: (IsEVar v)
-  => Vec.Vector n (Defn In (EFinScope n v)) -> TC v s (Vec.Vector n (UTypeSchema s))
+inferRec ::
+  (IsEVar v) =>
+  Vec.Vector n (Defn In Void (EFinScope n v)) ->
+  TC v s (Vec.Vector n (UTypeSchema s))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -170,7 +171,7 @@ inferRec defns = do
     return t_rhss
   traverse generalize t_rhss
 
-infer :: IsEVar v => Expr In v -> TC v s (UType s)
+infer :: IsEVar v => Expr In Void v -> TC v s (UType s)
 infer = \case
     EVar _ ident -> do
       ts <- lookupType ident

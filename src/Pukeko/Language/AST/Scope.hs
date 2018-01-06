@@ -7,6 +7,7 @@ module Pukeko.Language.AST.Scope
   , EScope
   , EFinScope
   , TScope
+  , TScope1
   , TFinScope
   , scope
   , _Bound
@@ -50,6 +51,8 @@ type EScope = Scope Id.EVar
 type EFinScope n = EScope (Finite n)
 
 type TScope = Scope Id.TVar
+
+type TScope1 = TScope ()
 
 type TFinScope n = TScope (Finite n)
 
@@ -112,6 +115,10 @@ instance IsVarLevel Id.EVar where
 instance IsVarLevel (Finite n) where
   type EnvLevelOf (Finite n) = Vec.Vector n
   lookupEnvLevel = flip (Vec.!)
+
+instance IsVarLevel () where
+  type EnvLevelOf () = Identity
+  lookupEnvLevel () = runIdentity
 
 -- TODO: Replace @Ord@ by @Eq@.
 class (Ord v, Pretty v, Pretty (BaseName v)) => IsVar v where

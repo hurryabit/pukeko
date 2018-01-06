@@ -29,6 +29,7 @@ type family StageId st where
 
 type HasELam st = StageId st <=? 600
 type HasEMat st = StageId st <=? 400
+type HasETyp st = 1000 <=? StageId st
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
@@ -47,7 +48,11 @@ type SameTopNodes st1 st2 =
   , HasTLDef st1 ~ HasTLDef st2
   , HasTLSup st1 ~ HasTLSup st2
   )
-type SameNodes st1 st2 = (HasELam st1 ~ HasELam st2, HasEMat st1 ~ HasEMat st2)
+type SameNodes st1 st2 =
+  ( HasELam st1 ~ HasELam st2
+  , HasEMat st1 ~ HasEMat st2
+  , HasETyp st1 ~ HasETyp st2
+  )
 
 type SameModuleInfo st1 st2 =
   ( HasMICons st1 ~ HasMICons st2
