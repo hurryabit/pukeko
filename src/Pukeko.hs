@@ -23,7 +23,7 @@ compileToCore
   => Parser.Module
   -> m (CoreCompiler.Module, LambdaLifter.Module)
 compileToCore module_ = do
-  module_ll <- return (Renamer.renameModule module_)
+  module_ll <- Renamer.renameModule module_
                >>= TypeResolver.resolveModule
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule

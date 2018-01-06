@@ -6,6 +6,8 @@ module Pukeko.Language.AST.Scope
   ( Scope (..)
   , EScope
   , EFinScope
+  , TScope
+  , TFinScope
   , scope
   , _Bound
   , _Free
@@ -19,6 +21,10 @@ module Pukeko.Language.AST.Scope
   , IsVarLevel (..)
   , IsVar (..)
   , IsEVar
+  , IsTVar
+  , Void
+  , absurd
+  , Nat
   )
   where
 
@@ -27,6 +33,8 @@ import           Data.Finite       (Finite)
 import           Data.Forget
 import qualified Data.Map          as Map
 import qualified Data.Vector.Sized as Vec
+import           Data.Void
+import           GHC.TypeLits      (Nat)
 
 import           Pukeko.Error      (bug)
 import           Pukeko.Pretty
@@ -40,6 +48,10 @@ data Scope b i v
 type EScope = Scope Id.EVar
 
 type EFinScope n = EScope (Finite n)
+
+type TScope = Scope Id.TVar
+
+type TFinScope n = TScope (Finite n)
 
 scope :: (i -> a) -> (v -> a) -> Scope b i v -> a
 scope f g = \case
@@ -110,6 +122,8 @@ class (Ord v, Pretty v, Pretty (BaseName v)) => IsVar v where
 
 type IsEVar v = (IsVar v, BaseName v ~ Id.EVar)
 
+type IsTVar v = (IsVar v, BaseName v ~ Id.TVar)
+
 instance IsVar Id.EVar where
   type BaseName Id.EVar = Id.EVar
   type EnvOf Id.EVar = Map.Map Id.EVar
@@ -125,6 +139,12 @@ instance (Pretty b, IsVarLevel i, IsVar v, BaseName v ~ b) => IsVar (Scope b i v
   lookupEnv i (Pair env_j env_v) = case i of
     Bound j _ -> lookupEnvLevel j env_j
     Free  v   -> lookupEnv v env_v
+
+instance IsVar Void where
+  type BaseName Void = Id.TVar
+  type EnvOf Void = Const ()
+  baseName = absurd
+  lookupEnv = absurd
 
 makePrisms ''Scope
 

@@ -1,46 +1,45 @@
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE GADTs #-}
 module Pukeko.Language.AST.ConDecl
   ( TConDecl (..)
   , DConDecl (..)
-  , mkTConDecl
-  , mkDConDecl
+  , DConDeclN (..)
   , typeOf
   ) where
+
+import           Data.Foldable     (toList)
+import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
 import           Pukeko.Language.Type
+import           Pukeko.Language.AST.Scope
 
-data TConDecl = MkTConDecl
+data TConDecl = forall n. MkTConDecl
   { _tname  :: Id.TCon
-  , _params :: [Id.TVar]
-  , _dcons  :: [DConDecl]
+  , _params :: Vec.Vector n Id.TVar
+  , _dcons  :: [DConDeclN n]
   }
 
-data DConDecl = MkDConDecl
+data DConDeclN n = MkDConDeclN
   { _tcon   :: Id.TCon
   , _dname  :: Id.DCon
   , _tag    :: Int
-  , _fields :: [Type Id.TVar]
+  , _fields :: [Type (TFinScope n Void)]
   }
 
-mkTConDecl :: Id.TCon -> [Id.TVar] -> [DConDecl] -> TConDecl
-mkTConDecl _tname _params dcons = MkTConDecl
-  { _tname
-  , _params
-  , _dcons = zipWith (\_tag dcon -> dcon{_tcon = _tname, _tag}) [0..] dcons
-  }
-
-mkDConDecl :: Id.DCon -> [Type Id.TVar] -> DConDecl
-mkDConDecl _dname _fields =
-  -- TODO: Get rid of those @undefined@s.
-  MkDConDecl{_tcon = undefined, _dname, _tag = undefined, _fields}
-
+-- TODO: Remove this temporary hack.
 typeOf :: TConDecl -> DConDecl -> Type Id.TVar
-typeOf MkTConDecl{_params} MkDConDecl{_tcon, _fields} =
-  foldr (~>) (appTCon _tcon (map TVar _params)) _fields
+typeOf MkTConDecl{_params} (MkDConDecl MkDConDeclN{_tcon, _fields}) =
+  foldr (~>) (appTCon _tcon (map TVar (toList _params))) (map (fmap baseName) _fields)
+
+data DConDecl = forall n. MkDConDecl (DConDeclN n)
 
 instance Pretty TConDecl where
   pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname
 
+instance Pretty (DConDeclN n) where
+  pPrintPrec lvl prec MkDConDeclN{_dname} = pPrintPrec lvl prec _dname
+
 instance Pretty DConDecl where
-  pPrintPrec lvl prec MkDConDecl{_dname} = pPrintPrec lvl prec _dname
+  pPrintPrec lvl prec (MkDConDecl dcon) = pPrintPrec lvl prec dcon

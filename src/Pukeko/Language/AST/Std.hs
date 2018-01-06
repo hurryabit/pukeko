@@ -64,7 +64,7 @@ data Module st = MkModule
 
 data TopLevel st
   = HasTLTyp st ~ 'True => TLTyp Pos [Con.TConDecl]
-  | HasTLVal st ~ 'True => TLVal Pos Id.EVar (Type Id.TVar)
+  | HasTLVal st ~ 'True => TLVal Pos Id.EVar TypeSchema
   | forall n.
     HasTLLet st ~ 'True => TLLet Pos (Vector n (Defn st Id.EVar))
   | forall n.

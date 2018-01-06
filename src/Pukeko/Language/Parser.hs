@@ -14,7 +14,6 @@ import qualified Text.Parsec.Token as Token
 import           Pukeko.Error
 import           Pukeko.Language.Operator    (Spec (..))
 import           Pukeko.Language.AST.Std     (GenDefn (..), Patn (..), Bind (..), Pos)
-import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Parser.AST
 import           Pukeko.Language.Type
 import qualified Pukeko.Language.Ident       as Id
@@ -177,11 +176,11 @@ operatorTable = map (map f) (reverse Op.table)
   where
     f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
 
-tconDecl :: Parser Con.TConDecl
-tconDecl = Con.mkTConDecl
+tconDecl :: Parser TConDecl
+tconDecl = MkTConDecl
   <$> tcon
   <*> many tvar
   <*> option [] (reservedOp "=" *> many1 dconDecl)
 
-dconDecl :: Parser Con.DConDecl
-dconDecl = Con.mkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype
+dconDecl :: Parser DConDecl
+dconDecl = MkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype

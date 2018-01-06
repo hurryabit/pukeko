@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Pukeko.Pretty
   ( (<+>)
   , pretty
@@ -8,6 +9,7 @@ module Pukeko.Pretty
   where
 
 import Data.Monoid
+import Data.Void
 import Text.PrettyPrint.HughesPJClass hiding ((<>), (<+>))
 
 import qualified Text.PrettyPrint.HughesPJClass as HughesPJClass ((<+>))
@@ -23,3 +25,6 @@ pretty = pPrint
 
 prettyPrint :: Pretty a => a -> IO ()
 prettyPrint = print . pPrint
+
+instance Pretty Void where
+  pPrintPrec _ _ = absurd

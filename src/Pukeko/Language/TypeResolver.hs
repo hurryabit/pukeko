@@ -36,11 +36,14 @@ runTR tr =
   let st = MkTRState mempty mempty
   in  runExcept (runStateT (unTR tr) st)
 
-trType :: Pos -> Type Id.TVar -> TR (Type Id.TVar)
+trType :: Pos -> Type tv -> TR (Type tv)
 trType w = type2tcon $ \tcon -> do
   ex <- uses st2tcons (has (ix tcon))
   unless ex (throwAt w "unknown type cons" tcon)
   pure tcon
+
+trTypeSchema :: Pos -> TypeSchema -> TR TypeSchema
+trTypeSchema w (MkTypeSchema xs t) = MkTypeSchema xs <$> trType w t
 
 -- TODO: Have only one insert function.
 insertTCon :: Pos -> Con.TConDecl -> TR ()
@@ -49,11 +52,11 @@ insertTCon posn tcon@Con.MkTConDecl{_tname} = do
   when (isJust old) $ throwAt posn "duplicate type cons" _tname
   st2tcons . at _tname ?= tcon
 
-insertDCon :: Pos -> Con.DConDecl -> TR ()
-insertDCon posn con@Con.MkDConDecl{_dname} = do
+insertDCon :: Pos -> Con.DConDeclN n -> TR ()
+insertDCon posn con@Con.MkDConDeclN{_dname} = do
   old <- use (st2dcons . at _dname)
   when (isJust old) $ throwAt posn "duplicate term cons" _dname
-  st2dcons . at _dname ?= con
+  st2dcons . at _dname ?= Con.MkDConDecl con
 
 findDCon :: Pos -> Id.DCon -> TR Id.DCon
 findDCon w dcon = do
@@ -66,14 +69,14 @@ trTopLevel top = case top of
   TLTyp w tconDecls -> do
     for_ tconDecls (insertTCon w)
     for_ tconDecls $ \Con.MkTConDecl{_dcons = dconDecls} -> do
-      for_ dconDecls $ \dconDecl@Con.MkDConDecl{_fields} -> do
+      for_ dconDecls $ \dconDecl@Con.MkDConDeclN{_fields} -> do
         for_ _fields (trType w)
         insertDCon w dconDecl
     pure (TLTyp w tconDecls)
-  TLVal w x t -> TLVal w x <$> trType w t
-  TLLet w ds  -> TLLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
-  TLRec w ds  -> TLRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
-  TLAsm w x a -> pure (TLAsm w x a)
+  TLVal w x ts -> TLVal w x <$> trTypeSchema w ts
+  TLLet w ds   -> TLLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
+  TLRec w ds   -> TLRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
+  TLAsm w x a  -> pure (TLAsm w x a)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
 resolveModule (MkModule _info0 tops0) = do

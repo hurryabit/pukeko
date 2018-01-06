@@ -168,9 +168,9 @@ groupDests ::
   Pos -> Col m v Dest -> RowMatch m n v -> PM (GrpMatch v)
 groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
   let drs = toList (LS.zip ds rs)
-  dconDecl0 <- findDCon dcon0
-  tconDecl <- findTCon (Con._tcon dconDecl0)
-  grps <- for (Con._dcons tconDecl) $ \Con.MkDConDecl{_dname = dcon1} -> do
+  Con.MkDConDecl dconDecl0 <- findDCon dcon0
+  Con.MkTConDecl{_dcons} <- findTCon (Con._tcon dconDecl0)
+  grps <- for _dcons $ \Con.MkDConDeclN{_dname = dcon1} -> do
     let drs1 = filter (\(MkDest dcon2 _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" dcon1

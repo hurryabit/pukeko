@@ -15,6 +15,7 @@ import           Data.Maybe       (catMaybes)
 import qualified Data.Map         as Map
 import           Data.STRef
 import           Data.Traversable
+import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
 import           Pukeko.Pretty
@@ -38,7 +39,7 @@ data Kind a where
   Arrow :: Kind a -> Kind a -> Kind a
   UVar  :: STRef s (UVar s) -> Kind (Open s)
 
-type KCEnv s = Map.Map Id.TVar (Kind (Open s))
+type KCEnv n s = Vec.Vector n (Kind (Open s))
 
 data KCState s = MkKCState
   { _typeCons :: Map.Map Id.TCon (Kind (Open s))
@@ -46,38 +47,39 @@ data KCState s = MkKCState
   }
 makeLenses ''KCState
 
-newtype KC s a =
-  KC{unKC :: ReaderT (KCEnv s) (StateT (KCState s) (ExceptT String (ST s))) a}
+newtype KC n s a =
+  KC{unKC :: ReaderT (KCEnv n s) (StateT (KCState s) (ExceptT String (ST s))) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
-           , MonadReader (KCEnv s)
+           , MonadReader (KCEnv n s)
            , MonadState (KCState s)
            )
 
-runKC :: MonadError String m => (forall s. KC s a) -> m a
-runKC kc = runST (runExceptT (evalStateT (runReaderT (unKC kc) env) st0))
+runKC :: MonadError String m => (forall n s. KC n s a) -> m a
+runKC kc = runST (runExceptT (evalStateT (runReaderT (unKC kc) env0) st0))
   where
     st0 = MkKCState
       { _typeCons = Map.empty
       , _fresh    = Id.freshTVars
       }
-    env = Map.empty
+    env0 = Vec.empty
 
-liftST :: ST s a -> KC s a
+liftST :: ST s a -> KC n s a
 liftST = KC . lift . lift . lift
 
-freshUVar :: KC s (Kind (Open s))
+freshUVar :: KC n s (Kind (Open s))
 freshUVar = do
   v <- fresh %%= (\(v:vs) -> (v, vs))
   UVar <$> liftST (newSTRef (Free (Forget v)))
 
-kcType :: Kind (Open s) -> Type Id.TVar -> KC s ()
+localize :: Vec.Vector n (Kind (Open s)) -> KC n s a -> KC m s a
+localize env = KC . withReaderT (const env) . unKC
+
+kcType :: Kind (Open s) -> Type (TFinScope n Void) -> KC n s ()
 kcType k = \case
   TVar v -> do
-    kv_opt <- view (at v)
-    case kv_opt of
-      Nothing -> throwDoc $ "unknown type variable:" <+> pretty v
-      Just kv -> unify kv k
+    kv <- asks (Vec.! scope id absurd v)
+    unify kv k
   TArr -> unify (Arrow Star (Arrow Star Star)) k
   TCon tcon -> do
     kcon_opt <- use (typeCons . at tcon)
@@ -89,8 +91,7 @@ kcType k = \case
     kcType ktp tp
     kcType (Arrow ktp k) tf
 
-
-kcTypDef :: [Con.TConDecl] -> KC s ()
+kcTypDef :: [Con.TConDecl] -> KC n s ()
 kcTypDef tcons = do
   kinds <- for tcons $ \Con.MkTConDecl{_tname} -> do
     kind <- freshUVar
@@ -99,19 +100,18 @@ kcTypDef tcons = do
   for_ (zip tcons kinds) $ \(Con.MkTConDecl{_params, _dcons}, tconKind) -> do
     paramKinds <- traverse (const freshUVar) _params
     unify tconKind (foldr Arrow Star paramKinds)
-    let env = Map.fromList (zip _params paramKinds)
-    local (const env) $ do
-      for_ _dcons $ \Con.MkDConDecl{_fields} -> do
+    localize paramKinds $ do
+      for_ _dcons $ \Con.MkDConDeclN{_fields} -> do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 
-kcVal :: Type Id.TVar ->KC s ()
-kcVal t = do
-  env <- sequence $ Map.fromSet (const freshUVar) (vars t)
-  local (const env) $ kcType Star t
+kcVal :: TypeSchema -> KC n s ()
+kcVal (MkTypeSchema xs t) = do
+  env <- traverse (const freshUVar) xs
+  localize env (kcType Star t)
 
 
-kcTopLevel :: TopLevel In -> KC s (Maybe (TopLevel Out))
+kcTopLevel :: TopLevel In -> KC n s (Maybe (TopLevel Out))
 kcTopLevel = \case
   TLTyp w tcons -> do
     here w (kcTypDef tcons)
@@ -125,14 +125,14 @@ kcTopLevel = \case
   where
     yield = pure . Just
 
-kcModule ::Module In -> KC s (Module Out)
+kcModule ::Module In -> KC n s (Module Out)
 kcModule = module2tops (fmap catMaybes . traverse kcTopLevel)
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule module_ = runKC (kcModule module_)
 
 
-unwind :: Kind (Open s) -> KC s (Kind (Open s))
+unwind :: Kind (Open s) -> KC n s (Kind (Open s))
 unwind = \case
   k0@(UVar uref) -> do
     uvar <- liftST (readSTRef uref)
@@ -144,14 +144,14 @@ unwind = \case
         pure k2
   k -> pure k
 
-assertFree :: STRef s (UVar s) -> KC s ()
+assertFree :: STRef s (UVar s) -> KC a s ()
 assertFree uref = do
   uvar <- liftST (readSTRef uref)
   case uvar of
     Free _ -> pure ()
     Link _ -> bug "kind checker" "unwinding produced link" Nothing
 
-occursCheck :: STRef s (UVar s) -> Kind (Open s) -> KC s ()
+occursCheck :: STRef s (UVar s) -> Kind (Open s) -> KC n s ()
 occursCheck uref1 = \case
   Star        -> pure ()
   Arrow kf kp -> occursCheck uref1 kf *> occursCheck uref1 kp
@@ -163,7 +163,7 @@ occursCheck uref1 = \case
           Link k2 -> occursCheck uref1 k2
           Free _  -> pure ()
 
-unify :: Kind (Open s) -> Kind (Open s) -> KC s ()
+unify :: Kind (Open s) -> Kind (Open s) -> KC n s ()
 unify k1 k2 = do
   k1 <- unwind k1
   k2 <- unwind k2
@@ -183,7 +183,7 @@ unify k1 k2 = do
       d2 <- liftST (prettyKind False k2)
       throwDoc $ "cannot unify kinds" <+> d1 <+> "and" <+> d2
 
-close :: Kind (Open s) -> KC s ()
+close :: Kind (Open s) -> KC n s ()
 close k = do
   k <- unwind k
   case k of

@@ -25,7 +25,7 @@ import qualified Pukeko.Language.AST.ConDecl       as Con
 import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
-import           Pukeko.Language.Type              (typeInt)
+import           Pukeko.Language.Type              (TypeSchema (..), typeInt)
 import           Pukeko.Language.TypeChecker.Type
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
@@ -54,7 +54,8 @@ evalTC ::
   MonadError String m =>
   (forall s. TC Id.EVar s a) -> ModuleInfo In -> m a
 evalTC tc info = runST $
-  let locals0 = Map.map (open . snd) (MI.funs info)
+  -- TODO: Remove this @fmap baseName@ hack.
+  let locals0 = Map.map (\(_, MkTypeSchema _ t) -> open (fmap baseName t)) (MI.funs info)
       env0 = MkEnvironment locals0 0
       st0 = MkTCState []
   in  runExceptT (evalStateT (runReaderT (runInfoT (unTC tc) info) env0) st0)
@@ -109,21 +110,22 @@ instantiate t = do
 instantiateTCon :: Id.TCon -> TC v s (UType s Id.TVar, Map.Map Id.TVar (UType s Id.TVar))
 instantiateTCon tcon = do
   Con.MkTConDecl{_params} <- findTCon tcon
-  t_params <- traverse (const freshUVar) _params
-  return (appTCon tcon t_params, Map.fromList (zip _params t_params))
+  let params = toList _params
+  t_params <- traverse (const freshUVar) params
+  return (appTCon tcon t_params, Map.fromList (zip params t_params))
 
 inferPatn :: Patn -> UType s Id.TVar -> TC v s (Map.Map Id.EVar (UType s Id.TVar))
 inferPatn patn t_expr = case patn of
   PVar (BWild _) -> return Map.empty
   PVar (BName _ ident) -> return (Map.singleton ident t_expr)
   PCon w dcon patns -> do
-    Con.MkDConDecl{_dname, _tcon, _fields} <- findDCon dcon
+    Con.MkDConDecl Con.MkDConDeclN{_dname, _tcon, _fields} <- findDCon dcon
     when (length patns /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
       "expects" <+> int (length _fields) <+> "arguments"
     (t_inst, env_inst) <- instantiateTCon _tcon
     unify w t_expr t_inst
-    t_fields <- liftST $ traverse (subst env_inst . open) _fields
+    t_fields <- liftST $ traverse (subst env_inst . open . fmap baseName) _fields
     Map.unions <$> zipWithM inferPatn patns t_fields
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
@@ -158,8 +160,8 @@ infer = \case
       t <- lookupType ident
       instantiate t
     ECon _ dcon -> do
-      dconDecl <- findDCon dcon
-      tconDecl <- findTCon (Con._tcon dconDecl)
+      dconDecl@(Con.MkDConDecl Con.MkDConDeclN{_tcon}) <- findDCon dcon
+      tconDecl <- findTCon _tcon
       instantiate $ open (Con.typeOf tconDecl dconDecl)
     ENum _ _num -> return (open typeInt)
     EApp w fun args -> do

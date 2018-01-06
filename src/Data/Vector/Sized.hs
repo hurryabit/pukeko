@@ -7,6 +7,7 @@ module Data.Vector.Sized
     -- * Functions
   , (!)
   , (++)
+  , empty
   , withList
   , matchList
   , zip
@@ -29,6 +30,9 @@ MkVector v ! i = v V.! toInt i
 
 (++) :: Vector m a -> Vector n a -> Vector (m+n) a
 MkVector v ++ MkVector w = MkVector (v V.++ w)
+
+empty :: Vector 0 a
+empty = MkVector V.empty
 
 withList :: forall a r. [a] -> (forall n. KnownNat n => Vector n a -> r) -> r
 withList xs k =

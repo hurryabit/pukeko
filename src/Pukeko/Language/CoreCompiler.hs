@@ -68,7 +68,7 @@ ccExpr = \case
           Nothing -> pure (Global (name x1))
           Just y2 -> pure (External y2)
   In.ECon _ dcon  -> do
-    Con.MkDConDecl{_tag, _fields} <- findDCon dcon
+    Con.MkDConDecl Con.MkDConDeclN{_tag, _fields} <- findDCon dcon
     pure $ Pack _tag (length _fields)
   In.ENum _ n     -> pure $ Num n
   In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us

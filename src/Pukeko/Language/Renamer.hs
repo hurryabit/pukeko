@@ -6,58 +6,79 @@ module Pukeko.Language.Renamer
 
 import           Control.Lens
 import           Control.Monad.Reader
+import           Data.Finite       (Finite)
 import qualified Data.Map          as Map
 import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 
+import           Pukeko.Error
 import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage      as St
+import qualified Pukeko.Language.AST.ConDecl    as Con
 import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Parser.AST     as Ps
 import qualified Pukeko.Language.Ident          as Id
+import           Pukeko.Language.Type           (toSchema)
 
 type Out = St.Renamer
 
-renameModule :: Ps.Module -> Module Out
-renameModule = MkModule info . runRn . traverse rnTopLevel
+renameModule :: MonadError String m => Ps.Module -> m (Module Out)
+renameModule tops = runRn $ MkModule info <$> traverse rnTopLevel tops
   where
     info = MI.MkModuleInfo MI.Absent MI.Absent MI.Absent
 
-data Env tv = MkEnv (Map.Map Id.EVar tv) (Id.EVar -> tv)
+data Env ev = MkEnv (Map.Map Id.EVar ev) (Id.EVar -> ev)
 
-newtype Rn tv a = Rn{unRn :: Reader (Env tv) a}
+newtype Rn ev a = Rn{unRn :: ReaderT (Env ev) (Except String) a}
   deriving ( Functor, Applicative, Monad
-           , MonadReader (Env tv)
+           , MonadReader (Env ev)
+           , MonadError String
            )
 
-runRn :: Rn Id.EVar a -> a
-runRn ix = runReader (unRn ix) (MkEnv mempty id)
+runRn :: MonadError String m => Rn Id.EVar a -> m a
+runRn ix = runExcept (runReaderT (unRn ix) (MkEnv mempty id))
 
-localize :: Map.Map Id.EVar i -> Rn (EScope i tv) a -> Rn tv a
-localize bs = Rn . withReader upd . unRn
+localize :: Map.Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
+localize bs = Rn . withReaderT upd . unRn
   where
     upd (MkEnv bound0 mkFree) =
       let bound1 = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free bound0
       in  MkEnv bound1 (Free . mkFree)
 
-localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (EFinScope n tv) a -> Rn tv a
+localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (EFinScope n ev) a -> Rn ev a
 localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
 
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
 rnTopLevel top = case top of
-  Ps.TLTyp w ts  -> pure (TLTyp w ts)
-  Ps.TLVal w x t -> pure (TLVal w x t)
+  Ps.TLTyp w tcs -> TLTyp w <$> traverse rnTConDecl tcs `catchError` throwErrorAt w
+  Ps.TLVal w x t -> pure (TLVal w x (toSchema t))
   Ps.TLLet w ds0 -> Vec.withList ds0 $ \ds1 ->
     TLLet w <$> traverse rnDefn ds1
   Ps.TLRec w ds0 -> Vec.withList ds0 $ \ds1 ->
     localizeDefns ds1 $ TLRec w <$> traverse rnDefn ds1
   Ps.TLAsm w x a -> pure (TLAsm w x a)
 
-rnDefn :: Ps.Defn Id.EVar -> Rn tv (Defn Out tv)
+rnTConDecl :: Ps.TConDecl -> Rn ev Con.TConDecl
+rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
+  let env = ifoldMap (flip Map.singleton) ps1
+  Con.MkTConDecl tcon ps1 <$> zipWithM (rnDConDecl tcon env) [0..] dcs0
+
+rnDConDecl ::
+  forall n ev.
+  Id.TCon -> Map.Map Id.TVar (Finite n) -> Int -> Ps.DConDecl -> Rn ev (Con.DConDeclN n)
+rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
+  Con.MkDConDeclN tcon dcon tag <$> (traverse . traverse) rnTVar ts
+  where
+    rnTVar :: Id.TVar -> Rn ev (TFinScope n Void)
+    rnTVar x = case x `Map.lookup` env of
+      Just i  -> pure (mkBound i x)
+      Nothing -> throw "unknown type variable" x
+
+rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out ev)
 rnDefn = rhs2 rnExpr
 
-rnExpr :: Ps.Expr Id.EVar -> Rn tv (Expr Out tv)
+rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out ev)
 rnExpr = \case
   Ps.EVar w x ->
     asks $ \(MkEnv bound mkFree) -> EVar w (Map.findWithDefault (mkFree x) x bound)
@@ -73,7 +94,7 @@ rnExpr = \case
   Ps.ERec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
-rnAltn :: Ps.Altn Id.EVar -> Rn tv (Altn Out tv)
+rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out ev)
 rnAltn (Ps.MkAltn w p e) = do
   let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p)
   MkAltn w p <$> localize bs (rnExpr e)

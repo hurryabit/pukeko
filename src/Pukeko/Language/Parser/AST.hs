@@ -5,6 +5,8 @@ module Pukeko.Language.Parser.AST
   , DCon
   , Module
   , TopLevel (..)
+  , TConDecl (..)
+  , DConDecl (..)
   , Defn
   , Expr (..)
   , Altn (..)
@@ -20,8 +22,7 @@ where
 
 import           Pukeko.Pos
 import           Pukeko.Language.AST.Std (GenDefn (..), Patn (..), Bind (..))
-import qualified Pukeko.Language.AST.ConDecl as Con
-import qualified Pukeko.Language.Ident       as Id
+import qualified Pukeko.Language.Ident   as Id
 import           Pukeko.Language.Type
 
 type TCon = Id.TCon
@@ -30,11 +31,22 @@ type DCon = Id.DCon
 type Module = [TopLevel]
 
 data TopLevel
-  = TLTyp Pos [Con.TConDecl]
+  = TLTyp Pos [TConDecl]
   | TLVal Pos Id.EVar (Type Id.TVar)
   | TLLet Pos [Defn Id.EVar]
   | TLRec Pos [Defn Id.EVar]
   | TLAsm Pos Id.EVar String
+
+data TConDecl = MkTConDecl
+  { _tname  :: Id.TCon
+  , _params :: [Id.TVar]
+  , _dcons  :: [DConDecl]
+  }
+
+data DConDecl = MkDConDecl
+  { _dname  :: Id.DCon
+  , _fields :: [Type Id.TVar]
+  }
 
 type Defn = GenDefn Expr
 
