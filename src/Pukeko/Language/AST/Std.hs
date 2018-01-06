@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Language.AST.Std
   ( GenModuleInfo (..)
   , ModuleInfo
@@ -97,10 +98,10 @@ data Expr st tv ev
     ECas Pos (Expr st tv ev) [Case st tv ev]
   | HasEMat st ~ 'True =>
     EMat Pos (Expr st tv ev) [Altn st tv ev]
+  | forall n. HasETyp st ~ 'True =>
+    ETyAbs Pos (Vector n Id.TVar) (Expr st (TFinScope n tv) ev)
   | HasETyp st ~ 'True =>
-    ETyAbs Pos Id.TVar (Expr st (TScope1 tv) ev)
-  | HasETyp st ~ 'True =>
-    ETyApp Pos (Expr st tv ev) (Type tv)
+    ETyApp Pos (Expr st tv ev) [StageType st tv]
 
 data Bind st tv = MkBind
   { _bindPos  :: Pos
@@ -243,19 +244,19 @@ patn2evar f = \case
   PCon w c ps -> PCon w c <$> (traverse . patn2evar) f ps
 
 -- * Scoped lenses
-type ScopedLens scope s t a b =
-  forall f v w. (Functor f) =>
-  (forall i. a (scope i v) -> f (b (scope i w))) -> s v -> f (t w)
+type EScopedLens s t a b =
+  forall f ev1 ev2. (Functor f) =>
+  (forall i. a (EScope i ev1) -> f (b (EScope i ev2))) -> s ev1 -> f (t ev2)
 
 over' ::
   ((forall i. g (s i v1) -> Identity (g (s i v2))) -> f v1 -> Identity (f v2)) ->
    (forall i. g (s i v1) ->           g (s i v2))  -> f v1 ->           f v2
 over' l f = runIdentity . l (Identity . f)
 
-case2rhs :: ScopedLens EScope (Case st1 tv) (Case st2 tv) (Expr st1 tv) (Expr st2 tv)
+case2rhs :: EScopedLens (Case st1 tv1) (Case st2 tv2) (Expr st1 tv1) (Expr st2 tv2)
 case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
 
-altn2rhs :: ScopedLens EScope (Altn st1 tv) (Altn st2 tv) (Expr st1 tv) (Expr st2 tv)
+altn2rhs :: EScopedLens (Altn st1 tv1) (Altn st2 tv2) (Expr st1 tv1) (Expr st2 tv2)
 altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
 
 -- * Retagging
@@ -349,7 +350,18 @@ instance HasLhs (Bind st tv) where
   lhs = bindEVar
 
 -- * Pretty printing
-instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
+class PrettyType f where
+  pPrintPrecType :: (IsTVar tv) => PrettyLevel -> Rational -> f tv -> Doc
+
+instance PrettyType NoType where
+  pPrintPrecType _ _ NoType = mempty
+
+instance PrettyType Type where
+  pPrintPrecType = pPrintPrec
+
+type PrettyStage st = PrettyType (StageType st)
+
+instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
   pPrintPrec _ _ = \case
     TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
@@ -363,11 +375,12 @@ instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 
-instance (IsEVar ev, IsTVar tv) => Pretty (Defn st tv ev) where
+instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
   pPrintPrec lvl _ (MkDefn b t) =
     hang (pPrintPrec lvl 0 b <+> equals) 2 (pPrintPrec lvl 0 t)
 
-prettyDefns :: (IsEVar ev, IsTVar tv) => Bool -> Vector n (Defn st tv ev) -> Doc
+prettyDefns ::
+  (IsEVar ev, IsTVar tv, PrettyStage st) => Bool -> Vector n (Defn st tv ev) -> Doc
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
     d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
@@ -375,7 +388,7 @@ prettyDefns isrec ds = case toList ds of
       let_ | isrec     = "let rec"
            | otherwise = "let"
 
-instance (IsEVar ev, IsTVar tv) => Pretty (Expr st tv ev) where
+instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
   pPrintPrec lvl prec = \case
     EVar _ x -> pretty (baseName x)
     ECon _ c -> pretty c
@@ -397,10 +410,8 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Expr st tv ev) where
     ELet _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
     ERec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
     ELam _ bs t ->
-      maybeParens (prec > 0) $ hsep
-        [ "fun", hsep (fmap pretty bs)
-        , "->" , pPrintPrec lvl 0 t
-        ]
+      maybeParens (prec > 0)
+      $ hang ("fun" <+> hsep (fmap (pPrintPrec lvl 1) bs) <+> "->") 2 (pPrintPrec lvl 0 t)
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
     --     [ "if"  <+> pPrintPrec lvl 0 _cond <+> "then"
@@ -414,18 +425,27 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Expr st tv ev) where
     ECas _ t cs ->
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) cs
-    ETyAbs _ x e ->
+    ETyAbs _ xs e ->
       maybeParens (prec > 0)
-      $ "fun" <+> "@" <> pretty x <+> "->" <+> pPrintPrec lvl prec e
-    ETyApp _ e t ->
+      $ hang ("fun" <+> prettyAtType pretty xs <+> "->") 2 (pPrintPrec lvl prec e)
+    ETyApp _ e0 ts ->
       maybeParens (prec > Op.aprec)
-      $ pPrintPrec lvl Op.aprec e <+> "@" <> pPrintPrec lvl 3 t
+      $ pPrintPrec lvl Op.aprec e0 <+> prettyAtType (pPrintPrecType lvl 3) ts
 
-instance (IsTVar tv) => Pretty (Bind st tv) where
+prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
+prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
+
+instance (IsTVar tv, PrettyStage st) => Pretty (Bind st tv) where
   -- FIXME: Print type.
-  pPrintPrec _ _ (MkBind _ x _) = pretty x
+  pPrintPrec lvl prec (MkBind _ x t)
+    | isEmpty td = xd
+    | otherwise  = maybeParens (prec > 0) (xd <+> colon <+> td)
+    where
+      xd = pretty x
+      td = pPrintPrecType lvl 0 t
 
-instance (IsEVar ev, IsTVar tv) => Pretty (Case st tv ev) where
+
+instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
   pPrintPrec lvl _ (MkCase _ c bs t) =
     hang ("|" <+> pretty c <+> hsep (fmap prettyBind bs) <+> "->")
       2 (pPrintPrec lvl 0 t)
@@ -434,8 +454,7 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Case st tv ev) where
         Nothing -> "_"
         Just x  -> pretty x
 
-
-instance (IsEVar ev, IsTVar tv) => Pretty (Altn st tv ev) where
+instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 

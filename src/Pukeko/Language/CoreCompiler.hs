@@ -41,7 +41,7 @@ compileModule (In.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
 
-bindName :: In.Bind In Void -> Name
+bindName :: In.Bind In tv -> Name
 bindName = name . view lhs
 
 scoped :: CC (EScope i v) a -> CC v a
@@ -57,10 +57,10 @@ ccTopLevel = \case
     at (b^.lhs) ?= n
     pure (Asm n)
 
-ccDefn :: IsEVar v => In.Defn In Void v -> CC v Defn
+ccDefn :: IsEVar ev => In.Defn In tv ev -> CC ev Defn
 ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
-ccExpr :: IsEVar v => In.Expr In Void v -> CC v Expr
+ccExpr :: IsEVar ev => In.Expr In tv ev -> CC ev Expr
 ccExpr = \case
   In.EVar _ x0 -> do
     global <- asks ($ x0)
@@ -80,5 +80,5 @@ ccExpr = \case
   In.ERec _ ds t  -> scoped $ Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
-ccCase :: IsEVar v => In.Case In Void v -> CC v Altn
+ccCase :: IsEVar ev => In.Case In tv ev -> CC ev Altn
 ccCase (In.MkCase _ _ bs t) = MkAltn (map (fmap name) (toList bs)) <$> scoped (ccExpr t)

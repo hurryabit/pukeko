@@ -37,7 +37,8 @@ data Type tv
   | TArr
   | TCon Id.TCon
   | TApp (Type tv) (Type tv)
-  deriving (Functor, Foldable, Traversable)
+  | forall n.
+    TUni (Vec.Vector n Id.TVar) (Type (TFinScope n tv))
 
 data TypeSchema = forall n. MkTypeSchema (Vec.Vector n Id.TVar) (Type (TFinScope n Void))
 
@@ -74,6 +75,7 @@ type2tcon f = \case
   TArr       -> pure TArr
   TCon c     -> TCon <$> f c
   TApp tf tp -> TApp <$> type2tcon f tf <*> type2tcon f tp
+  TUni xs tq -> TUni xs <$> type2tcon f tq
 
 instance IsTVar tv => Pretty (Type tv) where
   pPrintPrec lvl prec = \case
@@ -83,11 +85,17 @@ instance IsTVar tv => Pretty (Type tv) where
     TFun tx ty ->
       maybeParens (prec > 1) (pPrintPrec lvl 2 tx <+> "->" <+> pPrintPrec lvl 1 ty)
     TApp tf tx ->
-      maybeParens (prec > 2) (pPrintPrec lvl 3 tf <+> pPrintPrec lvl 3 tx)
+      maybeParens (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
+    TUni xs tq ->
+      maybeParens (prec > 0) ("∀" <> hsep (fmap pretty xs) <> "." <+> pPrintPrec lvl 0 tq)
 
 instance Pretty TypeSchema where
   pPrintPrec lvl prec (MkTypeSchema xs t) =
-    "forall" <+> hsep (fmap pretty xs) <> "." <+> pPrintPrec lvl prec t
+    "∀" <+> hsep (fmap pretty xs) <> "." <+> pPrintPrec lvl prec t
 
 instance IsTVar tv => Show (Type tv) where
   show = prettyShow
+
+deriving instance Functor     Type
+deriving instance Foldable    Type
+deriving instance Traversable Type

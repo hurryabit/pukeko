@@ -9,6 +9,7 @@ module Pukeko.Language.TypeChecker.UType
   , (*~>)
   , appN
   , appTCon
+  , toSchema
   , open
   , openSchema
   , subst
@@ -43,7 +44,7 @@ data UType s
   | UTApp (UType s) (UType s)
   | UVar (STRef s (UVar s))
 
-data UTypeSchema s = MkUTypeSchema [Id.TVar] (UType s)
+data UTypeSchema s tv = MkUTypeSchema [Id.TVar] (UType s)
 
 pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp UTArr tx) ty
@@ -60,14 +61,18 @@ appN = foldl UTApp
 appTCon :: Id.TCon -> [UType s] -> UType s
 appTCon = appN . UTCon
 
+toSchema :: UType s -> UTypeSchema s Void
+toSchema = MkUTypeSchema []
+
 open :: Type Id.TVar -> UType s
 open = \case
   TVar x     -> UTVar x
   TArr       -> UTArr
   TCon c     -> UTCon c
   TApp tf tp -> UTApp (open tf) (open tp)
+  TUni _  _  -> bug "type checker" "universal quantification in input" Nothing
 
-openSchema :: TypeSchema -> UTypeSchema s
+openSchema :: TypeSchema -> UTypeSchema s Void
 openSchema (MkTypeSchema xs t0) =
   let t1 = fmap (scope (xs Vec.!) absurd) t0
   in  MkUTypeSchema (toList xs) (open t1)

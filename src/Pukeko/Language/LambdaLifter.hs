@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 module Pukeko.Language.LambdaLifter
-  ( Module
+  ( Out
   , liftModule
   )
 where
@@ -16,15 +16,13 @@ import qualified Data.Set          as Set
 import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 
-import           Pukeko.Language.AST.Std     hiding (Module)
-import qualified Pukeko.Language.AST.Std     as Std
+import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage   as St
 import qualified Pukeko.Language.Ident       as Id
+import           Pukeko.Language.Type        (NoType (..))
 
-type In  = St.DeadCode
+type In  = St.TypeEraser
 type Out = St.LambdaLifter
-
-type Module = Std.Module Out
 
 type State = [Id.EVar]
 
@@ -72,13 +70,13 @@ llExpr = \case
     -- not break the tests right now.
     let capturedL = sortOn baseName $ Set.toList capturedS
     Vec.withList capturedL $ \(capturedV :: Vec.Vector m (EFinScope n v)) -> do
-      let newBinds = fmap (\x -> MkBind w (baseName x) undefined) capturedV Vec.++ oldBinds
+      let newBinds = fmap (\x -> MkBind w (baseName x) NoType) capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
             Free  v   -> Free  (baseName v)
       let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (baseName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
-      tell [TLSup (MkBind w lhs undefined) (fmap retagBind newBinds) (fmap (rename Map.!) rhs)]
+      tell [TLSup (MkBind w lhs NoType) (fmap retagBind newBinds) (fmap (rename Map.!) rhs)]
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
@@ -102,8 +100,8 @@ llTopLevel = \case
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [TLCaf (MkBind w lhs undefined) rhs]
+        tell [TLCaf (MkBind w lhs NoType) rhs]
   TLAsm b asm -> tell [TLAsm (retagBind b) asm]
 
-liftModule :: Std.Module In -> Std.Module Out
+liftModule :: Module In -> Module Out
 liftModule = over module2tops (execLL . traverse_ llTopLevel)

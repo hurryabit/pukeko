@@ -18,12 +18,13 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
 import           Pukeko.Language.Info
+import           Pukeko.Language.Type
 import           Pukeko.Language.AST.Std            hiding (Bind (..))
 import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.Ident              as Id
 
-type In  = St.TypeChecker
+type In  = St.TypeChecker Type
 type Out = St.PatternMatcher
 
 newtype PM a = PM{unPM :: InfoT (ModuleInfo In) (StateT [Id.EVar] (Except String)) a}
@@ -39,7 +40,7 @@ evalPM pm decls = runExcept $ evalStateT (runInfoT (unPM pm) decls) []
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
 
-pmExpr :: Expr In Void v -> PM (Expr Out Void v)
+pmExpr :: Expr In tv ev -> PM (Expr Out tv ev)
 pmExpr = \case
   EVar w x          -> pure (EVar w x)
   ECon w c          -> pure (ECon w c)
@@ -53,6 +54,8 @@ pmExpr = \case
     as1@LS.Cons{} -> do
       t1 <- pmExpr t0
       pmMatch w (mkRowMatch1 t1 as1)
+  ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
+  ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
@@ -66,8 +69,8 @@ compileModule (MkModule decls tops) =
   MkModule decls <$> evalPM (traverse pmTopLevel tops) decls
 
 pmMatch ::
-  forall m m' n v. m ~ 'LS.Succ m' =>
-  Pos -> RowMatch m n v -> PM (Expr Out Void v)
+  forall m m' n tv ev. m ~ 'LS.Succ m' =>
+  Pos -> RowMatch m n tv ev -> PM (Expr Out tv ev)
 pmMatch w rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBindCols w colMatch1 $ \case
@@ -96,50 +99,53 @@ patnToBind = \case
   PVar w x -> Just (BName w x)
   PCon{}   -> Nothing
 
-type RhsExpr v = Expr In Void (EScope Id.EVar v)
+type RhsExpr tv ev = Expr In tv (EScope Id.EVar ev)
 
-data Row n v = MkRow (LS.List n Patn) (RhsExpr v)
+data Row n tv ev = MkRow (LS.List n Patn) (RhsExpr tv ev)
 
-data RowMatch m n v = MkRowMatch (LS.List n (Expr Out Void v)) (LS.List m (Row n v))
+data RowMatch m n tv ev =
+  MkRowMatch (LS.List n (Expr Out tv ev)) (LS.List m (Row n tv ev))
 
-mkRow1 :: Altn In Void v -> Row LS.One v
+mkRow1 :: Altn In tv ev -> Row LS.One tv ev
 mkRow1 (MkAltn _ p t) = MkRow (LS.Singleton p) t
 
-mkRowMatch1 :: Expr Out Void v -> LS.List m (Altn In Void v) -> RowMatch m LS.One v
+mkRowMatch1 :: Expr Out tv ev -> LS.List m (Altn In tv ev) -> RowMatch m LS.One tv ev
 mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 
-data Col m v a = MkCol (Expr Out Void v) (LS.List m a)
+data Col m tv ev a = MkCol (Expr Out tv ev) (LS.List m a)
 
-data ColMatch m n v = MkColMatch (LS.List n (Col m v Patn)) (LS.List m (RhsExpr v))
+data ColMatch m n tv ev =
+  MkColMatch (LS.List n (Col m tv ev Patn)) (LS.List m (RhsExpr tv ev))
 
-colPatn :: Traversal (Col m v a) (Col m v b) a b
+colPatn :: Traversal (Col m tv ev a) (Col m tv ev b) a b
 colPatn f (MkCol t ps) = MkCol t <$> traverse f ps
 
-rowToCol :: RowMatch m n v -> ColMatch m n v
+rowToCol :: RowMatch m n tv ev -> ColMatch m n tv ev
 rowToCol (MkRowMatch ts rs) =
   let (pss, us) = LS.unzipWith (\(MkRow ps u) -> (ps, u)) rs
       cs = LS.zipWith MkCol ts (LS.transpose ts pss)
   in  MkColMatch cs us
 
-colToRow :: ColMatch m n v -> RowMatch m n v
+colToRow :: ColMatch m n tv ev -> RowMatch m n tv ev
 colToRow (MkColMatch cs us) =
   let (ts, pss) = LS.unzipWith (\(MkCol t ps) -> (t, ps)) cs
       rs = LS.zipWith MkRow (LS.transpose us pss) us
   in  MkRowMatch ts rs
 
-elimBindCols :: Pos -> ColMatch m n v -> (forall n'. ColMatch m n' v -> PM a) -> PM a
+elimBindCols ::
+  Pos -> ColMatch m n tv ev -> (forall n'. ColMatch m n' tv ev -> PM a) -> PM a
 elimBindCols w (MkColMatch cs0 us0) k = do
   let (cs1, bcs) = partitionEithers (map isBindCol (toList cs0))
   us1 <- foldlM (applyBindCol w) us0 bcs
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
   where
-    isBindCol :: Col n v Patn -> Either (Col n v Patn) (Col n v Bind)
+    isBindCol :: Col n tv ev Patn -> Either (Col n tv ev Patn) (Col n tv ev Bind)
     isBindCol (MkCol t ps) =
       case traverse patnToBind ps of
         Just bs -> Right (MkCol t bs)
         Nothing -> Left  (MkCol t ps)
     applyBindCol ::
-      Pos -> LS.List m (RhsExpr v) -> Col m v Bind -> PM (LS.List m (RhsExpr v))
+      Pos -> LS.List m (RhsExpr tv ev) -> Col m tv ev Bind -> PM (LS.List m (RhsExpr tv ev))
     applyBindCol w rhss (MkCol t bs) = case t of
       EVar _ x ->
         let replacePatnWithX rhs = \case
@@ -161,7 +167,7 @@ patnToDest = \case
   PCon _ c ps -> Just (MkDest c ps)
 
 findDestCol ::
-  Pos -> ColMatch m ('LS.Succ n) v -> PM (Col m v Dest, ColMatch m n v)
+  Pos -> ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev Dest, ColMatch m n tv ev)
 findDestCol w (MkColMatch cs0 us) =
   case find (colPatn patnToDest) cs0 of
     Nothing       -> throwErrorAt w "cannot apply constructor rule"
@@ -173,15 +179,15 @@ findDestCol w (MkColMatch cs0 us) =
       LS.Cons _             LS.Nil       -> Nothing
       LS.Cons x             xs@LS.Cons{} -> fmap (second (LS.Cons x)) (find f xs)
 
-data GrpMatchItem v =
+data GrpMatchItem tv ev =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n (EFinScope k v))
+  MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n tv (EFinScope k ev))
 
-data GrpMatch v = MkGrpMatch (Expr Out Void v) [GrpMatchItem v]
+data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) [GrpMatchItem tv ev]
 
 groupDests ::
-  forall m m' n v. m ~ 'LS.Succ m' =>
-  Pos -> Col m v Dest -> RowMatch m n v -> PM (GrpMatch v)
+  forall m m' n tv ev. m ~ 'LS.Succ m' =>
+  Pos -> Col m tv ev Dest -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
   let drs = toList (LS.zip ds rs)
   Con.MkDConDecl dconDecl0 <- findDCon dcon0
@@ -207,10 +213,10 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
           pure $ MkGrpMatchItem con (fmap (BName w . snd) ixs0) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps
 
-grpMatchExpr :: Pos -> GrpMatch v -> PM (Expr Out Void v)
+grpMatchExpr :: Pos -> GrpMatch tv ev -> PM (Expr Out tv ev)
 grpMatchExpr w (MkGrpMatch t is) =
   ECas w t <$> traverse (grpMatchItemAltn w) is
 
-grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (Case Out Void v)
+grpMatchItemAltn :: Pos -> GrpMatchItem tv ev -> PM (Case Out tv ev)
 grpMatchItemAltn w (MkGrpMatchItem con bs rm) =
   MkCase w con (fmap bindName bs) <$> pmMatch w rm

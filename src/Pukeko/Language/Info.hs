@@ -9,11 +9,13 @@ module Pukeko.Language.Info
   , findTCon
   , findDCon
   , findFun
+  , liftCatch
   ) where
 
 import           Control.Monad.Error.Class
 import           Control.Monad.State.Class
 import           Control.Monad.Reader
+import           Control.Monad.Supply
 import qualified Control.Monad.Trans.Reader  as Reader
 import           Control.Monad.Signatures    (Catch)
 import qualified Data.Map                    as Map
@@ -30,7 +32,11 @@ class Monad m => MonadInfo i m | m -> i where
   allFuns  :: (i ~ GenModuleInfo cons 'True) => m (Map.Map Id.EVar (Pos, TypeSchema))
 
 newtype InfoT i m a = InfoT{unInfoT :: ReaderT i m a}
-  deriving (Functor, Applicative, Monad, MonadTrans)
+  deriving ( Functor, Applicative, Monad, MonadTrans
+           , MonadError e
+           , MonadState s
+           , MonadSupply s
+           )
 
 runInfoT :: InfoT i m a -> i -> m a
 runInfoT = runReaderT . unInfoT
@@ -62,12 +68,3 @@ instance MonadReader r m => MonadReader r (InfoT i m) where
   ask = lift ask
   local = mapInfoT . local
   reader = lift . reader
-
-instance MonadError e m => MonadError e (InfoT i m) where
-  throwError = lift . throwError
-  catchError = liftCatch catchError
-
-instance MonadState s m => MonadState s (InfoT i m) where
-  get = lift get
-  put = lift . put
-  state = lift . state

@@ -1,4 +1,4 @@
-COMP = stack exec pukeko -- -l
+COMP = stack exec pukeko -- -l -t
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
@@ -26,6 +26,7 @@ SOURCES     = monad_io.pu \
 							sort_gen.pu \
 							rmq_gen.pu
 LAMBDAS     = $(SOURCES:.pu=.ll)
+TYPES       = $(SOURCES:.pu=.ti)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
 EXECUTABLES = $(SOURCES:.pu=)
@@ -55,11 +56,11 @@ gc.o: ../gc.c
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 clean:
-	rm -f $(LAMBDAS) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
+	rm -f $(LAMBDAS) $(TYPES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
 
 .PHONEY: all asm clean bench clean.bench
 
-.PRECIOUS: %.asm %.ll
+.PRECIOUS: %.asm %.ll %.ti
 
 bench: $(BENCHMARKS)
 

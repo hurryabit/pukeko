@@ -90,6 +90,7 @@ kcType k = \case
     ktp <- freshUVar
     kcType ktp tp
     kcType (Arrow ktp k) tf
+  TUni _ _ -> bug "kind checker" "universal quantificatio" Nothing
 
 kcTypDef :: [Con.TConDecl] -> KC n s ()
 kcTypDef tcons = do

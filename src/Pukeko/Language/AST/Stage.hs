@@ -11,45 +11,48 @@ data Renamer
 data TypeResolver
 data KindChecker
 data FunResolver
-data TypeChecker
+data TypeChecker (t :: * -> *)
 data PatternMatcher
 data DeadCode
+data TypeEraser
 data LambdaLifter
 data CoreCompiler
 
 type family StageId st where
-  StageId Parser         =   0
-  StageId Renamer        = 100
-  StageId TypeResolver   = 200
-  StageId FunResolver    = 250
-  StageId KindChecker    = 300
-  StageId TypeChecker    = 400
-  StageId PatternMatcher = 500
-  StageId DeadCode       = 600
-  StageId LambdaLifter   = 700
-  StageId CoreCompiler   = 999
+  StageId Parser          =   0
+  StageId Renamer         = 100
+  StageId TypeResolver    = 200
+  StageId FunResolver     = 250
+  StageId KindChecker     = 300
+  StageId (TypeChecker t) = 400
+  StageId PatternMatcher  = 500
+  StageId DeadCode        = 600
+  StageId TypeEraser      = 650
+  StageId LambdaLifter    = 700
+  StageId CoreCompiler    = 999
 
 type family StageType st where
-  StageType Parser         = NoType
-  StageType Renamer        = NoType
-  StageType TypeResolver   = NoType
-  StageType FunResolver    = NoType
-  StageType KindChecker    = NoType
-  StageType TypeChecker    = Type
-  StageType PatternMatcher = Type
-  StageType DeadCode       = Type
-  StageType LambdaLifter   = Type
-  StageType CoreCompiler   = Type
+  StageType Parser          = NoType
+  StageType Renamer         = NoType
+  StageType TypeResolver    = NoType
+  StageType FunResolver     = NoType
+  StageType KindChecker     = NoType
+  StageType (TypeChecker t) = t
+  StageType PatternMatcher  = Type
+  StageType DeadCode        = Type
+  StageType TypeEraser      = NoType
+  StageType LambdaLifter    = NoType
+  StageType CoreCompiler    = NoType
 
-type HasELam st = StageId st <=? 600
+type HasELam st = StageId st <=? 650
 type HasEMat st = StageId st <=? 400
-type HasETyp st = 1000 <=? StageId st
+type HasETyp st = (400 <=? StageId st) && (StageId st <=? 600)
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
                                         -- the pretty printer
 type HasTLLet st = StageId st <=? 350
-type HasTLDef st = (400 <=? StageId st) && (StageId st <=? 600)
+type HasTLDef st = (400 <=? StageId st) && (StageId st <=? 650)
 type HasTLSup st = 700 <=? StageId st
 
 type HasMICons st = 200 <=? StageId st

@@ -50,6 +50,7 @@ library:
   - containers
   - fclabels
   - lens
+  - monad-st
   - mtl
   - parsec
   - pretty
