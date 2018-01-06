@@ -9,12 +9,15 @@ module Pukeko.Language.AST.Std
   , TopLevel (..)
   , Defn (..)
   , Expr (..)
+  , Bind (..)
   , Case (..)
   , Altn (..)
   , Patn (..)
 
   , abstract
   , (//)
+
+  , bindEVar
 
   , module2tops
   , defn2rhs
@@ -25,6 +28,7 @@ module Pukeko.Language.AST.Std
 
   , retagDefn
   , retagExpr
+  , retagBind
 
   , Pos
   , module Pukeko.Language.AST.Scope
@@ -63,16 +67,15 @@ data TopLevel st
   | forall n. HasTLLet st ~ 'True =>
     TLRec Pos (Vector n (Defn st Void (EFinScope n Id.EVar)))
   | HasTLDef st ~ 'True =>
-    TLDef Pos Id.EVar (Expr st Void Id.EVar)
+    TLDef     (Bind st Void) (Expr st Void Id.EVar)
   | forall n. HasTLSup st ~ 'True =>
-    TLSup Pos Id.EVar (Vector n Id.EVar) (Expr st Void (EFinScope n Id.EVar))
+    TLSup     (Bind st Void) (Vector n (Bind st Void )) (Expr st Void (EFinScope n Id.EVar))
   | HasTLSup st ~ 'True =>
-    TLCaf Pos Id.EVar (Expr st Void Id.EVar)
-  | TLAsm Pos Id.EVar String
+    TLCaf     (Bind st Void) (Expr st Void Id.EVar)
+  | TLAsm     (Bind st Void) String
 
 data Defn st tv ev = MkDefn
-  { _defnPos :: Pos
-  , _defnLhs :: Id.EVar
+  { _defnLhs :: Bind st tv
   , _defnRhs :: Expr st tv ev
   }
 
@@ -82,7 +85,7 @@ data Expr st tv ev
   | ENum Pos Int
   | EApp Pos (Expr st tv ev) [Expr st tv ev]
   | forall n. HasELam st ~ 'True =>
-    ELam Pos (Vector n Id.EVar)                       (Expr st tv (EFinScope n ev))
+    ELam Pos (Vector n (Bind st tv))                  (Expr st tv (EFinScope n ev))
   | forall n.
     ELet Pos (Vector n (Defn st tv ev))               (Expr st tv (EFinScope n ev))
   | forall n.
@@ -95,6 +98,11 @@ data Expr st tv ev
     ETyAbs Pos Id.TVar (Expr st (TScope1 tv) ev)
   | HasETyp st ~ 'True =>
     ETyApp Pos (Expr st tv ev) (Type tv)
+
+data Bind st tv = MkBind
+  { _bindPos  :: Pos
+  , _bindEVar :: Id.EVar
+  }
 
 data Case st tv ev = forall n. MkCase
   { _casePos   :: Pos
@@ -116,6 +124,7 @@ data Patn
 
 -- * Derived optics
 makeLenses ''Defn
+makeLenses ''Bind
 
 -- * Abstraction and substition
 
@@ -158,7 +167,7 @@ module2tops ::
 module2tops f (MkModule info tops) = MkModule info <$> f tops
 
 defn2rhs :: Lens (Defn st1 tv ev1) (Defn st2 tv ev2) (Expr st1 tv ev1) (Expr st2 tv ev2)
-defn2rhs f (MkDefn w x e) = MkDefn w x <$> f e
+defn2rhs f (MkDefn b e) = MkDefn (retagBind b) <$> f e
 
 -- * Deep traversals
 type DConTraversal t =
@@ -166,7 +175,7 @@ type DConTraversal t =
   IndexedTraversal Pos (t st1 tv ev) (t st2 tv ev) Id.DCon Id.DCon
 
 defn2dcon :: DConTraversal Defn
-defn2dcon f (MkDefn w x e) = MkDefn w x <$> expr2dcon f e
+defn2dcon f (MkDefn b e) = MkDefn (retagBind b) <$> expr2dcon f e
 
 expr2dcon :: DConTraversal Expr
 expr2dcon f = \case
@@ -175,7 +184,7 @@ expr2dcon f = \case
   ENum w n       -> pure (ENum w n)
   EApp w t  us   -> EApp w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
   ECas w t  cs   -> ECas w <$> expr2dcon f t <*> (traverse . case2dcon) f cs
-  ELam w bs t    -> ELam w bs <$> expr2dcon f t
+  ELam w bs t    -> ELam w (fmap retagBind bs) <$> expr2dcon f t
   ELet w ds t    -> ELet w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   ERec w ds t    -> ERec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   EMat w t  as   -> EMat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
@@ -225,11 +234,14 @@ retagDefn = over defn2dcon id
 retagExpr :: (SameNodes st1 st2) => Expr st1 tv ev -> Expr st2 tv ev
 retagExpr = over expr2dcon id
 
+retagBind :: Bind st1 tv -> Bind st2 tv
+retagBind (MkBind w x) = MkBind w x
+
 -- * Manual instances
 instance FunctorWithIndex     Pos (Defn st tv) where
 instance FoldableWithIndex    Pos (Defn st tv) where
 instance TraversableWithIndex Pos (Defn st tv) where
-  itraverse f (MkDefn w x e) = MkDefn w x <$> itraverse f e
+  itraverse f (MkDefn b e) = MkDefn b <$> itraverse f e
 
 instance FunctorWithIndex     Pos (Expr st tv) where
 instance FoldableWithIndex    Pos (Expr st tv) where
@@ -264,11 +276,11 @@ instance TraversableWithIndex Pos (Altn st tv) where
 
 
 instance HasPos (Defn st tv ev) where
-  pos = defnPos
+  pos = defnLhs . bindPos
 
 instance HasLhs (Defn st tv ev) where
   type Lhs (Defn st tv ev) = Id.EVar
-  lhs = defnLhs
+  lhs = defnLhs . bindEVar
 
 instance HasRhs (Defn st tv ev) where
   type Rhs (Defn st tv ev) = Expr st tv ev
@@ -295,17 +307,17 @@ instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
       "val" <+> pretty x <+> colon <+> pretty t
     TLLet _ ds -> prettyDefns False ds
     TLRec _ ds -> prettyDefns True  ds
-    TLDef w x e -> "let" <+> pretty (MkDefn w x e)
-    TLSup _ x bs e ->
-      "let" <+> hang (pretty x <+> hsep (fmap pretty bs) <+> equals) 2 (pretty e)
-    TLCaf _ x t ->
-      "let" <+> hang (pretty x <+> equals) 2 (pretty t)
-    TLAsm _ x s ->
-      hsep ["external", pretty x, equals, text (show s)]
+    TLDef   b e -> "let" <+> pretty (MkDefn b e)
+    TLSup   b bs e ->
+      "let" <+> hang (pretty b <+> hsep (fmap pretty bs) <+> equals) 2 (pretty e)
+    TLCaf   b t ->
+      "let" <+> hang (pretty b <+> equals) 2 (pretty t)
+    TLAsm   b s ->
+      hsep ["external", pretty b, equals, text (show s)]
 
 instance (IsEVar ev, IsTVar tv) => Pretty (Defn st tv ev) where
-  pPrintPrec lvl _ (MkDefn _ x t) =
-    hang (pPrintPrec lvl 0 x <+> equals) 2 (pPrintPrec lvl 0 t)
+  pPrintPrec lvl _ (MkDefn b t) =
+    hang (pPrintPrec lvl 0 b <+> equals) 2 (pPrintPrec lvl 0 t)
 
 prettyDefns :: (IsEVar ev, IsTVar tv) => Bool -> Vector n (Defn st tv ev) -> Doc
 prettyDefns isrec ds = case toList ds of
@@ -360,6 +372,9 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Expr st tv ev) where
     ETyApp _ e t ->
       maybeParens (prec > Op.aprec)
       $ pPrintPrec lvl Op.aprec e <+> "@" <> pPrintPrec lvl 3 t
+
+instance (IsTVar tv) => Pretty (Bind st tv) where
+  pPrintPrec _ _ (MkBind _ x) = pretty x
 
 instance (IsEVar ev, IsTVar tv) => Pretty (Case st tv ev) where
   pPrintPrec lvl _ (MkCase _ c bs t) =

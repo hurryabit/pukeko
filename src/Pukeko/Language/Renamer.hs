@@ -45,7 +45,8 @@ localize bs = Rn . withReaderT upd . unRn
       in  MkEnv bound1 (Free . mkFree)
 
 localizeDefns :: Vec.Vector n (Ps.Defn _) -> Rn (EFinScope n ev) a -> Rn ev a
-localizeDefns = localize . ifoldMap (\i (Ps.MkDefn _ x _) -> Map.singleton x i)
+localizeDefns =
+  localize . ifoldMap (\i (Ps.MkDefn (Ps.MkBind _ x) _) -> Map.singleton x i)
 
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
 rnTopLevel top = case top of
@@ -55,7 +56,7 @@ rnTopLevel top = case top of
     TLLet w <$> traverse rnDefn ds1
   Ps.TLRec w ds0 -> Vec.withList ds0 $ \ds1 ->
     localizeDefns ds1 $ TLRec w <$> traverse rnDefn ds1
-  Ps.TLAsm w x a -> pure (TLAsm w x a)
+  Ps.TLAsm w x a -> pure (TLAsm (MkBind w x) a)
 
 rnTConDecl :: Ps.TConDecl -> Rn ev Con.TConDecl
 rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
@@ -74,7 +75,7 @@ rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
       Nothing -> throw "unknown type variable" x
 
 rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out Void ev)
-rnDefn (Ps.MkDefn w x e) = MkDefn w x <$> rnExpr e
+rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
 rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out Void ev)
 rnExpr = \case
@@ -84,13 +85,16 @@ rnExpr = \case
   Ps.ENum w n -> pure (ENum w n)
   Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es
   Ps.EMat w e0  as -> EMat w <$> rnExpr e0 <*> traverse rnAltn as
-  Ps.ELam w bs0 e0 -> Vec.withList bs0 $ \bs1 -> do
-    let bs2 = ifoldMap (flip Map.singleton) bs1
+  Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
+    let bs2 = ifoldMap (\i (MkBind _ x) -> Map.singleton x i) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0)
   Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     ELet w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
   Ps.ERec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
+
+rnBind :: Ps.Bind -> Bind Out Void
+rnBind (Ps.MkBind w x) = MkBind w x
 
 rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
 rnAltn (Ps.MkAltn w p0 e) = do

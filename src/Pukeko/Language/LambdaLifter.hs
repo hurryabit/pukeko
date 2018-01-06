@@ -72,13 +72,13 @@ llExpr = \case
     -- not break the tests right now.
     let capturedL = sortOn baseName $ Set.toList capturedS
     Vec.withList capturedL $ \(capturedV :: Vec.Vector m (EFinScope n v)) -> do
-      let newBinds = fmap baseName capturedV Vec.++ oldBinds
+      let newBinds = fmap (MkBind w . baseName) capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
             Free  v   -> Free  (baseName v)
       let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (baseName v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
-      tell [TLSup w lhs newBinds (fmap (rename Map.!) rhs)]
+      tell [TLSup (MkBind w lhs) (fmap retagBind newBinds) (fmap (rename Map.!) rhs)]
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
@@ -93,7 +93,7 @@ llCase (MkCase w c bs e) = MkCase w c bs <$> scoped (llExpr e)
 
 llTopLevel :: TopLevel In -> LL Id.EVar ()
 llTopLevel = \case
-  TLDef w lhs rhs -> do
+  TLDef (MkBind w lhs) rhs -> do
     put $ Id.freshEVars "ll" lhs
     case rhs of
       ELam{} -> do
@@ -102,8 +102,8 @@ llTopLevel = \case
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [TLCaf w lhs rhs]
-  TLAsm w lhs asm -> tell [TLAsm w lhs asm]
+        tell [TLCaf (MkBind w lhs) rhs]
+  TLAsm b asm -> tell [TLAsm (retagBind b) asm]
 
 liftModule :: Std.Module In -> Std.Module Out
 liftModule = over module2tops (execLL . traverse_ llTopLevel)

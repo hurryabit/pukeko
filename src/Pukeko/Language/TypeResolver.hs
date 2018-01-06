@@ -77,7 +77,7 @@ trTopLevel top = case top of
   TLVal w x ts -> TLVal w x <$> trTypeSchema w ts
   TLLet w ds   -> TLLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
   TLRec w ds   -> TLRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
-  TLAsm w x a  -> pure (TLAsm w x a)
+  TLAsm   b a  -> pure (TLAsm (retagBind b) a)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
 resolveModule (MkModule _info0 tops0) = do

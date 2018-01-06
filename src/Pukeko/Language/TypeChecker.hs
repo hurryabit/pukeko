@@ -210,12 +210,12 @@ checkTopLevel :: TopLevel In -> TC Id.EVar s [TopLevel Out]
 checkTopLevel = \case
   TLLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
   TLRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
-  TLAsm w ident asm -> pure [TLAsm w ident asm]
+  TLAsm   b asm -> pure [TLAsm (retagBind b) asm]
   where
     handleLetOrRec inferLetOrRec mkTopExpr defns = do
       resetFresh
       t_defns <- inferLetOrRec defns
-      for (toList (Vec.zip defns t_defns)) $ \(MkDefn w x e, t_defn0) -> do
+      for (toList (Vec.zip defns t_defns)) $ \(MkDefn b@(MkBind w x) e, t_defn0) -> do
         t_defn <- instantiate t_defn0
         -- NOTE: If we instantiate the type schema, universally quantified type
         -- variables would be turned into unification variables and the
@@ -225,7 +225,7 @@ checkTopLevel = \case
         -- let f = fun x -> x
         MkUTypeSchema _ t_decl <- lookupType x
         unify w t_decl t_defn
-        pure (TLDef w x (mkTopExpr e))
+        pure (TLDef (retagBind b) (mkTopExpr e))
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule (MkModule decls tops)=

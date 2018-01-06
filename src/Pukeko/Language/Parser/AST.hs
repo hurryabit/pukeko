@@ -9,6 +9,7 @@ module Pukeko.Language.Parser.AST
   , DConDecl (..)
   , Defn (..)
   , Expr (..)
+  , Bind (..)
   , Altn (..)
   , Patn (..)
 
@@ -47,7 +48,7 @@ data DConDecl = MkDConDecl
   , _fields :: [Type Id.TVar]
   }
 
-data Defn v = MkDefn Pos Id.EVar (Expr v)
+data Defn v = MkDefn Bind (Expr v)
 
 data Expr v
   = EVar Pos v
@@ -55,9 +56,11 @@ data Expr v
   | ENum Pos Int
   | EApp Pos (Expr v) [Expr v]
   | EMat Pos (Expr v) [Altn v]
-  | ELam Pos [Id.EVar] (Expr v)
+  | ELam Pos [Bind] (Expr v)
   | ELet Pos [Defn v] (Expr v)
   | ERec Pos [Defn v] (Expr v)
+
+data Bind = MkBind Pos Id.EVar
 
 data Altn v = MkAltn Pos Patn (Expr v)
 
@@ -82,7 +85,7 @@ mkIf wt t wu u wv v =
             , MkAltn wv (PCon wv (Id.dcon "False") []) v
             ]
 
-mkLam :: Pos -> [Id.EVar] -> Expr v -> Expr v
-mkLam pos patns expr
-  | null patns = expr
-  | otherwise  = ELam pos patns expr
+mkLam :: Pos -> [Bind] -> Expr v -> Expr v
+mkLam w bs e
+  | null bs   = e
+  | otherwise = ELam w bs e

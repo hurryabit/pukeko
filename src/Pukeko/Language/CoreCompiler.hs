@@ -45,17 +45,17 @@ scoped = CC . mapInfoT (withReaderT (scope (const Nothing))) . unCC
 
 ccTopLevel :: In.TopLevel In -> CC Id.EVar TopLevel
 ccTopLevel = \case
-  In.TLSup _ x bs t ->
-    Def (name x) (map (Just . name) (toList bs)) <$> scoped (ccExpr t)
-  In.TLCaf _ x    t ->
+  In.TLSup (In.MkBind _ x) bs t ->
+    Def (name x) (map (Just . name . In._bindEVar) (toList bs)) <$> scoped (ccExpr t)
+  In.TLCaf (In.MkBind _ x)    t ->
     Def (name x) [] <$> ccExpr t
-  In.TLAsm _ x    s -> do
+  In.TLAsm (In.MkBind _ x)    s -> do
     let n = MkName s
     at x ?= n
     pure (Asm n)
 
 ccDefn :: IsEVar v => In.Defn In Void v -> CC v Defn
-ccDefn (In.MkDefn _ v t) = MkDefn (name v) <$> ccExpr t
+ccDefn (In.MkDefn (In.MkBind _ v) t) = MkDefn (name v) <$> ccExpr t
 
 ccExpr :: IsEVar v => In.Expr In Void v -> CC v Expr
 ccExpr = \case

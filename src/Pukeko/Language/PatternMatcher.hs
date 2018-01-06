@@ -18,7 +18,7 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
 import           Pukeko.Language.Info
-import           Pukeko.Language.AST.Std
+import           Pukeko.Language.AST.Std            hiding (Bind (..))
 import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.Ident              as Id
@@ -45,7 +45,7 @@ pmExpr = \case
   ECon w c          -> pure (ECon w c)
   ENum w n          -> pure (ENum w n)
   EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
-  ELam w bs t       -> ELam w bs <$> pmExpr t
+  ELam w bs t       -> ELam w (fmap retagBind bs) <$> pmExpr t
   ELet w ds t       -> ELet w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
   ERec w ds t       -> ERec w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
   EMat w t0 as0     -> LS.withList as0 $ \case
@@ -56,10 +56,10 @@ pmExpr = \case
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
-  TLDef w f t -> do
-    put (Id.freshEVars "pm" f)
-    TLDef w f <$> pmExpr t
-  TLAsm w f a -> pure (TLAsm w f a)
+  TLDef b t -> do
+    put (Id.freshEVars "pm" (b^.bindEVar))
+    TLDef (retagBind b) <$> pmExpr t
+  TLAsm b a -> pure (TLAsm (retagBind b) a)
 
 compileModule :: MonadError String m => Module In -> m (Module Out)
 compileModule (MkModule decls tops) =

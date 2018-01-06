@@ -115,12 +115,12 @@ apatn = PWld <$> getPosition <*  symbol "_"       <|>
         parens patn
 
 defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
-defnValLhs = MkDefn <$> getPosition <*> evar
+defnValLhs = MkDefn <$> bind
 
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
-  (.) <$> (MkDefn <$> getPosition <*> evar)
-      <*> (ELam <$> getPosition <*> many1 evar)
+  (.) <$> (MkDefn <$> bind)
+      <*> (ELam <$> getPosition <*> many1 bind)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
@@ -156,7 +156,7 @@ expr =
     <*> (reserved "with"  *> many1 altn)
   , ELam
     <$> getPosition
-    <*> (reserved "fun" *> many1 evar)
+    <*> (reserved "fun" *> many1 bind)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]
@@ -167,6 +167,9 @@ aexpr = choice
   , ENum <$> getPosition <*> nat
   , parens expr
   ]
+
+bind :: Parser Bind
+bind = MkBind <$> getPosition <*> evar
 
 operatorTable = map (map f) (reverse Op.table)
   where

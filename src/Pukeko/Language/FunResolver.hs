@@ -51,8 +51,8 @@ declareFun w fun typ = do
   when dup (throwAt w "duplicate declaration of function" fun)
   declared . at fun ?= (w, typ)
 
-defineFun :: Pos -> Id.EVar -> FR ()
-defineFun w fun = do
+defineFun :: Bind In Void -> FR ()
+defineFun (MkBind w fun) = do
   ex <- uses declared (has (ix fun))
   unless ex (throwAt w "undeclared function" fun)
   dup <- use (defined . contains fun)
@@ -79,8 +79,8 @@ frTopLevel = \case
     traverse_ defineFun' ds0
     ds1 <- traverse (itraverse (traverse . useFun)) ds0
     pure (TLRec w (fmap retagDefn ds1))
-  TLAsm w x s -> do
-    defineFun w x
-    pure (TLAsm w x s)
+  TLAsm b s -> do
+    defineFun b
+    pure (TLAsm (retagBind b) s)
   where
-    defineFun' (MkDefn w fun _) = defineFun w fun
+    defineFun' (MkDefn b _) = defineFun b
