@@ -8,9 +8,11 @@ import qualified Data.Graph    as G
 import qualified Data.Set      as Set
 import qualified Data.Set.Lens as Set
 
+import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.Ident              as Id
+import           Pukeko.Language.Type               (Type)
 
 type In  = St.PatternMatcher
 type Out = St.DeadCode
@@ -26,12 +28,12 @@ cleanModule = over module2tops $ \tops0 ->
     deps = Set.toList . Set.setOf (topLevel2expr . traverse)
 
 topLevelLhs :: TopLevel In -> Id.EVar
-topLevelLhs = \case
-  TLDef (MkBind _ x) _ -> x
-  TLAsm (MkBind _ x) _ -> x
+topLevelLhs = view lhs . \case
+  TLDef b _ -> b
+  TLAsm b _ -> b
 
 topLevel2expr ::
-  St.HasTLDef st ~ 'True =>
+  (St.HasTLDef st ~ 'True, St.StageType st ~ Type) =>
   Traversal (TopLevel In) (TopLevel st) (Expr In Void Id.EVar) (Expr st Void Id.EVar)
 topLevel2expr f = \case
   TLDef b e -> TLDef (retagBind b) <$> f e

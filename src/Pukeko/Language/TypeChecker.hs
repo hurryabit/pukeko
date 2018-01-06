@@ -27,7 +27,7 @@ import qualified Pukeko.Language.AST.ConDecl       as Con
 import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
-import           Pukeko.Language.Type              (typeInt)
+import           Pukeko.Language.Type              (NoType (..), typeInt)
 import           Pukeko.Language.TypeChecker.UType
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
@@ -206,16 +206,21 @@ infer = \case
         unify w t_res t_rhs
       return t_res
 
+tagInt :: Expr In tv ev -> TC ev s (Expr Out tv ev)
+tagInt = expr2type (\NoType -> pure undefined)
+
+-- FIXME: Define types.
+-- TODO: Use @NoType@ pattern where possible
 checkTopLevel :: TopLevel In -> TC Id.EVar s [TopLevel Out]
 checkTopLevel = \case
-  TLLet _ defns -> handleLetOrRec inferLet  retagExpr                 defns
-  TLRec _ defns -> handleLetOrRec inferRec (retagExpr . fmap unscope) defns
-  TLAsm   b asm -> pure [TLAsm (retagBind b) asm]
+  TLLet _ defns -> handleLetOrRec inferLet  tagInt                 defns
+  TLRec _ defns -> handleLetOrRec inferRec (tagInt . fmap unscope) defns
+  TLAsm (MkBind w x NoType) asm -> pure [TLAsm (MkBind w x undefined) asm]
   where
     handleLetOrRec inferLetOrRec mkTopExpr defns = do
       resetFresh
       t_defns <- inferLetOrRec defns
-      for (toList (Vec.zip defns t_defns)) $ \(MkDefn b@(MkBind w x) e, t_defn0) -> do
+      for (toList (Vec.zip defns t_defns)) $ \(MkDefn (MkBind w x NoType) e, t_defn0) -> do
         t_defn <- instantiate t_defn0
         -- NOTE: If we instantiate the type schema, universally quantified type
         -- variables would be turned into unification variables and the
@@ -225,7 +230,7 @@ checkTopLevel = \case
         -- let f = fun x -> x
         MkUTypeSchema _ t_decl <- lookupType x
         unify w t_decl t_defn
-        pure (TLDef (retagBind b) (mkTopExpr e))
+        TLDef (MkBind w x undefined) <$> mkTopExpr e
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule (MkModule decls tops)=

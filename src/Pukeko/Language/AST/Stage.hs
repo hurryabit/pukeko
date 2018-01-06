@@ -4,6 +4,8 @@ module Pukeko.Language.AST.Stage where
 
 import GHC.TypeLits
 
+import Pukeko.Language.Type (NoType, Type)
+
 data Parser
 data Renamer
 data TypeResolver
@@ -26,6 +28,18 @@ type family StageId st where
   StageId DeadCode       = 600
   StageId LambdaLifter   = 700
   StageId CoreCompiler   = 999
+
+type family StageType st where
+  StageType Parser         = NoType
+  StageType Renamer        = NoType
+  StageType TypeResolver   = NoType
+  StageType FunResolver    = NoType
+  StageType KindChecker    = NoType
+  StageType TypeChecker    = Type
+  StageType PatternMatcher = Type
+  StageType DeadCode       = Type
+  StageType LambdaLifter   = Type
+  StageType CoreCompiler   = Type
 
 type HasELam st = StageId st <=? 600
 type HasEMat st = StageId st <=? 400
@@ -53,6 +67,8 @@ type SameNodes st1 st2 =
   , HasEMat st1 ~ HasEMat st2
   , HasETyp st1 ~ HasETyp st2
   )
+
+type SameTypes st1 st2 = (StageType st1 ~ StageType st2)
 
 type SameModuleInfo st1 st2 =
   ( HasMICons st1 ~ HasMICons st2

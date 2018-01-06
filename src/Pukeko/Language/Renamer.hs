@@ -17,7 +17,7 @@ import qualified Pukeko.Language.AST.ConDecl    as Con
 import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Parser.AST     as Ps
 import qualified Pukeko.Language.Ident          as Id
-import           Pukeko.Language.Type           (toSchema)
+import           Pukeko.Language.Type           (NoType (..), toSchema)
 
 type Out = St.Renamer
 
@@ -56,7 +56,7 @@ rnTopLevel top = case top of
     TLLet w <$> traverse rnDefn ds1
   Ps.TLRec w ds0 -> Vec.withList ds0 $ \ds1 ->
     localizeDefns ds1 $ TLRec w <$> traverse rnDefn ds1
-  Ps.TLAsm w x a -> pure (TLAsm (MkBind w x) a)
+  Ps.TLAsm w x a -> pure (TLAsm (MkBind w x NoType) a)
 
 rnTConDecl :: Ps.TConDecl -> Rn ev Con.TConDecl
 rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
@@ -86,7 +86,7 @@ rnExpr = \case
   Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es
   Ps.EMat w e0  as -> EMat w <$> rnExpr e0 <*> traverse rnAltn as
   Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
-    let bs2 = ifoldMap (\i (MkBind _ x) -> Map.singleton x i) bs1
+    let bs2 = ifoldMap (\i (MkBind _ x NoType) -> Map.singleton x i) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0)
   Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     ELet w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
@@ -94,7 +94,7 @@ rnExpr = \case
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
 rnBind :: Ps.Bind -> Bind Out Void
-rnBind (Ps.MkBind w x) = MkBind w x
+rnBind (Ps.MkBind w x) = MkBind w x NoType
 
 rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
 rnAltn (Ps.MkAltn w p0 e) = do

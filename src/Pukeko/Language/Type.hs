@@ -2,7 +2,8 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Language.Type
-  ( Type (..)
+  ( NoType (..)
+  , Type (..)
   , TypeSchema (..)
   , (~>)
   , (*~>)
@@ -28,6 +29,8 @@ import qualified Pukeko.Language.Ident as Id
 import           Pukeko.Language.AST.Scope
 
 infixr 1 ~>, *~>
+
+data NoType tv = NoType
 
 data Type tv
   = TVar tv

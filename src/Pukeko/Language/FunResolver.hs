@@ -52,7 +52,7 @@ declareFun w fun typ = do
   declared . at fun ?= (w, typ)
 
 defineFun :: Bind In Void -> FR ()
-defineFun (MkBind w fun) = do
+defineFun (MkBind w fun NoType) = do
   ex <- uses declared (has (ix fun))
   unless ex (throwAt w "undeclared function" fun)
   dup <- use (defined . contains fun)

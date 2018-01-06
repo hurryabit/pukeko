@@ -11,6 +11,7 @@ import           Data.Foldable     (toList)
 import qualified Data.Map          as Map
 
 import           Pukeko.Core.Syntax
+import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Scope
 import qualified Pukeko.Language.AST.ConDecl      as Con
 import qualified Pukeko.Language.AST.Std          as In
@@ -40,22 +41,24 @@ compileModule (In.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
 
+bindName :: In.Bind In Void -> Name
+bindName = name . view lhs
+
 scoped :: CC (EScope i v) a -> CC v a
 scoped = CC . mapInfoT (withReaderT (scope (const Nothing))) . unCC
 
 ccTopLevel :: In.TopLevel In -> CC Id.EVar TopLevel
 ccTopLevel = \case
-  In.TLSup (In.MkBind _ x) bs t ->
-    Def (name x) (map (Just . name . In._bindEVar) (toList bs)) <$> scoped (ccExpr t)
-  In.TLCaf (In.MkBind _ x)    t ->
-    Def (name x) [] <$> ccExpr t
-  In.TLAsm (In.MkBind _ x)    s -> do
+  In.TLSup b bs t ->
+    Def (bindName b) (map (Just . bindName) (toList bs)) <$> scoped (ccExpr t)
+  In.TLCaf b    t -> Def (bindName b) [] <$> ccExpr t
+  In.TLAsm b    s -> do
     let n = MkName s
-    at x ?= n
+    at (b^.lhs) ?= n
     pure (Asm n)
 
 ccDefn :: IsEVar v => In.Defn In Void v -> CC v Defn
-ccDefn (In.MkDefn (In.MkBind _ v) t) = MkDefn (name v) <$> ccExpr t
+ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
 ccExpr :: IsEVar v => In.Expr In Void v -> CC v Expr
 ccExpr = \case
