@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Pukeko.Language.TypeChecker.Type
+module Pukeko.Language.TypeChecker.UType
   ( UType (..)
   , UVar (..)
   , (~>)
@@ -30,40 +30,40 @@ import qualified Pukeko.Language.Ident as Id
 
 infixr 1 ~>, *~>
 
-data UVar s tv
-  = UFree tv Int  -- NOTE: The @Int@ is the level of this unification variable.
-  | ULink (UType s tv)
+data UVar s
+  = UFree Id.TVar Int  -- NOTE: The @Int@ is the level of this unification variable.
+  | ULink (UType s)
 
-data UType s tv
-  = UTVar tv
+data UType s
+  = UTVar Id.TVar
   | UTArr
   | UTCon Id.TCon
-  | UTApp (UType s tv) (UType s tv)
-  | UVar (STRef s (UVar s tv))
+  | UTApp (UType s) (UType s)
+  | UVar (STRef s (UVar s))
 
-pattern UTFun :: UType s tv -> UType s tv -> UType s tv
+pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp UTArr tx) ty
 
-(~>) :: UType s tv -> UType s tv -> UType s tv
+(~>) :: UType s -> UType s -> UType s
 (~>) = UTFun
 
-(*~>) :: [UType s tv] -> UType s tv -> UType s tv
+(*~>) :: [UType s] -> UType s -> UType s
 t_args *~> t_res = foldr (~>) t_res t_args
 
-appN :: UType s tv -> [UType s tv] -> UType s tv
+appN :: UType s -> [UType s] -> UType s
 appN = foldl UTApp
 
-appTCon :: Id.TCon -> [UType s tv] -> UType s tv
+appTCon :: Id.TCon -> [UType s] -> UType s
 appTCon = appN . UTCon
 
-open :: Type tv -> UType s tv
+open :: Type Id.TVar -> UType s
 open = \case
   TVar x     -> UTVar x
   TArr       -> UTArr
   TCon c     -> UTCon c
   TApp tf tp -> UTApp (open tf) (open tp)
 
-vars :: Ord tv => UType s tv -> ST s (Set.Set tv)
+vars :: UType s -> ST s (Set.Set Id.TVar)
 vars = \case
   UTVar v -> pure (Set.singleton v)
   UTArr   -> pure Set.empty
@@ -75,14 +75,11 @@ vars = \case
       UFree _ _ -> pure Set.empty
       ULink t   -> vars t
 
-subst ::
-  forall s tv.
-  (Show tv, Ord tv) =>
-  Map.Map tv (UType s tv) -> UType s tv -> ST s (UType s tv)
+subst :: Map.Map Id.TVar (UType s) -> UType s -> ST s (UType s)
 subst env t = runReaderT (subst' t) env
   where
-    subst' :: UType s tv
-           -> ReaderT (Map.Map tv (UType s tv)) (ST s) (UType s tv)
+    subst' :: UType s
+           -> ReaderT (Map.Map Id.TVar (UType s)) (ST s) (UType s)
     subst' = \case
       UTVar x -> do
         let e = bug "type instantiation" "unknown variable" (Just $ show x)
@@ -99,12 +96,12 @@ subst env t = runReaderT (subst' t) env
 -- * Deep traversals
 
 -- * Pretty printing
-prettyUVar :: Pretty tv => PrettyLevel -> Rational -> UVar s tv -> ST s Doc
+prettyUVar :: PrettyLevel -> Rational -> UVar s -> ST s Doc
 prettyUVar lvl prec = \case
   UFree x _ -> pure (pretty x)
   ULink t   -> prettyUType lvl prec t
 
-prettyUType :: Pretty tv => PrettyLevel -> Rational -> UType s tv -> ST s Doc
+prettyUType :: PrettyLevel -> Rational -> UType s -> ST s Doc
 prettyUType lvl prec = \case
   UTVar v -> pure (pretty v)
   UTArr   -> pure "(->)"

@@ -26,14 +26,14 @@ import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
 import           Pukeko.Language.Type              (TypeSchema (..), typeInt)
-import           Pukeko.Language.TypeChecker.Type
+import           Pukeko.Language.TypeChecker.UType
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
 type In  = St.KindChecker
 type Out = St.TypeChecker
 
 data Environment v s = MkEnvironment
-  { _locals :: Sc.EnvOf v (UType s Id.TVar)
+  { _locals :: Sc.EnvOf v (UType s)
   , _level  :: Int
   }
 makeLenses ''Environment
@@ -66,27 +66,27 @@ liftST = TC . lift . lift . lift . lift
 resetFresh :: TC v s ()
 resetFresh = fresh .= Id.freshTVars
 
-freshUVar :: TC v s (UType s Id.TVar)
+freshUVar :: TC v s (UType s)
 freshUVar = do
   x <- fresh %%= (\(x:xs) -> (x,xs))
   l <- view level
   UVar <$> liftST (newSTRef (UFree x l))
 
-unify :: Pos -> UType s Id.TVar -> UType s Id.TVar -> TC v s ()
+unify :: Pos -> UType s -> UType s -> TC v s ()
 unify w t1 t2 = TC $ lift $ lift $ lift $ U.unify w t1 t2
 
 localize ::
   forall i v s a.
   (IsVarLevel i, IsVar v) =>
-  EnvLevelOf i (UType s Id.TVar) ->
+  EnvLevelOf i (UType s) ->
   TC (EScope i v) s a ->
   TC v s a
 localize ts = TC . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
-lookupType :: (IsVar v, Pretty v) => v -> TC v s (UType s Id.TVar)
+lookupType :: (IsVar v, Pretty v) => v -> TC v s (UType s)
 lookupType = views locals . Sc.lookupEnv
 
-generalize :: UType s Id.TVar -> TC v s (UType s Id.TVar)
+generalize :: UType s -> TC v s (UType s)
 generalize t0 = case t0 of
   (UVar uref) -> do
     uvar <- liftST $ readSTRef uref
@@ -101,20 +101,20 @@ generalize t0 = case t0 of
   UTCon{} -> pure t0
   UTApp tf tp -> UTApp <$> generalize tf <*> generalize tp
 
-instantiate :: UType s Id.TVar -> TC v s (UType s Id.TVar)
+instantiate :: UType s -> TC v s (UType s)
 instantiate t = do
   xs <- liftST $ vars t
   env <- sequence $ Map.fromSet (const freshUVar) xs
   liftST $ subst env t
 
-instantiateTCon :: Id.TCon -> TC v s (UType s Id.TVar, Map.Map Id.TVar (UType s Id.TVar))
+instantiateTCon :: Id.TCon -> TC v s (UType s, Map.Map Id.TVar (UType s))
 instantiateTCon tcon = do
   Con.MkTConDecl{_params} <- findTCon tcon
   let params = toList _params
   t_params <- traverse (const freshUVar) params
   return (appTCon tcon t_params, Map.fromList (zip params t_params))
 
-inferPatn :: Patn -> UType s Id.TVar -> TC v s (Map.Map Id.EVar (UType s Id.TVar))
+inferPatn :: Patn -> UType s -> TC v s (Map.Map Id.EVar (UType s))
 inferPatn patn t_expr = case patn of
   PVar (BWild _) -> return Map.empty
   PVar (BName _ ident) -> return (Map.singleton ident t_expr)
@@ -132,7 +132,7 @@ inferPatn patn t_expr = case patn of
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
   :: (IsEVar v)
-  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UType s Id.TVar))
+  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UType s))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -144,7 +144,7 @@ inferLet defns = do
 
 inferRec
   :: (IsEVar v)
-  => Vec.Vector n (Defn In (EFinScope n v)) -> TC v s (Vec.Vector n (UType s Id.TVar))
+  => Vec.Vector n (Defn In (EFinScope n v)) -> TC v s (Vec.Vector n (UType s))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -154,7 +154,7 @@ inferRec defns = do
     return t_rhss
   traverse generalize t_rhss
 
-infer :: IsEVar v => Expr In v -> TC v s (UType s Id.TVar)
+infer :: IsEVar v => Expr In v -> TC v s (UType s)
 infer = \case
     EVar _ ident -> do
       t <- lookupType ident
