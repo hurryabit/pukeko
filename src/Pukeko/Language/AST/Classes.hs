@@ -17,6 +17,3 @@ class HasRhs a where
 class HasRhs1 (t :: * -> *) where
   type Rhs1 t :: * -> *
   rhs1 :: Lens (t a) (t b) (Rhs1 t a) (Rhs1 t b)
-
-class HasRhs2 (t :: (* -> *) -> * -> *) where
-  rhs2 :: Lens (t f a) (t g b) (f a) (g b)

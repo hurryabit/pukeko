@@ -7,8 +7,7 @@ module Pukeko.Language.AST.Std
   , ModuleInfo
   , Module (..)
   , TopLevel (..)
-  , GenDefn (..)
-  , Defn
+  , Defn (..)
   , Expr (..)
   , Case (..)
   , Altn (..)
@@ -75,14 +74,11 @@ data TopLevel st
   | HasTLSup st ~ 'True => TLCaf Pos Id.EVar (Expr st Id.EVar)
   |                         TLAsm Pos Id.EVar String
 
-data GenDefn expr v = MkDefn
+data Defn st v = MkDefn
   { _defnPos :: Pos
   , _defnLhs :: Id.EVar
-  , _defnRhs :: expr v
+  , _defnRhs :: Expr st v
   }
-  deriving (Functor, Foldable, Traversable)
-
-type Defn st = GenDefn (Expr st)
 
 data Expr st v
   =           EVar Pos v
@@ -118,7 +114,7 @@ data Bind
 
 
 -- * Derived optics
-makeLenses ''GenDefn
+makeLenses ''Defn
 makePrisms ''Bind
 
 
@@ -180,7 +176,7 @@ type ExprConTraversal t =
   IndexedTraversal Pos (t st1 v) (t st2 v) Id.DCon Id.DCon
 
 defn2dcon :: ExprConTraversal Defn
-defn2dcon = rhs2 . expr2dcon
+defn2dcon f (MkDefn w x e) = MkDefn w x <$> expr2dcon f e
 
 expr2dcon :: ExprConTraversal Expr
 expr2dcon f = \case
@@ -242,9 +238,9 @@ retagExpr ::
 retagExpr = over expr2dcon id
 
 -- * Manual instances
-instance TraversableWithIndex Pos expr => FunctorWithIndex     Pos (GenDefn expr) where
-instance TraversableWithIndex Pos expr => FoldableWithIndex    Pos (GenDefn expr) where
-instance TraversableWithIndex Pos expr => TraversableWithIndex Pos (GenDefn expr) where
+instance FunctorWithIndex     Pos (Defn st) where
+instance FoldableWithIndex    Pos (Defn st) where
+instance TraversableWithIndex Pos (Defn st) where
   itraverse f (MkDefn w x e) = MkDefn w x <$> itraverse f e
 
 instance FunctorWithIndex     Pos (Expr st) where
@@ -277,23 +273,20 @@ instance TraversableWithIndex Pos (Altn st) where
 
 
 
-instance HasPos (GenDefn expr v) where
+instance HasPos (Defn st v) where
   pos = defnPos
 
-instance HasLhs (GenDefn expr v) where
-  type Lhs (GenDefn expr v) = Id.EVar
+instance HasLhs (Defn st v) where
+  type Lhs (Defn st v) = Id.EVar
   lhs = defnLhs
 
-instance HasRhs (GenDefn expr v) where
-  type Rhs (GenDefn expr v) = expr v
+instance HasRhs (Defn st v) where
+  type Rhs (Defn st v) = Expr st v
   rhs = defnRhs
 
-instance HasRhs1 (GenDefn expr) where
-  type Rhs1 (GenDefn expr) = expr
+instance HasRhs1 (Defn st) where
+  type Rhs1 (Defn st) = Expr st
   rhs1 = defnRhs
-
-instance HasRhs2 GenDefn where
-  rhs2 = defnRhs
 
 instance HasPos (Expr std v) where
   pos f = \case
@@ -403,6 +396,10 @@ prettyBinds :: Vector n Bind -> Doc
 prettyBinds = hsep . map pretty . toList
 
 -- * Derived instances
+deriving instance Functor     (Defn st)
+deriving instance Foldable    (Defn st)
+deriving instance Traversable (Defn st)
+
 deriving instance Functor     (Expr st)
 deriving instance Foldable    (Expr st)
 deriving instance Traversable (Expr st)

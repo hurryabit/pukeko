@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 -- | Transform AST to use type safe de Bruijn indices.
 module Pukeko.Language.Renamer
   ( renameModule
@@ -12,7 +11,6 @@ import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
-import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage      as St
 import qualified Pukeko.Language.AST.ConDecl    as Con
@@ -46,8 +44,8 @@ localize bs = Rn . withReaderT upd . unRn
       let bound1 = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free bound0
       in  MkEnv bound1 (Free . mkFree)
 
-localizeDefns :: Vec.Vector n (GenDefn _ _) -> Rn (EFinScope n ev) a -> Rn ev a
-localizeDefns = localize . ifoldMap (\i d -> Map.singleton (d^.lhs) i)
+localizeDefns :: Vec.Vector n (Ps.Defn _) -> Rn (EFinScope n ev) a -> Rn ev a
+localizeDefns = localize . ifoldMap (\i (Ps.MkDefn _ x _) -> Map.singleton x i)
 
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
 rnTopLevel top = case top of
@@ -76,7 +74,7 @@ rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
       Nothing -> throw "unknown type variable" x
 
 rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out ev)
-rnDefn = rhs2 rnExpr
+rnDefn (Ps.MkDefn w x e) = MkDefn w x <$> rnExpr e
 
 rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out ev)
 rnExpr = \case
@@ -86,7 +84,7 @@ rnExpr = \case
   Ps.ENum w n -> pure (ENum w n)
   Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es
   Ps.EMat w e0  as -> EMat w <$> rnExpr e0 <*> traverse rnAltn as
-  Ps.ELam w bs0 e0 -> Vec.withList bs0 $ \bs1 -> do
+  Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
     let bs2 = ifoldMapOf (itraversed . _BName) (\i (_w, x) -> Map.singleton x i) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0)
   Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
@@ -95,6 +93,17 @@ rnExpr = \case
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
 rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out ev)
-rnAltn (Ps.MkAltn w p e) = do
-  let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p)
-  MkAltn w p <$> localize bs (rnExpr e)
+rnAltn (Ps.MkAltn w p0 e) = do
+  let p1 = rnPatn p0
+  let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p1)
+  MkAltn w p1 <$> localize bs (rnExpr e)
+
+rnPatn :: Ps.Patn -> Patn
+rnPatn = \case
+  Ps.PVar   b    -> PVar (rnBind b)
+  Ps.PCon w c ps -> PCon w c (map rnPatn ps)
+
+rnBind :: Ps.Bind -> Bind
+rnBind = \case
+  Ps.BWild w   -> BWild w
+  Ps.BName w x -> BName w x

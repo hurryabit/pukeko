@@ -12,8 +12,8 @@ import Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
 import           Pukeko.Error
+import           Pukeko.Pos
 import           Pukeko.Language.Operator    (Spec (..))
-import           Pukeko.Language.AST.Std     (GenDefn (..), Patn (..), Bind (..), Pos)
 import           Pukeko.Language.Parser.AST
 import           Pukeko.Language.Type
 import qualified Pukeko.Language.Ident       as Id

@@ -7,10 +7,11 @@ module Pukeko.Language.Parser.AST
   , TopLevel (..)
   , TConDecl (..)
   , DConDecl (..)
-  , Defn
+  , Defn (..)
   , Expr (..)
   , Altn (..)
-  , Patn
+  , Patn (..)
+  , Bind (..)
 
     -- * Smart constructors
   , mkApp
@@ -21,7 +22,6 @@ module Pukeko.Language.Parser.AST
 where
 
 import           Pukeko.Pos
-import           Pukeko.Language.AST.Std (GenDefn (..), Patn (..), Bind (..))
 import qualified Pukeko.Language.Ident   as Id
 import           Pukeko.Language.Type
 
@@ -48,7 +48,7 @@ data DConDecl = MkDConDecl
   , _fields :: [Type Id.TVar]
   }
 
-type Defn = GenDefn Expr
+data Defn v = MkDefn Pos Id.EVar (Expr v)
 
 data Expr v
   = EVar Pos v
@@ -61,6 +61,14 @@ data Expr v
   | ERec Pos [Defn v] (Expr v)
 
 data Altn v = MkAltn Pos Patn (Expr v)
+
+data Patn
+  = PVar     Bind
+  | PCon Pos Id.DCon [Patn]
+
+data Bind
+  = BWild Pos
+  | BName Pos Id.EVar
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
 mkApp pos fun args

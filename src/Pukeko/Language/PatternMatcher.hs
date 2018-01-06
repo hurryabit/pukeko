@@ -18,7 +18,6 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
 import           Pukeko.Language.Info
-import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
@@ -40,6 +39,9 @@ evalPM pm decls = runExcept $ evalStateT (runInfoT (unPM pm) decls) []
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
 
+pmDefn :: Defn In v -> PM (Defn Out v)
+pmDefn (MkDefn w x e) = MkDefn w x <$> pmExpr e
+
 pmExpr :: Expr In v -> PM (Expr Out v)
 pmExpr = \case
   EVar w x          -> pure (EVar w x)
@@ -47,8 +49,8 @@ pmExpr = \case
   ENum w n          -> pure (ENum w n)
   EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
   ELam w bs t       -> ELam w bs <$> pmExpr t
-  ELet w ds t       -> ELet w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
-  ERec w ds t       -> ERec w <$> (traverse . rhs2) pmExpr ds <*> pmExpr t
+  ELet w ds t       -> ELet w <$> traverse pmDefn ds <*> pmExpr t
+  ERec w ds t       -> ERec w <$> traverse pmDefn ds <*> pmExpr t
   EMat w t0 as0     -> LS.withList as0 $ \case
     LS.Nil -> bug "pattern matcher" "no alternatives" Nothing
     as1@LS.Cons{} -> do

@@ -15,9 +15,7 @@ import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
--- import           GHC.TypeLits
 
-import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std     hiding (Module)
 import qualified Pukeko.Language.AST.Std     as Std
 import qualified Pukeko.Language.AST.Stage   as St
@@ -56,15 +54,18 @@ scoped :: LL (EScope i v) a -> LL v a
 scoped =
   LL . withRWST(\(MkEnv mk is) s -> (MkEnv (Free . mk) (scope (const False) is), s)) . unLL
 
-llExpr :: forall v. (IsEVar v) => Expr In v -> LL v (Expr Out v)
+llDefn :: (IsEVar v) => Defn In v -> LL v (Defn Out v)
+llDefn (MkDefn w x e) = MkDefn w x <$> llExpr e
+
+llExpr :: (IsEVar v) => Expr In v -> LL v (Expr Out v)
 llExpr = \case
   EVar w x -> pure (EVar w x)
   ECon w c -> pure (ECon w c)
   ENum w n -> pure (ENum w n)
   EApp w t  us -> EApp w <$> llExpr t <*> traverse llExpr us
   ECas w t  cs -> ECas w <$> llExpr t <*> traverse llCase cs
-  ELet w ds t -> ELet w <$> (traverse . rhs2) llExpr ds <*> scoped (llExpr t)
-  ERec w ds t -> scoped $ ERec w <$> (traverse . rhs2) llExpr ds <*> llExpr t
+  ELet w ds t -> ELet w <$> traverse llDefn ds <*> scoped (llExpr t)
+  ERec w ds t -> scoped $ ERec w <$> traverse llDefn ds <*> llExpr t
   ELam w oldBinds rhs -> do
     lhs <- freshIdent
     (rhs, isGlobal) <- scoped ((,) <$> llExpr rhs <*> asks _isGlobal)
