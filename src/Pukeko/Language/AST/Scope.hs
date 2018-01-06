@@ -101,7 +101,7 @@ extendEnv ::
 extendEnv env_i env_v = Pair env_i env_v
 
 -- TODO: Replace @Ord@ by @Eq@.
-class Ord i => IsVarLevel i where
+class (Ord i, Functor (EnvLevelOf i)) => IsVarLevel i where
   type EnvLevelOf i :: * -> *
   lookupEnvLevel :: i -> EnvLevelOf i a -> a
 

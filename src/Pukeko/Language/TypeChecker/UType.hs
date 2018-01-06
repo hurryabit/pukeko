@@ -4,12 +4,13 @@
 module Pukeko.Language.TypeChecker.UType
   ( UType (..)
   , UVar (..)
+  , UTypeSchema (..)
   , (~>)
   , (*~>)
   , appN
   , appTCon
   , open
-  , vars
+  , openSchema
   , subst
   , prettyUVar
   , prettyUType
@@ -18,15 +19,16 @@ module Pukeko.Language.TypeChecker.UType
 
 import           Control.Monad.Reader
 import           Control.Monad.ST
-import           Data.Ratio () -- for precedences in pretty printer
+import           Data.Foldable     (toList)
 import           Data.STRef
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import qualified Data.Map          as Map
+import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Error
 import           Pukeko.Pretty
-import           Pukeko.Language.Type (Type (..))
+import           Pukeko.Language.Type (Type (..), TypeSchema (..))
 import qualified Pukeko.Language.Ident as Id
+import           Pukeko.Language.AST.Scope
 
 infixr 1 ~>, *~>
 
@@ -40,6 +42,8 @@ data UType s
   | UTCon Id.TCon
   | UTApp (UType s) (UType s)
   | UVar (STRef s (UVar s))
+
+data UTypeSchema s = MkUTypeSchema [Id.TVar] (UType s)
 
 pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp UTArr tx) ty
@@ -63,17 +67,10 @@ open = \case
   TCon c     -> UTCon c
   TApp tf tp -> UTApp (open tf) (open tp)
 
-vars :: UType s -> ST s (Set.Set Id.TVar)
-vars = \case
-  UTVar v -> pure (Set.singleton v)
-  UTArr   -> pure Set.empty
-  UTCon _ -> pure Set.empty
-  UTApp tf tp -> Set.union <$> vars tf <*> vars tp
-  UVar uref -> do
-    uvar <- readSTRef uref
-    case uvar of
-      UFree _ _ -> pure Set.empty
-      ULink t   -> vars t
+openSchema :: TypeSchema -> UTypeSchema s
+openSchema (MkTypeSchema xs t0) =
+  let t1 = fmap (scope (xs Vec.!) absurd) t0
+  in  MkUTypeSchema (toList xs) (open t1)
 
 subst :: Map.Map Id.TVar (UType s) -> UType s -> ST s (UType s)
 subst env t = runReaderT (subst' t) env
@@ -92,8 +89,6 @@ subst env t = runReaderT (subst' t) env
         case uvar of
           UFree _ _ -> pure t0
           ULink t1  -> subst' t1
-
--- * Deep traversals
 
 -- * Pretty printing
 prettyUVar :: PrettyLevel -> Rational -> UVar s -> ST s Doc

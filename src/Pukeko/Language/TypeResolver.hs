@@ -7,6 +7,7 @@ import           Control.Monad.State
 import           Data.Foldable       (for_)
 import qualified Data.Map            as Map
 import           Data.Maybe          (isJust)
+import           GHC.TypeLits        (KnownNat)
 
 import           Pukeko.Error
 import           Pukeko.Language.AST.Std
@@ -52,7 +53,7 @@ insertTCon posn tcon@Con.MkTConDecl{_tname} = do
   when (isJust old) $ throwAt posn "duplicate type cons" _tname
   st2tcons . at _tname ?= tcon
 
-insertDCon :: Pos -> Con.DConDeclN n -> TR ()
+insertDCon :: KnownNat n => Pos -> Con.DConDeclN n -> TR ()
 insertDCon posn con@Con.MkDConDeclN{_dname} = do
   old <- use (st2dcons . at _dname)
   when (isJust old) $ throwAt posn "duplicate term cons" _dname

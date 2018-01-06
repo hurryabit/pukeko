@@ -7,9 +7,11 @@ where
 import           Control.Lens
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Control.Monad.Writer
 import           Control.Monad.ST
 import           Data.Foldable    (for_, toList)
 import qualified Data.Map         as Map
+import qualified Data.Set         as Set
 import           Data.STRef
 import           Data.Traversable
 import qualified Data.Vector.Sized as Vec
@@ -25,7 +27,7 @@ import qualified Pukeko.Language.AST.ConDecl       as Con
 import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
-import           Pukeko.Language.Type              (TypeSchema (..), typeInt)
+import           Pukeko.Language.Type              (typeInt)
 import           Pukeko.Language.TypeChecker.UType
 import qualified Pukeko.Language.TypeChecker.Unify as U
 
@@ -33,7 +35,7 @@ type In  = St.KindChecker
 type Out = St.TypeChecker
 
 data Environment v s = MkEnvironment
-  { _locals :: Sc.EnvOf v (UType s)
+  { _locals :: Sc.EnvOf v (UTypeSchema s)
   , _level  :: Int
   }
 makeLenses ''Environment
@@ -54,8 +56,7 @@ evalTC ::
   MonadError String m =>
   (forall s. TC Id.EVar s a) -> ModuleInfo In -> m a
 evalTC tc info = runST $
-  -- TODO: Remove this @fmap baseName@ hack.
-  let locals0 = Map.map (\(_, MkTypeSchema _ t) -> open (fmap baseName t)) (MI.funs info)
+  let locals0 = fmap (openSchema . snd) (MI.funs info)
       env0 = MkEnvironment locals0 0
       st0 = MkTCState []
   in  runExceptT (evalStateT (runReaderT (runInfoT (unTC tc) info) env0) st0)
@@ -78,34 +79,48 @@ unify w t1 t2 = TC $ lift $ lift $ lift $ U.unify w t1 t2
 localize ::
   forall i v s a.
   (IsVarLevel i, IsVar v) =>
-  EnvLevelOf i (UType s) ->
+  EnvLevelOf i (UTypeSchema s) ->
   TC (EScope i v) s a ->
   TC v s a
 localize ts = TC . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTC
 
-lookupType :: (IsVar v, Pretty v) => v -> TC v s (UType s)
+localizeType ::
+  forall i v s a.
+  (IsVarLevel i, IsVar v) =>
+  EnvLevelOf i (UType s) ->
+  TC (EScope i v) s a ->
+  TC v s a
+localizeType lvl = localize (fmap (MkUTypeSchema []) lvl)
+
+lookupType :: (IsVar v, Pretty v) => v -> TC v s (UTypeSchema s)
 lookupType = views locals . Sc.lookupEnv
 
-generalize :: UType s -> TC v s (UType s)
-generalize t0 = case t0 of
-  (UVar uref) -> do
-    uvar <- liftST $ readSTRef uref
-    cur_level <- view level
-    case uvar of
-      UFree x l
-        | l > cur_level -> pure (UTVar x)
-        | otherwise     -> pure t0
-      ULink t1 -> generalize t1
-  UTVar{} -> pure t0
-  UTArr{} -> pure t0
-  UTCon{} -> pure t0
-  UTApp tf tp -> UTApp <$> generalize tf <*> generalize tp
+generalize :: UType s -> TC v s (UTypeSchema s)
+generalize t0 = do
+  (t1, xs) <- runWriterT (go t0)
+  pure (MkUTypeSchema (toList xs) t1)
+  where
+    go t0 = case t0 of
+      (UVar uref) -> do
+        uvar <- lift (liftST (readSTRef uref))
+        cur_level <- view level
+        case uvar of
+          UFree x l
+            | l > cur_level -> do
+                tell (Set.singleton x)
+                pure (UTVar x)
+            | otherwise     -> pure t0
+          ULink t1 -> go t1
+      UTVar{} -> pure t0
+      UTArr{} -> pure t0
+      UTCon{} -> pure t0
+      UTApp tf tp -> UTApp <$> go tf <*> go tp
 
-instantiate :: UType s -> TC v s (UType s)
-instantiate t = do
-  xs <- liftST $ vars t
-  env <- sequence $ Map.fromSet (const freshUVar) xs
-  liftST $ subst env t
+instantiate :: UTypeSchema s -> TC v s (UType s)
+instantiate (MkUTypeSchema xs t) = do
+  uvars <- traverse (const freshUVar) xs
+  let env = Map.fromList (zip xs uvars)
+  liftST (subst env t)
 
 instantiateTCon :: Id.TCon -> TC v s (UType s, Map.Map Id.TVar (UType s))
 instantiateTCon tcon = do
@@ -125,6 +140,7 @@ inferPatn patn t_expr = case patn of
       "expects" <+> int (length _fields) <+> "arguments"
     (t_inst, env_inst) <- instantiateTCon _tcon
     unify w t_expr t_inst
+    -- TODO: Remove this @fmap baseName@ hack.
     t_fields <- liftST $ traverse (subst env_inst . open . fmap baseName) _fields
     Map.unions <$> zipWithM inferPatn patns t_fields
 
@@ -132,7 +148,7 @@ inferPatn patn t_expr = case patn of
 -- TODO: Add test to ensure types are generalized properly.
 inferLet
   :: (IsEVar v)
-  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UType s))
+  => Vec.Vector n (Defn In v) -> TC v s (Vec.Vector n (UTypeSchema s))
 inferLet defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
@@ -144,11 +160,11 @@ inferLet defns = do
 
 inferRec
   :: (IsEVar v)
-  => Vec.Vector n (Defn In (EFinScope n v)) -> TC v s (Vec.Vector n (UType s))
+  => Vec.Vector n (Defn In (EFinScope n v)) -> TC v s (Vec.Vector n (UTypeSchema s))
 inferRec defns = do
   t_rhss <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
-    t_rhss <- localize t_lhss $ traverse (infer . view rhs) defns
+    t_rhss <- localizeType t_lhss $ traverse (infer . view rhs) defns
     ifor_ defns $ \i defn ->
       unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
     return t_rhss
@@ -157,12 +173,12 @@ inferRec defns = do
 infer :: IsEVar v => Expr In v -> TC v s (UType s)
 infer = \case
     EVar _ ident -> do
-      t <- lookupType ident
-      instantiate t
+      ts <- lookupType ident
+      instantiate ts
     ECon _ dcon -> do
       dconDecl@(Con.MkDConDecl Con.MkDConDeclN{_tcon}) <- findDCon dcon
       tconDecl <- findTCon _tcon
-      instantiate $ open (Con.typeOf tconDecl dconDecl)
+      instantiate (openSchema (Con.typeOf tconDecl dconDecl))
     ENum _ _num -> return (open typeInt)
     EApp w fun args -> do
       t_fun <- infer fun
@@ -172,7 +188,7 @@ infer = \case
       return t_res
     ELam _ binds rhs -> do
       t_params <- traverse (const freshUVar) binds
-      t_rhs <- localize t_params (infer rhs)
+      t_rhs <- localizeType t_params (infer rhs)
       return (toList t_params *~> t_rhs)
     ELet _ defns rhs -> do
       t_defns <- inferLet defns
@@ -185,7 +201,7 @@ infer = \case
       t_res <- freshUVar
       for_ altns $ \(MkAltn w patn rhs) -> do
         t_binds <- inferPatn patn t_expr
-        t_rhs <- localize t_binds (infer rhs)
+        t_rhs <- localizeType t_binds (infer rhs)
         unify w t_res t_rhs
       return t_res
 
@@ -200,7 +216,13 @@ checkTopLevel = \case
       t_defns <- inferLetOrRec defns
       for (toList (Vec.zip defns t_defns)) $ \(MkDefn w x e, t_defn0) -> do
         t_defn <- instantiate t_defn0
-        t_decl <- lookupType x
+        -- NOTE: If we instantiate the type schema, universally quantified type
+        -- variables would be turned into unification variables and the
+        -- following would type check:
+        --
+        -- val f : a -> b
+        -- let f = fun x -> x
+        MkUTypeSchema _ t_decl <- lookupType x
         unify w t_decl t_defn
         pure (TLDef w x (mkTopExpr e))
 

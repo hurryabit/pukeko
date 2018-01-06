@@ -1,5 +1,5 @@
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeApplications #-}
 module Pukeko.Language.AST.ConDecl
   ( TConDecl (..)
   , DConDecl (..)
@@ -7,15 +7,19 @@ module Pukeko.Language.AST.ConDecl
   , typeOf
   ) where
 
-import           Data.Foldable     (toList)
+import           Control.Lens       (itoList)
+import           Data.Proxy         (Proxy (Proxy))
+import           Data.Type.Equality ((:~:) (Refl))
 import qualified Data.Vector.Sized as Vec
+import           GHC.TypeLits
 
+import           Pukeko.Error
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
 import           Pukeko.Language.Type
 import           Pukeko.Language.AST.Scope
 
-data TConDecl = forall n. MkTConDecl
+data TConDecl = forall n. KnownNat n => MkTConDecl
   { _tname  :: Id.TCon
   , _params :: Vec.Vector n Id.TVar
   , _dcons  :: [DConDeclN n]
@@ -28,12 +32,24 @@ data DConDeclN n = MkDConDeclN
   , _fields :: [Type (TFinScope n Void)]
   }
 
--- TODO: Remove this temporary hack.
-typeOf :: TConDecl -> DConDecl -> Type Id.TVar
-typeOf MkTConDecl{_params} (MkDConDecl MkDConDeclN{_tcon, _fields}) =
-  foldr (~>) (appTCon _tcon (map TVar (toList _params))) (map (fmap baseName) _fields)
+data DConDecl = forall n. KnownNat n => MkDConDecl (DConDeclN n)
 
-data DConDecl = forall n. MkDConDecl (DConDeclN n)
+typeOf :: TConDecl -> DConDecl -> TypeSchema
+typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _fields})
+  | _tname /= _tcon = bug "con decl" "type and data constructor do not match" names
+  | otherwise       = go _params _fields
+  where
+    go ::
+      forall n1 n2. (KnownNat n1, KnownNat n2) =>
+      Vec.Vector n1 Id.TVar -> [Type (TFinScope n2 Void)] -> TypeSchema
+    go xs flds =
+      case sameNat (Proxy @n1) (Proxy @n2) of
+        Just Refl ->
+          let res = appTCon _tcon [ TVar (mkBound i x) | (i, x) <- itoList xs ]
+          in  MkTypeSchema xs (flds *~> res)
+        Nothing ->
+          bug "con decl" "type and data constructor have different arity" names
+    names = Just (show _tname ++ " & " ++ show _dname)
 
 instance Pretty TConDecl where
   pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname
