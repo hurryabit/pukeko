@@ -17,7 +17,7 @@ external return = "return"
 external print = "print"
 external input = "input"
 external (>>=) = "bind"
-let (;ll1) m2 _ = m2
+let (;ll1) m2 x = m2
 let (;) m1 m2 = (>>=) m1 ((;ll1) m2)
 let iter_io$ll1 f x m = (;) (f x) m
 let iter_io f = foldr (iter_io$ll1 f) (return Unit)

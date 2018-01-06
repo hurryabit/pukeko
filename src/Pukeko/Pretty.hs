@@ -3,25 +3,30 @@ module Pukeko.Pretty
   ( (<+>)
   , pretty
   , prettyPrint
+  , hsep
   , module Data.Monoid
   , module Text.PrettyPrint.HughesPJClass
   )
   where
 
+import Data.Foldable
 import Data.Monoid
 import Data.Void
-import Text.PrettyPrint.HughesPJClass hiding ((<>), (<+>))
+import Text.PrettyPrint.HughesPJClass hiding ((<>), (<+>), hsep)
 
-import qualified Text.PrettyPrint.HughesPJClass as HughesPJClass ((<+>))
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 infixr 6 <+>
 
 (<+>) :: Doc -> Doc -> Doc
-(<+>) = (HughesPJClass.<+>)
+(<+>) = (PP.<+>)
 {-# INLINE (<+>) #-}
 
 pretty :: Pretty a => a -> Doc
 pretty = pPrint
+
+hsep :: (Foldable t) => t Doc -> Doc
+hsep = PP.hsep . toList
 
 prettyPrint :: Pretty a => a -> IO ()
 prettyPrint = print . pPrint

@@ -11,7 +11,6 @@ module Pukeko.Language.Parser.AST
   , Expr (..)
   , Altn (..)
   , Patn (..)
-  , Bind (..)
 
     -- * Smart constructors
   , mkApp
@@ -56,19 +55,16 @@ data Expr v
   | ENum Pos Int
   | EApp Pos (Expr v) [Expr v]
   | EMat Pos (Expr v) [Altn v]
-  | ELam Pos [Bind]   (Expr v)
+  | ELam Pos [Id.EVar] (Expr v)
   | ELet Pos [Defn v] (Expr v)
   | ERec Pos [Defn v] (Expr v)
 
 data Altn v = MkAltn Pos Patn (Expr v)
 
 data Patn
-  = PVar     Bind
+  = PWld Pos
+  | PVar Pos Id.EVar
   | PCon Pos Id.DCon [Patn]
-
-data Bind
-  = BWild Pos
-  | BName Pos Id.EVar
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
 mkApp pos fun args
@@ -86,7 +82,7 @@ mkIf wt t wu u wv v =
             , MkAltn wv (PCon wv (Id.dcon "False") []) v
             ]
 
-mkLam :: Pos -> [Bind] -> Expr v -> Expr v
+mkLam :: Pos -> [Id.EVar] -> Expr v -> Expr v
 mkLam pos patns expr
   | null patns = expr
   | otherwise  = ELam pos patns expr

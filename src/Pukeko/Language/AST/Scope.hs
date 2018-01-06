@@ -48,6 +48,7 @@ data Scope b i v
 
 type EScope = Scope Id.EVar
 
+-- TODO: Replace @Ord@ by @Eq@.
 type EFinScope n = EScope (Finite n)
 
 type TScope = Scope Id.TVar
@@ -103,8 +104,7 @@ extendEnv ::
   EnvOf (Scope (BaseName v) i v) a
 extendEnv env_i env_v = Pair env_i env_v
 
--- TODO: Replace @Ord@ by @Eq@.
-class (Ord i, Functor (EnvLevelOf i)) => IsVarLevel i where
+class (Functor (EnvLevelOf i)) => IsVarLevel i where
   type EnvLevelOf i :: * -> *
   lookupEnvLevel :: i -> EnvLevelOf i a -> a
 
@@ -120,8 +120,7 @@ instance IsVarLevel () where
   type EnvLevelOf () = Identity
   lookupEnvLevel () = runIdentity
 
--- TODO: Replace @Ord@ by @Eq@.
-class (Ord v, Pretty v, Pretty (BaseName v)) => IsVar v where
+class IsVar v where
   type BaseName v :: *
   type EnvOf v :: * -> *
   baseName :: v -> BaseName v
@@ -154,8 +153,3 @@ instance IsVar Void where
   lookupEnv = absurd
 
 makePrisms ''Scope
-
-instance (Pretty b, Pretty v) => Pretty (Scope b i v) where
-  pPrint = \case
-    Bound _ (Forget b) -> pretty b
-    Free v -> pretty v

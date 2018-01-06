@@ -38,5 +38,5 @@ let main =
                (print z; print y))
           ys
           zs)
-      >>= fun _ ->
+      >>= fun x ->
       return Unit

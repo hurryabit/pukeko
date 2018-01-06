@@ -92,7 +92,7 @@ localizeType ::
   TC v s a
 localizeType lvl = localize (fmap (MkUTypeSchema []) lvl)
 
-lookupType :: (IsVar v, Pretty v) => v -> TC v s (UTypeSchema s)
+lookupType :: (IsVar v) => v -> TC v s (UTypeSchema s)
 lookupType = views locals . Sc.lookupEnv
 
 generalize :: UType s -> TC v s (UTypeSchema s)
@@ -131,8 +131,8 @@ instantiateTCon tcon = do
 
 inferPatn :: Patn -> UType s -> TC v s (Map.Map Id.EVar (UType s))
 inferPatn patn t_expr = case patn of
-  PVar (BWild _) -> return Map.empty
-  PVar (BName _ ident) -> return (Map.singleton ident t_expr)
+  PWld _   -> pure Map.empty
+  PVar _ x -> pure (Map.singleton x t_expr)
   PCon w dcon patns -> do
     Con.MkDConDecl Con.MkDConDeclN{_dname, _tcon, _fields} <- findDCon dcon
     when (length patns /= length _fields) $

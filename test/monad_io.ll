@@ -5,7 +5,7 @@ external return = "return"
 external print = "print"
 external input = "input"
 external (>>=) = "bind"
-let (;ll1) m2 _ = m2
+let (;ll1) m2 x = m2
 let (;) m1 m2 = (>>=) m1 ((;ll1) m2)
 let when p m =
       match p with

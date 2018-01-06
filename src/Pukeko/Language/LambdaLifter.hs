@@ -54,14 +54,13 @@ scoped :: LL (EScope i v) a -> LL v a
 scoped =
   LL . withRWST(\(MkEnv mk is) s -> (MkEnv (Free . mk) (scope (const False) is), s)) . unLL
 
-llExpr :: forall v. (IsEVar v) => Expr In Void v -> LL v (Expr Out Void v)
+llExpr :: (IsEVar v, Ord v) => Expr In Void v -> LL v (Expr Out Void v)
 llExpr = \case
   EVar w x -> pure (EVar w x)
   ECon w c -> pure (ECon w c)
   ENum w n -> pure (ENum w n)
   EApp w t  us -> EApp w <$> llExpr t <*> traverse llExpr us
-  ECas w t  cs ->
-    ECas w <$> llExpr t <*> traverse (case2rhs (scoped . llExpr)) cs
+  ECas w t  cs -> ECas w <$> llExpr t <*> traverse llCase cs
   ELet w ds t -> ELet w <$> (traverse . defn2rhs) llExpr ds <*> scoped (llExpr t)
   ERec w ds t -> scoped $ ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
   ELam w oldBinds rhs -> do
@@ -73,7 +72,7 @@ llExpr = \case
     -- not break the tests right now.
     let capturedL = sortOn baseName $ Set.toList capturedS
     Vec.withList capturedL $ \(capturedV :: Vec.Vector m (EFinScope n v)) -> do
-      let newBinds = fmap (BName w . baseName) capturedV Vec.++ oldBinds
+      let newBinds = fmap baseName capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
             Free  v   -> Free  (baseName v)
@@ -88,6 +87,9 @@ llExpr = \case
       case capturedL of
         []  -> return fun
         _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
+
+llCase :: (IsEVar v, Ord v) => Case In Void v -> LL v (Case Out Void v)
+llCase (MkCase w c bs e) = MkCase w c bs <$> scoped (llExpr e)
 
 llTopLevel :: TopLevel In -> LL Id.EVar ()
 llTopLevel = \case

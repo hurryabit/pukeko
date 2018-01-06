@@ -84,8 +84,8 @@ rnExpr = \case
   Ps.ENum w n -> pure (ENum w n)
   Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es
   Ps.EMat w e0  as -> EMat w <$> rnExpr e0 <*> traverse rnAltn as
-  Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
-    let bs2 = ifoldMapOf (itraversed . _BName) (\i (_w, x) -> Map.singleton x i) bs1
+  Ps.ELam w bs0 e0 -> Vec.withList bs0 $ \bs1 -> do
+    let bs2 = ifoldMap (flip Map.singleton) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0)
   Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     ELet w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
@@ -95,15 +95,11 @@ rnExpr = \case
 rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
 rnAltn (Ps.MkAltn w p0 e) = do
   let p1 = rnPatn p0
-  let bs = Map.fromSet id (Set.setOf (patn2bind . bind2evar) p1)
+  let bs = Map.fromSet id (Set.setOf patn2evar p1)
   MkAltn w p1 <$> localize bs (rnExpr e)
 
 rnPatn :: Ps.Patn -> Patn
 rnPatn = \case
-  Ps.PVar   b    -> PVar (rnBind b)
+  Ps.PWld w      -> PWld w
+  Ps.PVar w x    -> PVar w x
   Ps.PCon w c ps -> PCon w c (map rnPatn ps)
-
-rnBind :: Ps.Bind -> Bind
-rnBind = \case
-  Ps.BWild w   -> BWild w
-  Ps.BName w x -> BName w x

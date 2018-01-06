@@ -12,28 +12,19 @@ module Pukeko.Language.AST.Std
   , Case (..)
   , Altn (..)
   , Patn (..)
-  , Bind (..)
 
   , abstract
   , (//)
-  , bindName
-  , patnToBind
 
   , module2tops
   , defn2rhs
-  , bind2evar
   , defn2dcon
-  , patn2bind
+  , patn2evar
   , case2rhs
   , altn2rhs
 
   , retagDefn
   , retagExpr
-
-  , _BWild
-  , _BName
-
-  , prettyBinds
 
   , Pos
   , module Pukeko.Language.AST.Scope
@@ -74,7 +65,7 @@ data TopLevel st
   | HasTLDef st ~ 'True =>
     TLDef Pos Id.EVar (Expr st Void Id.EVar)
   | forall n. HasTLSup st ~ 'True =>
-    TLSup Pos Id.EVar (Vector n Bind) (Expr st Void (EFinScope n Id.EVar))
+    TLSup Pos Id.EVar (Vector n Id.EVar) (Expr st Void (EFinScope n Id.EVar))
   | HasTLSup st ~ 'True =>
     TLCaf Pos Id.EVar (Expr st Void Id.EVar)
   | TLAsm Pos Id.EVar String
@@ -91,7 +82,7 @@ data Expr st tv ev
   | ENum Pos Int
   | EApp Pos (Expr st tv ev) [Expr st tv ev]
   | forall n. HasELam st ~ 'True =>
-    ELam Pos (Vector n Bind)                          (Expr st tv (EFinScope n ev))
+    ELam Pos (Vector n Id.EVar)                       (Expr st tv (EFinScope n ev))
   | forall n.
     ELet Pos (Vector n (Defn st tv ev))               (Expr st tv (EFinScope n ev))
   | forall n.
@@ -108,7 +99,7 @@ data Expr st tv ev
 data Case st tv ev = forall n. MkCase
   { _casePos   :: Pos
   , _caseCon   :: Id.DCon
-  , _caseBinds :: Vector n Bind
+  , _caseBinds :: Vector n (Maybe Id.EVar)
   , _caseRhs   :: Expr st tv (EFinScope n ev)
   }
 
@@ -119,18 +110,12 @@ data Altn st tv ev = MkAltn
   }
 
 data Patn
-  = PVar     Bind
+  = PWld Pos
+  | PVar Pos Id.EVar
   | PCon Pos Id.DCon [Patn]
-
-data Bind
-  = BWild Pos
-  | BName Pos Id.EVar
-
 
 -- * Derived optics
 makeLenses ''Defn
-makePrisms ''Bind
-
 
 -- * Abstraction and substition
 
@@ -166,17 +151,6 @@ dist :: Pos -> EScope i (Expr st tv ev) -> Expr st tv (EScope i ev)
 dist w (Bound i x) = EVar w (Bound i x)
 dist _ (Free t)    = fmap Free t
 
--- * Getters
-bindName :: Bind -> Maybe Id.EVar
-bindName = \case
-  BWild _   -> Nothing
-  BName _ x -> Just x
-
-patnToBind :: Patn -> Maybe Bind
-patnToBind = \case
-  PVar b -> Just b
-  PCon{} -> Nothing
-
 -- * Lenses and traversals
 module2tops ::
   SameModuleInfo st1 st2 =>
@@ -185,12 +159,6 @@ module2tops f (MkModule info tops) = MkModule info <$> f tops
 
 defn2rhs :: Lens (Defn st1 tv ev1) (Defn st2 tv ev2) (Expr st1 tv ev1) (Expr st2 tv ev2)
 defn2rhs f (MkDefn w x e) = MkDefn w x <$> f e
-
--- TODO: Make this indexed if possible.
-bind2evar :: Traversal' Bind Id.EVar
-bind2evar f = \case
-  BWild w   -> pure (BWild w)
-  BName w x -> BName w <$> f x
 
 -- * Deep traversals
 type DConTraversal t =
@@ -224,19 +192,20 @@ altn2dcon f (MkAltn w p t) =
 
 patn2dcon :: IndexedTraversal' Pos Patn Id.DCon
 patn2dcon f = \case
-  PVar   b    -> pure $ PVar b
+  PWld w      -> pure (PWld w)
+  PVar w x    -> pure (PVar w x)
   PCon w c ps -> PCon w <$> indexed f w c <*> (traverse . patn2dcon) f ps
 
-patn2bind :: IndexedTraversal' Pos Patn Bind
-patn2bind f = \case
-  PVar   b    -> PVar <$> indexed f (b^.pos) b
-  PCon w c ps -> PCon w c <$> (traverse . patn2bind) f ps
+patn2evar :: IndexedTraversal' Pos Patn Id.EVar
+patn2evar f = \case
+  PWld w      -> pure (PWld w)
+  PVar w x    -> PVar w <$> indexed f w x
+  PCon w c ps -> PCon w c <$> (traverse . patn2evar) f ps
 
 -- * Scoped lenses
 type ScopedLens scope s t a b =
   forall f v w. (Functor f) =>
-  (forall i. IsVarLevel i => a (scope i v) -> f (b (scope i w))) ->
-  s v -> f (t w)
+  (forall i. a (scope i v) -> f (b (scope i w))) -> s v -> f (t w)
 
 over' ::
   ((forall i. g (s i v1) -> Identity (g (s i v2))) -> f v1 -> Identity (f v2)) ->
@@ -319,11 +288,6 @@ instance HasPos (Expr std tv ev) where
     ETyAbs w x e   -> fmap (\w' -> ETyAbs w' x e  ) (f w)
     ETyApp w e t   -> fmap (\w' -> ETyApp w' e t  ) (f w)
 
-instance HasPos Bind where
-  pos f = \case
-    BWild w   -> fmap         BWild       (f w)
-    BName w x -> fmap (\w' -> BName w' x) (f w)
-
 -- * Pretty printing
 instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
   pPrintPrec _ _ = \case
@@ -333,7 +297,7 @@ instance (HasTLTyp st ~ 'False) => Pretty (TopLevel st) where
     TLRec _ ds -> prettyDefns True  ds
     TLDef w x e -> "let" <+> pretty (MkDefn w x e)
     TLSup _ x bs e ->
-      "let" <+> hang (pretty x <+> prettyBinds bs <+> equals) 2 (pretty e)
+      "let" <+> hang (pretty x <+> hsep (fmap pretty bs) <+> equals) 2 (pretty e)
     TLCaf _ x t ->
       "let" <+> hang (pretty x <+> equals) 2 (pretty t)
     TLAsm _ x s ->
@@ -374,7 +338,7 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Expr st tv ev) where
     ERec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
     ELam _ bs t ->
       maybeParens (prec > 0) $ hsep
-        [ "fun", prettyBinds bs
+        [ "fun", hsep (fmap pretty bs)
         , "->" , pPrintPrec lvl 0 t
         ]
     -- If { _cond, _then, _else } ->
@@ -399,7 +363,13 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Expr st tv ev) where
 
 instance (IsEVar ev, IsTVar tv) => Pretty (Case st tv ev) where
   pPrintPrec lvl _ (MkCase _ c bs t) =
-    hang ("|" <+> pretty c <+> prettyBinds bs <+> "->") 2 (pPrintPrec lvl 0 t)
+    hang ("|" <+> pretty c <+> hsep (fmap prettyBind bs) <+> "->")
+      2 (pPrintPrec lvl 0 t)
+    where
+      prettyBind = \case
+        Nothing -> "_"
+        Just x  -> pretty x
+
 
 instance (IsEVar ev, IsTVar tv) => Pretty (Altn st tv ev) where
   pPrintPrec lvl _ (MkAltn _ p t) =
@@ -407,18 +377,11 @@ instance (IsEVar ev, IsTVar tv) => Pretty (Altn st tv ev) where
 
 instance Pretty Patn where
   pPrintPrec lvl prec = \case
-    PVar   b    -> pretty b
+    PWld _      -> "_"
+    PVar _ x    -> pretty x
     PCon _ c ps ->
       maybeParens (prec > 0 && not (null ps)) $
       pretty c <+> hsep (map (pPrintPrec lvl 1) (toList ps))
-
-instance Pretty Bind where
-  pPrint = \case
-    BWild _   -> "_"
-    BName _ x -> pretty x
-
-prettyBinds :: Vector n Bind -> Doc
-prettyBinds = hsep . map pretty . toList
 
 -- * Derived instances
 deriving instance Functor     (Defn st tv)

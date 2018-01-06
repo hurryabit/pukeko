@@ -24,7 +24,7 @@ let zip_with f xs ys =
 external return = "return"
 external print = "print"
 external (>>=) = "bind"
-let (;ll1) m2 _ = m2
+let (;ll1) m2 x = m2
 let (;) m1 m2 = (>>=) m1 ((;ll1) m2)
 let sequence_io$ll2 x xs = return (Cons x xs)
 let sequence_io$ll1 ms x =
@@ -53,7 +53,7 @@ let main$ll1 n y z =
       match (<) y z with
       | False -> (;) (print z) (print y)
       | True -> (;) (print y) (print z)
-let main$ll2 _ = return Unit
+let main$ll2 x = return Unit
 let main =
       let n = 400000 in
       (;) (print n) let m = 100000 in

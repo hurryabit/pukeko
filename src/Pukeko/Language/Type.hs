@@ -72,9 +72,9 @@ type2tcon f = \case
   TCon c     -> TCon <$> f c
   TApp tf tp -> TApp <$> type2tcon f tf <*> type2tcon f tp
 
-instance Pretty tv => Pretty (Type tv) where
+instance IsTVar tv => Pretty (Type tv) where
   pPrintPrec lvl prec = \case
-    TVar x -> pretty x
+    TVar x -> pretty (baseName x)
     TArr   -> "(->)"
     TCon c -> pretty c
     TFun tx ty ->
@@ -84,7 +84,7 @@ instance Pretty tv => Pretty (Type tv) where
 
 instance Pretty TypeSchema where
   pPrintPrec lvl prec (MkTypeSchema xs t) =
-    "forall" <+> hsep (map pretty (toList xs)) <> "." <+> pPrintPrec lvl prec t
+    "forall" <+> hsep (fmap pretty xs) <> "." <+> pPrintPrec lvl prec t
 
-instance Pretty tv => Show (Type tv) where
+instance IsTVar tv => Show (Type tv) where
   show = prettyShow

@@ -104,17 +104,13 @@ module_ = many1 $ choice
     <*> (reserved "type" *> sepBy1 tconDecl (reserved "and"))
   ]
 
-bind :: Parser Bind
-bind = BWild <$> getPosition <*  symbol "_" <|>
-       BName <$> getPosition <*> evar
-
-
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
 patn, apatn :: Parser Patn
 patn  = PCon <$> getPosition <*> dcon <*> many apatn <|>
         apatn
-apatn = PVar <$> bind <|>
+apatn = PWld <$> getPosition <*  symbol "_"       <|>
+        PVar <$> getPosition <*> evar             <|>
         PCon <$> getPosition <*> dcon <*> pure [] <|>
         parens patn
 
@@ -124,7 +120,7 @@ defnValLhs = MkDefn <$> getPosition <*> evar
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
   (.) <$> (MkDefn <$> getPosition <*> evar)
-      <*> (ELam <$> getPosition <*> many1 bind)
+      <*> (ELam <$> getPosition <*> many1 evar)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
@@ -160,7 +156,7 @@ expr =
     <*> (reserved "with"  *> many1 altn)
   , ELam
     <$> getPosition
-    <*> (reserved "fun" *> many1 bind)
+    <*> (reserved "fun" *> many1 evar)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]

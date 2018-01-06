@@ -191,7 +191,7 @@ val (>>=) : IO a -> (a -> IO b) -> IO b
 external (>>=) = "bind"
 
 val (;) : IO Unit -> IO a -> IO a
-let (;) m1 m2 = m1 >>= fun _ -> m2
+let (;) m1 m2 = m1 >>= fun x -> m2
 
 val sequence_io : List (IO a) -> IO (List a)
 let rec sequence_io ms =

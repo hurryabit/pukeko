@@ -9,7 +9,6 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Foldable     (toList)
 import qualified Data.Map          as Map
-import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Core.Syntax
 import           Pukeko.Language.AST.Scope
@@ -46,8 +45,10 @@ scoped = CC . mapInfoT (withReaderT (scope (const Nothing))) . unCC
 
 ccTopLevel :: In.TopLevel In -> CC Id.EVar TopLevel
 ccTopLevel = \case
-  In.TLSup _ x bs t -> Def (name x) (ccBinds bs) <$> scoped (ccExpr t)
-  In.TLCaf _ x    t -> Def (name x) []           <$> ccExpr t
+  In.TLSup _ x bs t ->
+    Def (name x) (map (Just . name) (toList bs)) <$> scoped (ccExpr t)
+  In.TLCaf _ x    t ->
+    Def (name x) [] <$> ccExpr t
   In.TLAsm _ x    s -> do
     let n = MkName s
     at x ?= n
@@ -77,7 +78,4 @@ ccExpr = \case
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
 ccCase :: IsEVar v => In.Case In Void v -> CC v Altn
-ccCase (In.MkCase _ _ bs t) = MkAltn (ccBinds bs) <$> scoped (ccExpr t)
-
-ccBinds :: Vec.Vector n In.Bind -> [Maybe Name]
-ccBinds = map (fmap name . In.bindName) . toList
+ccCase (In.MkCase _ _ bs t) = MkAltn (map (fmap name) (toList bs)) <$> scoped (ccExpr t)

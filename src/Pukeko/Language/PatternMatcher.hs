@@ -80,6 +80,22 @@ pmMatch w rowMatch0 = do
       grpMatch <- groupDests w destCol rowMatch4
       grpMatchExpr w grpMatch
 
+-- TODO: Do this in a more principled way.
+data Bind
+  = BWild Pos
+  | BName Pos Id.EVar
+
+bindName :: Bind -> Maybe Id.EVar
+bindName = \case
+  BWild _   -> Nothing
+  BName _ x -> Just x
+
+patnToBind :: Patn -> Maybe Bind
+patnToBind = \case
+  PWld w   -> Just (BWild w)
+  PVar w x -> Just (BName w x)
+  PCon{}   -> Nothing
+
 type RhsExpr v = Expr In Void (EScope Id.EVar v)
 
 data Row n v = MkRow (LS.List n Patn) (RhsExpr v)
@@ -140,7 +156,8 @@ data Dest = MkDest Id.DCon [Patn]
 
 patnToDest :: Patn -> Maybe Dest
 patnToDest = \case
-  PVar   _    -> Nothing
+  PWld{}      -> Nothing
+  PVar{}      -> Nothing
   PCon _ c ps -> Just (MkDest c ps)
 
 findDestCol ::
@@ -196,4 +213,4 @@ grpMatchExpr w (MkGrpMatch t is) =
 
 grpMatchItemAltn :: Pos -> GrpMatchItem v -> PM (Case Out Void v)
 grpMatchItemAltn w (MkGrpMatchItem con bs rm) =
-  MkCase w con bs <$> pmMatch w rm
+  MkCase w con (fmap bindName bs) <$> pmMatch w rm
