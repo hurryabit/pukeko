@@ -367,6 +367,24 @@ let f xy =
   | Pair x _ -> x
   | Pair _ y -> y
 
+-- SUBSECTION type inferencer and checker
+
+-- TEST annotation and inferred agree
+-- SUCCESS
+val myfold1 : (b -> a -> b) -> b -> List a -> b
+let rec myfold1 f y0 xs =
+  match xs with
+  | Nil -> y0
+  | Cons x xs -> myfold1 f (f y0 x) xs
+
+-- TEST annotation and inferred disagree
+-- FAILURE (line 5, column 26): expected type a -> b -> a, but found type b -> a -> b
+val myfold2 : (a -> b -> a) -> a -> List b -> a
+let rec myfold2 f y0 xs =
+  match xs with
+  | Nil -> y0
+  | Cons x xs -> myfold2 f (f y0 x) xs
+
 
 -- SECTION pattern matcher
 

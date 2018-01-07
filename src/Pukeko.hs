@@ -22,15 +22,17 @@ import qualified Pukeko.Language.FunResolver    as FunResolver
 
 compileToCore
   :: MonadError String m
-  => Parser.Module
+  => Bool
+  -> Parser.Module
   -> m (CoreCompiler.Module, Module LambdaLifter.Out, Module Inferencer.Out)
-compileToCore module_ = do
+compileToCore unsafe module_ = do
+  let checkModule = if unsafe then return else TypeChecker.checkModule
   module_ti <- Renamer.renameModule module_
                >>= TypeResolver.resolveModule
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule
                >>= Inferencer.inferModule
-               >>= TypeChecker.checkModule
+               >>= checkModule
   module_ll <- return (TypeEraser.eraseModule module_ti)
                >>= PatternMatcher.compileModule
                >>= return . DeadCode.cleanModule

@@ -14,8 +14,8 @@ import qualified Pukeko.GMachine.Compiler as Compiler
 import qualified Pukeko.GMachine.NASM     as NASM
 import qualified Pukeko.GMachine.PeepHole as PeepHole
 
-compile :: Bool -> Bool -> Bool -> Bool -> String -> IO ()
-compile write_ll write_ti write_gm no_prelude file_user = do
+compile :: Bool -> Bool -> Bool -> Bool -> Bool -> String -> IO ()
+compile write_ll write_ti write_gm no_prelude unsafe file_user = do
   let file_prel = replaceFileName file_user "prelude.pu"
   code_user <- readFile file_user
   code_prel <-
@@ -29,7 +29,7 @@ compile write_ll write_ti write_gm no_prelude file_user = do
           then return []
           else Parser.parseModule file_prel code_prel
         let module_ = mod_prel ++ mod_user
-        (module_cc, module_ll, module_ti) <- Pukeko.compileToCore module_
+        (module_cc, module_ll, module_ti) <- Pukeko.compileToCore unsafe module_
         program <- Compiler.compile module_cc
         program <- pure $ PeepHole.optimize program
         nasm <- NASM.assemble program
@@ -59,6 +59,7 @@ opts =
     <*> switch (short 't' <> long "infer"  <> help "Write result of type inference")
     <*> switch (short 'g' <> long "gcode"  <> help "Write intermediate g-machine code")
     <*> switch (short 'n' <> long "no-prelude"  <> help "Don't load the prelude")
+    <*> switch (short 'u' <> long "unsafe" <> help "Don't run the type checker")
     -- <*> option auto (short 'h' <> long "heap"  <> value 1000 <> metavar "SIZE")
     <*> argument str (metavar "FILE")
 

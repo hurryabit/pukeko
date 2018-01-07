@@ -13,7 +13,7 @@ shouldFail :: Parser.Module -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
         module_ <- Parser.parseModule "<input>" code
-        Pukeko.compileToCore (prelude ++ module_)
+        Pukeko.compileToCore False (prelude ++ module_)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> expectationFailure "should fail, but succeeded"
@@ -25,7 +25,7 @@ shouldSucceed :: Parser.Module -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
         module_ <- Parser.parseModule "<input>" code
-        Pukeko.compileToCore (prelude ++ module_)
+        Pukeko.compileToCore False (prelude ++ module_)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> return ()
