@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Pukeko.Language.TypeChecker.UType
+module Pukeko.Language.Inferencer.UType
   ( UType (..)
   , UVar (..)
   , UTypeSchema (..)

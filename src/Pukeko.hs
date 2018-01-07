@@ -14,7 +14,7 @@ import qualified Pukeko.Language.KindChecker    as KindChecker
 import qualified Pukeko.Language.LambdaLifter   as LambdaLifter
 import qualified Pukeko.Language.Parser         as Parser
 import qualified Pukeko.Language.PatternMatcher as PatternMatcher
-import qualified Pukeko.Language.TypeChecker    as TypeChecker
+import qualified Pukeko.Language.Inferencer     as Inferencer
 import qualified Pukeko.Language.TypeEraser     as TypeEraser
 import qualified Pukeko.Language.TypeResolver   as TypeResolver
 import qualified Pukeko.Language.FunResolver    as FunResolver
@@ -22,13 +22,13 @@ import qualified Pukeko.Language.FunResolver    as FunResolver
 compileToCore
   :: MonadError String m
   => Parser.Module
-  -> m (CoreCompiler.Module, Module LambdaLifter.Out, Module TypeChecker.Out)
+  -> m (CoreCompiler.Module, Module LambdaLifter.Out, Module Inferencer.Out)
 compileToCore module_ = do
   module_ti <- Renamer.renameModule module_
                >>= TypeResolver.resolveModule
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule
-               >>= TypeChecker.checkModule
+               >>= Inferencer.inferModule
   module_ll <- PatternMatcher.compileModule module_ti
                >>= return . DeadCode.cleanModule
                >>= return . TypeEraser.eraseModule

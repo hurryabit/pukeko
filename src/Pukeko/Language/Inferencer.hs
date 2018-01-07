@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
-module Pukeko.Language.TypeChecker
+module Pukeko.Language.Inferencer
   ( Out
-  , checkModule
+  , inferModule
   )
 where
 
@@ -30,12 +30,12 @@ import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
 import           Pukeko.Language.Type              (NoType (..), Type (..), typeInt)
-import           Pukeko.Language.TypeChecker.UType
-import qualified Pukeko.Language.TypeChecker.Unify as U
+import           Pukeko.Language.Inferencer.UType
+import qualified Pukeko.Language.Inferencer.Unify as U
 
 type In    = St.KindChecker
-type Out   = St.TypeChecker Type
-type Aux s = St.TypeChecker (UTypeSchema s)
+type Out   = St.Inferencer Type
+type Aux s = St.Inferencer (UTypeSchema s)
 
 data Environment v s = MkEnvironment
   { _locals :: Sc.EnvOf v (UTypeSchema s Void)
@@ -248,8 +248,8 @@ inferTopLevel = \case
         unify w t_decl t_defn
         pure (TLDef b (squashScope e))
 
-inferModule :: Module In -> TI Id.EVar s (Module (Aux s))
-inferModule (MkModule decls tops)=
+inferModule' :: Module In -> TI Id.EVar s (Module (Aux s))
+inferModule' (MkModule decls tops)=
   MkModule decls <$> concat <$> traverse inferTopLevel tops
 
 type TQEnv tv = Map.Map Id.TVar tv
@@ -344,7 +344,7 @@ qualTopLevel = \case
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule = (module2tops . traverse) (\top -> reset *> qualTopLevel top)
 
-checkModule :: MonadError String m => Module In -> m (Module Out)
-checkModule m0@(MkModule info0 _) = runST $ runExceptT $ do
-  m1 <- runTI (inferModule m0) info0
+inferModule :: MonadError String m => Module In -> m (Module Out)
+inferModule m0@(MkModule info0 _) = runST $ runExceptT $ do
+  m1 <- runTI (inferModule' m0) info0
   runTQ (qualModule m1)

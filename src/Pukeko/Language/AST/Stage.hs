@@ -11,7 +11,7 @@ data Renamer
 data TypeResolver
 data KindChecker
 data FunResolver
-data TypeChecker (t :: * -> *)
+data Inferencer (t :: * -> *)
 data PatternMatcher
 data DeadCode
 data TypeEraser
@@ -24,7 +24,7 @@ type family StageId st where
   StageId TypeResolver    = 200
   StageId FunResolver     = 250
   StageId KindChecker     = 300
-  StageId (TypeChecker t) = 400
+  StageId (Inferencer t)  = 400
   StageId PatternMatcher  = 500
   StageId DeadCode        = 600
   StageId TypeEraser      = 650
@@ -37,7 +37,7 @@ type family StageType st where
   StageType TypeResolver    = NoType
   StageType FunResolver     = NoType
   StageType KindChecker     = NoType
-  StageType (TypeChecker t) = t
+  StageType (Inferencer t)  = t
   StageType PatternMatcher  = Type
   StageType DeadCode        = Type
   StageType TypeEraser      = NoType

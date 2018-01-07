@@ -1,4 +1,4 @@
-module Pukeko.Language.TypeChecker.Unify
+module Pukeko.Language.Inferencer.Unify
   ( TU
   , unify
   )
@@ -11,7 +11,7 @@ import           Data.STRef
 import           Pukeko.Error
 import           Pukeko.Pos
 import           Pukeko.Pretty
-import           Pukeko.Language.TypeChecker.UType
+import           Pukeko.Language.Inferencer.UType
 
 type TU s = ExceptT String (ST s)
 

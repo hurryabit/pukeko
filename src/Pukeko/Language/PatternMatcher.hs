@@ -24,7 +24,7 @@ import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.Ident              as Id
 
-type In  = St.TypeChecker Type
+type In  = St.Inferencer Type
 type Out = St.PatternMatcher
 
 newtype PM a = PM{unPM :: InfoT (ModuleInfo In) (StateT [Id.EVar] (Except String)) a}
