@@ -30,7 +30,7 @@ eraseExpr = \case
   ELet w ds e0  -> ELet w (fmap eraseDefn ds) (eraseExpr e0)
   ERec w ds e0  -> ERec w (fmap eraseDefn ds) (eraseExpr e0)
   -- ECas w e0 cs  -> ECas w (eraseExpr e0) (map eraseCase cs)
-  EMat w e0 as  -> EMat w (eraseExpr e0) (map eraseAltn as)
+  EMat w e0 as  -> EMat w (eraseExpr e0) (fmap eraseAltn as)
   ETyAbs _ _ e0 -> eraseExpr e0
   ETyApp _ e0 _ -> eraseExpr e0
 

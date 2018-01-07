@@ -20,6 +20,10 @@ module Pukeko.Language.AST.Std
 
   , bindEVar
   , bindType
+  , caseCon
+  , caseTArgs
+  , altnPatn
+  , altnRhs
 
   , module2tops
   , defn2rhs
@@ -40,6 +44,8 @@ module Pukeko.Language.AST.Std
 import Control.Lens
 import Data.Vector.Sized (Vector)
 import Data.Foldable
+import qualified Data.List.NonEmpty as NE
+import           GHC.TypeLits
 
 import           Pukeko.Pos
 import           Pukeko.Pretty
@@ -94,10 +100,10 @@ data Expr st tv ev
   | forall n.
     ERec Pos (Vector n (Defn st tv (EFinScope n ev))) (Expr st tv (EFinScope n ev))
   | HasEMat st ~ 'False =>
-    ECas Pos (Expr st tv ev) [Case st tv ev]
+    ECas Pos (Expr st tv ev) (NE.NonEmpty (Case st tv ev))
   | HasEMat st ~ 'True =>
-    EMat Pos (Expr st tv ev) [Altn st tv ev]
-  | forall n. HasETyp st ~ 'True =>
+    EMat Pos (Expr st tv ev) (NE.NonEmpty (Altn st tv ev))
+  | forall n. (HasETyp st ~ 'True, KnownNat n) =>
     ETyAbs Pos (Vector n Id.TVar) (Expr st (TFinScope n tv) ev)
   | HasETyp st ~ 'True =>
     ETyApp Pos (Expr st tv ev) [StageType st tv]
@@ -130,6 +136,8 @@ data Patn st tv
 -- * Derived optics
 makeLenses ''Defn
 makeLenses ''Bind
+makeLenses ''Case
+makeLenses ''Altn
 
 -- * Abstraction and substition
 
@@ -147,11 +155,11 @@ expr // f = case expr of
   ECon w c       -> ECon w c
   ENum w n       -> ENum w n
   EApp w t  us   -> EApp w (t // f) (map (// f) us)
-  ECas w t  cs   -> ECas w (t // f) (map (over' case2rhs (/// f)) cs)
+  ECas w t  cs   -> ECas w (t // f) (fmap (over' case2rhs (/// f)) cs)
   ELam w ps t    -> ELam w ps (t /// f)
   ELet w ds t    -> ELet w (over (traverse . defn2rhs) (//  f) ds) (t /// f)
   ERec w ds t    -> ERec w (over (traverse . defn2rhs) (/// f) ds) (t /// f)
-  EMat w t  as   -> EMat w (t // f) (map (over' altn2rhs (/// f)) as)
+  EMat w t  as   -> EMat w (t // f) (fmap (over' altn2rhs (/// f)) as)
   ETyAbs w x e   -> ETyAbs w x (e // f)
   ETyApp w e t   -> ETyApp w (e // f) t
 
@@ -159,11 +167,11 @@ expr // f = case expr of
   Expr st tv (EScope i ev1)                 ->
   (forall tv. Pos -> ev1 -> Expr st tv ev2) ->
   Expr st tv (EScope i ev2)
-t /// f = t // (\w x -> dist w (fmap (f w) x))
+t /// f = t // (\w x -> pdist w (fmap (f w) x))
 
-dist :: Pos -> EScope i (Expr st tv ev) -> Expr st tv (EScope i ev)
-dist w (Bound i x) = EVar w (Bound i x)
-dist _ (Free t)    = fmap Free t
+pdist :: Pos -> EScope i (Expr st tv ev) -> Expr st tv (EScope i ev)
+pdist w (Bound i x) = EVar w (Bound i x)
+pdist _ (Free t)    = fmap Free t
 
 -- * Lenses and traversals
 module2tops ::
@@ -363,6 +371,12 @@ instance HasLhs (Bind st tv) where
   type Lhs (Bind st tv) = Id.EVar
   lhs = bindEVar
 
+instance HasPos (Altn st tv ev) where
+  pos = altnPos
+
+instance HasPos (Case st tv ev) where
+  pos = casePos
+
 -- * Pretty printing
 class PrettyType f where
   pPrintPrecType :: (IsTVar tv) => PrettyLevel -> Rational -> f tv -> Doc
@@ -435,10 +449,10 @@ instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
     --     ]
     EMat _ t as ->
       maybeParens (prec > 0) $ vcat
-      $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) as
+      $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList as)
     ECas _ t cs ->
       maybeParens (prec > 0) $ vcat
-      $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) cs
+      $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList cs)
     ETyAbs _ xs e ->
       maybeParens (prec > 0)
       $ hang ("fun" <+> prettyAtType pretty xs <+> "->") 2 (pPrintPrec lvl prec e)

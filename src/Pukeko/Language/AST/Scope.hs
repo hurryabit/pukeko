@@ -15,9 +15,10 @@ module Pukeko.Language.AST.Scope
   , mkBound
   , strengthen
   , weaken
-  , weaken1
   , abstract1
   , unscope
+  , dist
+  , (>>>=)
   , extendEnv
   , IsVarLevel (..)
   , IsVar (..)
@@ -74,11 +75,6 @@ strengthen component = \case
 weaken :: v -> Scope b i v
 weaken = Free
 
-weaken1 :: Scope b j v -> Scope b j (Scope b i v)
-weaken1 = \case
-  Bound j b -> Bound j b
-  Free  x   -> Free  (Free x)
-
 abstract1 :: (j -> Maybe i) -> Scope b j v -> Scope b j (Scope b i v)
 abstract1 f = \case
   Bound (f -> Just i) b -> Free (Bound i b)
@@ -92,10 +88,20 @@ unscope = \case
   Bound _ (Forget b) -> b
   Free  x            -> x
 
+dist :: Applicative f => Scope b i (f v) -> f (Scope b i v)
+dist = \case
+  Bound i b -> pure (Bound i b)
+  Free  t   -> fmap Free t
+
+(>>>=) :: Monad f => f (Scope b i v1) -> (v1 -> f v2) -> f (Scope b i v2)
+t >>>= f = t >>= dist . fmap f
+
+
 lookupMap :: (Ord i, Pretty i) => i -> Map.Map i a -> a
 lookupMap i = Map.findWithDefault (bug "scope" "lookup failed" (Just (prettyShow i))) i
 
 data Pair f g a = Pair (f a) (g a)
+  deriving (Functor)
 
 extendEnv ::
   forall i v a.
@@ -121,7 +127,7 @@ instance IsVarLevel () where
   type EnvLevelOf () = Identity
   lookupEnvLevel () = runIdentity
 
-class IsVar v where
+class (Functor (EnvOf v)) => IsVar v where
   type BaseName v :: *
   type EnvOf v :: * -> *
   baseName :: v -> BaseName v
@@ -129,7 +135,7 @@ class IsVar v where
 
 type IsEVar v = (IsVar v, BaseName v ~ Id.EVar)
 
-type IsTVar v = (IsVar v, BaseName v ~ Id.TVar)
+type IsTVar v = (Eq v, IsVar v, BaseName v ~ Id.TVar)
 
 instance IsVar Id.EVar where
   type BaseName Id.EVar = Id.EVar
@@ -137,7 +143,7 @@ instance IsVar Id.EVar where
   baseName = id
   lookupEnv = lookupMap
 
-instance (Pretty b, IsVarLevel i, IsVar v, BaseName v ~ b) => IsVar (Scope b i v) where
+instance (IsVarLevel i, IsVar v, BaseName v ~ b) => IsVar (Scope b i v) where
   type BaseName (Scope b i v) = b
   type EnvOf (Scope b i v) = Pair (EnvLevelOf i) (EnvOf v)
   baseName = \case
@@ -154,3 +160,8 @@ instance IsVar Void where
   lookupEnv = absurd
 
 makePrisms ''Scope
+
+instance Bifunctor (Scope b) where
+  bimap f g = \case
+    Bound i b -> Bound (f i) b
+    Free  x   -> Free  (g x)

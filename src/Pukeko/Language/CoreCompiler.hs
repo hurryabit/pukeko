@@ -78,7 +78,7 @@ ccExpr = \case
   In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us
   In.ELet _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> scoped (ccExpr t)
   In.ERec _ ds t  -> scoped $ Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
-  In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
+  In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase (toList cs)
 
 ccCase :: IsEVar ev => In.Case In tv ev -> CC ev Altn
 ccCase (In.MkCase _ _ _ bs t) =

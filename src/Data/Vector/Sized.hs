@@ -8,10 +8,13 @@ module Data.Vector.Sized
   , (!)
   , (++)
   , empty
+  , plength
   , withList
   , matchList
   , zip
   , zipWith
+  , zipWithM
+  , zipWithM_
   , unzip
   )
 where
@@ -25,7 +28,7 @@ import qualified Data.Vector as V
 import           GHC.TypeLits
 
 newtype Vector (n :: Nat) a = MkVector (V.Vector a)
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Functor, Foldable, Traversable)
 
 (!) :: Vector n a -> Finite n -> a
 MkVector v ! i = v V.! toInt i
@@ -35,6 +38,9 @@ MkVector v ++ MkVector w = MkVector (v V.++ w)
 
 empty :: Vector 0 a
 empty = MkVector V.empty
+
+plength :: Vector n a -> Proxy n
+plength _ = Proxy
 
 withList :: forall a r. [a] -> (forall n. KnownNat n => Vector n a -> r) -> r
 withList xs k =
@@ -54,6 +60,12 @@ zip (MkVector xs) (MkVector ys) = MkVector (V.zip xs ys)
 
 zipWith :: (a -> b -> c) -> Vector n a -> Vector n b -> Vector n c
 zipWith f (MkVector xs) (MkVector ys) = MkVector (V.zipWith f xs ys)
+
+zipWithM :: Monad m => (a -> b -> m c) -> Vector n a -> Vector n b -> m (Vector n c)
+zipWithM f (MkVector xs) (MkVector ys) = MkVector <$> V.zipWithM f xs ys
+
+zipWithM_ :: Monad m => (a -> b -> m c) -> Vector n a -> Vector n b -> m ()
+zipWithM_ f (MkVector xs) (MkVector ys) = V.zipWithM_ f xs ys
 
 unzip :: Vector n (a, b) -> (Vector n a, Vector n b)
 unzip (MkVector xys) = (MkVector xs, MkVector ys)

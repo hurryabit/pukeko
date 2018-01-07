@@ -45,7 +45,7 @@ typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _field
     go xs flds =
       case sameNat (Proxy @n1) (Proxy @n2) of
         Just Refl ->
-          let res = appTCon _tcon [ TVar (mkBound i x) | (i, x) <- itoList xs ]
+          let res = mkTApp (TCon _tcon) [ TVar (mkBound i x) | (i, x) <- itoList xs ]
           in  mkTUni xs (flds *~> res)
         Nothing ->
           bug "con decl" "type and data constructor have different arity" names

@@ -13,7 +13,7 @@ module Pukeko.Pretty
 import Data.Foldable
 import Data.Monoid
 import Data.Void
-import Text.PrettyPrint.HughesPJClass hiding ((<>), (<+>), hsep)
+import Text.PrettyPrint.HughesPJClass hiding ((<>), (<+>), hsep, first)
 
 import qualified Text.PrettyPrint.HughesPJClass as PP
 

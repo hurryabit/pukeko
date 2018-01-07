@@ -6,6 +6,7 @@ module Pukeko.Language.Renamer
 import           Control.Lens
 import           Control.Monad.Reader
 import           Data.Finite       (Finite)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map          as Map
 import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
@@ -84,7 +85,10 @@ rnExpr = \case
   Ps.ECon w c -> pure (ECon w c)
   Ps.ENum w n -> pure (ENum w n)
   Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es
-  Ps.EMat w e0  as -> EMat w <$> rnExpr e0 <*> traverse rnAltn as
+  Ps.EMat w e0  as0 ->
+    case as0 of
+      []   -> throwErrorAt w "pattern match without alternatives"
+      a:as -> EMat w <$> rnExpr e0 <*> traverse rnAltn (a NE.:| as)
   Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
     let bs2 = ifoldMap (\i (MkBind _ x NoType) -> Map.singleton x i) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0)

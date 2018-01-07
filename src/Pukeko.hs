@@ -15,6 +15,7 @@ import qualified Pukeko.Language.LambdaLifter   as LambdaLifter
 import qualified Pukeko.Language.Parser         as Parser
 import qualified Pukeko.Language.PatternMatcher as PatternMatcher
 import qualified Pukeko.Language.Inferencer     as Inferencer
+import qualified Pukeko.Language.TypeChecker    as TypeChecker
 import qualified Pukeko.Language.TypeEraser     as TypeEraser
 import qualified Pukeko.Language.TypeResolver   as TypeResolver
 import qualified Pukeko.Language.FunResolver    as FunResolver
@@ -29,6 +30,7 @@ compileToCore module_ = do
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule
                >>= Inferencer.inferModule
+               >>= TypeChecker.checkModule
   module_ll <- return (TypeEraser.eraseModule module_ti)
                >>= PatternMatcher.compileModule
                >>= return . DeadCode.cleanModule

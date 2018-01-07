@@ -9,6 +9,7 @@ module Pukeko.Language.Info
   , findTCon
   , findDCon
   , findFun
+  , typeOfDCon
   , liftCatch
   ) where
 
@@ -55,6 +56,12 @@ findDCon tcon = (Map.! tcon) <$> allDCons
 
 findFun :: MonadInfo (GenModuleInfo cons 'True) m => Id.EVar -> m (Pos, Type Void)
 findFun fun = (Map.! fun) <$> allFuns
+
+typeOfDCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.DCon -> m (Type Void)
+typeOfDCon dcon = do
+  dconDecl@(Con.MkDConDecl Con.MkDConDeclN{_tcon}) <- findDCon dcon
+  tconDecl <- findTCon _tcon
+  pure (Con.typeOf tconDecl dconDecl)
 
 liftCatch :: Catch e m a -> Catch e (InfoT i m) a
 liftCatch f m h = InfoT $ Reader.liftCatch f (unInfoT m) (unInfoT . h)

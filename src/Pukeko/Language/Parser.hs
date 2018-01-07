@@ -77,7 +77,7 @@ type_, atype :: Parser (Type Id.TVar)
 type_ =
   buildExpressionParser
     [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
-    (appN <$> atype <*> many atype)
+    (mkTApp <$> atype <*> many atype)
   <?> "type"
 atype = choice
   [ TVar <$> tvar

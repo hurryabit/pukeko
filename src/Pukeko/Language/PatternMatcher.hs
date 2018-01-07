@@ -11,6 +11,7 @@ import           Control.Monad.State
 import           Data.Bifunctor   (second)
 import           Data.Either      (partitionEithers)
 import           Data.Foldable    (foldlM, toList)
+import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Sized  as LS
 import qualified Data.Map         as Map
 import           Data.Traversable (for)
@@ -49,9 +50,7 @@ pmExpr = \case
   ELam w bs t       -> ELam w (fmap retagBind bs) <$> pmExpr t
   ELet w ds t       -> ELet w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
   ERec w ds t       -> ERec w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
-  EMat w t0 as0     -> LS.withList as0 $ \case
-    LS.Nil -> bug "pattern matcher" "no alternatives" Nothing
-    as1@LS.Cons{} -> do
+  EMat w t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch w (mkRowMatch1 t1 as1)
   -- ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
@@ -184,16 +183,19 @@ data GrpMatchItem tv ev =
   forall m m' n k. m ~ 'LS.Succ m' =>
   MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n tv (EFinScope k ev))
 
-data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) [GrpMatchItem tv ev]
+data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev))
 
 groupDests ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
   Pos -> Col m tv ev (Dest tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
   let drs = toList (LS.zip ds rs)
-  Con.MkDConDecl dconDecl0 <- findDCon dcon0
-  Con.MkTConDecl{_dcons} <- findTCon (Con._tcon dconDecl0)
-  grps <- for _dcons $ \Con.MkDConDeclN{_dname = dcon1} -> do
+  Con.MkDConDecl Con.MkDConDeclN{_tcon = tcon} <- findDCon dcon0
+  Con.MkTConDecl{_dcons = dcons0} <- findTCon tcon
+  dcons1 <- case dcons0 of
+    []   -> throwAt w "pattern match on type without data constructors" tcon
+    d:ds -> pure (d :| ds)
+  grps <- for dcons1 $ \Con.MkDConDeclN{_dname = dcon1} -> do
     let drs1 = filter (\(MkDest dcon2 _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" dcon1
@@ -209,7 +211,7 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
           grpRows <- for drs2 $ \(MkDest _ ps, MkRow qs u) ->
             case LS.match ixs ps of
               Nothing  -> bug "pattern matcher" "wrong number of patterns" Nothing
-              Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap weaken1 u)
+              Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (fmap weaken) u)
           let ts1 = LS.map (EVar w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) ts
           pure $ MkGrpMatchItem con (fmap (BName w . snd) ixs0) (MkRowMatch ts1 grpRows)
   pure $ MkGrpMatch t grps

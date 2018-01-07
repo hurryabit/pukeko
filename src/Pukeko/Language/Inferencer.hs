@@ -187,10 +187,9 @@ infer = \case
       (t, us) <- lookupType x >>= instantiate
       pure (mkETyApp (EVar w x) us, t)
     ECon w c -> do
-      dconDecl@(Con.MkDConDecl Con.MkDConDeclN{_tcon}) <- findDCon c
-      tconDecl <- findTCon _tcon
-      (t, us) <- instantiate (open (Con.typeOf tconDecl dconDecl))
-      pure (mkETyApp (ECon w c) us, t)
+      t0 <- typeOfDCon c
+      (t1, us) <- instantiate (open t0)
+      pure (mkETyApp (ECon w c) us, t1)
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
       (fun1, t_fun) <- infer fun0

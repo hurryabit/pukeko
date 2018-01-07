@@ -5,10 +5,11 @@ module Pukeko.Language.Type
   ( NoType (..)
   , Type (..)
   , mkTUni
+  , pattern TFun
   , (~>)
   , (*~>)
-  , appN
-  , appTCon
+  , mkTApp
+  , gatherTApp
   , typeInt
   , vars
   , toPrenex
@@ -19,12 +20,15 @@ module Pukeko.Language.Type
   where
 
 import           Control.Lens
+import           Control.Monad
 import           Data.Foldable (toList)
 import qualified Data.Map      as Map
 import           Data.Ratio    () -- for precedences in pretty printer
 import qualified Data.Set      as Set
 import qualified Data.Set.Lens as Set
+import           Data.Type.Equality ((:~:) (Refl))
 import qualified Data.Vector.Sized as Vec
+import           GHC.TypeLits
 
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
@@ -39,13 +43,13 @@ data Type tv
   | TArr
   | TCon Id.TCon
   | TApp (Type tv) (Type tv)
-  | forall n.
+  | forall n. KnownNat n =>
     TUni (Vec.Vector n Id.TVar) (Type (TFinScope n tv))
 
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
 
-mkTUni :: Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
+mkTUni :: KnownNat n => Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
 mkTUni xs t
   | null xs   = fmap (strengthen "mkTUni") t
   | otherwise = TUni xs t
@@ -56,11 +60,15 @@ mkTUni xs t
 (*~>) :: [Type tv] -> Type tv -> Type tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
-appN :: Type tv -> [Type tv] -> Type tv
-appN = foldl TApp
+mkTApp :: Type tv -> [Type tv] -> Type tv
+mkTApp = foldl TApp
 
-appTCon :: Id.TCon -> [Type tv] -> Type tv
-appTCon = appN . TCon
+gatherTApp :: Type tv -> (Type tv, [Type tv])
+gatherTApp = go []
+  where
+    go us = \case
+      TApp t u -> go (u:us) t
+      t        -> (t, us)
 
 typeInt :: Type tv
 typeInt  = TCon (Id.tcon "Int")
@@ -82,6 +90,35 @@ type2tcon f = \case
   TCon c     -> TCon <$> f c
   TApp tf tp -> TApp <$> type2tcon f tf <*> type2tcon f tp
   TUni xs tq -> TUni xs <$> type2tcon f tq
+
+instance (IsTVar tv) => Eq (Type tv) where
+  t1 == t2 = case (t1, t2) of
+    (TVar x1, TVar x2) -> x1 == x2
+    (TArr   , TArr   ) -> True
+    (TCon c1, TCon c2) -> c1 == c2
+    (TApp tf1 tp1, TApp tf2 tp2) -> tf1 == tf2 && tp1 == tp2
+    (TUni xs1 tq1, TUni xs2 tq2) ->
+      case sameNat (Vec.plength xs1) (Vec.plength xs2) of
+        Nothing   -> False
+        Just Refl -> tq1 == tq2
+    (TVar{}, _) -> False
+    (TArr{}, _) -> False
+    (TCon{}, _) -> False
+    (TApp{}, _) -> False
+    (TUni{}, _) -> False
+
+instance Applicative Type where
+  pure = TVar
+  (<*>) = ap
+
+instance Monad Type where
+  return = pure
+  t >>= f = case t of
+    TVar x -> f x
+    TArr   -> TArr
+    TCon c -> TCon c
+    TApp tf tp -> TApp (tf >>= f) (tp >>= f)
+    TUni xs tq -> TUni xs (tq >>>= f)
 
 instance IsTVar tv => Pretty (Type tv) where
   pPrintPrec lvl prec = \case

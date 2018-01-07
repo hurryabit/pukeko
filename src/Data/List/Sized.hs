@@ -9,6 +9,7 @@ module Data.List.Sized
   , SomeList (..)
   , fromList
   , withList
+  , withNonEmpty
   , match
   , map
   , (++)
@@ -22,6 +23,7 @@ where
 
 import           Prelude        hiding ((++), map, replicate, unzip, zip, zipWith)
 import           Data.Bifunctor (bimap)
+import           Data.List.NonEmpty (NonEmpty (..))
 
 data Nat = Zero | Succ Nat
 
@@ -52,6 +54,9 @@ fromList = \case
 withList :: [a] -> (forall n. List n a -> b) -> b
 withList xs k = case fromList xs of
   SomeList ys -> k ys
+
+withNonEmpty :: NonEmpty a -> (forall n. List ('Succ n) a -> b) -> b
+withNonEmpty (x :| xs0) k = withList xs0 $ \xs1 -> k (Cons x xs1)
 
 match :: List n a -> [b] -> Maybe (List n b)
 match Nil         []     = Just Nil
