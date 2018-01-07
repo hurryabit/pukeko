@@ -12,14 +12,17 @@ module Data.Vector.Sized
   , withList
   , matchList
   , zip
+  , zip3
   , zipWith
+  , zipWith3
   , zipWithM
   , zipWithM_
+  , zipWith3M_
   , unzip
   )
 where
 
-import           Prelude hiding ((++), zip, zipWith, unzip)
+import           Prelude hiding ((++), zip, zip3, zipWith, zipWith3, unzip)
 
 import           Control.Lens.Indexed
 import           Data.Finite
@@ -58,14 +61,24 @@ matchList (MkVector v0) xs
 zip :: Vector n a -> Vector n b -> Vector n (a, b)
 zip (MkVector xs) (MkVector ys) = MkVector (V.zip xs ys)
 
+zip3 :: Vector n a -> Vector n b -> Vector n c -> Vector n (a, b, c)
+zip3 (MkVector xs) (MkVector ys) (MkVector zs) = MkVector (V.zip3 xs ys zs)
+
 zipWith :: (a -> b -> c) -> Vector n a -> Vector n b -> Vector n c
 zipWith f (MkVector xs) (MkVector ys) = MkVector (V.zipWith f xs ys)
+
+zipWith3 :: (a -> b -> c -> d) -> Vector n a -> Vector n b -> Vector n c -> Vector n d
+zipWith3 f (MkVector xs) (MkVector ys) (MkVector zs) = MkVector (V.zipWith3 f xs ys zs)
 
 zipWithM :: Monad m => (a -> b -> m c) -> Vector n a -> Vector n b -> m (Vector n c)
 zipWithM f (MkVector xs) (MkVector ys) = MkVector <$> V.zipWithM f xs ys
 
 zipWithM_ :: Monad m => (a -> b -> m c) -> Vector n a -> Vector n b -> m ()
 zipWithM_ f (MkVector xs) (MkVector ys) = V.zipWithM_ f xs ys
+
+zipWith3M_ ::
+  Monad m => (a -> b -> c -> m ()) -> Vector n a -> Vector n b -> Vector n c -> m ()
+zipWith3M_ f xs ys zs = sequence_ (zipWith3 f xs ys zs)
 
 unzip :: Vector n (a, b) -> (Vector n a, Vector n b)
 unzip (MkVector xys) = (MkVector xs, MkVector ys)

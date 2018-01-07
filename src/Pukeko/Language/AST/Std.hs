@@ -15,6 +15,8 @@ module Pukeko.Language.AST.Std
   , Altn (..)
   , Patn (..)
 
+  , mkETyApp
+
   , abstract
   , (//)
 
@@ -139,6 +141,13 @@ makeLenses ''Bind
 makeLenses ''Case
 makeLenses ''Altn
 
+mkETyApp ::
+  (HasETyp st ~ 'True) => Pos -> Expr st tv ev -> [StageType st tv] -> Expr st tv ev
+mkETyApp w e0 = \case
+  [] -> e0
+  ts -> ETyApp w e0 ts
+
+
 -- * Abstraction and substition
 
 -- | Abstract all variables which are mapped to @Just@.
@@ -149,7 +158,7 @@ abstract f = fmap (match f)
     match f v = maybe (Free v) (uncurry mkBound) (f v)
 
 -- | Replace subexpressions.
-(//) :: Expr st tv ev1 -> (forall tv. Pos -> ev1 -> Expr st tv ev2) -> Expr st tv ev2
+(//) :: Expr st tv ev1 -> (Pos -> ev1 -> Expr st tv ev2) -> Expr st tv ev2
 expr // f = case expr of
   EVar w x       -> f w x
   ECon w c       -> ECon w c
@@ -160,12 +169,12 @@ expr // f = case expr of
   ELet w ds t    -> ELet w (over (traverse . defn2rhs) (//  f) ds) (t /// f)
   ERec w ds t    -> ERec w (over (traverse . defn2rhs) (/// f) ds) (t /// f)
   EMat w t  as   -> EMat w (t // f) (fmap (over' altn2rhs (/// f)) as)
-  ETyAbs w x e   -> ETyAbs w x (e // f)
+  ETyAbs _ _ _   -> error "THIS IS NOT IMPLEMENTED"
   ETyApp w e t   -> ETyApp w (e // f) t
 
 (///) ::
-  Expr st tv (EScope i ev1)                 ->
-  (forall tv. Pos -> ev1 -> Expr st tv ev2) ->
+  Expr st tv (EScope i ev1) ->
+  (Pos -> ev1 -> Expr st tv ev2) ->
   Expr st tv (EScope i ev2)
 t /// f = t // (\w x -> pdist w (fmap (f w) x))
 

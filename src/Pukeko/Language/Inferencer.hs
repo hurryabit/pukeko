@@ -11,7 +11,7 @@ import           Control.Monad.Supply
 import           Control.Monad.Writer
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
-import           Data.Foldable    (toList)
+import           Data.Foldable
 import qualified Data.Map         as Map
 import qualified Data.Set         as Set
 import           Data.STRef
@@ -82,10 +82,11 @@ localize ts = TI . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . un
 lookupType :: (IsVar v) => v -> TI v s (UType s Void)
 lookupType = views locals . Sc.lookupEnv
 
-generalize :: UType s Void -> TI v s (UType s Void)
+generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
 generalize t0 = do
-  (t1, xs) <- runWriterT (go t0)
-  pure (mkUTUni (Set.toList xs) t1)
+  (t1, xs1) <- runWriterT (go t0)
+  let xs2 = toList xs1
+  pure (mkUTUni xs2 t1, map UTVar xs2)
   where
     go t0 = case t0 of
       (UVar uref) -> do
@@ -154,7 +155,7 @@ inferLet defns = do
     pure (rhss, t_rhss)
   fmap Vec.unzip $ ifor defns $ \i (MkDefn (MkBind w x NoType) _) -> do
     let rhs = rhss Vec.! i
-    ts_rhs <- generalize (t_rhss Vec.! i)
+    (ts_rhs, _) <- generalize (t_rhss Vec.! i)
     pure (MkDefn (MkBind w x ts_rhs) rhs, ts_rhs)
 
 inferRec ::
@@ -162,21 +163,25 @@ inferRec ::
   Vec.Vector n (Defn In Void (EFinScope n v)) ->
   TI v s ( Vec.Vector n (Defn (Aux s) Void (EFinScope n v))
          , Vec.Vector n (UType s Void))
-inferRec defns = do
-  (rhss, t_rhss) <- local (level +~ 1) $ do
-    t_lhss <- traverse (const freshUVar) defns
-    (rhss, t_rhss) <-
-      Vec.unzip <$> localize t_lhss (traverse (infer . view rhs) defns)
-    ifor_ defns $ \i defn ->
-      unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
-    pure (rhss, t_rhss)
-  fmap Vec.unzip $ ifor defns $ \i (MkDefn (MkBind w x NoType) _) -> do
-    let rhs = rhss Vec.! i
-    ts_rhs <- generalize (t_rhss Vec.! i)
-    pure (MkDefn (MkBind w x ts_rhs) rhs, ts_rhs)
+inferRec defns0 = do
+  let (ls0, rs0) = Vec.unzip (fmap (\(MkDefn l r) -> (l, r)) defns0)
+  (rs1, ts1) <- local (level +~ 1) $ do
+    us <- traverse (const freshUVar) ls0
+    (rs1, ts1) <- Vec.unzip <$> localize us (traverse infer rs0)
+    for_ (Vec.zip3 ls0 us ts1) $ \(l0, u, t1) -> unify (l0^.pos) u t1
+    pure (rs1, ts1)
+  (ts2, qs) <- Vec.unzip <$> traverse generalize ts1
+  let ls1 = Vec.zipWith (set bindType) ts2 ls0
+  let f w =
+        scope'
+        (\i b -> mkETyApp w (EVar w (mkBound i b)) (map (fmap absurd) (qs Vec.! i)))
+        (EVar w . Free)
+  let rs2 = fmap (// f) rs1
+  let defns1 = Vec.zipWith MkDefn ls1 rs2
+  pure (defns1, ts2)
 
-mkETyApp :: Expr (Aux s) Void v -> [UType s Void] -> Expr (Aux s) Void v
-mkETyApp e0 ys
+mkETyApp1 :: Expr (Aux s) Void v -> [UType s Void] -> Expr (Aux s) Void v
+mkETyApp1 e0 ys
   | null ys = e0
   | otherwise = ETyApp (e0^.pos) e0 ys
 
@@ -185,11 +190,11 @@ infer :: IsEVar v => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void
 infer = \case
     EVar w x -> do
       (t, us) <- lookupType x >>= instantiate
-      pure (mkETyApp (EVar w x) us, t)
+      pure (mkETyApp1 (EVar w x) us, t)
     ECon w c -> do
       t0 <- typeOfDCon c
       (t1, us) <- instantiate (open t0)
-      pure (mkETyApp (ECon w c) us, t1)
+      pure (mkETyApp1 (ECon w c) us, t1)
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
       (fun1, t_fun) <- infer fun0

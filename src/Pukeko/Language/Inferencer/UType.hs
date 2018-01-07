@@ -20,6 +20,7 @@ module Pukeko.Language.Inferencer.UType
 
 import           Control.Monad.Reader
 import           Control.Monad.ST
+import           Data.Coerce       (coerce)
 import           Data.Foldable     (toList)
 import           Data.STRef
 import qualified Data.List.NonEmpty as NE
@@ -126,3 +127,6 @@ prettyUType lvl prec = \case
   UVar uref -> do
     uvar <- readSTRef uref
     prettyUVar lvl prec uvar
+
+instance Functor (UType s) where
+  fmap _ = coerce

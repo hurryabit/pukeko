@@ -31,13 +31,13 @@ let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
         fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
           match xs with
           | Nil @a -> y0
-          | Cons @a x xs -> f x (foldr f y0 xs)
+          | Cons @a x xs -> f x (foldr @a @b f y0 xs)
 let foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
           match xs with
           | Nil @a -> y0
-          | Cons @a x xs -> foldl f (f y0 x) xs
+          | Cons @a x xs -> foldl @a @b f (f y0 x) xs
 let take : ∀a. Int -> List a -> List a =
       fun @a ->
         fun (n : Int) (xs : List a) ->
@@ -46,7 +46,7 @@ let take : ∀a. Int -> List a -> List a =
           | False ->
             match xs with
             | Nil @a -> Nil @a
-            | Cons @a x xs -> Cons @a x (take ((-) n 1) xs)
+            | Cons @a x xs -> Cons @a x (take @a ((-) n 1) xs)
 let nth : ∀a. List a -> Int -> a =
       fun @a ->
         fun (xs : List a) (n : Int) ->
@@ -55,7 +55,7 @@ let nth : ∀a. List a -> Int -> a =
           | Cons @a x xs ->
             match (<=) n 0 with
             | True -> x
-            | False -> nth xs ((-) n 1)
+            | False -> nth @a xs ((-) n 1)
 let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -64,7 +64,7 @@ let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
           | Cons @a x xs ->
             match ys with
             | Nil @b -> Nil @c
-            | Cons @b y ys -> Cons @c (f x y) (zip_with f xs ys)
+            | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
 let partition : ∀a. (a -> Bool) -> List a -> Pair (List a) (List a) =
       fun @a ->
         fun (p : a -> Bool) (xs : List a) ->
@@ -85,7 +85,7 @@ let append : ∀a. List a -> List a -> List a =
         fun (xs : List a) (ys : List a) ->
           match xs with
           | Nil @a -> ys
-          | Cons @a x xs -> Cons @a x (append xs ys)
+          | Cons @a x xs -> Cons @a x (append @a xs ys)
 let concat : ∀a. List (List a) -> List a =
       fun @a -> foldr @(List a) @(List a) (append @a) (Nil @a)
 let map : ∀a b. (a -> b) -> List a -> List b =
@@ -93,7 +93,7 @@ let map : ∀a b. (a -> b) -> List a -> List b =
         fun (f : a -> b) (xs : List a) ->
           match xs with
           | Nil @a -> Nil @b
-          | Cons @a x xs -> Cons @b (f x) (map f xs)
+          | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
 let concat_map : ∀a b. (b -> List a) -> List b -> List a =
       fun @a @b ->
         fun (f : b -> List a) (xs : List b) ->
@@ -105,7 +105,7 @@ let replicate : ∀a. Int -> a -> List a =
         fun (n : Int) (x : a) ->
           match (<=) n 0 with
           | True -> Nil @a
-          | False -> Cons @a x (replicate ((-) n 1) x)
+          | False -> Cons @a x (replicate @a ((-) n 1) x)
 let insert_tree : Int -> Tree Int -> Tree Int =
       fun (x : Int) (t : Tree Int) ->
         match t with
@@ -120,7 +120,7 @@ let in_order : ∀a. Tree a -> List a =
           match t with
           | Leaf @a -> Nil @a
           | Branch @a l x r ->
-            append @a (in_order l) (Cons @a x (in_order r))
+            append @a (in_order @a l) (Cons @a x (in_order @a r))
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -135,8 +135,8 @@ let sequence_io : ∀a. List (IO a) -> IO (List a) =
           | Nil @(IO a) -> return @(List a) (Nil @a)
           | Cons @(IO a) m ms ->
             (>>=) @a @(List a) m (fun (x : a) ->
-                                    (>>=) @(List a) @(List a) (sequence_io ms) (fun (xs : List a) ->
-                                                                                  return @(List a) (Cons @a x xs)))
+                                    (>>=) @(List a) @(List a) (sequence_io @a ms) (fun (xs : List a) ->
+                                                                                     return @(List a) (Cons @a x xs)))
 let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) ->
@@ -154,7 +154,8 @@ let pair : ∀a. (a -> a -> a) -> List a -> List a =
           match xs1 with
           | Nil @a -> Nil @a
           | Cons @a x1 (Nil @a) -> xs1
-          | Cons @a x1 (Cons @a x2 xs3) -> Cons @a (op x1 x2) (pair op xs3)
+          | Cons @a x1 (Cons @a x2 xs3) ->
+            Cons @a (op x1 x2) (pair @a op xs3)
 let single : ∀a. Int -> a -> RmqTree a =
       fun @a ->
         fun (i : Int) (x : a) ->

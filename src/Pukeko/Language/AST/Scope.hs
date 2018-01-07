@@ -10,6 +10,7 @@ module Pukeko.Language.AST.Scope
   , TScope1
   , TFinScope
   , scope
+  , scope'
   , _Bound
   , _Free
   , mkBound
@@ -59,9 +60,12 @@ type TScope1 = TScope ()
 type TFinScope n = TScope (Finite n)
 
 scope :: (i -> a) -> (v -> a) -> Scope b i v -> a
-scope f g = \case
-  Bound i _ -> f i
-  Free  x   -> g x
+scope f = scope' (const . f)
+
+scope' :: (i -> b -> a) -> (v -> a) -> Scope b i v -> a
+scope' f g = \case
+  Bound i (Forget b) -> f i b
+  Free  x            -> g x
 
 mkBound :: i -> b -> Scope b i v
 mkBound i b = Bound i (Forget b)
