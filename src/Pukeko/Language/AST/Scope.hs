@@ -65,6 +65,7 @@ scope f g = \case
 mkBound :: i -> b -> Scope b i v
 mkBound i b = Bound i (Forget b)
 
+-- TODO: Use @HasCallstack@.
 strengthen :: Show b => String -> Scope b i v -> v
 strengthen component = \case
   Bound _ (Forget b) -> bug component "cannot strengthen" (Just (show b))

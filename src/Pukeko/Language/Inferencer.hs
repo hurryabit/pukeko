@@ -35,10 +35,10 @@ import qualified Pukeko.Language.Inferencer.Unify as U
 
 type In    = St.KindChecker
 type Out   = St.Inferencer Type
-type Aux s = St.Inferencer (UTypeSchema s)
+type Aux s = St.Inferencer (UType s)
 
 data Environment v s = MkEnvironment
-  { _locals :: Sc.EnvOf v (UTypeSchema s Void)
+  { _locals :: Sc.EnvOf v (UType s Void)
   , _level  :: Int
   }
 makeLenses ''Environment
@@ -58,42 +58,34 @@ instance MonadST (TI v s) where
 
 runTI :: TI Id.EVar s a -> ModuleInfo In -> ExceptT String (ST s) a
 runTI tc info = do
-  let locals0 = fmap (openSchema . snd) (MI.funs info)
+  let locals0 = fmap (open . snd) (MI.funs info)
   let env0 = MkEnvironment locals0 0
   evalSupplyT (runReaderT (runInfoT (unTI tc) info) env0) Id.freshTVars
 
-freshUVar :: TI v s (UType s)
+freshUVar :: TI v s (UType s Void)
 freshUVar = do
   x <- fresh
   l <- view level
   UVar <$> liftST (newSTRef (UFree x l))
 
-unify :: Pos -> UType s -> UType s -> TI v s ()
+unify :: Pos -> UType s Void -> UType s Void -> TI v s ()
 unify w t1 t2 = TI $ lift $ lift $ lift $ U.unify w t1 t2
 
 localize ::
   forall i v s a.
   (IsVarLevel i, IsVar v) =>
-  EnvLevelOf i (UTypeSchema s Void) ->
+  EnvLevelOf i (UType s Void) ->
   TI (EScope i v) s a ->
   TI v s a
 localize ts = TI . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTI
 
-localizeType ::
-  forall i v s a.
-  (IsVarLevel i, IsVar v) =>
-  EnvLevelOf i (UType s) ->
-  TI (EScope i v) s a ->
-  TI v s a
-localizeType lvl = localize (fmap (MkUTypeSchema []) lvl)
-
-lookupType :: (IsVar v) => v -> TI v s (UTypeSchema s Void)
+lookupType :: (IsVar v) => v -> TI v s (UType s Void)
 lookupType = views locals . Sc.lookupEnv
 
-generalize :: UType s -> TI v s (UTypeSchema s Void)
+generalize :: UType s Void -> TI v s (UType s Void)
 generalize t0 = do
   (t1, xs) <- runWriterT (go t0)
-  pure (MkUTypeSchema (toList xs) t1)
+  pure (mkUTUni (Set.toList xs) t1)
   where
     go t0 = case t0 of
       (UVar uref) -> do
@@ -111,16 +103,18 @@ generalize t0 = do
       UTVar{} -> pure t0
       UTArr{} -> pure t0
       UTCon{} -> pure t0
+      UTUni{} -> bug "inferencer" "quantification during generalization" Nothing
       UTApp tf tp -> UTApp <$> go tf <*> go tp
 
-instantiate :: UTypeSchema s Void -> TI v s (UType s, [UType s])
-instantiate (MkUTypeSchema xs t0) = do
+instantiate :: UType s Void -> TI v s (UType s Void, [UType s Void])
+instantiate ts = do
+  let (xs, t0) = unUTUni ts
   uvars <- traverse (const freshUVar) xs
   let env = Map.fromList (zip xs uvars)
   t1 <- liftST (subst env t0)
   pure (t1, uvars)
 
-instantiateTCon :: Id.TCon -> TI v s (UType s, [UType s], Map.Map Id.TVar (UType s))
+instantiateTCon :: Id.TCon -> TI v s (UType s Void, [UType s Void], Map.Map Id.TVar (UType s Void))
 instantiateTCon tcon = do
   Con.MkTConDecl{_params} <- findTCon tcon
   let params = toList _params
@@ -128,7 +122,7 @@ instantiateTCon tcon = do
   return (appTCon tcon t_params, t_params, Map.fromList (zip params t_params))
 
 inferPatn ::
-  Patn In Void -> UType s -> TI v s (Patn (Aux s) Void, Map.Map Id.EVar (UType s))
+  Patn In Void -> UType s Void -> TI v s (Patn (Aux s) Void, Map.Map Id.EVar (UType s Void))
 inferPatn patn t_expr = case patn of
   PWld w   -> pure (PWld w, Map.empty)
   PVar w x -> pure (PVar w x, Map.singleton x t_expr)
@@ -140,16 +134,16 @@ inferPatn patn t_expr = case patn of
     (t_inst, t_params, env_inst) <- instantiateTCon _tcon
     unify w t_expr t_inst
     -- TODO: Remove this @fmap baseName@ hack.
-    t_fields <- liftST $ traverse (subst env_inst . open . fmap baseName) _fields
+    t_fields <- liftST $ traverse (subst env_inst . open1 . fmap baseName) _fields
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
-    pure (PCon w dcon (map (MkUTypeSchema []) t_params) ps1, Map.unions binds)
+    pure (PCon w dcon t_params ps1, Map.unions binds)
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
 inferLet ::
   (IsEVar v) =>
   Vec.Vector n (Defn In Void v) ->
-  TI v s (Vec.Vector n (Defn (Aux s) Void v), Vec.Vector n (UTypeSchema s Void))
+  TI v s (Vec.Vector n (Defn (Aux s) Void v), Vec.Vector n (UType s Void))
 inferLet defns = do
   -- TODO: Make this less imperative.
   (rhss, t_rhss) <- local (level +~ 1) $ do
@@ -167,12 +161,12 @@ inferRec ::
   (IsEVar v) =>
   Vec.Vector n (Defn In Void (EFinScope n v)) ->
   TI v s ( Vec.Vector n (Defn (Aux s) Void (EFinScope n v))
-         , Vec.Vector n (UTypeSchema s Void))
+         , Vec.Vector n (UType s Void))
 inferRec defns = do
   (rhss, t_rhss) <- local (level +~ 1) $ do
     t_lhss <- traverse (const freshUVar) defns
     (rhss, t_rhss) <-
-      Vec.unzip <$> localizeType t_lhss (traverse (infer . view rhs) defns)
+      Vec.unzip <$> localize t_lhss (traverse (infer . view rhs) defns)
     ifor_ defns $ \i defn ->
       unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
     pure (rhss, t_rhss)
@@ -181,13 +175,13 @@ inferRec defns = do
     ts_rhs <- generalize (t_rhss Vec.! i)
     pure (MkDefn (MkBind w x ts_rhs) rhs, ts_rhs)
 
-mkETyApp :: Expr (Aux s) Void v -> [UType s] -> Expr (Aux s) Void v
+mkETyApp :: Expr (Aux s) Void v -> [UType s Void] -> Expr (Aux s) Void v
 mkETyApp e0 ys
   | null ys = e0
-  | otherwise = ETyApp (e0^.pos) e0 (map (MkUTypeSchema []) ys)
+  | otherwise = ETyApp (e0^.pos) e0 ys
 
 
-infer :: IsEVar v => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s)
+infer :: IsEVar v => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
 infer = \case
     EVar w x -> do
       (t, us) <- lookupType x >>= instantiate
@@ -195,7 +189,7 @@ infer = \case
     ECon w c -> do
       dconDecl@(Con.MkDConDecl Con.MkDConDeclN{_tcon}) <- findDCon c
       tconDecl <- findTCon _tcon
-      (t, us) <- instantiate (openSchema (Con.typeOf tconDecl dconDecl))
+      (t, us) <- instantiate (open (Con.typeOf tconDecl dconDecl))
       pure (mkETyApp (ECon w c) us, t)
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
@@ -206,8 +200,8 @@ infer = \case
       pure (EApp w fun1 args1, t_res)
     ELam w binds0 rhs0 -> do
       t_binds <- traverse (const freshUVar) binds0
-      (rhs1, t_rhs) <- localizeType t_binds (infer rhs0)
-      let binds1 = Vec.zipWith (\(MkBind w' x NoType) t -> MkBind w' x (toSchema t)) binds0 t_binds
+      (rhs1, t_rhs) <- localize t_binds (infer rhs0)
+      let binds1 = Vec.zipWith (\(MkBind w' x NoType) -> MkBind w' x) binds0 t_binds
       pure (ELam w binds1 rhs1, toList t_binds *~> t_rhs)
     ELet w defns0 rhs0 -> do
       (defns1, t_defns) <- inferLet defns0
@@ -222,7 +216,7 @@ infer = \case
       t_res <- freshUVar
       altns1 <- for altns0 $ \(MkAltn w' patn0 rhs0) -> do
         (patn1, t_binds) <- inferPatn patn0 t_expr
-        (rhs1, t_rhs) <- localizeType t_binds (infer rhs0)
+        (rhs1, t_rhs) <- localize t_binds (infer rhs0)
         unify w t_res t_rhs
         pure (MkAltn w' patn1 rhs1)
       pure (EMat w expr1 altns1, t_res)
@@ -246,7 +240,7 @@ inferTopLevel = \case
         --
         -- val f : a -> b
         -- let f = fun x -> x
-        MkUTypeSchema _ t_decl <- lookupType x
+        (_, t_decl) <- unUTUni <$> lookupType x
         unify w t_decl t_defn
         pure (TLDef b (squashScope e))
 
@@ -283,7 +277,7 @@ localizeTQ xs m = do
   let upd env0 = env1 <> fmap Free env0
   (TQ . withReaderT upd . unTQ) (m ys)
 
-qualType :: UType s -> TQ tv s (Type tv)
+qualType :: UType s Void -> TQ tv s (Type tv)
 qualType = \case
   UTVar x -> do
     y_mb <- asks (x `Map.lookup`)
@@ -294,6 +288,7 @@ qualType = \case
   UTArr -> pure TArr
   UTCon c -> pure (TCon c)
   UTApp t1 t2 -> TApp <$> qualType t1 <*> qualType t2
+  UTUni{} -> bug "inferencer" "quantification during quantification" Nothing
   UVar uref -> do
     uvar <- liftST (readSTRef uref)
     case uvar of
@@ -301,19 +296,13 @@ qualType = \case
                    "free unification variable during quantification" (Just (show x))
       ULink t -> qualType t
 
-qualType' :: UTypeSchema s Void -> TQ tv s (Type tv)
-qualType' (MkUTypeSchema ys t) = do
-  unless (null ys) (bug "type checker" "quantification in abstraction" Nothing)
-  qualType t
-
-
 qualDefn :: Defn (Aux s) Void ev -> TQ tv s (Defn Out tv ev)
-qualDefn (MkDefn (MkBind w x (MkUTypeSchema ys0 t0)) e0) = case ys0 of
-  [] -> MkDefn <$> (MkBind w x <$> qualType t0) <*> qualExpr e0
-  _  -> Vec.withList ys0 $ \ys1 -> localizeTQ ys1 $ \ys2 -> do
+qualDefn (MkDefn (MkBind w x ts) e0) = case ts of
+  UTUni ys0 t0 -> Vec.withList (toList ys0) $ \ys1 -> localizeTQ ys1 $ \ys2 -> do
     t1  <- TUni ys2 <$> qualType t0
     e1  <- ETyAbs w ys2 <$> qualExpr e0
     pure (MkDefn (MkBind w x t1) e1)
+  t0 -> MkDefn <$> (MkBind w x <$> qualType t0) <*> qualExpr e0
 
 qualExpr :: Expr (Aux s) Void ev -> TQ tv s (Expr Out tv ev)
 qualExpr = \case
@@ -323,13 +312,13 @@ qualExpr = \case
   EApp w e0 es -> EApp w <$> qualExpr e0 <*> traverse qualExpr es
   ELam w bs0 e0 -> do
     bs1 <- for bs0 $ \(MkBind w' x ts) -> do
-      MkBind w' x <$> qualType' ts
+      MkBind w' x <$> qualType ts
     ELam w bs1 <$> qualExpr e0
   ELet w ds e0 -> ELet w <$> traverse qualDefn ds <*> qualExpr e0
   ERec w ds e0 -> ERec w <$> traverse qualDefn ds <*> qualExpr e0
   EMat w e0 as -> EMat w <$> qualExpr e0 <*> traverse qualAltn as
   ETyAbs _ _ _ -> bug "type checker" "type abstraction during quantification" Nothing
-  ETyApp w e0 ts -> ETyApp w <$> qualExpr e0 <*> traverse qualType' ts
+  ETyApp w e0 ts -> ETyApp w <$> qualExpr e0 <*> traverse qualType ts
 
 qualAltn :: Altn (Aux s) Void ev -> TQ tv s (Altn Out tv ev)
 qualAltn (MkAltn w p e) = MkAltn w <$> qualPatn p <*> qualExpr e
@@ -338,18 +327,20 @@ qualPatn :: Patn (Aux s) Void -> TQ tv s (Patn Out tv)
 qualPatn = \case
   PWld w -> pure (PWld w)
   PVar w x -> pure (PVar w x)
-  PCon w c ts ps -> PCon w c <$> traverse qualType' ts <*> traverse qualPatn ps
+  PCon w c ts ps -> PCon w c <$> traverse qualType ts <*> traverse qualPatn ps
 
 qualTopLevel :: TopLevel (Aux s) -> TQ Void s (TopLevel Out)
 qualTopLevel = \case
   TLDef b e -> do
     MkDefn b e <- qualDefn (MkDefn b e)
     pure (TLDef b e)
-  TLAsm (MkBind w x (MkUTypeSchema ys0 t0)) s -> do
+  TLAsm (MkBind w x ts) s -> do
     -- TODO: Avoid code duplication with qualDefn.
-    t1 <- case ys0 of
-      [] -> qualType t0
-      _  -> Vec.withList ys0 $ \ys1 -> localizeTQ ys1 (\ys2 -> TUni ys2 <$> qualType t0)
+    t1 <- case ts of
+      UTUni ys0 t0 ->
+        Vec.withList (toList ys0) $ \ys1 ->
+          localizeTQ ys1 (\ys2 -> TUni ys2 <$> qualType t0)
+      t0 -> qualType t0
     pure (TLAsm (MkBind w x t1) s)
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)

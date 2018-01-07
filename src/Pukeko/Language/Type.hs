@@ -1,18 +1,20 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeOperators #-}
 module Pukeko.Language.Type
   ( NoType (..)
   , Type (..)
-  , TypeSchema (..)
+  , mkTUni
   , (~>)
   , (*~>)
   , appN
   , appTCon
   , typeInt
   , vars
-  , toSchema
+  , toPrenex
   , type2tcon
+  , Void
+  , absurd
   )
   where
 
@@ -40,10 +42,13 @@ data Type tv
   | forall n.
     TUni (Vec.Vector n Id.TVar) (Type (TFinScope n tv))
 
-data TypeSchema = forall n. MkTypeSchema (Vec.Vector n Id.TVar) (Type (TFinScope n Void))
-
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
+
+mkTUni :: Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
+mkTUni xs t
+  | null xs   = fmap (strengthen "mkTUni") t
+  | otherwise = TUni xs t
 
 (~>) :: Type tv -> Type tv -> Type tv
 (~>) = TFun
@@ -63,10 +68,11 @@ typeInt  = TCon (Id.tcon "Int")
 vars :: Ord tv => Type tv -> Set.Set tv
 vars = Set.setOf traversed
 
-toSchema :: Type Id.TVar -> TypeSchema
-toSchema t = Vec.withList (toList (vars t)) $ \xs ->
-  let env = ifoldMap (\i x -> Map.singleton x (mkBound i x)) xs
-  in  MkTypeSchema xs (fmap (env Map.!) t)
+toPrenex :: Type Id.TVar -> Type Void
+toPrenex t =
+  Vec.withList (toList (vars t)) $ \xs ->
+    let env = ifoldMap (\i x -> Map.singleton x (mkBound i x)) xs
+    in  mkTUni xs (fmap (env Map.!) t)
 
 -- * Deep traversals
 type2tcon :: Traversal' (Type tv) Id.TCon
@@ -87,11 +93,7 @@ instance IsTVar tv => Pretty (Type tv) where
     TApp tf tx ->
       maybeParens (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
     TUni xs tq ->
-      maybeParens (prec > 0) ("∀" <> hsep (fmap pretty xs) <> "." <+> pPrintPrec lvl 0 tq)
-
-instance Pretty TypeSchema where
-  pPrintPrec lvl prec (MkTypeSchema xs t) =
-    "∀" <+> hsep (fmap pretty xs) <> "." <+> pPrintPrec lvl prec t
+      maybeParens (prec > 0) ("∀" <> hsepMap pretty xs <> "." <+> pPrintPrec lvl 0 tq)
 
 instance IsTVar tv => Show (Type tv) where
   show = prettyShow

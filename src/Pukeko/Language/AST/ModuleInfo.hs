@@ -22,7 +22,7 @@ data Present (b :: Bool) a where
 data GenModuleInfo cons vals = MkModuleInfo
   { _tcons :: Present cons (Map.Map Id.TCon Con.TConDecl)
   , _dcons :: Present cons (Map.Map Id.DCon Con.DConDecl)
-  , _funs  :: Present vals (Map.Map Id.EVar (Pos, TypeSchema))
+  , _funs  :: Present vals (Map.Map Id.EVar (Pos, Type Void))
   }
 
 tcons :: GenModuleInfo 'True vals -> Map.Map Id.TCon Con.TConDecl
@@ -31,5 +31,5 @@ tcons = unPresent . _tcons
 dcons :: GenModuleInfo 'True vals -> Map.Map Id.DCon Con.DConDecl
 dcons = unPresent . _dcons
 
-funs :: GenModuleInfo cons 'True -> Map.Map Id.EVar (Pos, TypeSchema)
+funs :: GenModuleInfo cons 'True -> Map.Map Id.EVar (Pos, Type Void)
 funs = unPresent . _funs

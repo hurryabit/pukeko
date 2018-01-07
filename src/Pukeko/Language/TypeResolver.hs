@@ -43,9 +43,6 @@ trType w = type2tcon $ \tcon -> do
   unless ex (throwAt w "unknown type cons" tcon)
   pure tcon
 
-trTypeSchema :: Pos -> TypeSchema -> TR TypeSchema
-trTypeSchema w (MkTypeSchema xs t) = MkTypeSchema xs <$> trType w t
-
 -- TODO: Have only one insert function.
 insertTCon :: Pos -> Con.TConDecl -> TR ()
 insertTCon posn tcon@Con.MkTConDecl{_tname} = do
@@ -74,7 +71,7 @@ trTopLevel top = case top of
         for_ _fields (trType w)
         insertDCon w dconDecl
     pure (TLTyp w tconDecls)
-  TLVal w x ts -> TLVal w x <$> trTypeSchema w ts
+  TLVal w x t  -> TLVal w x <$> trType w t
   TLLet w ds   -> TLLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
   TLRec w ds   -> TLRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
   TLAsm   b a  -> pure (TLAsm (retagBind b) a)

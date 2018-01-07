@@ -17,7 +17,7 @@ import qualified Pukeko.Language.AST.ConDecl    as Con
 import qualified Pukeko.Language.AST.ModuleInfo as MI
 import qualified Pukeko.Language.Parser.AST     as Ps
 import qualified Pukeko.Language.Ident          as Id
-import           Pukeko.Language.Type           (NoType (..), toSchema)
+import           Pukeko.Language.Type           (NoType (..), toPrenex)
 
 type Out = St.Renamer
 
@@ -51,7 +51,7 @@ localizeDefns =
 rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
 rnTopLevel top = case top of
   Ps.TLTyp w tcs -> TLTyp w <$> traverse rnTConDecl tcs `catchError` throwErrorAt w
-  Ps.TLVal w x t -> pure (TLVal w x (toSchema t))
+  Ps.TLVal w x t -> pure (TLVal w x (toPrenex t))
   Ps.TLLet w ds0 -> Vec.withList ds0 $ \ds1 ->
     TLLet w <$> traverse rnDefn ds1
   Ps.TLRec w ds0 -> Vec.withList ds0 $ \ds1 ->

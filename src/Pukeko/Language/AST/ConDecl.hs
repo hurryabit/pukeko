@@ -34,19 +34,19 @@ data DConDeclN n = MkDConDeclN
 
 data DConDecl = forall n. KnownNat n => MkDConDecl (DConDeclN n)
 
-typeOf :: TConDecl -> DConDecl -> TypeSchema
+typeOf :: TConDecl -> DConDecl -> Type Void
 typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _fields})
   | _tname /= _tcon = bug "con decl" "type and data constructor do not match" names
   | otherwise       = go _params _fields
   where
     go ::
       forall n1 n2. (KnownNat n1, KnownNat n2) =>
-      Vec.Vector n1 Id.TVar -> [Type (TFinScope n2 Void)] -> TypeSchema
+      Vec.Vector n1 Id.TVar -> [Type (TFinScope n2 Void)] -> Type Void
     go xs flds =
       case sameNat (Proxy @n1) (Proxy @n2) of
         Just Refl ->
           let res = appTCon _tcon [ TVar (mkBound i x) | (i, x) <- itoList xs ]
-          in  MkTypeSchema xs (flds *~> res)
+          in  mkTUni xs (flds *~> res)
         Nothing ->
           bug "con decl" "type and data constructor have different arity" names
     names = Just (show _tname ++ " & " ++ show _dname)

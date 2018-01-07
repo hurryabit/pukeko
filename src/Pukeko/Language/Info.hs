@@ -29,7 +29,7 @@ import           Pukeko.Language.Type
 class Monad m => MonadInfo i m | m -> i where
   allTCons :: (i ~ GenModuleInfo 'True funs) => m (Map.Map Id.TCon Con.TConDecl)
   allDCons :: (i ~ GenModuleInfo 'True funs) => m (Map.Map Id.DCon Con.DConDecl)
-  allFuns  :: (i ~ GenModuleInfo cons 'True) => m (Map.Map Id.EVar (Pos, TypeSchema))
+  allFuns  :: (i ~ GenModuleInfo cons 'True) => m (Map.Map Id.EVar (Pos, Type Void))
 
 newtype InfoT i m a = InfoT{unInfoT :: ReaderT i m a}
   deriving ( Functor, Applicative, Monad, MonadTrans
@@ -53,7 +53,7 @@ findTCon tcon = (Map.! tcon) <$> allTCons
 findDCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.DCon -> m Con.DConDecl
 findDCon tcon = (Map.! tcon) <$> allDCons
 
-findFun :: MonadInfo (GenModuleInfo cons 'True) m => Id.EVar -> m (Pos, TypeSchema)
+findFun :: MonadInfo (GenModuleInfo cons 'True) m => Id.EVar -> m (Pos, Type Void)
 findFun fun = (Map.! fun) <$> allFuns
 
 liftCatch :: Catch e m a -> Catch e (InfoT i m) a

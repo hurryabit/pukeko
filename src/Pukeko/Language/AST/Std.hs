@@ -63,7 +63,7 @@ data TopLevel st
   = HasTLTyp st ~ 'True =>
     TLTyp Pos [Con.TConDecl]
   | HasTLVal st ~ 'True =>
-    TLVal Pos Id.EVar TypeSchema
+    TLVal Pos Id.EVar (Type Void)
   | forall n. HasTLLet st ~ 'True =>
     TLLet Pos (Vector n (Defn st Void Id.EVar))
   | forall n. HasTLLet st ~ 'True =>

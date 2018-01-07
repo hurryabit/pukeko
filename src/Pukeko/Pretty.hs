@@ -4,6 +4,7 @@ module Pukeko.Pretty
   , pretty
   , prettyPrint
   , hsep
+  , hsepMap
   , module Data.Monoid
   , module Text.PrettyPrint.HughesPJClass
   )
@@ -27,6 +28,9 @@ pretty = pPrint
 
 hsep :: (Foldable t) => t Doc -> Doc
 hsep = PP.hsep . toList
+
+hsepMap :: (Foldable t) => (a -> Doc) -> t a -> Doc
+hsepMap f = PP.hsep . map f . toList
 
 prettyPrint :: Pretty a => a -> IO ()
 prettyPrint = print . pPrint

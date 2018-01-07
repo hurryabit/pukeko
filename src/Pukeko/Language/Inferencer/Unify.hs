@@ -16,7 +16,7 @@ import           Pukeko.Language.Inferencer.UType
 type TU s = ExceptT String (ST s)
 
 -- TODO: link compression
-unwind :: UType s -> TU s (UType s)
+unwind :: UType s tv -> TU s (UType s tv)
 unwind t0 = case t0 of
   UVar uref -> do
     uvar <- lift $ readSTRef uref
@@ -25,7 +25,7 @@ unwind t0 = case t0 of
       UFree _ _ -> return t0
   _ -> return t0
 
-occursCheck :: STRef s (UVar s) -> UType s -> TU s ()
+occursCheck :: STRef s (UVar s tv) -> UType s tv -> TU s ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwError "occurs check"
@@ -42,9 +42,10 @@ occursCheck uref1 t2 = case t2 of
   UTVar _ -> pure ()
   UTCon _ -> pure ()
   UTArr   -> pure ()
+  UTUni{} -> bug "occurs check" "universal quantification" Nothing
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
-unify :: Pos -> UType s -> UType s -> TU s ()
+unify :: Pos -> UType s tv -> UType s tv -> TU s ()
 unify pos t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2

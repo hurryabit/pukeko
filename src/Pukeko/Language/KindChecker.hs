@@ -106,10 +106,14 @@ kcTypDef tcons = do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 
-kcVal :: TypeSchema -> KC n s ()
-kcVal (MkTypeSchema xs t) = do
-  env <- traverse (const freshUVar) xs
-  localize env (kcType Star t)
+kcVal :: Type Void -> KC n s ()
+kcVal = \case
+  TUni xs t -> k xs t
+  t         -> k Vec.empty (fmap absurd t)
+  where
+    k xs t = do
+      env <- traverse (const freshUVar) xs
+      localize env (kcType Star t)
 
 
 kcTopLevel :: TopLevel In -> KC n s (Maybe (TopLevel Out))
