@@ -30,14 +30,14 @@ let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
           match xs with
-          | Nil -> y0
-          | Cons x xs -> f x (foldr f y0 xs)
+          | Nil @a -> y0
+          | Cons @a x xs -> f x (foldr f y0 xs)
 let foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
           match xs with
-          | Nil -> y0
-          | Cons x xs -> foldl f (f y0 x) xs
+          | Nil @a -> y0
+          | Cons @a x xs -> foldl f (f y0 x) xs
 let take : ∀a. Int -> List a -> List a =
       fun @a ->
         fun (n : Int) (xs : List a) ->
@@ -45,14 +45,14 @@ let take : ∀a. Int -> List a -> List a =
           | True -> Nil @a
           | False ->
             match xs with
-            | Nil -> Nil @a
-            | Cons x xs -> Cons @a x (take ((-) n 1) xs)
+            | Nil @a -> Nil @a
+            | Cons @a x xs -> Cons @a x (take ((-) n 1) xs)
 let nth : ∀a. List a -> Int -> a =
       fun @a ->
         fun (xs : List a) (n : Int) ->
           match xs with
-          | Nil -> abort @a
-          | Cons x xs ->
+          | Nil @a -> abort @a
+          | Cons @a x xs ->
             match (<=) n 0 with
             | True -> x
             | False -> nth xs ((-) n 1)
@@ -60,21 +60,21 @@ let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
           match xs with
-          | Nil -> Nil @c
-          | Cons x xs ->
+          | Nil @a -> Nil @c
+          | Cons @a x xs ->
             match ys with
-            | Nil -> Nil @c
-            | Cons y ys -> Cons @c (f x y) (zip_with f xs ys)
+            | Nil @b -> Nil @c
+            | Cons @b y ys -> Cons @c (f x y) (zip_with f xs ys)
 let partition : ∀a. (a -> Bool) -> List a -> Pair (List a) (List a) =
       fun @a ->
         fun (p : a -> Bool) (xs : List a) ->
           let rec part_p : List a -> Pair (List a) (List a) =
                     fun (xs : List a) ->
                       match xs with
-                      | Nil -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
-                      | Cons x xs ->
+                      | Nil @a -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
+                      | Cons @a x xs ->
                         match part_p xs with
-                        | Pair ys zs ->
+                        | Pair @(List a) @(List a) ys zs ->
                           match p x with
                           | True -> Pair @(List a) @(List a) (Cons @a x ys) zs
                           | False -> Pair @(List a) @(List a) ys (Cons @a x zs)
@@ -84,16 +84,16 @@ let append : ∀a. List a -> List a -> List a =
       fun @a ->
         fun (xs : List a) (ys : List a) ->
           match xs with
-          | Nil -> ys
-          | Cons x xs -> Cons @a x (append xs ys)
+          | Nil @a -> ys
+          | Cons @a x xs -> Cons @a x (append xs ys)
 let concat : ∀a. List (List a) -> List a =
       fun @a -> foldr @(List a) @(List a) (append @a) (Nil @a)
 let map : ∀a b. (a -> b) -> List a -> List b =
       fun @a @b ->
         fun (f : a -> b) (xs : List a) ->
           match xs with
-          | Nil -> Nil @b
-          | Cons x xs -> Cons @b (f x) (map f xs)
+          | Nil @a -> Nil @b
+          | Cons @a x xs -> Cons @b (f x) (map f xs)
 let concat_map : ∀a b. (b -> List a) -> List b -> List a =
       fun @a @b ->
         fun (f : b -> List a) (xs : List b) ->
@@ -109,8 +109,8 @@ let replicate : ∀a. Int -> a -> List a =
 let insert_tree : Int -> Tree Int -> Tree Int =
       fun (x : Int) (t : Tree Int) ->
         match t with
-        | Leaf -> Branch @Int (Leaf @Int) x (Leaf @Int)
-        | Branch l y r ->
+        | Leaf @Int -> Branch @Int (Leaf @Int) x (Leaf @Int)
+        | Branch @Int l y r ->
           match (<=) x y with
           | True -> Branch @Int (insert_tree x l) y r
           | False -> Branch @Int l y (insert_tree x r)
@@ -118,8 +118,9 @@ let in_order : ∀a. Tree a -> List a =
       fun @a ->
         fun (t : Tree a) ->
           match t with
-          | Leaf -> Nil @a
-          | Branch l x r -> append @a (in_order l) (Cons @a x (in_order r))
+          | Leaf @a -> Nil @a
+          | Branch @a l x r ->
+            append @a (in_order l) (Cons @a x (in_order r))
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -131,8 +132,8 @@ let sequence_io : ∀a. List (IO a) -> IO (List a) =
       fun @a ->
         fun (ms : List (IO a)) ->
           match ms with
-          | Nil -> return @(List a) (Nil @a)
-          | Cons m ms ->
+          | Nil @(IO a) -> return @(List a) (Nil @a)
+          | Cons @(IO a) m ms ->
             (>>=) @a @(List a) m (fun (x : a) ->
                                     (>>=) @(List a) @(List a) (sequence_io ms) (fun (xs : List a) ->
                                                                                   return @(List a) (Cons @a x xs)))
@@ -154,8 +155,8 @@ let scanl : ∀a b. (a -> b -> a) -> a -> List b -> List a =
           let rec scanl_f : a -> List b -> List a =
                     fun (y0 : a) (xs : List b) ->
                       match xs with
-                      | Nil -> Nil @a
-                      | Cons x xs ->
+                      | Nil @b -> Nil @a
+                      | Cons @b x xs ->
                         let y0 : a = f y0 x in
                         Cons @a y0 (scanl_f y0 xs)
           in

@@ -24,7 +24,7 @@ import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.Ident              as Id
 
-type In  = St.Inferencer Type
+type In  = St.TypeEraser
 type Out = St.PatternMatcher
 
 newtype PM a = PM{unPM :: InfoT (ModuleInfo In) (StateT [Id.EVar] (Except String)) a}
@@ -54,8 +54,8 @@ pmExpr = \case
     as1@LS.Cons{} -> do
       t1 <- pmExpr t0
       pmMatch w (mkRowMatch1 t1 as1)
-  ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
-  ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
+  -- ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
+  -- ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
@@ -93,7 +93,7 @@ bindName = \case
   BWild _   -> Nothing
   BName _ x -> Just x
 
-patnToBind :: Patn -> Maybe Bind
+patnToBind :: Patn st tv -> Maybe Bind
 patnToBind = \case
   PWld w   -> Just (BWild w)
   PVar w x -> Just (BName w x)
@@ -101,7 +101,7 @@ patnToBind = \case
 
 type RhsExpr tv ev = Expr In tv (EScope Id.EVar ev)
 
-data Row n tv ev = MkRow (LS.List n Patn) (RhsExpr tv ev)
+data Row n tv ev = MkRow (LS.List n (Patn In tv)) (RhsExpr tv ev)
 
 data RowMatch m n tv ev =
   MkRowMatch (LS.List n (Expr Out tv ev)) (LS.List m (Row n tv ev))
@@ -115,7 +115,7 @@ mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 data Col m tv ev a = MkCol (Expr Out tv ev) (LS.List m a)
 
 data ColMatch m n tv ev =
-  MkColMatch (LS.List n (Col m tv ev Patn)) (LS.List m (RhsExpr tv ev))
+  MkColMatch (LS.List n (Col m tv ev (Patn In tv))) (LS.List m (RhsExpr tv ev))
 
 colPatn :: Traversal (Col m tv ev a) (Col m tv ev b) a b
 colPatn f (MkCol t ps) = MkCol t <$> traverse f ps
@@ -139,7 +139,8 @@ elimBindCols w (MkColMatch cs0 us0) k = do
   us1 <- foldlM (applyBindCol w) us0 bcs
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
   where
-    isBindCol :: Col n tv ev Patn -> Either (Col n tv ev Patn) (Col n tv ev Bind)
+    isBindCol ::
+      Col n tv ev (Patn In tv) -> Either (Col n tv ev (Patn In tv)) (Col n tv ev Bind)
     isBindCol (MkCol t ps) =
       case traverse patnToBind ps of
         Just bs -> Right (MkCol t bs)
@@ -158,16 +159,16 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest = MkDest Id.DCon [Patn]
+data Dest tv = MkDest Id.DCon [Patn In tv]
 
-patnToDest :: Patn -> Maybe Dest
+patnToDest :: forall tv. Patn In tv -> Maybe (Dest tv)
 patnToDest = \case
   PWld{}      -> Nothing
   PVar{}      -> Nothing
-  PCon _ c ps -> Just (MkDest c ps)
+  PCon _ c (_ :: [NoType tv]) ps -> Just (MkDest c ps)
 
 findDestCol ::
-  Pos -> ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev Dest, ColMatch m n tv ev)
+  Pos -> ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev (Dest tv), ColMatch m n tv ev)
 findDestCol w (MkColMatch cs0 us) =
   case find (colPatn patnToDest) cs0 of
     Nothing       -> throwErrorAt w "cannot apply constructor rule"
@@ -187,7 +188,7 @@ data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) [GrpMatchItem tv ev]
 
 groupDests ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
-  Pos -> Col m tv ev Dest -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
+  Pos -> Col m tv ev (Dest tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
   let drs = toList (LS.zip ds rs)
   Con.MkDConDecl dconDecl0 <- findDCon dcon0
@@ -219,4 +220,4 @@ grpMatchExpr w (MkGrpMatch t is) =
 
 grpMatchItemAltn :: Pos -> GrpMatchItem tv ev -> PM (Case Out tv ev)
 grpMatchItemAltn w (MkGrpMatchItem con bs rm) =
-  MkCase w con (fmap bindName bs) <$> pmMatch w rm
+  MkCase w con [] (fmap bindName bs) <$> pmMatch w rm

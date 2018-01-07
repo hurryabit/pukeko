@@ -24,7 +24,6 @@ module Pukeko.Language.AST.Std
   , module2tops
   , defn2rhs
   , defn2dcon
-  , expr2type
   , patn2evar
   , case2rhs
   , altn2rhs
@@ -112,20 +111,21 @@ data Bind st tv = MkBind
 data Case st tv ev = forall n. MkCase
   { _casePos   :: Pos
   , _caseCon   :: Id.DCon
+  , _caseTArgs :: [StageType st tv]
   , _caseBinds :: Vector n (Maybe Id.EVar)
   , _caseRhs   :: Expr st tv (EFinScope n ev)
   }
 
 data Altn st tv ev = MkAltn
   { _altnPos  :: Pos
-  , _altnPatn :: Patn
+  , _altnPatn :: Patn st tv
   , _altnRhs  :: Expr st tv (EScope Id.EVar ev)
   }
 
-data Patn
+data Patn st tv
   = PWld Pos
   | PVar Pos Id.EVar
-  | PCon Pos Id.DCon [Patn]
+  | PCon Pos Id.DCon [StageType st tv] [Patn st tv]
 
 -- * Derived optics
 makeLenses ''Defn
@@ -199,49 +199,55 @@ expr2dcon f = \case
   ETyApp w e t   -> ETyApp w <$> expr2dcon f e <*> pure t
 
 case2dcon :: DConTraversal Case
-case2dcon f (MkCase w c bs t) =
-  MkCase w <$> indexed f w c <*> pure bs <*> expr2dcon f t
+case2dcon f (MkCase w c ts bs e) =
+  MkCase w <$> indexed f w c <*> pure ts <*> pure bs <*> expr2dcon f e
 
 altn2dcon :: DConTraversal Altn
 altn2dcon f (MkAltn w p t) =
   MkAltn w <$> patn2dcon f p <*> expr2dcon f t
 
-patn2dcon :: IndexedTraversal' Pos Patn Id.DCon
+patn2dcon ::
+  (SameTypes st1 st2) =>
+  IndexedTraversal Pos (Patn st1 tv) (Patn st2 tv) Id.DCon Id.DCon
 patn2dcon f = \case
   PWld w      -> pure (PWld w)
   PVar w x    -> pure (PVar w x)
-  PCon w c ps -> PCon w <$> indexed f w c <*> (traverse . patn2dcon) f ps
+  PCon w c ts ps -> PCon w <$> indexed f w c <*> pure ts <*> (traverse . patn2dcon) f ps
 
-type TypeTraversal t =
-  forall st1 st2 tv ev. (SameNodes st1 st2, HasETyp st1 ~ 'False) =>
-  IndexedTraversal Pos
-  -- Traversal
-  (t st1 tv ev) (t st2 tv ev) (StageType st1 tv) (StageType st2 tv)
+-- type TypeTraversal t =
+--   forall st1 st2 tv ev. (SameNodes st1 st2, HasETyp st1 ~ 'False) =>
+--   IndexedTraversal Pos
+--   -- Traversal
+--   (t st1 tv ev) (t st2 tv ev) (StageType st1 tv) (StageType st2 tv)
 
-defn2type :: TypeTraversal Defn
-defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
+-- defn2type :: TypeTraversal Defn
+-- defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
 
-expr2type :: TypeTraversal Expr
-expr2type f = \case
-  EVar w x -> pure (EVar w x)
-  ECon w c -> pure (ECon w c)
-  ENum w n -> pure (ENum w n)
-  EApp w e1 e2 -> EApp w <$> expr2type f e1 <*> (traverse . expr2type) f e2
-  ELam w bs e0 -> ELam w <$> (traverse . bind2type) f bs <*> expr2type f e0
-  ELet w ds e0 -> ELet w <$> (traverse . defn2type) f ds <*> expr2type f e0
-  ERec w ds e0 -> ERec w <$> (traverse . defn2type) f ds <*> expr2type f e0
-  ECas w e0 cs -> ECas w <$> expr2type f e0 <*> traverse (case2rhs (expr2type f)) cs
-  EMat w e0 as -> EMat w <$> expr2type f e0 <*> traverse (altn2rhs (expr2type f)) as
+-- expr2type :: TypeTraversal Expr
+-- expr2type f = \case
+--   EVar w x -> pure (EVar w x)
+--   ECon w c -> pure (ECon w c)
+--   ENum w n -> pure (ENum w n)
+--   EApp w e1 e2 -> EApp w <$> expr2type f e1 <*> (traverse . expr2type) f e2
+--   ELam w bs e0 -> ELam w <$> (traverse . bind2type) f bs <*> expr2type f e0
+--   ELet w ds e0 -> ELet w <$> (traverse . defn2type) f ds <*> expr2type f e0
+--   ERec w ds e0 -> ERec w <$> (traverse . defn2type) f ds <*> expr2type f e0
+--   ECas w e0 cs -> ECas w <$> expr2type f e0 <*> traverse (case2type f) cs
+--   EMat w e0 as -> EMat w <$> expr2type f e0 <*> traverse (altn2rhs (expr2type f)) as
 
-bind2type ::
-  IndexedLens Pos (Bind st1 tv) (Bind st2 tv) (StageType st1 tv) (StageType st2 tv)
-bind2type f (MkBind w x t) = MkBind w x <$> indexed f w t
+-- case2type :: TypeTraversal Case
+-- case2type f (MkCase w c ts bs e) =
+--   MkCase w c <$> traverse (indexed f w) ts <*> pure bs <*> pure e
 
-patn2evar :: IndexedTraversal' Pos Patn Id.EVar
+-- bind2type ::
+--   IndexedLens Pos (Bind st1 tv) (Bind st2 tv) (StageType st1 tv) (StageType st2 tv)
+-- bind2type f (MkBind w x t) = MkBind w x <$> indexed f w t
+
+patn2evar :: IndexedTraversal' Pos (Patn st tv) Id.EVar
 patn2evar f = \case
   PWld w      -> pure (PWld w)
   PVar w x    -> PVar w <$> indexed f w x
-  PCon w c ps -> PCon w c <$> (traverse . patn2evar) f ps
+  PCon w c ts ps -> PCon w c ts <$> (traverse . patn2evar) f ps
 
 -- * Scoped lenses
 type EScopedLens s t a b =
@@ -253,11 +259,15 @@ over' ::
    (forall i. g (s i v1) ->           g (s i v2))  -> f v1 ->           f v2
 over' l f = runIdentity . l (Identity . f)
 
-case2rhs :: EScopedLens (Case st1 tv1) (Case st2 tv2) (Expr st1 tv1) (Expr st2 tv2)
-case2rhs f (MkCase w c bs t) = MkCase w c bs <$> f t
+case2rhs ::
+  (SameTypes st1 st2) =>
+  EScopedLens (Case st1 tv) (Case st2 tv) (Expr st1 tv) (Expr st2 tv)
+case2rhs f (MkCase w c ts bs e) = MkCase w c ts bs <$> f e
 
-altn2rhs :: EScopedLens (Altn st1 tv1) (Altn st2 tv2) (Expr st1 tv1) (Expr st2 tv2)
-altn2rhs f (MkAltn w p t) = MkAltn w p <$> f t
+altn2rhs ::
+  (SameTypes st1 st2) =>
+  EScopedLens (Altn st1 tv) (Altn st2 tv) (Expr st1 tv) (Expr st2 tv)
+altn2rhs f (MkAltn w p t) = MkAltn w (retagPatn p) <$> f t
 
 -- * Retagging
 retagDefn :: (SameNodes st1 st2, SameTypes st1 st2) => Defn st1 tv ev -> Defn st2 tv ev
@@ -266,8 +276,12 @@ retagDefn = over defn2dcon id
 retagExpr :: (SameNodes st1 st2, SameTypes st1 st2) => Expr st1 tv ev -> Expr st2 tv ev
 retagExpr = over expr2dcon id
 
-retagBind :: (StageType st1 ~ StageType st2) => Bind st1 tv -> Bind st2 tv
+retagBind :: (SameTypes st1 st2) => Bind st1 tv -> Bind st2 tv
 retagBind (MkBind w x t) = MkBind w x t
+
+retagPatn :: (SameTypes st1 st2) => Patn st1 tv -> Patn st2 tv
+retagPatn = over patn2dcon id
+
 
 -- * Manual instances
 instance FunctorWithIndex     Pos (Defn st tv) where
@@ -298,7 +312,7 @@ instance TraversableWithIndex Pos (Expr st tv) where
 instance FunctorWithIndex     Pos (Case st tv) where
 instance FoldableWithIndex    Pos (Case st tv) where
 instance TraversableWithIndex Pos (Case st tv) where
-  itraverse f (MkCase w c bs e0) = MkCase w c bs <$> itraverse (traverse . f) e0
+  itraverse f (MkCase w c ts bs e0) = MkCase w c ts bs <$> itraverse (traverse . f) e0
 
 instance FunctorWithIndex     Pos (Altn st tv) where
 instance FoldableWithIndex    Pos (Altn st tv) where
@@ -446,9 +460,14 @@ instance (IsTVar tv, PrettyStage st) => Pretty (Bind st tv) where
 
 
 instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
-  pPrintPrec lvl _ (MkCase _ c bs t) =
-    hang ("|" <+> pretty c <+> hsep (fmap prettyBind bs) <+> "->")
-      2 (pPrintPrec lvl 0 t)
+  pPrintPrec lvl _ (MkCase _ c ts bs e) =
+    hang
+      ( "|"
+        <+> pretty c
+        <+> prettyAtType (pPrintPrecType lvl 3) ts
+        <+> hsep (fmap prettyBind bs) <+> "->"
+      )
+      2 (pPrintPrec lvl 0 e)
     where
       prettyBind = \case
         Nothing -> "_"
@@ -458,13 +477,15 @@ instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance Pretty Patn where
+instance (IsTVar tv, PrettyStage st) => Pretty (Patn st tv) where
   pPrintPrec lvl prec = \case
     PWld _      -> "_"
     PVar _ x    -> pretty x
-    PCon _ c ps ->
-      maybeParens (prec > 0 && not (null ps)) $
-      pretty c <+> hsep (map (pPrintPrec lvl 1) (toList ps))
+    PCon _ c ts ps ->
+      maybeParens (prec > 0 && (not (null ts) || not (null ps)))
+      $ pretty c
+        <+> prettyAtType (pPrintPrecType lvl 3) ts
+        <+> hsep (map (pPrintPrec lvl 1) ps)
 
 -- * Derived instances
 deriving instance Functor     (Defn st tv)

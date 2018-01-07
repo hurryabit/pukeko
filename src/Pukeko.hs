@@ -29,9 +29,10 @@ compileToCore module_ = do
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule
                >>= Inferencer.inferModule
-  module_ll <- PatternMatcher.compileModule module_ti
+  module_ll <- return (TypeEraser.eraseModule module_ti)
+               >>= PatternMatcher.compileModule
                >>= return . DeadCode.cleanModule
-               >>= return . TypeEraser.eraseModule
+               -- >>= return . TypeEraser.eraseModule
                >>= return . LambdaLifter.liftModule
   let module_cc = CoreCompiler.compileModule module_ll
   return (module_cc, module_ll, module_ti)

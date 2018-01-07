@@ -81,4 +81,5 @@ ccExpr = \case
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase cs
 
 ccCase :: IsEVar ev => In.Case In tv ev -> CC ev Altn
-ccCase (In.MkCase _ _ bs t) = MkAltn (map (fmap name) (toList bs)) <$> scoped (ccExpr t)
+ccCase (In.MkCase _ _ _ bs t) =
+  MkAltn (map (fmap name) (toList bs)) <$> scoped (ccExpr t)

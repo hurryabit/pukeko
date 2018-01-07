@@ -102,8 +102,8 @@ rnAltn (Ps.MkAltn w p0 e) = do
   let bs = Map.fromSet id (Set.setOf patn2evar p1)
   MkAltn w p1 <$> localize bs (rnExpr e)
 
-rnPatn :: Ps.Patn -> Patn
+rnPatn :: Ps.Patn -> Patn Out Void
 rnPatn = \case
   Ps.PWld w      -> PWld w
   Ps.PVar w x    -> PVar w x
-  Ps.PCon w c ps -> PCon w c (map rnPatn ps)
+  Ps.PCon w c ps -> PCon w c [] (map rnPatn ps)

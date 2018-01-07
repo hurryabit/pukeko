@@ -21,7 +21,7 @@ import qualified Pukeko.Language.AST.Stage   as St
 import qualified Pukeko.Language.Ident       as Id
 import           Pukeko.Language.Type        (NoType (..))
 
-type In  = St.TypeEraser
+type In  = St.DeadCode
 type Out = St.LambdaLifter
 
 type State = [Id.EVar]
@@ -87,7 +87,7 @@ llExpr = \case
         _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
 
 llCase :: (IsEVar v, Ord v) => Case In Void v -> LL v (Case Out Void v)
-llCase (MkCase w c bs e) = MkCase w c bs <$> scoped (llExpr e)
+llCase (MkCase w c ts bs e) = MkCase w c ts bs <$> scoped (llExpr e)
 
 llTopLevel :: TopLevel In -> LL Id.EVar ()
 llTopLevel = \case

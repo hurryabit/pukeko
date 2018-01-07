@@ -120,27 +120,29 @@ instantiate (MkUTypeSchema xs t0) = do
   t1 <- liftST (subst env t0)
   pure (t1, uvars)
 
-instantiateTCon :: Id.TCon -> TI v s (UType s, Map.Map Id.TVar (UType s))
+instantiateTCon :: Id.TCon -> TI v s (UType s, [UType s], Map.Map Id.TVar (UType s))
 instantiateTCon tcon = do
   Con.MkTConDecl{_params} <- findTCon tcon
   let params = toList _params
   t_params <- traverse (const freshUVar) params
-  return (appTCon tcon t_params, Map.fromList (zip params t_params))
+  return (appTCon tcon t_params, t_params, Map.fromList (zip params t_params))
 
-inferPatn :: Patn -> UType s -> TI v s (Map.Map Id.EVar (UType s))
+inferPatn ::
+  Patn In Void -> UType s -> TI v s (Patn (Aux s) Void, Map.Map Id.EVar (UType s))
 inferPatn patn t_expr = case patn of
-  PWld _   -> pure Map.empty
-  PVar _ x -> pure (Map.singleton x t_expr)
-  PCon w dcon patns -> do
+  PWld w   -> pure (PWld w, Map.empty)
+  PVar w x -> pure (PVar w x, Map.singleton x t_expr)
+  PCon w dcon (_ :: [NoType Void]) ps0 -> do
     Con.MkDConDecl Con.MkDConDeclN{_dname, _tcon, _fields} <- findDCon dcon
-    when (length patns /= length _fields) $
+    when (length ps0 /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
       "expects" <+> int (length _fields) <+> "arguments"
-    (t_inst, env_inst) <- instantiateTCon _tcon
+    (t_inst, t_params, env_inst) <- instantiateTCon _tcon
     unify w t_expr t_inst
     -- TODO: Remove this @fmap baseName@ hack.
     t_fields <- liftST $ traverse (subst env_inst . open . fmap baseName) _fields
-    Map.unions <$> zipWithM inferPatn patns t_fields
+    (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
+    pure (PCon w dcon (map (MkUTypeSchema []) t_params) ps1, Map.unions binds)
 
 -- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
@@ -218,11 +220,11 @@ infer = \case
     EMat w expr0 altns0 -> do
       (expr1, t_expr) <- infer expr0
       t_res <- freshUVar
-      altns1 <- for altns0 $ \(MkAltn w' patn rhs0) -> do
-        t_binds <- inferPatn patn t_expr
+      altns1 <- for altns0 $ \(MkAltn w' patn0 rhs0) -> do
+        (patn1, t_binds) <- inferPatn patn0 t_expr
         (rhs1, t_rhs) <- localizeType t_binds (infer rhs0)
         unify w t_res t_rhs
-        pure (MkAltn w' patn rhs1)
+        pure (MkAltn w' patn1 rhs1)
       pure (EMat w expr1 altns1, t_res)
 
 inferTopLevel :: TopLevel In -> TI Id.EVar s [TopLevel (Aux s)]
@@ -325,9 +327,18 @@ qualExpr = \case
     ELam w bs1 <$> qualExpr e0
   ELet w ds e0 -> ELet w <$> traverse qualDefn ds <*> qualExpr e0
   ERec w ds e0 -> ERec w <$> traverse qualDefn ds <*> qualExpr e0
-  EMat w e0 as -> EMat w <$> qualExpr e0 <*> traverse (altn2rhs qualExpr) as
+  EMat w e0 as -> EMat w <$> qualExpr e0 <*> traverse qualAltn as
   ETyAbs _ _ _ -> bug "type checker" "type abstraction during quantification" Nothing
   ETyApp w e0 ts -> ETyApp w <$> qualExpr e0 <*> traverse qualType' ts
+
+qualAltn :: Altn (Aux s) Void ev -> TQ tv s (Altn Out tv ev)
+qualAltn (MkAltn w p e) = MkAltn w <$> qualPatn p <*> qualExpr e
+
+qualPatn :: Patn (Aux s) Void -> TQ tv s (Patn Out tv)
+qualPatn = \case
+  PWld w -> pure (PWld w)
+  PVar w x -> pure (PVar w x)
+  PCon w c ts ps -> PCon w c <$> traverse qualType' ts <*> traverse qualPatn ps
 
 qualTopLevel :: TopLevel (Aux s) -> TQ Void s (TopLevel Out)
 qualTopLevel = \case

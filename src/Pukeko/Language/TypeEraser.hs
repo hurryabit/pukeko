@@ -4,9 +4,9 @@ module Pukeko.Language.TypeEraser
 
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage as St
-import           Pukeko.Language.Type      (NoType (..))
+import           Pukeko.Language.Type      (Type, NoType (..))
 
-type In  = St.DeadCode
+type In  = St.Inferencer Type
 type Out = St.TypeEraser
 
 eraseModule :: Module In -> Module Out
@@ -29,12 +29,22 @@ eraseExpr = \case
   ELam w bs e0  -> ELam w (fmap eraseBind bs) (eraseExpr e0)
   ELet w ds e0  -> ELet w (fmap eraseDefn ds) (eraseExpr e0)
   ERec w ds e0  -> ERec w (fmap eraseDefn ds) (eraseExpr e0)
-  ECas w e0 cs  -> ECas w (eraseExpr e0) (map eraseCase cs)
+  -- ECas w e0 cs  -> ECas w (eraseExpr e0) (map eraseCase cs)
+  EMat w e0 as  -> EMat w (eraseExpr e0) (map eraseAltn as)
   ETyAbs _ _ e0 -> eraseExpr e0
   ETyApp _ e0 _ -> eraseExpr e0
 
 eraseBind :: Bind In tv -> Bind Out Void
 eraseBind (MkBind w x _) = MkBind w x NoType
 
-eraseCase :: Case In tv ev -> Case Out Void ev
-eraseCase (MkCase w c xs e) = MkCase w c xs (eraseExpr e)
+-- eraseCase :: Case In tv ev -> Case Out Void ev
+-- eraseCase (MkCase w c _ts bs e) = MkCase w c [] bs (eraseExpr e)
+
+eraseAltn :: Altn In tv ev -> Altn Out Void ev
+eraseAltn (MkAltn w p e) = MkAltn w (erasePatn p) (eraseExpr e)
+
+erasePatn :: Patn In tv -> Patn Out Void
+erasePatn = \case
+  PWld w          -> PWld w
+  PVar w x        -> PVar w x
+  PCon w c _ts ps -> PCon w c [] (map erasePatn ps)

@@ -12,7 +12,7 @@ import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.Ident              as Id
-import           Pukeko.Language.Type               (Type)
+import           Pukeko.Language.Type               (NoType)
 
 type In  = St.PatternMatcher
 type Out = St.DeadCode
@@ -33,7 +33,7 @@ topLevelLhs = view lhs . \case
   TLAsm b _ -> b
 
 topLevel2expr ::
-  (St.HasTLDef st ~ 'True, St.StageType st ~ Type) =>
+  (St.HasTLDef st ~ 'True, St.StageType st ~ NoType) =>
   Traversal (TopLevel In) (TopLevel st) (Expr In Void Id.EVar) (Expr st Void Id.EVar)
 topLevel2expr f = \case
   TLDef b e -> TLDef (retagBind b) <$> f e
