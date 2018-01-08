@@ -232,12 +232,19 @@ let f x = g x
 val f : a -> a
 let f x = f x
 
--- TEST parallel call
+-- TEST backward call in parallel
+-- FAILURE (line 4, column 11): undefined function 'f'
+val f : a -> a
+val g : a -> a
+let f x = x
+and g x = f x
+
+-- TEST forward call in parallel
 -- FAILURE (line 3, column 11): undefined function 'g'
 val f : a -> a
 val g : a -> a
 let f x = g x
-and g x = f x
+and g x = x
 
 -- SECTION type checker
 
