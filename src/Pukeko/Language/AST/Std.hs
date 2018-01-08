@@ -388,7 +388,7 @@ instance HasPos (Case st tv ev) where
 
 -- * Pretty printing
 class PrettyType f where
-  pPrintPrecType :: (IsTVar tv) => PrettyLevel -> Rational -> f tv -> Doc
+  pPrintPrecType :: (BaseTVar tv) => PrettyLevel -> Rational -> f tv -> Doc
 
 instance PrettyType NoType where
   pPrintPrecType _ _ NoType = mempty
@@ -412,12 +412,12 @@ instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 
-instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
+instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
   pPrintPrec lvl _ (MkDefn b t) =
     hang (pPrintPrec lvl 0 b <+> equals) 2 (pPrintPrec lvl 0 t)
 
 prettyDefns ::
-  (IsEVar ev, IsTVar tv, PrettyStage st) => Bool -> Vector n (Defn st tv ev) -> Doc
+  (BaseEVar ev, BaseTVar tv, PrettyStage st) => Bool -> Vector n (Defn st tv ev) -> Doc
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
     d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
@@ -425,9 +425,9 @@ prettyDefns isrec ds = case toList ds of
       let_ | isrec     = "let rec"
            | otherwise = "let"
 
-instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
+instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
   pPrintPrec lvl prec = \case
-    EVar _ x -> pretty (baseName x)
+    EVar _ x -> pretty (baseEVar x)
     ECon _ c -> pretty c
     ENum _ n -> int n
     EApp _ t us ->
@@ -472,7 +472,7 @@ instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
 prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
-instance (IsTVar tv, PrettyStage st) => Pretty (Bind st tv) where
+instance (BaseTVar tv, PrettyStage st) => Pretty (Bind st tv) where
   -- FIXME: Print type.
   pPrintPrec lvl prec (MkBind _ x t)
     | isEmpty td = xd
@@ -481,8 +481,7 @@ instance (IsTVar tv, PrettyStage st) => Pretty (Bind st tv) where
       xd = pretty x
       td = pPrintPrecType lvl 0 t
 
-
-instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
+instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
   pPrintPrec lvl _ (MkCase _ c ts bs e) =
     hang
       ( "|"
@@ -496,11 +495,11 @@ instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
         Nothing -> "_"
         Just x  -> pretty x
 
-instance (IsEVar ev, IsTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
+instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance (IsTVar tv, PrettyStage st) => Pretty (Patn st tv) where
+instance (BaseTVar tv, PrettyStage st) => Pretty (Patn st tv) where
   pPrintPrec lvl prec = \case
     PWld _      -> "_"
     PVar _ x    -> pretty x

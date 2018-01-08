@@ -73,13 +73,13 @@ unify w t1 t2 = TI $ lift $ lift $ lift $ U.unify w t1 t2
 
 localize ::
   forall i v s a.
-  (IsVarLevel i, IsVar v) =>
+  (HasEnvLevel i, HasEnv v) =>
   EnvLevelOf i (UType s Void) ->
   TI (EScope i v) s a ->
   TI v s a
 localize ts = TI . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTI
 
-lookupType :: (IsVar v) => v -> TI v s (UType s Void)
+lookupType :: (HasEnv v) => v -> TI v s (UType s Void)
 lookupType = views locals . Sc.lookupEnv
 
 generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
@@ -134,13 +134,13 @@ inferPatn patn t_expr = case patn of
     (t_inst, t_params, env_inst) <- instantiateTCon _tcon
     unify w t_expr t_inst
     -- TODO: Remove this @fmap baseName@ hack.
-    t_fields <- liftST $ traverse (subst env_inst . open1 . fmap baseName) _fields
+    t_fields <- liftST $ traverse (subst env_inst . open1 . fmap baseTVar) _fields
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
     pure (PCon w dcon t_params ps1, Map.unions binds)
 
 -- TODO: Add test to ensure types are generalized properly.
 inferLet ::
-  (IsEVar v) =>
+  (HasEnv v) =>
   Vec.Vector n (Defn In Void v) ->
   TI v s (Vec.Vector n (Defn (Aux s) Void v), Vec.Vector n (UType s Void))
 inferLet defns0 = do
@@ -152,7 +152,7 @@ inferLet defns0 = do
   pure (defns1, ts2)
 
 inferRec ::
-  (IsEVar v) =>
+  (HasEnv v) =>
   Vec.Vector n (Defn In Void (EFinScope n v)) ->
   TI v s ( Vec.Vector n (Defn (Aux s) Void (EFinScope n v))
          , Vec.Vector n (UType s Void))
@@ -171,7 +171,7 @@ inferRec defns0 = do
   let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bindType t2) ts2 ls0 rs2
   pure (defns1, ts2)
 
-infer :: IsEVar v => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
+infer :: (HasEnv v) => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
 infer = \case
     EVar w x -> first (mkETyApp w (EVar w x)) <$> (lookupType x >>= instantiate)
     ECon w c -> first (mkETyApp w (ECon w c)) <$> (typeOfDCon c >>= instantiate . open)

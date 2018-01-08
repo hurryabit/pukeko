@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ViewPatterns #-}
 -- | Type for encoding DeBruijn style scoping.
 module Pukeko.Language.AST.Scope
@@ -21,10 +22,12 @@ module Pukeko.Language.AST.Scope
   , dist
   , (>>>=)
   , extendEnv
-  , IsVarLevel (..)
-  , IsVar (..)
-  , IsEVar
-  , IsTVar
+  , HasEnvLevel (..)
+  , HasEnv (..)
+  , BaseEVar
+  , BaseTVar
+  , baseEVar
+  , baseTVar
   , Void
   , absurd
   , Nat
@@ -108,60 +111,71 @@ data Pair f g a = Pair (f a) (g a)
   deriving (Functor)
 
 extendEnv ::
-  forall i v a.
-  (IsVarLevel i, IsVar v) =>
+  forall i v a b.
+  (HasEnvLevel i, HasEnv v) =>
   EnvLevelOf i a ->
   EnvOf v a ->
-  EnvOf (Scope (BaseName v) i v) a
+  EnvOf (Scope b i v) a
 extendEnv env_i env_v = Pair env_i env_v
 
-class (Functor (EnvLevelOf i)) => IsVarLevel i where
+class (Functor (EnvLevelOf i)) => HasEnvLevel i where
   type EnvLevelOf i :: * -> *
   lookupEnvLevel :: i -> EnvLevelOf i a -> a
 
-instance IsVarLevel Id.EVar where
+instance HasEnvLevel Id.EVar where
   type EnvLevelOf Id.EVar = Map.Map Id.EVar
   lookupEnvLevel = lookupMap
 
-instance IsVarLevel (Finite n) where
+instance HasEnvLevel (Finite n) where
   type EnvLevelOf (Finite n) = Vec.Vector n
   lookupEnvLevel = flip (Vec.!)
 
-instance IsVarLevel () where
+instance HasEnvLevel () where
   type EnvLevelOf () = Identity
   lookupEnvLevel () = runIdentity
 
-class (Functor (EnvOf v)) => IsVar v where
-  type BaseName v :: *
+class (Functor (EnvOf v)) => HasEnv v where
   type EnvOf v :: * -> *
-  baseName :: v -> BaseName v
   lookupEnv :: v -> EnvOf v a -> a
 
-type IsEVar v = (IsVar v, BaseName v ~ Id.EVar)
+instance HasEnv Void where
+  type EnvOf Void = Const ()
+  lookupEnv = absurd
 
-type IsTVar v = (Eq v, IsVar v, BaseName v ~ Id.TVar)
-
-instance IsVar Id.EVar where
-  type BaseName Id.EVar = Id.EVar
+instance HasEnv Id.EVar where
   type EnvOf Id.EVar = Map.Map Id.EVar
-  baseName = id
   lookupEnv = lookupMap
 
-instance (IsVarLevel i, IsVar v, BaseName v ~ b) => IsVar (Scope b i v) where
-  type BaseName (Scope b i v) = b
+instance (HasEnvLevel i, HasEnv v) => HasEnv (Scope b i v) where
   type EnvOf (Scope b i v) = Pair (EnvLevelOf i) (EnvOf v)
-  baseName = \case
-    Bound _ (Forget b) -> b
-    Free  v            -> baseName v
   lookupEnv i (Pair env_j env_v) = case i of
     Bound j _ -> lookupEnvLevel j env_j
     Free  v   -> lookupEnv v env_v
 
-instance IsVar Void where
-  type BaseName Void = Id.TVar
-  type EnvOf Void = Const ()
+class BaseName b v where
+  baseName :: v -> b
+
+type BaseEVar ev = (BaseName Id.EVar ev)
+
+type BaseTVar tv = (BaseName Id.TVar tv)
+
+baseEVar :: BaseEVar ev => ev -> Id.EVar
+baseEVar = baseName
+
+baseTVar :: BaseTVar tv => tv -> Id.TVar
+baseTVar = baseName
+
+-- TODO: Remove this when it's no longer necessary.
+instance BaseName Id.EVar Id.EVar where
+  baseName = id
+
+instance BaseName b Void where
   baseName = absurd
-  lookupEnv = absurd
+
+instance (BaseName b v) => BaseName b (Scope b i v) where
+  baseName = \case
+    Bound _ (Forget b) -> b
+    Free  v            -> baseName v
 
 makePrisms ''Scope
 

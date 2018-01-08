@@ -42,6 +42,10 @@ checkModule module0@(MkModule info tops) = do
   runTC (traverse_ checkTopLevel tops) info
   pure module0
 
+type IsEVar ev = (HasEnv ev)
+
+type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
+
 type ModuleInfoTC = GenModuleInfo 'True 'True
 
 newtype TC tv ev a =
@@ -60,7 +64,7 @@ lookupType :: (IsEVar ev) => ev -> TC tv ev (Type tv)
 lookupType = TC . asks . lookupEnv
 
 localizeTypes ::
-  forall i tv ev a. (IsVarLevel i, IsEVar ev) =>
+  forall i tv ev a. (HasEnvLevel i, IsEVar ev) =>
   EnvLevelOf i (Type tv) -> TC tv (EScope i ev) a -> TC tv ev a
 localizeTypes bs =
   let f = extendEnv @i @ev bs

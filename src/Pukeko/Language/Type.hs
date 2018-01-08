@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Language.Type
   ( NoType (..)
   , Type (..)
@@ -91,7 +92,7 @@ type2tcon f = \case
   TApp tf tp -> TApp <$> type2tcon f tf <*> type2tcon f tp
   TUni xs tq -> TUni xs <$> type2tcon f tq
 
-instance (IsTVar tv) => Eq (Type tv) where
+instance (Eq tv) => Eq (Type tv) where
   t1 == t2 = case (t1, t2) of
     (TVar x1, TVar x2) -> x1 == x2
     (TArr   , TArr   ) -> True
@@ -120,9 +121,9 @@ instance Monad Type where
     TApp tf tp -> TApp (tf >>= f) (tp >>= f)
     TUni xs tq -> TUni xs (tq >>>= f)
 
-instance IsTVar tv => Pretty (Type tv) where
+instance BaseTVar tv => Pretty (Type tv) where
   pPrintPrec lvl prec = \case
-    TVar x -> pretty (baseName x)
+    TVar x -> pretty (baseTVar x)
     TArr   -> "(->)"
     TCon c -> pretty c
     TFun tx ty ->
@@ -132,7 +133,7 @@ instance IsTVar tv => Pretty (Type tv) where
     TUni xs tq ->
       maybeParens (prec > 0) ("∀" <> hsepMap pretty xs <> "." <+> pPrintPrec lvl 0 tq)
 
-instance IsTVar tv => Show (Type tv) where
+instance BaseTVar tv => Show (Type tv) where
   show = prettyShow
 
 deriving instance Functor     Type

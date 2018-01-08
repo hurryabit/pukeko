@@ -57,15 +57,15 @@ ccTopLevel = \case
     at (b^.lhs) ?= n
     pure (Asm n)
 
-ccDefn :: IsEVar ev => In.Defn In tv ev -> CC ev Defn
+ccDefn :: (BaseEVar ev) => In.Defn In tv ev -> CC ev Defn
 ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
-ccExpr :: IsEVar ev => In.Expr In tv ev -> CC ev Expr
+ccExpr :: (BaseEVar ev) => In.Expr In tv ev -> CC ev Expr
 ccExpr = \case
   In.EVar _ x0 -> do
     global <- asks ($ x0)
     case global of
-      Nothing -> pure (Local (name (baseName x0)))
+      Nothing -> pure (Local (name (baseEVar x0)))
       Just x1 -> do
         external <- use (at x1)
         case external of
@@ -80,6 +80,6 @@ ccExpr = \case
   In.ERec _ ds t  -> scoped $ Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase (toList cs)
 
-ccCase :: IsEVar ev => In.Case In tv ev -> CC ev Altn
+ccCase :: (BaseEVar ev) => In.Case In tv ev -> CC ev Altn
 ccCase (In.MkCase _ _ _ bs t) =
   MkAltn (map (fmap name) (toList bs)) <$> scoped (ccExpr t)
