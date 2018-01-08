@@ -15,6 +15,7 @@ module Pukeko.Language.AST.Std
   , Altn (..)
   , Patn (..)
 
+  , mkEApp
   , mkETyApp
 
   , abstract
@@ -140,11 +141,16 @@ makeLenses ''Bind
 makeLenses ''Case
 makeLenses ''Altn
 
+mkEApp :: Pos -> Expr st tv ev -> [Expr st tv ev] -> Expr st tv ev
+mkEApp w e0 es
+  | null es   = e0
+  | otherwise = EApp w e0 es
+
 mkETyApp ::
   (HasETyp st ~ 'True) => Pos -> Expr st tv ev -> [StageType st tv] -> Expr st tv ev
-mkETyApp w e0 = \case
-  [] -> e0
-  ts -> ETyApp w e0 ts
+mkETyApp w e0 ts
+  | null ts   = e0
+  | otherwise = ETyApp w e0 ts
 
 
 -- * Abstraction and substition
@@ -503,7 +509,6 @@ prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
 instance (BaseTVar tv, PrettyStage st) => Pretty (Bind st tv) where
-  -- FIXME: Print type.
   pPrintPrec lvl prec (MkBind _ x t)
     | isEmpty td = xd
     | otherwise  = maybeParens (prec > 0) (xd <+> colon <+> td)

@@ -6,8 +6,8 @@ module Pukeko.Language.LambdaLifter
 where
 
 import           Control.Lens
-import           Control.Lens.Extras (is)
 import           Control.Monad.RWS
+import           Data.Either       (partitionEithers)
 import qualified Data.Finite       as Fin
 import           Data.Foldable     (traverse_)
 import           Data.List         (sortOn)
@@ -55,26 +55,21 @@ llExpr = \case
   ELam w oldBinds rhs -> do
     lhs <- freshIdent
     rhs <- llExpr rhs
-    let (capturedS, others) = Set.partition (is _Free) (Set.setOf traverse rhs)
+    let unscope = scope' (\i b -> Right (i, b)) Left
+    let (capturedS, others) =
+          partitionEithers (map unscope (Set.toList (Set.setOf traverse rhs)))
     -- TODO: Arrange 'captured' in a clever way. The @sortOn varName@ is just to
     -- not break the tests right now.
-    let capturedL = sortOn baseEVar (Set.toList capturedS)
-    Vec.withList capturedL $ \(capturedV :: Vec.Vector m (EFinScope n v)) -> do
+    let capturedL = sortOn baseEVar capturedS
+    Vec.withList capturedL $ \(capturedV :: Vec.Vector m v) -> do
       let newBinds = fmap (\x -> MkBind w (baseEVar x) NoType) capturedV Vec.++ oldBinds
-      let renameOther = \case
-            Bound i x -> Bound (Fin.shift i) x
-            -- FIXME: Use a proper partition above to avoid this case.
-            Free  _   -> error "THIS CANNOT HAPPEN!"
-      let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (baseEVar v))
-      let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
+      let renameOther (i, b) = (mkBound i b, mkBound (Fin.shift i) b)
+      let renameCaptured i v =
+            Map.singleton (Free v) (mkBound (Fin.weaken i) (baseEVar v))
+      let rename =
+            Map.fromList (map renameOther others) <> ifoldMap renameCaptured capturedV
       tell [TLSup (MkBind w lhs NoType) (fmap retagBind newBinds) (fmap (rename Map.!) rhs)]
-      let unfree = \case
-            Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
-            Free v  -> v
-      let fun = EVal w lhs
-      case capturedL of
-        []  -> return fun
-        _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
+      pure (mkEApp w (EVal w lhs) (map (EVar w) capturedL))
 
 llCase :: (BaseEVar v, Ord v) => Case In Void v -> LL (Case Out Void v)
 llCase (MkCase w c ts bs e) = MkCase w c ts bs <$> llExpr e

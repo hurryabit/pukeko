@@ -18,7 +18,6 @@ module Pukeko.Language.AST.Scope
   , strengthen
   , weaken
   , abstract1
-  , unscope
   , dist
   , (>>>=)
   , extendEnv
@@ -87,13 +86,6 @@ abstract1 f = \case
   Bound (f -> Just i) b -> Free (Bound i b)
   Bound j             b -> Bound j b
   Free  x               -> Free (Free x)
-
--- TODO: Find out where we use the inverse 'scope' without naming it like this.
--- It's probably in the de Bruijn indexer.
-unscope :: Scope Id.EVar i Id.EVar -> Id.EVar
-unscope = \case
-  Bound _ (Forget b) -> b
-  Free  x            -> x
 
 dist :: Applicative f => Scope b i (f v) -> f (Scope b i v)
 dist = \case
