@@ -72,8 +72,7 @@ trTopLevel top = case top of
         insertDCon w dconDecl
     pure (TLTyp w tconDecls)
   TLVal w x t  -> TLVal w x <$> trType w t
-  TLLet w ds   -> TLLet w <$> itraverseOf (traverse . defn2dcon) findDCon ds
-  TLRec w ds   -> TLRec w <$> itraverseOf (traverse . defn2dcon) findDCon ds
+  TLDef     d  -> TLDef <$> itraverseOf defn2dcon findDCon d
   TLAsm   b a  -> pure (TLAsm (retagBind b) a)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)

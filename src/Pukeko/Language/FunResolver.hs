@@ -4,7 +4,6 @@ module Pukeko.Language.FunResolver
 
 import           Control.Lens
 import           Control.Monad.State
-import           Data.Foldable (traverse_)
 import qualified Data.Map      as Map
 import qualified Data.Set      as Set
 
@@ -59,28 +58,15 @@ defineFun (MkBind w fun NoType) = do
   when dup (throwAt w "duplicate definition of function" fun)
   defined . contains fun .= True
 
-useFun :: Pos -> Id.EVar -> FR Id.EVar
-useFun w fun = do
-  ex <- use (defined . contains fun)
-  unless ex (throwAt w "undefined function" fun)
-  pure fun
-
 frTopLevel :: TopLevel In -> FR (TopLevel Out)
 frTopLevel = \case
   TLTyp w tcs -> pure (TLTyp w tcs)
   TLVal w x t -> do
     declareFun w x t
     pure (TLVal w x t)
-  TLLet w ds0 -> do
-    ds1 <- traverse (itraverse useFun) ds0
-    traverse_ defineFun' ds1
-    pure (TLLet w (fmap retagDefn ds1))
-  TLRec w ds0 -> do
-    traverse_ defineFun' ds0
-    ds1 <- traverse (itraverse (traverse . useFun)) ds0
-    pure (TLRec w (fmap retagDefn ds1))
+  TLDef d -> do
+    defineFun (d^.defnLhs)
+    pure (TLDef (retagDefn d))
   TLAsm b s -> do
     defineFun b
     pure (TLAsm (retagBind b) s)
-  where
-    defineFun' (MkDefn b _) = defineFun b

@@ -21,77 +21,67 @@ import qualified Pukeko.Language.AST.Stage   as St
 import qualified Pukeko.Language.Ident       as Id
 import           Pukeko.Language.Type        (NoType (..))
 
-type In  = St.DeadCode
+type In  = St.PatternMatcher
 type Out = St.LambdaLifter
 
 type State = [Id.EVar]
 
-data Env v = MkEnv
-  { _mkGlobal :: Id.EVar -> v
-  , _isGlobal :: v -> Bool
-  }
-
-newtype LL v a = LL{unLL :: RWS (Env v) [TopLevel Out] State a}
+-- TODO: Use @SupplyT@.
+newtype LL a = LL{unLL :: RWS () [TopLevel Out] State a}
   deriving ( Functor, Applicative, Monad
-           , MonadReader (Env v)
            , MonadWriter [TopLevel Out]
            , MonadState State
            )
 
-execLL :: LL Id.EVar () -> [TopLevel Out]
+execLL :: LL () -> [TopLevel Out]
 execLL ll =
-  let env = MkEnv id (const True)
-      state = []
-      ((), defns) = evalRWS (unLL ll) env state
+  let state = []
+      ((), defns) = evalRWS (unLL ll) () state
   in  defns
 
-freshIdent :: LL v Id.EVar
+freshIdent :: LL Id.EVar
 freshIdent = state $ \(ident:idents) -> (ident, idents)
 
-scoped :: LL (EScope i v) a -> LL v a
-scoped =
-  LL . withRWST(\(MkEnv mk is) s -> (MkEnv (Free . mk) (scope (const False) is), s)) . unLL
-
-llExpr :: (BaseEVar v, Ord v) => Expr In Void v -> LL v (Expr Out Void v)
+llExpr :: (BaseEVar v, Ord v) => Expr In Void v -> LL (Expr Out Void v)
 llExpr = \case
   EVar w x -> pure (EVar w x)
+  EVal w z -> pure (EVal w z)
   ECon w c -> pure (ECon w c)
   ENum w n -> pure (ENum w n)
   EApp w t  us -> EApp w <$> llExpr t <*> traverse llExpr us
   ECas w t  cs -> ECas w <$> llExpr t <*> traverse llCase cs
-  ELet w ds t -> ELet w <$> (traverse . defn2rhs) llExpr ds <*> scoped (llExpr t)
-  ERec w ds t -> scoped $ ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
+  ELet w ds t -> ELet w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
+  ERec w ds t -> ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
   ELam w oldBinds rhs -> do
     lhs <- freshIdent
-    (rhs, isGlobal) <- scoped ((,) <$> llExpr rhs <*> asks _isGlobal)
-    let isCaptured v = is _Free v && not (isGlobal v)
-    let (capturedS, others) = Set.partition isCaptured $ Set.setOf traverse rhs
+    rhs <- llExpr rhs
+    let (capturedS, others) = Set.partition (is _Free) (Set.setOf traverse rhs)
     -- TODO: Arrange 'captured' in a clever way. The @sortOn varName@ is just to
     -- not break the tests right now.
-    let capturedL = sortOn baseEVar $ Set.toList capturedS
+    let capturedL = sortOn baseEVar (Set.toList capturedS)
     Vec.withList capturedL $ \(capturedV :: Vec.Vector m (EFinScope n v)) -> do
       let newBinds = fmap (\x -> MkBind w (baseEVar x) NoType) capturedV Vec.++ oldBinds
       let renameOther = \case
             Bound i x -> Bound (Fin.shift i) x
-            Free  v   -> Free  (baseEVar v)
+            -- FIXME: Use a proper partition above to avoid this case.
+            Free  _   -> error "THIS CANNOT HAPPEN!"
       let renameCaptured i v = Map.singleton v (mkBound (Fin.weaken i) (baseEVar v))
       let rename = Map.fromSet renameOther others <> ifoldMap renameCaptured capturedV
       tell [TLSup (MkBind w lhs NoType) (fmap retagBind newBinds) (fmap (rename Map.!) rhs)]
       let unfree = \case
             Bound{} -> undefined -- NOTE: Everyhing in @capturedL@ starts with 'Free'.
             Free v  -> v
-      mkGlobal <- asks _mkGlobal
-      let fun = EVar w (mkGlobal lhs)
+      let fun = EVal w lhs
       case capturedL of
         []  -> return fun
         _:_ -> return $ EApp w fun (map (EVar w . unfree) capturedL)
 
-llCase :: (BaseEVar v, Ord v) => Case In Void v -> LL v (Case Out Void v)
-llCase (MkCase w c ts bs e) = MkCase w c ts bs <$> scoped (llExpr e)
+llCase :: (BaseEVar v, Ord v) => Case In Void v -> LL (Case Out Void v)
+llCase (MkCase w c ts bs e) = MkCase w c ts bs <$> llExpr e
 
-llTopLevel :: TopLevel In -> LL Id.EVar ()
+llTopLevel :: TopLevel In -> LL ()
 llTopLevel = \case
-  TLDef (MkBind w lhs _) rhs -> do
+  TLDef (MkDefn (MkBind w lhs _) rhs) -> do
     put $ Id.freshEVars "ll" lhs
     case rhs of
       ELam{} -> do

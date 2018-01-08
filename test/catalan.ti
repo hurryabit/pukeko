@@ -94,10 +94,10 @@ let map : ∀a b. (a -> b) -> List a -> List b =
           match xs with
           | Nil @a -> Nil @b
           | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
-let concat_map : ∀a b. (b -> List a) -> List b -> List a =
+let concat_map : ∀a b. (a -> List b) -> List a -> List b =
       fun @a @b ->
-        fun (f : b -> List a) (xs : List b) ->
-          concat @a (map @b @(List a) f xs)
+        fun (f : a -> List b) (xs : List a) ->
+          concat @b (map @a @(List b) f xs)
 let length : ∀a. List a -> Int =
       fun @a -> foldr @a @Int (fun (x : a) (l : Int) -> (+) 1 l) 0
 let replicate : ∀a. Int -> a -> List a =
@@ -125,9 +125,10 @@ external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
-let (;) : ∀a b. IO b -> IO a -> IO a =
-      fun @a @b ->
-        fun (m1 : IO b) (m2 : IO a) -> (>>=) @b @a m1 (fun (x : b) -> m2)
+let (;) : ∀a. IO Unit -> IO a -> IO a =
+      fun @a ->
+        fun (m1 : IO Unit) (m2 : IO a) ->
+          (>>=) @Unit @a m1 (fun (x : Unit) -> m2)
 let sequence_io : ∀a. List (IO a) -> IO (List a) =
       fun @a ->
         fun (ms : List (IO a)) ->
@@ -149,16 +150,16 @@ let mul_p : Int -> Int -> Int =
 let add_p : Int -> Int -> Int =
       fun (x : Int) (y : Int) -> (%) ((+) x y) p
 let sum_p : List Int -> Int = foldl @Int @Int add_p 0
-let scanl : ∀a b. (a -> b -> a) -> a -> List b -> List a =
+let scanl : ∀a b. (b -> a -> b) -> b -> List a -> List b =
       fun @a @b ->
-        fun (f : a -> b -> a) ->
-          let rec scanl_f : a -> List b -> List a =
-                    fun (y0 : a) (xs : List b) ->
+        fun (f : b -> a -> b) ->
+          let rec scanl_f : b -> List a -> List b =
+                    fun (y0 : b) (xs : List a) ->
                       match xs with
-                      | Nil @b -> Nil @a
-                      | Cons @b x xs ->
-                        let y0 : a = f y0 x in
-                        Cons @a y0 (scanl_f y0 xs)
+                      | Nil @a -> Nil @b
+                      | Cons @a x xs ->
+                        let y0 : b = f y0 x in
+                        Cons @b y0 (scanl_f y0 xs)
           in
           scanl_f
 let sols : List Int =

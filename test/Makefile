@@ -1,4 +1,4 @@
-COMP = stack exec pukeko -- -l -t -u
+COMP = stack exec pukeko -- -l -t
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time

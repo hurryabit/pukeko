@@ -13,7 +13,6 @@ data KindChecker
 data FunResolver
 data Inferencer (t :: * -> *)
 data PatternMatcher
-data DeadCode
 data TypeEraser
 data LambdaLifter
 data CoreCompiler
@@ -27,7 +26,6 @@ type family StageId st where
   StageId (Inferencer t)  = 400
   StageId TypeEraser      = 450
   StageId PatternMatcher  = 500
-  StageId DeadCode        = 600
   StageId LambdaLifter    = 700
   StageId CoreCompiler    = 999
 
@@ -40,7 +38,6 @@ type family StageType st where
   StageType (Inferencer t)  = t
   StageType TypeEraser      = NoType
   StageType PatternMatcher  = NoType
-  StageType DeadCode        = NoType
   StageType LambdaLifter    = NoType
   StageType CoreCompiler    = NoType
 
@@ -51,8 +48,7 @@ type HasETyp st = (400 <=? StageId st) && (StageId st <=? 400)
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
                                         -- the pretty printer
-type HasTLLet st = StageId st <=? 350
-type HasTLDef st = (400 <=? StageId st) && (StageId st <=? 650)
+type HasTLDef st = StageId st <=? 650
 type HasTLSup st = 700 <=? StageId st
 
 type HasMICons st = 200 <=? StageId st
@@ -61,7 +57,6 @@ type HasMIFuns st = 250 <=? StageId st
 type SameTopNodes st1 st2 =
   ( HasTLTyp st1 ~ HasTLTyp st2
   , HasTLVal st1 ~ HasTLVal st2
-  , HasTLLet st1 ~ HasTLLet st2
   , HasTLDef st1 ~ HasTLDef st2
   , HasTLSup st1 ~ HasTLSup st2
   )

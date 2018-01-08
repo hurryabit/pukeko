@@ -204,17 +204,17 @@ external f = "f"
 -- SUBSECTION call of undeclared function
 
 -- TEST one definition
--- FAILURE (line 2, column 11): undefined function 'g'
+-- FAILURE (line 2, column 11): unknown variable 'g'
 val f : x -> x
 let f a = g a
 
 -- TEST recursive definition
--- FAILURE (line 2, column 15): undefined function 'g'
+-- FAILURE (line 2, column 15): unknown variable 'g'
 val f : x -> x
 let rec f a = g a
 
 -- TEST post declaration
--- FAILURE (line 2, column 11): undefined function 'g'
+-- FAILURE (line 2, column 11): unknown variable 'g'
 val f : a -> a
 let f x = g x
 val g : a -> a
@@ -222,25 +222,25 @@ val g : a -> a
 -- SUBSECTION call of undefined function
 
 -- TEST call of other
--- FAILURE (line 3, column 11): undefined function 'g'
+-- FAILURE (line 3, column 11): unknown variable 'g'
 val f : a -> a
 val g : a -> a
 let f x = g x
 
 -- TEST call of self
--- FAILURE (line 2, column 11): undefined function 'f'
+-- FAILURE (line 2, column 11): unknown variable 'f'
 val f : a -> a
 let f x = f x
 
 -- TEST backward call in parallel
--- FAILURE (line 4, column 11): undefined function 'f'
+-- FAILURE (line 4, column 11): unknown variable 'f'
 val f : a -> a
 val g : a -> a
 let f x = x
 and g x = f x
 
 -- TEST forward call in parallel
--- FAILURE (line 3, column 11): undefined function 'g'
+-- FAILURE (line 3, column 11): unknown variable 'g'
 val f : a -> a
 val g : a -> a
 let f x = g x
@@ -251,7 +251,7 @@ and g x = x
 -- SUBSECTION term cons
 
 -- TEST underapplication in expression
--- FAILURE (line 2, column 5): mismatching types Option and (->) _2
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _1
 val bad : Option a
 let bad = Some
 
@@ -282,7 +282,7 @@ val bad : Unit
 let bad = 1
 
 -- TEST type cons vs arrow
--- FAILURE (line 2, column 5): mismatching types Option and (->) _2
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _1
 val bad : Option a
 let bad = fun y -> y
 
@@ -302,7 +302,7 @@ val bad : a
 let bad = 1
 
 -- TEST qvar vs arrow
--- FAILURE (line 2, column 5): mismatching types a and _2 -> _2
+-- FAILURE (line 2, column 5): mismatching types a and _1 -> _1
 val bad : a
 let bad = fun y -> y
 
@@ -327,9 +327,9 @@ val f : (a -> b) -> (a -> c)
 let f x = x
 
 -- TEST occurs check
--- FAILURE (line 2, column 15): '_3' occurs in List _3
+-- FAILURE (line 2, column 23): '_3' occurs in List _3
 val bad : List a
-let rec bad = Cons bad Nil
+let bad = let rec x = Cons x Nil in x
 
 -- SUBSECTION misc
 
@@ -385,7 +385,7 @@ let rec myfold1 f y0 xs =
   | Cons x xs -> myfold1 f (f y0 x) xs
 
 -- TEST annotation and inferred disagree
--- FAILURE (line 5, column 26): expected type a -> b -> a, but found type b -> a -> b
+-- SUCCESS
 val myfold2 : (a -> b -> a) -> a -> List b -> a
 let rec myfold2 f y0 xs =
   match xs with

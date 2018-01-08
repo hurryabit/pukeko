@@ -94,10 +94,10 @@ let map : ∀a b. (a -> b) -> List a -> List b =
           match xs with
           | Nil @a -> Nil @b
           | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
-let concat_map : ∀a b. (b -> List a) -> List b -> List a =
+let concat_map : ∀a b. (a -> List b) -> List a -> List b =
       fun @a @b ->
-        fun (f : b -> List a) (xs : List b) ->
-          concat @a (map @b @(List a) f xs)
+        fun (f : a -> List b) (xs : List a) ->
+          concat @b (map @a @(List b) f xs)
 let length : ∀a. List a -> Int =
       fun @a -> foldr @a @Int (fun (x : a) (l : Int) -> (+) 1 l) 0
 let replicate : ∀a. Int -> a -> List a =
@@ -125,9 +125,10 @@ external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
-let (;) : ∀a b. IO b -> IO a -> IO a =
-      fun @a @b ->
-        fun (m1 : IO b) (m2 : IO a) -> (>>=) @b @a m1 (fun (x : b) -> m2)
+let (;) : ∀a. IO Unit -> IO a -> IO a =
+      fun @a ->
+        fun (m1 : IO Unit) (m2 : IO a) ->
+          (>>=) @Unit @a m1 (fun (x : Unit) -> m2)
 let sequence_io : ∀a. List (IO a) -> IO (List a) =
       fun @a ->
         fun (ms : List (IO a)) ->

@@ -5,9 +5,11 @@ module Pukeko.Language.Renamer
 
 import           Control.Lens
 import           Control.Monad.Reader
+import           Control.Monad.State
 import           Data.Finite       (Finite)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map          as Map
+import qualified Data.Set          as Set
 import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 
@@ -23,41 +25,51 @@ import           Pukeko.Language.Type           (NoType (..), toPrenex)
 type Out = St.Renamer
 
 renameModule :: MonadError String m => Ps.Module -> m (Module Out)
-renameModule tops = runRn $ MkModule info <$> traverse rnTopLevel tops
+renameModule tops = runRn $ MkModule info <$> concat <$> traverse rnTopLevel tops
   where
     info = MI.MkModuleInfo MI.Absent MI.Absent MI.Absent
 
-data Env ev = MkEnv (Map.Map Id.EVar ev) (Id.EVar -> ev)
+type RnEnv ev = Map.Map Id.EVar ev
+type RnState = Set.Set Id.EVar
 
-newtype Rn ev a = Rn{unRn :: ReaderT (Env ev) (Except String) a}
+newtype Rn ev a = Rn{unRn :: ReaderT (RnEnv ev) (StateT RnState (Except String)) a}
   deriving ( Functor, Applicative, Monad
-           , MonadReader (Env ev)
+           , MonadReader (RnEnv ev)
+           , MonadState  RnState
            , MonadError String
            )
 
-runRn :: MonadError String m => Rn Id.EVar a -> m a
-runRn ix = runExcept (runReaderT (unRn ix) (MkEnv mempty id))
+runRn :: MonadError String m => Rn Void a -> m a
+runRn ix = runExcept (evalStateT (runReaderT (unRn ix) Map.empty) Set.empty)
 
 localize :: Map.Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
 localize bs = Rn . withReaderT upd . unRn
   where
-    upd (MkEnv bound0 mkFree) =
-      let bound1 = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free bound0
-      in  MkEnv bound1 (Free . mkFree)
+    upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
 localizeDefns :: Vec.Vector n (Ps.Defn _) -> Rn (EFinScope n ev) a -> Rn ev a
 localizeDefns =
   localize . ifoldMap (\i (Ps.MkDefn (Ps.MkBind _ x) _) -> Map.singleton x i)
 
-rnTopLevel :: Ps.TopLevel -> Rn Id.EVar (TopLevel Out)
+rnTopLevel :: Ps.TopLevel -> Rn Void [TopLevel Out]
 rnTopLevel top = case top of
-  Ps.TLTyp w tcs -> TLTyp w <$> traverse rnTConDecl tcs `catchError` throwErrorAt w
-  Ps.TLVal w x t -> pure (TLVal w x (toPrenex t))
-  Ps.TLLet w ds0 -> Vec.withList ds0 $ \ds1 ->
-    TLLet w <$> traverse rnDefn ds1
-  Ps.TLRec w ds0 -> Vec.withList ds0 $ \ds1 ->
-    localizeDefns ds1 $ TLRec w <$> traverse rnDefn ds1
-  Ps.TLAsm w x a -> pure (TLAsm (MkBind w x NoType) a)
+  Ps.TLTyp w tcs ->
+    (:[]) . TLTyp w <$> traverse rnTConDecl tcs `catchError` throwErrorAt w
+  Ps.TLVal w x t -> pure [TLVal w x (toPrenex t)]
+  Ps.TLLet _ ds0 -> do
+    ds1 <- traverse rnDefn ds0
+    let xs = map (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
+    id <>= Set.fromList xs
+    pure (map TLDef ds1)
+  Ps.TLRec _ ds0 -> do
+    let xs = map (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
+    id <>= Set.fromList xs
+    ds1 <- traverse rnDefn ds0
+    pure (map TLDef ds1)
+  Ps.TLAsm w x a -> do
+    id <>= Set.singleton x
+    pure [TLAsm (MkBind w x NoType) a]
+
 
 rnTConDecl :: Ps.TConDecl -> Rn ev Con.TConDecl
 rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
@@ -80,8 +92,13 @@ rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
 rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out Void ev)
 rnExpr = \case
-  Ps.EVar w x ->
-    asks $ \(MkEnv bound mkFree) -> EVar w (Map.findWithDefault (mkFree x) x bound)
+  Ps.EVar w x -> do
+    y_mb <- view (at x)
+    case y_mb of
+      Just y -> pure (EVar w y)
+      Nothing -> do
+        global <- use (contains x)
+        if global then pure (EVal w x) else throwAt w "unknown variable" x
   Ps.ECon w c -> pure (ECon w c)
   Ps.ENum w n -> pure (ENum w n)
   Ps.EApp w e0  es -> EApp w <$> rnExpr e0 <*> traverse rnExpr es

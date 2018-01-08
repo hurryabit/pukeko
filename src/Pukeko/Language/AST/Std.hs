@@ -22,6 +22,7 @@ module Pukeko.Language.AST.Std
 
   , bindEVar
   , bindType
+  , defnLhs
   , caseCon
   , caseTArgs
   , altnPatn
@@ -30,6 +31,7 @@ module Pukeko.Language.AST.Std
   , module2tops
   , defn2rhs
   , defn2dcon
+  , expr2eval
   , patn2evar
   , case2rhs
   , altn2rhs
@@ -72,17 +74,13 @@ data TopLevel st
     TLTyp Pos [Con.TConDecl]
   | HasTLVal st ~ 'True =>
     TLVal Pos Id.EVar (Type Void)
-  | forall n. HasTLLet st ~ 'True =>
-    TLLet Pos (Vector n (Defn st Void Id.EVar))
-  | forall n. HasTLLet st ~ 'True =>
-    TLRec Pos (Vector n (Defn st Void (EFinScope n Id.EVar)))
   | HasTLDef st ~ 'True =>
-    TLDef     (Bind st Void) (Expr st Void Id.EVar)
+    TLDef     (Defn st Void Void)
   | forall n. HasTLSup st ~ 'True =>
-    TLSup     (Bind st Void) (Vector n (Bind st Void )) (Expr st Void (EFinScope n Id.EVar))
+    TLSup     (Bind st Void) (Vector n (Bind st Void )) (Expr st Void (EFinScope n Void))
   -- TODO: Use TLDef for CAFs.
   | HasTLSup st ~ 'True =>
-    TLCaf     (Bind st Void) (Expr st Void Id.EVar)
+    TLCaf     (Bind st Void) (Expr st Void Void)
   | TLAsm     (Bind st Void) String
 
 data Defn st tv ev = MkDefn
@@ -92,6 +90,7 @@ data Defn st tv ev = MkDefn
 
 data Expr st tv ev
   = EVar Pos ev
+  | EVal Pos Id.EVar
   | ECon Pos Id.DCon
   | ENum Pos Int
   | EApp Pos (Expr st tv ev) [Expr st tv ev]
@@ -161,6 +160,7 @@ abstract f = fmap (match f)
 (//) :: Expr st tv ev1 -> (Pos -> ev1 -> Expr st tv ev2) -> Expr st tv ev2
 expr // f = case expr of
   EVar w x       -> f w x
+  EVal w z       -> EVal w z
   ECon w c       -> ECon w c
   ENum w n       -> ENum w n
   EApp w t  us   -> EApp w (t // f) (map (// f) us)
@@ -204,6 +204,7 @@ defn2dcon f (MkDefn b e) = MkDefn (retagBind b) <$> expr2dcon f e
 expr2dcon :: DConTraversal Expr
 expr2dcon f = \case
   EVar w x       -> pure (EVar w x)
+  EVal w z       -> pure (EVal w z)
   ECon w c       -> ECon w <$> indexed f w c
   ENum w n       -> pure (ENum w n)
   EApp w t  us   -> EApp w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
@@ -230,6 +231,36 @@ patn2dcon f = \case
   PWld w      -> pure (PWld w)
   PVar w x    -> pure (PVar w x)
   PCon w c ts ps -> PCon w <$> indexed f w c <*> pure ts <*> (traverse . patn2dcon) f ps
+
+type EValTraversal t =
+  forall st1 st2 tv ev. (SameNodes st1 st2, SameTypes st1 st2) =>
+  IndexedTraversal Pos (t st1 tv ev) (t st2 tv ev) Id.EVar Id.EVar
+
+defn2eval :: EValTraversal Defn
+defn2eval f (MkDefn b e) = MkDefn (retagBind b) <$> expr2eval f e
+
+expr2eval :: EValTraversal Expr
+expr2eval f = \case
+  EVar w x       -> pure (EVar w x)
+  EVal w z       -> EVal w <$> indexed f w z
+  ECon w c       -> pure (ECon w c)
+  ENum w n       -> pure (ENum w n)
+  EApp w t  us   -> EApp w <$> expr2eval f t <*> (traverse . expr2eval) f us
+  ECas w t  cs   -> ECas w <$> expr2eval f t <*> (traverse . case2eval) f cs
+  ELam w bs t    -> ELam w (fmap retagBind bs) <$> expr2eval f t
+  ELet w ds t    -> ELet w <$> (traverse . defn2eval) f ds <*> expr2eval f t
+  ERec w ds t    -> ERec w <$> (traverse . defn2eval) f ds <*> expr2eval f t
+  EMat w t  as   -> EMat w <$> expr2eval f t <*> (traverse . altn2eval) f as
+  ETyAbs w x e   -> ETyAbs w x <$> expr2eval f e
+  ETyApp w e t   -> ETyApp w <$> expr2eval f e <*> pure t
+
+case2eval :: EValTraversal Case
+case2eval f (MkCase w c ts bs e) =
+  MkCase w c <$> pure ts <*> pure bs <*> expr2eval f e
+
+altn2eval :: EValTraversal Altn
+altn2eval f (MkAltn w p t) =
+  MkAltn w (retagPatn p) <$> expr2eval f t
 
 -- type TypeTraversal t =
 --   forall st1 st2 tv ev. (SameNodes st1 st2, HasETyp st1 ~ 'False) =>
@@ -311,6 +342,7 @@ instance FoldableWithIndex    Pos (Expr st tv) where
 instance TraversableWithIndex Pos (Expr st tv) where
   itraverse f = \case
     EVar w x -> EVar w <$> f w x
+    EVal w z -> pure (EVal w z)
     ECon w c -> pure (ECon w c)
     ENum w n -> pure (ENum w n)
     EApp w e0 es -> EApp w <$> itraverse f e0 <*> (traverse . itraverse) f es
@@ -341,9 +373,7 @@ instance HasPos (TopLevel st) where
   pos f = \case
     TLTyp w tcs -> fmap (\w' -> TLTyp w' tcs) (f w)
     TLVal w x t -> fmap (\w' -> TLVal w' x t) (f w)
-    TLLet w ds  -> fmap (\w' -> TLLet w' ds ) (f w)
-    TLRec w ds  -> fmap (\w' -> TLRec w' ds ) (f w)
-    TLDef b    e -> fmap (\b' -> TLDef b'    e) (pos f b)
+    TLDef      d -> fmap TLDef (pos f d)
     TLSup b bs e -> fmap (\b' -> TLSup b' bs e) (pos f b)
     TLCaf b    e -> fmap (\b' -> TLCaf b'    e) (pos f b)
     TLAsm b    s -> fmap (\b' -> TLAsm b'    s) (pos f b)
@@ -362,6 +392,7 @@ instance HasRhs (Defn st tv ev) where
 instance HasPos (Expr st tv ev) where
   pos f = \case
     EVar w x       -> fmap (\w' -> EVar w' x      ) (f w)
+    EVal w z       -> fmap (\w' -> EVal w' z      ) (f w)
     ECon w c       -> fmap (\w' -> ECon w' c      ) (f w)
     ENum w n       -> fmap (\w' -> ENum w' n      ) (f w)
     EApp w t  us   -> fmap (\w' -> EApp w' t  us  ) (f w)
@@ -402,9 +433,7 @@ instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
   pPrintPrec _ _ = \case
     TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
-    TLLet _ ds -> prettyDefns False ds
-    TLRec _ ds -> prettyDefns True  ds
-    TLDef   b e -> "let" <+> pretty (MkDefn b e)
+    TLDef     d -> "let" <+> pretty d
     TLSup   b bs e ->
       "let" <+> hang (pretty b <+> hsep (fmap pretty bs) <+> equals) 2 (pretty e)
     TLCaf   b t ->
@@ -428,6 +457,7 @@ prettyDefns isrec ds = case toList ds of
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
   pPrintPrec lvl prec = \case
     EVar _ x -> pretty (baseEVar x)
+    EVal _ z -> pretty z
     ECon _ c -> pretty c
     ENum _ n -> int n
     EApp _ t us ->

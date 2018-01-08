@@ -94,10 +94,10 @@ let map : ∀a b. (a -> b) -> List a -> List b =
           match xs with
           | Nil @a -> Nil @b
           | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
-let concat_map : ∀a b. (b -> List a) -> List b -> List a =
+let concat_map : ∀a b. (a -> List b) -> List a -> List b =
       fun @a @b ->
-        fun (f : b -> List a) (xs : List b) ->
-          concat @a (map @b @(List a) f xs)
+        fun (f : a -> List b) (xs : List a) ->
+          concat @b (map @a @(List b) f xs)
 let length : ∀a. List a -> Int =
       fun @a -> foldr @a @Int (fun (x : a) (l : Int) -> (+) 1 l) 0
 let replicate : ∀a. Int -> a -> List a =
@@ -125,9 +125,10 @@ external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
-let (;) : ∀a b. IO b -> IO a -> IO a =
-      fun @a @b ->
-        fun (m1 : IO b) (m2 : IO a) -> (>>=) @b @a m1 (fun (x : b) -> m2)
+let (;) : ∀a. IO Unit -> IO a -> IO a =
+      fun @a ->
+        fun (m1 : IO Unit) (m2 : IO a) ->
+          (>>=) @Unit @a m1 (fun (x : Unit) -> m2)
 let sequence_io : ∀a. List (IO a) -> IO (List a) =
       fun @a ->
         fun (ms : List (IO a)) ->
@@ -144,26 +145,26 @@ let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
                                  (;) @Unit (f x) m) (return @Unit Unit)
 let print_list : List Int -> IO Unit = iter_io @Int print
 let id : ∀a. a -> a = fun @a -> fun (x : a) -> x
-let cata : ∀a b c. ((Fix a -> c) -> a (Fix a) -> b) -> (b -> c) -> Fix a -> c =
-      fun @a @b @c ->
-        fun (fmap : (Fix a -> c) -> a (Fix a) -> b) (f : b -> c) (x : Fix a) ->
+let cata : ∀a b. ((Fix b -> a) -> b (Fix b) -> b a) -> (b a -> a) -> Fix b -> a =
+      fun @a @b ->
+        fun (fmap : (Fix b -> a) -> b (Fix b) -> b a) (f : b a -> a) (x : Fix b) ->
           match x with
-          | Fix @a y -> f (fmap (cata @a @b @c fmap f) y)
-let ana : ∀a b c. ((a -> Fix b) -> c -> b (Fix b)) -> (a -> c) -> a -> Fix b =
+          | Fix @b y -> f (fmap (cata @a @b fmap f) y)
+let ana : ∀a b. ((a -> Fix b) -> b a -> b (Fix b)) -> (a -> b a) -> a -> Fix b =
+      fun @a @b ->
+        fun (fmap : (a -> Fix b) -> b a -> b (Fix b)) (f : a -> b a) (x : a) ->
+          Fix @b (fmap (ana @a @b fmap f) (f x))
+let mapFix : ∀a b c. ((a -> b) -> (Fix (c a) -> Fix (c b)) -> c a (Fix (c a)) -> c b (Fix (c b))) -> (a -> b) -> Fix (c a) -> Fix (c b) =
       fun @a @b @c ->
-        fun (fmap : (a -> Fix b) -> c -> b (Fix b)) (f : a -> c) (x : a) ->
-          Fix @b (fmap (ana @a @b @c fmap f) (f x))
-let mapFix : ∀a b c. (a -> (Fix b -> Fix c) -> b (Fix b) -> c (Fix c)) -> a -> Fix b -> Fix c =
-      fun @a @b @c ->
-        fun (bimap : a -> (Fix b -> Fix c) -> b (Fix b) -> c (Fix c)) (f : a) (x : Fix b) ->
+        fun (bimap : (a -> b) -> (Fix (c a) -> Fix (c b)) -> c a (Fix (c a)) -> c b (Fix (c b))) (f : a -> b) (x : Fix (c a)) ->
           match x with
-          | Fix @b y -> Fix @c (bimap f (mapFix @a @b @c bimap f) y)
-let bimapListF : ∀a b c d. (a -> c) -> (b -> d) -> ListF a b -> ListF c d =
+          | Fix @(c a) y -> Fix @(c b) (bimap f (mapFix @a @b @c bimap f) y)
+let bimapListF : ∀a b c d. (a -> b) -> (c -> d) -> ListF a c -> ListF b d =
       fun @a @b @c @d ->
-        fun (f : a -> c) (g : b -> d) (x : ListF a b) ->
+        fun (f : a -> b) (g : c -> d) (x : ListF a c) ->
           match x with
-          | NilF @a @b -> NilF @c @d
-          | ConsF @a @b y z -> ConsF @c @d (f y) (g z)
+          | NilF @a @c -> NilF @b @d
+          | ConsF @a @c y z -> ConsF @b @d (f y) (g z)
 let mapFixList : ∀a b. (a -> b) -> Fix (ListF a) -> Fix (ListF b) =
       fun @a @b ->
         mapFix @a @b @ListF (bimapListF @a @b @(Fix (ListF a)) @(Fix (ListF b)))

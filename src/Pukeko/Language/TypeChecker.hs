@@ -23,14 +23,12 @@ import           Pukeko.Language.Info
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage as St
 import qualified Pukeko.Language.AST.ConDecl as Con
-import qualified Pukeko.Language.AST.ModuleInfo as MI
 import           Pukeko.Language.Type
 
 type Typed st =
   ( St.StageType st ~ Type
   , St.HasTLTyp st  ~ 'False
   , St.HasTLVal st  ~ 'False
-  , St.HasTLLet st  ~ 'False
   , St.HasTLDef st  ~ 'True
   , St.HasTLSup st  ~ 'False
   , St.HasMICons st ~ 'True
@@ -55,9 +53,9 @@ newtype TC tv ev a =
            , MonadInfo ModuleInfoTC
            )
 
-runTC :: MonadError String m => TC Void Id.EVar a -> ModuleInfoTC -> m a
+runTC :: MonadError String m => TC Void Void a -> ModuleInfoTC -> m a
 runTC tc mi =
-  let env = fmap snd (MI.funs mi)
+  let env = Const ()
   in  runExcept (runReaderT (runInfoT (unTC tc) mi) env)
 
 lookupType :: (IsEVar ev) => ev -> TC tv ev (Type tv)
@@ -78,6 +76,7 @@ localizeKinds =
 typeOf :: (Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   EVar _ x -> lookupType x
+  EVal _ z -> fmap absurd . snd <$> findFun z
   ECon _ c -> fmap absurd <$> typeOfDCon c
   ENum _ _ -> pure typeInt
   EApp _ e0 es -> do
@@ -190,7 +189,7 @@ check e t0 = do
 checkDefn :: (Typed st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
 checkDefn (MkDefn (MkBind _ _ t) e) = check e t
 
-checkTopLevel :: (Typed st) => TopLevel st -> TC Void Id.EVar ()
+checkTopLevel :: (Typed st) => TopLevel st -> TC Void Void ()
 checkTopLevel = \case
-  TLDef b e -> checkDefn (MkDefn b e)
+  TLDef   d -> checkDefn d
   TLAsm _ _ -> pure ()

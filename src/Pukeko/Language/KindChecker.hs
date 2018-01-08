@@ -124,8 +124,7 @@ kcTopLevel = \case
   TLVal w _ t -> do
     here w (kcVal t)
     pure Nothing
-  TLLet w ds  -> yield (TLLet w (fmap retagDefn ds))
-  TLRec w ds  -> yield (TLRec w (fmap retagDefn ds))
+  TLDef d -> yield (TLDef (retagDefn d))
   TLAsm   b a -> yield (TLAsm (retagBind b) a)
   where
     yield = pure . Just

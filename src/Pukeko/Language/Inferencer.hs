@@ -26,7 +26,6 @@ import           Pukeko.Language.Info
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage         as St
 import qualified Pukeko.Language.AST.ConDecl       as Con
-import qualified Pukeko.Language.AST.ModuleInfo    as MI
 import qualified Pukeko.Language.AST.Scope         as Sc
 import qualified Pukeko.Language.Ident             as Id
 import           Pukeko.Language.Type              (NoType (..), Type (..), typeInt)
@@ -56,10 +55,9 @@ instance MonadST (TI v s) where
   type World (TI v s) = s
   liftST = TI . liftST
 
-runTI :: TI Id.EVar s a -> ModuleInfo In -> ExceptT String (ST s) a
+runTI :: TI Void s a -> ModuleInfo In -> ExceptT String (ST s) a
 runTI tc info = do
-  let locals0 = fmap (open . snd) (MI.funs info)
-  let env0 = MkEnvironment locals0 0
+  let env0 = MkEnvironment (Const ()) 0
   evalSupplyT (runReaderT (runInfoT (unTI tc) info) env0) Id.freshTVars
 
 freshUVar :: TI v s (UType s Void)
@@ -79,8 +77,11 @@ localize ::
   TI v s a
 localize ts = TI . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTI
 
-lookupType :: (HasEnv v) => v -> TI v s (UType s Void)
-lookupType = views locals . Sc.lookupEnv
+lookupVar :: (HasEnv v) => v -> TI v s (UType s Void)
+lookupVar = views locals . Sc.lookupEnv
+
+lookupFun :: Id.EVar -> TI v s (UType s Void)
+lookupFun x = open . snd <$> findFun x
 
 generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
 generalize t0 = do
@@ -173,7 +174,8 @@ inferRec defns0 = do
 
 infer :: (HasEnv v) => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
 infer = \case
-    EVar w x -> first (mkETyApp w (EVar w x)) <$> (lookupType x >>= instantiate)
+    EVar w x -> first (mkETyApp w (EVar w x)) <$> (lookupVar x >>= instantiate)
+    EVal w z -> first (mkETyApp w (EVal w z)) <$> (lookupFun z >>= instantiate)
     ECon w c -> first (mkETyApp w (ECon w c)) <$> (typeOfDCon c >>= instantiate . open)
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
@@ -203,32 +205,30 @@ infer = \case
         pure (MkAltn w' patn1 rhs1)
       pure (EMat w expr1 altns1, t_res)
 
-inferTopLevel :: TopLevel In -> TI Id.EVar s [TopLevel (Aux s)]
+inferTopLevel :: TopLevel In -> TI Void s (TopLevel (Aux s))
 inferTopLevel = \case
-  TLLet _ defns -> handleLetOrRec inferLet  id            defns
-  TLRec _ defns -> handleLetOrRec inferRec (fmap unscope) defns
+  TLDef (MkDefn (MkBind w x NoType) e0) -> do
+    reset
+    -- NOTE: We do not instantiate the universally quantified type variables in
+    -- prenex position of @t_decl@. Turning them into unification variables
+    -- would make the following type check:
+    --
+    -- val f : a -> b
+    -- let f = fun x -> x
+    t_decl <- lookupFun x
+    let (_, t0) = unUTUni t_decl
+    (e1, t1) <- infer e0
+    -- NOTE: This unification should bind all unification variables in @t1@. If
+    -- it does not, the second quantification step will catch them.
+    unify w t0 t1
+    pure (TLDef (MkDefn (MkBind w x t_decl) e1))
   TLAsm (MkBind w x NoType) asm -> do
-    ts <- lookupType x
-    pure [TLAsm (MkBind w x ts) asm]
-  where
-    handleLetOrRec inferLetOrRec squashScope defns0 = do
-      reset
-      (defns1, _) <- inferLetOrRec defns0
-      for (toList defns1) $ \(MkDefn b@(MkBind w x ts_defn) e) -> do
-        (_us, t_defn) <- instantiate ts_defn
-        -- NOTE: If we instantiate the type schema, universally quantified type
-        -- variables would be turned into unification variables and the
-        -- following would type check:
-        --
-        -- val f : a -> b
-        -- let f = fun x -> x
-        (_, t_decl) <- unUTUni <$> lookupType x
-        unify w t_decl t_defn
-        pure (TLDef b (squashScope e))
+    t_decl <- lookupFun x
+    pure (TLAsm (MkBind w x t_decl) asm)
 
-inferModule' :: Module In -> TI Id.EVar s (Module (Aux s))
+inferModule' :: Module In -> TI Void s (Module (Aux s))
 inferModule' (MkModule decls tops)=
-  MkModule decls <$> concat <$> traverse inferTopLevel tops
+  MkModule decls <$> traverse inferTopLevel tops
 
 type TQEnv tv = Map.Map Id.TVar tv
 
@@ -289,6 +289,7 @@ qualDefn (MkDefn (MkBind w x ts) e0) = case ts of
 qualExpr :: Expr (Aux s) Void ev -> TQ tv s (Expr Out tv ev)
 qualExpr = \case
   EVar w x -> pure (EVar w x)
+  EVal w z -> pure (EVal w z)
   ECon w c -> pure (ECon w c)
   ENum w n -> pure (ENum w n)
   EApp w e0 es -> EApp w <$> qualExpr e0 <*> traverse qualExpr es
@@ -313,9 +314,7 @@ qualPatn = \case
 
 qualTopLevel :: TopLevel (Aux s) -> TQ Void s (TopLevel Out)
 qualTopLevel = \case
-  TLDef b e -> do
-    MkDefn b e <- qualDefn (MkDefn b e)
-    pure (TLDef b e)
+  TLDef d -> TLDef <$> qualDefn d
   TLAsm (MkBind w x ts) s -> do
     -- TODO: Avoid code duplication with qualDefn.
     t1 <- case ts of

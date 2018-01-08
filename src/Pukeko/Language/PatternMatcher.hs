@@ -44,6 +44,7 @@ freshEVar = state (\(x:xs) -> (x, xs))
 pmExpr :: Expr In tv ev -> PM (Expr Out tv ev)
 pmExpr = \case
   EVar w x          -> pure (EVar w x)
+  EVal w z          -> pure (EVal w z)
   ECon w c          -> pure (ECon w c)
   ENum w n          -> pure (ENum w n)
   EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
@@ -58,9 +59,9 @@ pmExpr = \case
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
-  TLDef b t -> do
+  TLDef (MkDefn b e) -> do
     put (Id.freshEVars "pm" (b^.bindEVar))
-    TLDef (retagBind b) <$> pmExpr t
+    TLDef <$> MkDefn (retagBind b) <$> pmExpr e
   TLAsm b a -> pure (TLAsm (retagBind b) a)
 
 compileModule :: MonadError String m => Module In -> m (Module Out)

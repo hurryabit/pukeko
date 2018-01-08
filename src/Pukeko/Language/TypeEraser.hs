@@ -14,7 +14,7 @@ eraseModule (MkModule info tops) = MkModule info (map eraseTopLevel tops)
 
 eraseTopLevel :: TopLevel In -> TopLevel Out
 eraseTopLevel = \case
-  TLDef b e -> TLDef (eraseBind b) (eraseExpr e)
+  TLDef   d -> TLDef (eraseDefn d)
   TLAsm b s -> TLAsm (eraseBind b) s
 
 eraseDefn :: Defn In tv ev -> Defn Out Void ev
@@ -23,6 +23,7 @@ eraseDefn (MkDefn b e) = MkDefn (eraseBind b) (eraseExpr e)
 eraseExpr :: Expr In tv ev -> Expr Out Void ev
 eraseExpr = \case
   EVar w x      -> EVar w x
+  EVal w z      -> EVal w z
   ECon w c      -> ECon w c
   ENum w n      -> ENum w n
   EApp w e0 es  -> EApp w (eraseExpr e0) (map eraseExpr es)
