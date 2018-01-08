@@ -17,6 +17,7 @@ import qualified Pukeko.Language.Ident              as Id
 -- TODO: Generalize type over arbitrary stages.
 type ElimStage st = (st ~ St.PatternMatcher)
 
+-- FIXME: Remove unreachable funs from module info as well.
 cleanModule :: (ElimStage st) => Module st -> Module st
 cleanModule = over module2tops $ \tops0 ->
   let (g, out, in_) = G.graphFromEdges $ map (\t -> (t, topLevelLhs t, deps t)) tops0

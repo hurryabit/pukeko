@@ -25,12 +25,12 @@ import qualified Pukeko.Language.AST.Stage as St
 import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Type
 
+-- FIXME: Drop @HasELam@ constraint.
 type Typed st =
   ( St.StageType st ~ Type
   , St.HasTLTyp st  ~ 'False
   , St.HasTLVal st  ~ 'False
-  , St.HasTLDef st  ~ 'True
-  , St.HasTLSup st  ~ 'False
+  , St.HasLambda  st  ~ 'True
   , St.HasMICons st ~ 'True
   , St.HasMIFuns st ~ 'True
   )

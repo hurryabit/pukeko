@@ -44,7 +44,6 @@ ccTopLevel :: In.TopLevel In -> CC TopLevel
 ccTopLevel = \case
   In.TLSup b bs t ->
     Def (bindName b) (map (Just . bindName) (toList bs)) <$> ccExpr t
-  In.TLCaf b    t -> Def (bindName b) [] <$> ccExpr t
   In.TLAsm b    s -> do
     let n = MkName s
     at (b^.lhs) ?= n

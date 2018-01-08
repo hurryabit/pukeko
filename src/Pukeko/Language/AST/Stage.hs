@@ -41,29 +41,27 @@ type family StageType st where
   StageType LambdaLifter    = NoType
   StageType CoreCompiler    = NoType
 
-type HasELam st = StageId st <=? 650
-type HasEMat st = StageId st <=? 450
-type HasETyp st = (400 <=? StageId st) && (StageId st <=? 400)
+-- TODO: Giver proper names to these constraints.
+type HasLambda st = StageId st <=? 650
+type HasEMat   st = StageId st <=? 450
+type HasETyp   st = (400 <=? StageId st) && (StageId st <=? 400)
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
                                         -- the pretty printer
-type HasTLDef st = StageId st <=? 650
-type HasTLSup st = 700 <=? StageId st
 
 type HasMICons st = 200 <=? StageId st
 type HasMIFuns st = 250 <=? StageId st
 
 type SameTopNodes st1 st2 =
-  ( HasTLTyp st1 ~ HasTLTyp st2
-  , HasTLVal st1 ~ HasTLVal st2
-  , HasTLDef st1 ~ HasTLDef st2
-  , HasTLSup st1 ~ HasTLSup st2
+  ( HasTLTyp  st1 ~ HasTLTyp  st2
+  , HasTLVal  st1 ~ HasTLVal  st2
+  , HasLambda st1 ~ HasLambda st2
   )
 type SameNodes st1 st2 =
-  ( HasELam st1 ~ HasELam st2
-  , HasEMat st1 ~ HasEMat st2
-  , HasETyp st1 ~ HasETyp st2
+  ( HasLambda st1 ~ HasLambda st2
+  , HasEMat   st1 ~ HasEMat   st2
+  , HasETyp   st1 ~ HasETyp   st2
   )
 
 type SameTypes st1 st2 = (StageType st1 ~ StageType st2)

@@ -85,7 +85,7 @@ llTopLevel = \case
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [TLCaf (MkBind w lhs NoType) rhs]
+        tell [TLSup (MkBind w lhs NoType) Vec.empty (fmap absurd rhs)]
   TLAsm b asm -> tell [TLAsm (retagBind b) asm]
 
 liftModule :: Module In -> Module Out

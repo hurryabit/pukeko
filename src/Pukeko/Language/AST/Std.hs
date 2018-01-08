@@ -75,13 +75,10 @@ data TopLevel st
     TLTyp Pos [Con.TConDecl]
   | HasTLVal st ~ 'True =>
     TLVal Pos Id.EVar (Type Void)
-  | HasTLDef st ~ 'True =>
+  | HasLambda st ~ 'True =>
     TLDef     (Defn st Void Void)
-  | forall n. HasTLSup st ~ 'True =>
+  | forall n. HasLambda st ~ 'False =>
     TLSup     (Bind st Void) (Vector n (Bind st Void )) (Expr st Void (EFinScope n Void))
-  -- TODO: Use TLDef for CAFs.
-  | HasTLSup st ~ 'True =>
-    TLCaf     (Bind st Void) (Expr st Void Void)
   | TLAsm     (Bind st Void) String
 
 data Defn st tv ev = MkDefn
@@ -95,7 +92,7 @@ data Expr st tv ev
   | ECon Pos Id.DCon
   | ENum Pos Int
   | EApp Pos (Expr st tv ev) [Expr st tv ev]
-  | forall n. HasELam st ~ 'True =>
+  | forall n. HasLambda st ~ 'True =>
     ELam Pos (Vector n (Bind st tv))                  (Expr st tv (EFinScope n ev))
   | forall n.
     ELet Pos (Vector n (Defn st tv ev))               (Expr st tv (EFinScope n ev))
@@ -381,7 +378,6 @@ instance HasPos (TopLevel st) where
     TLVal w x t -> fmap (\w' -> TLVal w' x t) (f w)
     TLDef      d -> fmap TLDef (pos f d)
     TLSup b bs e -> fmap (\b' -> TLSup b' bs e) (pos f b)
-    TLCaf b    e -> fmap (\b' -> TLCaf b'    e) (pos f b)
     TLAsm b    s -> fmap (\b' -> TLAsm b'    s) (pos f b)
 
 instance HasPos (Defn st tv ev) where
@@ -442,8 +438,6 @@ instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
     TLDef     d -> "let" <+> pretty d
     TLSup   b bs e ->
       "let" <+> hang (pretty b <+> hsep (fmap pretty bs) <+> equals) 2 (pretty e)
-    TLCaf   b t ->
-      "let" <+> hang (pretty b <+> equals) 2 (pretty t)
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 
