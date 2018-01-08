@@ -244,12 +244,12 @@ and g x = f x
 -- SUBSECTION term cons
 
 -- TEST underapplication in expression
--- FAILURE (line 2, column 5): mismatching types Option and (->) _3
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _2
 val bad : Option a
 let bad = Some
 
 -- TEST overapplication in expression
--- FAILURE (line 2, column 11): mismatching types Option and (->) _2
+-- FAILURE (line 2, column 11): mismatching types Option and (->) _1
 val f : a -> Option a
 let f x = Some x x
 
@@ -275,7 +275,7 @@ val bad : Unit
 let bad = 1
 
 -- TEST type cons vs arrow
--- FAILURE (line 2, column 5): mismatching types Option and (->) _3
+-- FAILURE (line 2, column 5): mismatching types Option and (->) _2
 val bad : Option a
 let bad = fun y -> y
 
@@ -295,7 +295,7 @@ val bad : a
 let bad = 1
 
 -- TEST qvar vs arrow
--- FAILURE (line 2, column 5): mismatching types a and _3 -> _3
+-- FAILURE (line 2, column 5): mismatching types a and _2 -> _2
 val bad : a
 let bad = fun y -> y
 
@@ -320,7 +320,7 @@ val f : (a -> b) -> (a -> c)
 let f x = x
 
 -- TEST occurs check
--- FAILURE (line 2, column 9): '_3' occurs in List _3
+-- FAILURE (line 2, column 15): '_3' occurs in List _3
 val bad : List a
 let rec bad = Cons bad Nil
 

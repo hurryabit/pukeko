@@ -11,6 +11,7 @@ import           Control.Monad.Supply
 import           Control.Monad.Writer
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
+import           Data.Bifunctor (first)
 import           Data.Foldable
 import qualified Data.Map         as Map
 import qualified Data.Set         as Set
@@ -22,7 +23,6 @@ import           Pukeko.Error
 import           Pukeko.Pos
 import           Pukeko.Pretty
 import           Pukeko.Language.Info
-import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage         as St
 import qualified Pukeko.Language.AST.ConDecl       as Con
@@ -107,13 +107,12 @@ generalize t0 = do
       UTUni{} -> bug "inferencer" "quantification during generalization" Nothing
       UTApp tf tp -> UTApp <$> go tf <*> go tp
 
-instantiate :: UType s Void -> TI v s (UType s Void, [UType s Void])
+instantiate :: UType s Void -> TI v s ([UType s Void], UType s Void)
 instantiate ts = do
   let (xs, t0) = unUTUni ts
   uvars <- traverse (const freshUVar) xs
   let env = Map.fromList (zip xs uvars)
-  t1 <- liftST (subst env t0)
-  pure (t1, uvars)
+  (,) uvars <$> liftST (subst env t0)
 
 instantiateTCon :: Id.TCon -> TI v s (UType s Void, [UType s Void], Map.Map Id.TVar (UType s Void))
 instantiateTCon tcon = do
@@ -139,24 +138,18 @@ inferPatn patn t_expr = case patn of
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
     pure (PCon w dcon t_params ps1, Map.unions binds)
 
--- TODO: Share mode core between 'inferLet' and 'inferRec'
 -- TODO: Add test to ensure types are generalized properly.
 inferLet ::
   (IsEVar v) =>
   Vec.Vector n (Defn In Void v) ->
   TI v s (Vec.Vector n (Defn (Aux s) Void v), Vec.Vector n (UType s Void))
-inferLet defns = do
-  -- TODO: Make this less imperative.
-  (rhss, t_rhss) <- local (level +~ 1) $ do
-    t_lhss <- traverse (const freshUVar) defns
-    (rhss, t_rhss) <- Vec.unzip <$> traverse (infer . view rhs) defns
-    ifor_ defns $ \i defn ->
-      unify (defn^.pos) (t_lhss Vec.! i) (t_rhss Vec.! i)
-    pure (rhss, t_rhss)
-  fmap Vec.unzip $ ifor defns $ \i (MkDefn (MkBind w x NoType) _) -> do
-    let rhs = rhss Vec.! i
-    (ts_rhs, _) <- generalize (t_rhss Vec.! i)
-    pure (MkDefn (MkBind w x ts_rhs) rhs, ts_rhs)
+inferLet defns0 = do
+  let (ls0, rs0) = Vec.unzip (fmap (\(MkDefn l r) -> (l, r)) defns0)
+  (rs1, ts1) <- Vec.unzip <$> local (level +~ 1) (traverse infer rs0)
+  (ts2, _qs) <- Vec.unzip <$> traverse generalize ts1
+  -- let ls1 = Vec.zipWith (set bindType) ts2 ls0
+  let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bindType t2) ts2 ls0 rs1
+  pure (defns1, ts2)
 
 inferRec ::
   (IsEVar v) =>
@@ -168,33 +161,20 @@ inferRec defns0 = do
   (rs1, ts1) <- local (level +~ 1) $ do
     us <- traverse (const freshUVar) ls0
     (rs1, ts1) <- Vec.unzip <$> localize us (traverse infer rs0)
-    for_ (Vec.zip3 ls0 us ts1) $ \(l0, u, t1) -> unify (l0^.pos) u t1
+    Vec.zipWith3M_ (\r0 -> unify (r0^.pos)) rs0 us ts1
     pure (rs1, ts1)
   (ts2, qs) <- Vec.unzip <$> traverse generalize ts1
-  let ls1 = Vec.zipWith (set bindType) ts2 ls0
-  let f w =
-        scope'
+  let addETyApp w = scope'
         (\i b -> mkETyApp w (EVar w (mkBound i b)) (map (fmap absurd) (qs Vec.! i)))
         (EVar w . Free)
-  let rs2 = fmap (// f) rs1
-  let defns1 = Vec.zipWith MkDefn ls1 rs2
+  let rs2 = fmap (// addETyApp) rs1
+  let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bindType t2) ts2 ls0 rs2
   pure (defns1, ts2)
-
-mkETyApp1 :: Expr (Aux s) Void v -> [UType s Void] -> Expr (Aux s) Void v
-mkETyApp1 e0 ys
-  | null ys = e0
-  | otherwise = ETyApp (e0^.pos) e0 ys
-
 
 infer :: IsEVar v => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
 infer = \case
-    EVar w x -> do
-      (t, us) <- lookupType x >>= instantiate
-      pure (mkETyApp1 (EVar w x) us, t)
-    ECon w c -> do
-      t0 <- typeOfDCon c
-      (t1, us) <- instantiate (open t0)
-      pure (mkETyApp1 (ECon w c) us, t1)
+    EVar w x -> first (mkETyApp w (EVar w x)) <$> (lookupType x >>= instantiate)
+    ECon w c -> first (mkETyApp w (ECon w c)) <$> (typeOfDCon c >>= instantiate . open)
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
       (fun1, t_fun) <- infer fun0
@@ -209,12 +189,10 @@ infer = \case
       pure (ELam w binds1 rhs1, toList t_binds *~> t_rhs)
     ELet w defns0 rhs0 -> do
       (defns1, t_defns) <- inferLet defns0
-      (rhs1, t_rhs) <- localize t_defns (infer rhs0)
-      pure (ELet w defns1 rhs1, t_rhs)
+      first (ELet w defns1) <$> localize t_defns (infer rhs0)
     ERec w defns0 rhs0 -> do
       (defns1, t_defns) <- inferRec defns0
-      (rhs1, t_rhs) <- localize t_defns (infer rhs0)
-      pure (ERec w defns1 rhs1, t_rhs)
+      first (ERec w defns1) <$> localize t_defns (infer rhs0)
     EMat w expr0 altns0 -> do
       (expr1, t_expr) <- infer expr0
       t_res <- freshUVar
@@ -237,7 +215,7 @@ inferTopLevel = \case
       reset
       (defns1, _) <- inferLetOrRec defns0
       for (toList defns1) $ \(MkDefn b@(MkBind w x ts_defn) e) -> do
-        (t_defn, _us) <- instantiate ts_defn
+        (_us, t_defn) <- instantiate ts_defn
         -- NOTE: If we instantiate the type schema, universally quantified type
         -- variables would be turned into unification variables and the
         -- following would type check:
