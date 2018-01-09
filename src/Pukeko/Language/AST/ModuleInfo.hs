@@ -6,7 +6,10 @@ module Pukeko.Language.AST.ModuleInfo
   , tcons
   , dcons
   , funs
+  , info2funs
   ) where
+
+import           Control.Lens
 
 import qualified Data.Map                    as Map
 
@@ -33,3 +36,10 @@ dcons = unPresent . _dcons
 
 funs :: GenModuleInfo cons 'True -> Map.Map Id.EVar (Pos, Type Void)
 funs = unPresent . _funs
+
+info2funs :: Traversal' (GenModuleInfo cons vals) (Map.Map Id.EVar (Pos, Type Void))
+info2funs f (MkModuleInfo ts ds fs) = MkModuleInfo ts ds <$> traverse f fs
+
+deriving instance Functor     (Present b)
+deriving instance Foldable    (Present b)
+deriving instance Traversable (Present b)

@@ -25,17 +25,18 @@ compileToCore
   => Bool
   -> Parser.Module
   -> m (CoreCompiler.Module, Module LambdaLifter.Out, Module Inferencer.Out)
-compileToCore _unsafe module_ = do
-  module_ti <- Renamer.renameModule module_
+compileToCore _unsafe module_pu = do
+  module_ti <- pure module_pu
+               >>= Renamer.renameModule
                >>= TypeResolver.resolveModule
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule
                >>= Inferencer.inferModule
-  module_ll <- return module_ti
+  module_ll <- pure module_ti
                >>= PatternMatcher.compileModule
                >>= TypeChecker.checkModule
-               >>= return . TypeEraser.eraseModule
-               >>= return . DeadCode.cleanModule
-               >>= return . LambdaLifter.liftModule
+               >>= pure . TypeEraser.eraseModule
+               >>= pure . LambdaLifter.liftModule
+               >>= pure . DeadCode.cleanModule
   let module_cc = CoreCompiler.compileModule module_ll
   return (module_cc, module_ll, module_ti)
