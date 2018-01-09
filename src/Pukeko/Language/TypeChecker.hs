@@ -25,12 +25,8 @@ import qualified Pukeko.Language.AST.Stage as St
 import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Type
 
--- FIXME: Drop @HasELam@ constraint.
 type Typed st =
   ( St.StageType st ~ Type
-  , St.HasTLTyp st  ~ 'False
-  , St.HasTLVal st  ~ 'False
-  , St.HasLambda  st  ~ 'True
   , St.HasMICons st ~ 'True
   , St.HasMIFuns st ~ 'True
   )
@@ -90,10 +86,7 @@ typeOf = \case
         TUni{} ->
           throwErrorAt (ek^.pos) "expected type argument, but found value argument"
         _ -> throwErrorAt (ek^.pos) "unexpected value argument"
-  ELam _ bs e0 -> do
-    let ts = fmap _bindType bs
-    t0 <- localizeTypes ts (typeOf e0)
-    pure (toList ts *~> t0)
+  ELam _ bs e0 -> typeOfLambda bs e0
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
     -- TODO: Make lenses for this combination.
@@ -118,6 +111,14 @@ typeOf = \case
       TFun{} ->
         throwErrorAt w "expected value argument, but found type argument"
       _ -> throwErrorAt w "unexpected type argument"
+
+typeOfLambda ::
+  (Typed st, IsTVar tv, IsEVar ev) =>
+  Vec.Vector n (Bind st tv) -> Expr st tv (EFinScope n ev) -> TC tv ev (Type tv)
+typeOfLambda bs e0 = do
+  let ts = fmap _bindType bs
+  t0 <- localizeTypes ts (typeOf e0)
+  pure (toList ts *~> t0)
 
 typeOfBranching ::
   (Typed st, IsTVar tv, IsEVar ev, HasPos branch) =>
@@ -152,42 +153,48 @@ typeOfCase t (MkCase w c ts bs e0) = do
   typeOfAltn t (MkAltn w (PCon w c ts ps) e1)
 
 patnEnvLevel ::
-  (IsTVar tv) =>
+  (Typed st, IsTVar tv) =>
   Patn st tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
 patnEnvLevel p t0 = case p of
   PWld _   -> pure Map.empty
   PVar _ x -> pure (Map.singleton x t0)
-  PCon w c _ts ps -> do
-    Con.MkDConDecl (Con.MkDConDeclN tcon1 dcon1 _tag flds1) <- findDCon c
-    case gatherTApp t0 of
-      (TCon tcon0, ts0L)
-        | tcon0 /= tcon1 -> throwDocAt w
-          ("expected constructor of type" <+> pretty tcon0
-           <> ", but found constructor of type" <+> pretty tcon1)
-        | length flds1 /= length ps -> throwDocAt w
-          ("expected" <+> int (length flds1) <+> "pattern arguments of" <+> pretty dcon1
-           <> ", but found" <+> int (length ps) <+> "pattern arguments")
-        | otherwise -> Vec.withList ts0L $ \ts0 ->
-            let fldsProxy :: [Type (TFinScope n tv)] -> Proxy n
-                fldsProxy _ = Proxy
-            in  case sameNat (Vec.plength ts0) (fldsProxy flds1) of
-                  Nothing -> bugWith "mismatching kinds for type constructor" tcon0
-                  Just Refl -> do
-                    let t_ps = map (>>= scope (ts0 Vec.!) absurd) flds1
-                    Map.unions <$> zipWithM patnEnvLevel ps t_ps
-      _ -> throwDocAt w ("cannot pattern match on type" <+> pretty t0)
+  PCon w c ts1 ps -> do
+    Con.MkDConDecl (Con.MkDConDeclN tcon dcon _tag flds1) <- findDCon c
+    let t1 = mkTApp (TCon tcon) (toList ts1)
+    unless (t0 == t1) $ throwDocAt w
+      ("expected pattern of type" <+> pretty t0
+       <> ", but found pattern of type" <+> pretty t1)
+    unless (length flds1 == length ps) $ throwDocAt w
+      ("expected" <+> int (length flds1) <+> "pattern arguments of" <+> pretty dcon
+       <> ", but found" <+> int (length ps) <+> "pattern arguments")
+    Vec.withList ts1 $ \ts2 -> do
+      let fldsProxy :: [Type (TFinScope n tv)] -> Proxy n
+          fldsProxy _ = Proxy
+      case sameNat (Vec.plength ts2) (fldsProxy flds1) of
+        Nothing -> bugWith "mismatching kinds for type constructor" tcon
+        Just Refl -> do
+          let t_ps = map (>>= scope (ts2 Vec.!) absurd) flds1
+          Map.unions <$> zipWithM patnEnvLevel ps t_ps
+
+match :: (IsTVar tv) => Pos -> Type tv -> Type tv -> TC tv ev ()
+match w t0 t1 =
+  unless (t0 == t1) $
+    throwDocAt w ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
 check :: (Typed st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
 check e t0 = do
   t1 <- typeOf e
-  unless (t0 == t1) $
-    throwDocAt (e^.pos)
-      ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
+  match (e^.pos) t0 t1
 
 checkDefn :: (Typed st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
 checkDefn (MkDefn (MkBind _ _ t) e) = check e t
 
 checkTopLevel :: (Typed st) => TopLevel st -> TC Void Void ()
 checkTopLevel = \case
+  TLTyp{} -> pure ()
+  TLVal{} -> pure ()
   TLDef   d -> checkDefn d
+  TLSup b bs e0 -> do
+    t0 <- typeOfLambda bs e0
+    match (b^.pos) (_bindType b) t0
   TLAsm _ _ -> pure ()
