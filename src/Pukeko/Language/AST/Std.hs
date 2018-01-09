@@ -466,8 +466,8 @@ instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
     TLDef     d -> "let" <+> pretty d
     TLSup _ z vs t bs e ->
       "let" <+>
-      hang (pretty z <+> dvs_t <+> hsep (fmap pretty bs) <+> equals) 2
-      (prettyETyAbs lvl prec vs e)
+      hang (pretty z <+> dvs_t <+> equals) 2
+      (prettyETyAbs lvl prec vs (prettyELam lvl 0 bs e))
       where
         dt = pPrintPrecType lvl prec t
         dvs_t
@@ -524,20 +524,22 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     ECas _ t cs ->
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList cs)
-    ETyAbs _ vs e -> prettyETyAbs lvl prec vs e
+    ETyAbs _ vs e -> prettyETyAbs lvl prec vs (pPrintPrec lvl 0 e)
     ETyApp _ e0 ts ->
       maybeParens (prec > Op.aprec)
       $ pPrintPrec lvl Op.aprec e0 <+> prettyAtType (pPrintPrecType lvl 3) ts
 
-prettyELam lvl prec bs e =
-  maybeParens (prec > 0)
-  $ hang ("fun" <+> hsep (fmap (pPrintPrec lvl 1) bs) <+> "->") 2 (pPrintPrec lvl 0 e)
-
-prettyETyAbs lvl prec vs e
-  | null vs   = pPrintPrec lvl prec e
+prettyELam lvl prec bs e
+  | null bs   = pPrintPrec lvl prec e
   | otherwise =
       maybeParens (prec > 0)
-      $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 (pPrintPrec lvl 0 e)
+      $ hang ("fun" <+> hsepMap (pPrintPrec lvl 1) bs <+> "->") 2 (pPrintPrec lvl 0 e)
+
+prettyETyAbs _ prec vs d
+  | null vs   = maybeParens (prec > 0) d
+  | otherwise =
+      maybeParens (prec > 0)
+      $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 d
 
 prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList

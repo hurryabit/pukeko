@@ -4,49 +4,56 @@ external (-) = "sub"
 external (%) = "mod"
 external (!=) = "ne"
 external (<=) = "le"
-let nth xs n =
-      match xs with
-      | Nil -> abort
-      | Cons x xs ->
-        match (<=) n 0 with
-        | False -> nth xs ((-) n 1)
-        | True -> x
-let append xs ys =
-      match xs with
-      | Nil -> ys
-      | Cons x xs -> Cons x (append xs ys)
+let nth =
+      fun xs n ->
+        match xs with
+        | Nil -> abort
+        | Cons x xs ->
+          match (<=) n 0 with
+          | False -> nth xs ((-) n 1)
+          | True -> x
+let append =
+      fun xs ys ->
+        match xs with
+        | Nil -> ys
+        | Cons x xs -> Cons x (append xs ys)
 external print = "print"
 external input = "input"
 external (>>=) = "bind"
-let repeat xs =
-      let rec ys = append xs ys in
-      ys
-let psums$ll1 psums0 n xs =
-      match xs with
-      | Nil -> Nil
-      | Cons x xs ->
-        let y = (+) x n in
-        Cons y (psums0 y xs)
+let repeat =
+      fun xs ->
+        let rec ys = append xs ys in
+        ys
+let psums$ll1 =
+      fun psums0 n xs ->
+        match xs with
+        | Nil -> Nil
+        | Cons x xs ->
+          let y = (+) x n in
+          Cons y (psums0 y xs)
 let psums =
       let rec psums0 = psums$ll1 psums0 in
       psums0 0
-let filter$ll1 p filter_p xs =
-      match xs with
-      | Nil -> Nil
-      | Cons x xs ->
-        let ys = filter_p xs in
-        match p x with
-        | False -> ys
-        | True -> Cons x ys
-let filter p =
-      let rec filter_p = filter$ll1 p filter_p in
-      filter_p
-let sieve$ll1 p k = (!=) ((%) k p) 0
-let sieve ks =
-      match ks with
-      | Nil -> abort
-      | Cons p ks -> Cons p (sieve (filter (sieve$ll1 p) ks))
+let filter$ll1 =
+      fun p filter_p xs ->
+        match xs with
+        | Nil -> Nil
+        | Cons x xs ->
+          let ys = filter_p xs in
+          match p x with
+          | False -> ys
+          | True -> Cons x ys
+let filter =
+      fun p ->
+        let rec filter_p = filter$ll1 p filter_p in
+        filter_p
+let sieve$ll1 = fun p k -> (!=) ((%) k p) 0
+let sieve =
+      fun ks ->
+        match ks with
+        | Nil -> abort
+        | Cons p ks -> Cons p (sieve (filter (sieve$ll1 p) ks))
 let primes =
       Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
-let main$ll1 n = print (nth primes n)
+let main$ll1 = fun n -> print (nth primes n)
 let main = (>>=) input main$ll1
