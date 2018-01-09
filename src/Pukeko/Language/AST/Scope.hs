@@ -45,9 +45,12 @@ import           Pukeko.Error      (bugWith)
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
 
+-- NOTE: The order of the constructors is chosen such that the derived @Ord@
+-- instance sorts the corresponding de Bruijn indices in decreasing order, which
+-- is good for lambda lifting.
 data Scope b i v
-  = Bound i (Forget b)
-  | Free v
+  = Free v
+  | Bound i (Forget b)
   deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
 
 type EScope = Scope Id.EVar

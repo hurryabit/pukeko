@@ -10,7 +10,6 @@ import           Control.Monad.RWS
 import           Data.Either       (partitionEithers)
 import qualified Data.Finite       as Fin
 import           Data.Foldable     (traverse_)
-import           Data.List         (sortOn)
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.Set.Lens     as Set
@@ -56,11 +55,8 @@ llExpr = \case
     lhs <- freshIdent
     rhs <- llExpr rhs
     let unscope = scope' (\i b -> Right (i, b)) Left
-    let (capturedS, others) =
+    let (capturedL, others) =
           partitionEithers (map unscope (Set.toList (Set.setOf traverse rhs)))
-    -- TODO: Arrange 'captured' in a clever way. The @sortOn varName@ is just to
-    -- not break the tests right now.
-    let capturedL = sortOn baseEVar capturedS
     Vec.withList capturedL $ \(capturedV :: Vec.Vector m v) -> do
       let newBinds = fmap (\x -> MkBind w (baseEVar x) NoType) capturedV Vec.++ oldBinds
       let renameOther (i, b) = (mkBound i b, mkBound (Fin.shift i) b)

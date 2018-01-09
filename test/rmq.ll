@@ -63,7 +63,7 @@ let build$ll1 op run ts =
 let build op xs =
       let rec run = build$ll1 op run in
       run (zip_with single nats xs)
-let query$ll1 aux one op q_hi q_lo t =
+let query$ll1 one op q_lo q_hi aux t =
       match t with
       | RmqEmpty -> one
       | RmqNode t_lo t_hi value left right ->
@@ -74,7 +74,7 @@ let query$ll1 aux one op q_hi q_lo t =
           | True -> value
         | True -> one
 let query one op q_lo q_hi =
-      let rec aux = query$ll1 aux one op q_hi q_lo in
+      let rec aux = query$ll1 one op q_lo q_hi aux in
       aux
 let infinity = 1000000000
 let min x y =
@@ -82,10 +82,10 @@ let min x y =
       | False -> y
       | True -> x
 let replicate_io n act = sequence_io (replicate n act)
-let main$ll5 lo t hi =
+let main$ll5 t lo hi =
       let res = query infinity min lo hi t in
       print res
-let main$ll4 t lo = (>>=) input (main$ll5 lo t)
+let main$ll4 t lo = (>>=) input (main$ll5 t lo)
 let main$ll6 x = return Unit
 let main$ll3 m xs =
       let t = build min xs in

@@ -30,7 +30,7 @@ let psums$ll1 psums0 n xs =
 let psums =
       let rec psums0 = psums$ll1 psums0 in
       psums0 0
-let filter$ll1 filter_p p xs =
+let filter$ll1 p filter_p xs =
       match xs with
       | Nil -> Nil
       | Cons x xs ->
@@ -39,7 +39,7 @@ let filter$ll1 filter_p p xs =
         | False -> ys
         | True -> Cons x ys
 let filter p =
-      let rec filter_p = filter$ll1 filter_p p in
+      let rec filter_p = filter$ll1 p filter_p in
       filter_p
 let sieve$ll1 p k = (!=) ((%) k p) 0
 let sieve ks =

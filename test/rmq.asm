@@ -407,14 +407,14 @@ g_push 5
 g_eval
 g_jumpcase .0, .1
 g_label .0
-g_pop 2
-g_update 5
-g_pop 4
+g_pop 1
+g_update 6
+g_pop 5
 g_unwind
 g_label .1
 g_uncons 5
 g_push 1
-g_push 10
+g_push 8
 g_pushglobal gm$gt, 2
 g_mkap 2
 g_push 1
@@ -432,7 +432,7 @@ g_push 2
 g_pushglobal gm$le, 2
 g_mkap 2
 g_push 1
-g_push 11
+g_push 9
 g_pushglobal gm$le, 2
 g_mkap 2
 g_pushglobal op$aa, 2
@@ -442,12 +442,12 @@ g_jumpcase .6, .7
 g_label .6
 g_pop 1
 g_push 4
-g_push 6
+g_push 10
 g_mkap 1
 g_push 4
-g_push 7
+g_push 11
 g_mkap 1
-g_push 9
+g_push 8
 g_updap 2, 12
 g_pop 11
 g_unwind
@@ -459,9 +459,9 @@ g_unwind
 g_label .8
 g_jump .5
 g_label .4
-g_pop 7
-g_update 5
-g_pop 4
+g_pop 6
+g_update 6
+g_pop 5
 g_unwind
 g_label .5
 g_jump .2
@@ -469,11 +469,11 @@ g_label .2
 
 g_globstart query, 4
 g_alloc 1
-g_push 3
+g_push 0
 g_push 5
-g_push 4
-g_push 4
-g_push 4
+g_push 5
+g_push 5
+g_push 5
 g_pushglobal query$ll1, 6
 g_updap 5, 1
 g_update 5
@@ -514,9 +514,9 @@ g_pop 2
 g_unwind
 
 g_globstart main$ll5, 3
-g_push 1
+g_push 0
 g_push 3
-g_push 2
+g_push 3
 g_pushglobal min, 2
 g_pushglobal infinity, 0
 g_pushglobal query, 4
@@ -528,8 +528,8 @@ g_pop 4
 g_unwind
 
 g_globstart main$ll4, 2
-g_push 0
-g_push 2
+g_push 1
+g_push 1
 g_pushglobal main$ll5, 3
 g_mkap 2
 g_pushglobal gm$input, 1

@@ -204,10 +204,10 @@ g_unwind
 g_label .1
 g_uncons 2
 g_push 1
-g_push 3
+g_push 4
 g_mkap 1
 g_push 1
-g_push 5
+g_push 4
 g_mkap 1
 g_eval
 g_jumpcase .3, .4
@@ -230,8 +230,8 @@ g_label .2
 
 g_globstart filter, 1
 g_alloc 1
-g_push 1
-g_push 1
+g_push 0
+g_push 2
 g_pushglobal filter$ll1, 3
 g_updap 2, 1
 g_update 2

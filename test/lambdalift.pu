@@ -1,0 +1,8 @@
+val g : Int -> Int -> Int -> Int -> Int
+let g a b c d = a
+
+val f : Int -> Int -> Int -> Int -> Int
+let f = fun x -> fun y1 y2 -> fun z -> g x y1 y2 z
+
+val main : IO Unit
+let main = print (f 1 2 3 4)
