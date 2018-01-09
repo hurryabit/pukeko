@@ -60,9 +60,14 @@ lookupType = TC . asks . lookupEnv
 localizeTypes ::
   forall i tv ev a. (HasEnvLevel i, IsEVar ev) =>
   EnvLevelOf i (Type tv) -> TC tv (EScope i ev) a -> TC tv ev a
-localizeTypes bs =
-  let f = extendEnv @i @ev bs
+localizeTypes ts =
+  let f = extendEnv @i @ev ts
   in  TC . mapInfoT (withReaderT f) . unTC
+
+localizeBinds ::
+  (St.StageType st ~ Type, HasEnvLevel i, IsEVar ev) =>
+  EnvLevelOf i (Bind st tv) -> TC tv (EScope i ev) a -> TC tv ev a
+localizeBinds = localizeTypes . fmap _bindType
 
 localizeKinds :: (IsEVar ev) => TC (TFinScope i tv) ev a -> TC tv ev a
 localizeKinds =
@@ -89,10 +94,9 @@ typeOf = \case
   ELam _ bs e0 -> typeOfLambda bs e0
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
-    -- TODO: Make lenses for this combination.
-    localizeTypes (fmap (_bindType . _defnLhs) ds) (typeOf e0)
+    localizeBinds (fmap _defnLhs ds) (typeOf e0)
   ERec _ ds e0 -> do
-    localizeTypes (fmap (_bindType . _defnLhs) ds) $ do
+    localizeBinds (fmap _defnLhs ds) $ do
       traverse_ checkDefn ds
       typeOf e0
   EMat _ e0 as -> typeOfBranching typeOfAltn e0 as
@@ -194,7 +198,5 @@ checkTopLevel = \case
   TLTyp{} -> pure ()
   TLVal{} -> pure ()
   TLDef   d -> checkDefn d
-  TLSup b bs e0 -> do
-    t0 <- typeOfLambda bs e0
-    match (b^.pos) (_bindType b) t0
+  TLSup _ _z _vs t bs e -> localizeKinds (localizeBinds bs (check e t))
   TLAsm _ _ -> pure ()

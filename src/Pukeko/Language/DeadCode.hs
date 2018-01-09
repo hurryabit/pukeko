@@ -31,15 +31,15 @@ cleanModule (MkModule info0 tops0) =
     deps = Set.toList . Set.setOf (\f -> topLevel2expr (expr2eval f))
 
 topLevelLhs :: (ElimStage st) => TopLevel st -> Id.EVar
-topLevelLhs = view lhs . \case
-  TLDef (MkDefn b _) -> b
-  TLSup b _ _        -> b
-  TLAsm b _          -> b
+topLevelLhs = \case
+  TLDef (MkDefn b _) -> b^.lhs
+  TLSup _ z _ _ _ _  -> z
+  TLAsm b _          -> b^.lhs
 
 topLevel2expr ::
   (ElimStage st, Applicative f) =>
   (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> TopLevel st -> f (TopLevel st)
 topLevel2expr f = \case
   TLDef d -> TLDef <$> defn2rhs f d
-  TLSup b bs e -> TLSup b bs <$> f e
+  TLSup w z vs t bs e -> TLSup w z vs t bs <$> f e
   TLAsm b s -> pure (TLAsm b s)

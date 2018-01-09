@@ -77,8 +77,12 @@ data TopLevel st
     TLVal Pos Id.EVar (Type Void)
   | HasLambda st ~ 'True =>
     TLDef     (Defn st Void Void)
-  | forall n. HasLambda st ~ 'False =>
-    TLSup     (Bind st Void) (Vector n (Bind st Void )) (Expr st Void (EFinScope n Void))
+  | forall m n. (HasLambda st ~ 'False, KnownNat m) =>
+    TLSup Pos Id.EVar
+      (Vector m Id.TVar)
+      (StageType st (TFinScope m Void))
+      (Vector n (Bind st (TFinScope m Void)))
+      (Expr st (TFinScope m Void) (EFinScope n Void))
   | TLAsm     (Bind st Void) String
 
 data Defn st tv ev = MkDefn
@@ -102,7 +106,7 @@ data Expr st tv ev
     ECas Pos (Expr st tv ev) (NE.NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
     EMat Pos (Expr st tv ev) (NE.NonEmpty (Altn st tv ev))
-  | forall n. (HasTypes st ~ 'True, KnownNat n) =>
+  | forall n. (HasTypes st ~ 'True, HasLambda st ~ 'True, KnownNat n) =>
     ETyAbs Pos (Vector n Id.TVar) (Expr st (TFinScope n tv) ev)
   | HasTypes st ~ 'True =>
     ETyApp Pos (Expr st tv ev) [StageType st tv]
@@ -371,13 +375,37 @@ instance FoldableWithIndex    Pos (Altn st tv) where
 instance TraversableWithIndex Pos (Altn st tv) where
   itraverse f (MkAltn w p e0) = MkAltn w p <$> itraverse (traverse . f) e0
 
+instance Functor (StageType st) => Bifunctor (Defn st) where
+  bimap f g (MkDefn b e) = MkDefn (fmap f b) (bimap f g e)
+
+instance Functor (StageType st) => Bifunctor (Expr st) where
+  bimap f g = \case
+    EVar w x -> EVar w (g x)
+    EVal w z -> EVal w z
+    ECon w c -> ECon w c
+    ENum w n -> ENum w n
+    EApp w e0 es -> EApp w (bimap f g e0) (map (bimap f g) es)
+    ELam w bs e0 -> ELam w (fmap (fmap f) bs) (bimap f (fmap g) e0)
+    ELet w ds e0 -> ELet w (fmap (bimap f g) ds) (bimap f (fmap g) e0)
+    ERec w ds e0 -> ERec w (fmap (bimap f (fmap g)) ds) (bimap f (fmap g) e0)
+    ECas w e0 cs -> ECas w (bimap f g e0) (fmap (bimap f g) cs)
+    EMat w e0 as -> EMat w (bimap f g e0) (fmap (bimap f g) as)
+    ETyAbs w xs e0 -> ETyAbs w xs (bimap (fmap f) g e0)
+    ETyApp w e0 ts -> ETyApp w (bimap f g e0) (fmap (fmap f) ts)
+
+instance Functor (StageType st) => Bifunctor (Case st) where
+  bimap f g (MkCase w c ts bs e) =
+    MkCase w c (fmap (fmap f) ts) bs (bimap f (fmap g) e)
+
+instance Functor (StageType st) => Bifunctor (Altn st) where
+  bimap f g (MkAltn w p e) = MkAltn w (fmap f p) (bimap f (fmap g) e)
 
 instance HasPos (TopLevel st) where
   pos f = \case
     TLTyp w tcs -> fmap (\w' -> TLTyp w' tcs) (f w)
     TLVal w x t -> fmap (\w' -> TLVal w' x t) (f w)
     TLDef      d -> fmap TLDef (pos f d)
-    TLSup b bs e -> fmap (\b' -> TLSup b' bs e) (pos f b)
+    TLSup w z vs t bs e -> fmap (\w' -> TLSup w' z vs t bs e) (f w)
     TLAsm b    s -> fmap (\b' -> TLAsm b'    s) (pos f b)
 
 instance HasPos (Defn st tv ev) where
@@ -432,12 +460,19 @@ instance PrettyType Type where
 type PrettyStage st = PrettyType (StageType st)
 
 instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
-  pPrintPrec _ _ = \case
+  pPrintPrec lvl prec = \case
     TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
     TLDef     d -> "let" <+> pretty d
-    TLSup   b bs e ->
-      "let" <+> hang (pretty b <+> hsep (fmap pretty bs) <+> equals) 2 (pretty e)
+    TLSup _ z vs t bs e ->
+      "let" <+>
+      hang (pretty z <+> dvs_t <+> hsep (fmap pretty bs) <+> equals) 2
+      (prettyETyAbs lvl prec vs e)
+      where
+        dt = pPrintPrecType lvl prec t
+        dvs_t
+          | isEmpty dt = empty
+          | otherwise  = colon <+> prettyTUni lvl prec vs dt
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 
@@ -475,9 +510,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     --         pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
     ELet _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
     ERec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
-    ELam _ bs t ->
-      maybeParens (prec > 0)
-      $ hang ("fun" <+> hsep (fmap (pPrintPrec lvl 1) bs) <+> "->") 2 (pPrintPrec lvl 0 t)
+    ELam _ bs e -> prettyELam lvl prec bs e
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
     --     [ "if"  <+> pPrintPrec lvl 0 _cond <+> "then"
@@ -491,22 +524,30 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     ECas _ t cs ->
       maybeParens (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList cs)
-    ETyAbs _ xs e ->
-      maybeParens (prec > 0)
-      $ hang ("fun" <+> prettyAtType pretty xs <+> "->") 2 (pPrintPrec lvl prec e)
+    ETyAbs _ vs e -> prettyETyAbs lvl prec vs e
     ETyApp _ e0 ts ->
       maybeParens (prec > Op.aprec)
       $ pPrintPrec lvl Op.aprec e0 <+> prettyAtType (pPrintPrecType lvl 3) ts
+
+prettyELam lvl prec bs e =
+  maybeParens (prec > 0)
+  $ hang ("fun" <+> hsep (fmap (pPrintPrec lvl 1) bs) <+> "->") 2 (pPrintPrec lvl 0 e)
+
+prettyETyAbs lvl prec vs e
+  | null vs   = pPrintPrec lvl prec e
+  | otherwise =
+      maybeParens (prec > 0)
+      $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 (pPrintPrec lvl 0 e)
 
 prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
 instance (BaseTVar tv, PrettyStage st) => Pretty (Bind st tv) where
-  pPrintPrec lvl prec (MkBind _ x t)
-    | isEmpty td = xd
-    | otherwise  = maybeParens (prec > 0) (xd <+> colon <+> td)
+  pPrintPrec lvl prec (MkBind _ z t)
+    | isEmpty td = zd
+    | otherwise  = maybeParens (prec > 0) (zd <+> colon <+> td)
     where
-      xd = pretty x
+      zd = pretty z
       td = pPrintPrecType lvl 0 t
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
@@ -553,3 +594,11 @@ deriving instance Traversable (Case st tv)
 deriving instance Functor     (Altn st tv)
 deriving instance Foldable    (Altn st tv)
 deriving instance Traversable (Altn st tv)
+
+deriving instance Functor     (StageType st) => Functor     (Patn st)
+deriving instance Foldable    (StageType st) => Foldable    (Patn st)
+deriving instance Traversable (StageType st) => Traversable (Patn st)
+
+deriving instance Functor     (StageType st) => Functor     (Bind st)
+deriving instance Foldable    (StageType st) => Foldable    (Bind st)
+deriving instance Traversable (StageType st) => Traversable (Bind st)

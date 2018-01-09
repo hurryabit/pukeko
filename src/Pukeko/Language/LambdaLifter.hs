@@ -7,6 +7,7 @@ where
 
 import           Control.Lens
 import           Control.Monad.RWS
+import           Data.Bifunctor    (first)
 import           Data.Either       (partitionEithers)
 import qualified Data.Finite       as Fin
 import           Data.Foldable     (traverse_)
@@ -64,7 +65,8 @@ llExpr = \case
             Map.singleton (Free v) (mkBound (Fin.weaken i) (baseEVar v))
       let rename =
             Map.fromList (map renameOther others) <> ifoldMap renameCaptured capturedV
-      tell [TLSup (MkBind w lhs NoType) (fmap retagBind newBinds) (fmap (rename Map.!) rhs)]
+      tell [TLSup w lhs Vec.empty NoType (fmap (fmap absurd . retagBind) newBinds)
+            (first absurd (fmap (rename Map.!) rhs))]
       pure (mkEApp w (EVal w lhs) (map (EVar w) capturedL))
 
 llCase :: (BaseEVar v, Ord v) => Case In Void v -> LL (Case Out Void v)
@@ -81,7 +83,7 @@ llTopLevel = \case
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
-        tell [TLSup (MkBind w lhs NoType) Vec.empty (fmap absurd rhs)]
+        tell [TLSup w lhs Vec.empty NoType  Vec.empty (bimap absurd absurd rhs)]
   TLAsm b asm -> tell [TLAsm (retagBind b) asm]
 
 liftModule :: Module In -> Module Out
