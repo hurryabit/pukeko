@@ -4,7 +4,7 @@ module Pukeko.Language.AST.Stage where
 
 import GHC.TypeLits
 
-import Pukeko.Language.Type (NoType)
+import Pukeko.Language.Type (NoType, Type)
 
 data Parser
 data Renamer
@@ -24,8 +24,8 @@ type family StageId st where
   StageId FunResolver     = 250
   StageId KindChecker     = 300
   StageId (Inferencer t)  = 400
-  StageId TypeEraser      = 450
   StageId PatternMatcher  = 500
+  StageId TypeEraser      = 550
   StageId LambdaLifter    = 700
   StageId CoreCompiler    = 999
 
@@ -36,14 +36,14 @@ type family StageType st where
   StageType FunResolver     = NoType
   StageType KindChecker     = NoType
   StageType (Inferencer t)  = t
+  StageType PatternMatcher  = Type
   StageType TypeEraser      = NoType
-  StageType PatternMatcher  = NoType
   StageType LambdaLifter    = NoType
   StageType CoreCompiler    = NoType
 
 type HasLambda st = StageId st <=? 650
 type HasNested st = StageId st <=? 450
-type HasTypes  st = (400 <=? StageId st) && (StageId st <=? 400)
+type HasTypes  st = (400 <=? StageId st) && (StageId st <=? 500)
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for

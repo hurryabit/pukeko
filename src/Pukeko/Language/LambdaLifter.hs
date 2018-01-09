@@ -20,7 +20,7 @@ import qualified Pukeko.Language.AST.Stage   as St
 import qualified Pukeko.Language.Ident       as Id
 import           Pukeko.Language.Type        (NoType (..))
 
-type In  = St.PatternMatcher
+type In  = St.TypeEraser
 type Out = St.LambdaLifter
 
 type State = [Id.EVar]

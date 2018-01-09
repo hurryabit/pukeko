@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 module Pukeko.Language.PatternMatcher
   ( compileModule
@@ -25,7 +26,7 @@ import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.Ident              as Id
 
-type In  = St.TypeEraser
+type In  = St.Inferencer Type
 type Out = St.PatternMatcher
 
 newtype PM a = PM{unPM :: InfoT (ModuleInfo In) (StateT [Id.EVar] (Except String)) a}
@@ -54,8 +55,8 @@ pmExpr = \case
   EMat w t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch w (mkRowMatch1 t1 as1)
-  -- ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
-  -- ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
+  ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
+  ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
@@ -159,13 +160,13 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest tv = MkDest Id.DCon [Patn In tv]
+data Dest tv = MkDest Id.DCon [Type tv] [Patn In tv]
 
 patnToDest :: forall tv. Patn In tv -> Maybe (Dest tv)
 patnToDest = \case
   PWld{}      -> Nothing
   PVar{}      -> Nothing
-  PCon _ c (_ :: [NoType tv]) ps -> Just (MkDest c ps)
+  PCon _ c ts ps -> Just (MkDest c ts ps)
 
 findDestCol ::
   Pos -> ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev (Dest tv), ColMatch m n tv ev)
@@ -182,39 +183,39 @@ findDestCol w (MkColMatch cs0 us) =
 
 data GrpMatchItem tv ev =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon (Vec.Vector k Bind) (RowMatch m n tv (EFinScope k ev))
+  MkGrpMatchItem Id.DCon [Type tv] (Vec.Vector k Bind) (RowMatch m n tv (EFinScope k ev))
 
 data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev))
 
 groupDests ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
   Pos -> Col m tv ev (Dest tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
-groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
+groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
   Con.MkDConDecl Con.MkDConDeclN{_tcon = tcon} <- findDCon dcon0
   Con.MkTConDecl{_dcons = dcons0} <- findTCon tcon
   dcons1 <- case dcons0 of
-    []   -> throwAt w "pattern match on type without data constructors" tcon
+    []   -> bugWith "pattern match on type without data constructors" tcon
     d:ds -> pure (d :| ds)
   grps <- for dcons1 $ \Con.MkDConDeclN{_dname = dcon1} -> do
-    let drs1 = filter (\(MkDest dcon2 _, _)-> dcon1 == dcon2) drs
+    let drs1 = filter (\(MkDest dcon2 _ts _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" dcon1
-      LS.Cons (MkDest con (traverse patnToBind -> Just bs0), MkRow qs u) LS.Nil ->
+      LS.Cons (MkDest con ts (traverse patnToBind -> Just bs0), MkRow qs u) LS.Nil ->
         Vec.withList bs0 $ \bs -> do
           let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
           let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
-          let ts1 = LS.map (fmap weaken) ts
-          pure $ MkGrpMatchItem con bs (MkRowMatch ts1 (LS.Singleton row))
-      drs2@(LS.Cons (MkDest con ps0, _) _) -> Vec.withList ps0 $ \ps -> do
+          let es1 = LS.map (fmap weaken) es
+          pure $ MkGrpMatchItem con ts bs (MkRowMatch es1 (LS.Singleton row))
+      drs2@(LS.Cons (MkDest con ts ps0, _) _) -> Vec.withList ps0 $ \ps -> do
         ixs0 <- itraverse (\i _ -> (,) i <$> freshEVar) ps
         LS.withList (toList ixs0)$ \ixs -> do
-          grpRows <- for drs2 $ \(MkDest _ ps, MkRow qs u) ->
+          grpRows <- for drs2 $ \(MkDest _ _ts ps, MkRow qs u) ->
             case LS.match ixs ps of
               Nothing  -> bug "wrong number of patterns"
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (fmap weaken) u)
-          let ts1 = LS.map (EVar w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) ts
-          pure $ MkGrpMatchItem con (fmap (BName w . snd) ixs0) (MkRowMatch ts1 grpRows)
+          let es1 = LS.map (EVar w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) es
+          pure (MkGrpMatchItem con ts (fmap (BName w . snd) ixs0) (MkRowMatch es1 grpRows))
   pure $ MkGrpMatch t grps
 
 grpMatchExpr :: Pos -> GrpMatch tv ev -> PM (Expr Out tv ev)
@@ -222,5 +223,5 @@ grpMatchExpr w (MkGrpMatch t is) =
   ECas w t <$> traverse (grpMatchItemAltn w) is
 
 grpMatchItemAltn :: Pos -> GrpMatchItem tv ev -> PM (Case Out tv ev)
-grpMatchItemAltn w (MkGrpMatchItem con bs rm) =
-  MkCase w con [] (fmap bindName bs) <$> pmMatch w rm
+grpMatchItemAltn w (MkGrpMatchItem con ts bs rm) =
+  MkCase w con ts (fmap bindName bs) <$> pmMatch w rm

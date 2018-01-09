@@ -15,7 +15,7 @@ import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.Ident              as Id
 
 -- TODO: Generalize type over arbitrary stages.
-type ElimStage st = (st ~ St.PatternMatcher)
+type ElimStage st = (st ~ St.TypeEraser)
 
 -- FIXME: Remove unreachable funs from module info as well.
 cleanModule :: (ElimStage st) => Module st -> Module st
