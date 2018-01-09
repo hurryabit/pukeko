@@ -37,13 +37,13 @@ runTR tr =
   let st = MkTRState mempty mempty
   in  runExcept (runStateT (unTR tr) st)
 
+-- TODO: Use proper terminology in error messages.
 trType :: Pos -> Type tv -> TR (Type tv)
 trType w = type2tcon $ \tcon -> do
   ex <- uses st2tcons (has (ix tcon))
   unless ex (throwAt w "unknown type cons" tcon)
   pure tcon
 
--- TODO: Have only one insert function.
 insertTCon :: Pos -> Con.TConDecl -> TR ()
 insertTCon posn tcon@Con.MkTConDecl{_tname} = do
   old <- use (st2tcons . at _tname)

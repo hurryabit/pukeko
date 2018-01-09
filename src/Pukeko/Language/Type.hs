@@ -52,7 +52,7 @@ pattern TFun tx ty = TApp (TApp TArr tx) ty
 
 mkTUni :: KnownNat n => Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
 mkTUni xs t
-  | null xs   = fmap (strengthen "mkTUni") t
+  | null xs   = fmap strengthen t
   | otherwise = TUni xs t
 
 (~>) :: Type tv -> Type tv -> Type tv

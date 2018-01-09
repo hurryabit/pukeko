@@ -41,7 +41,7 @@ import qualified Data.Vector.Sized as Vec
 import           Data.Void
 import           GHC.TypeLits      (Nat)
 
-import           Pukeko.Error      (bug)
+import           Pukeko.Error      (bugWith)
 import           Pukeko.Pretty
 import qualified Pukeko.Language.Ident as Id
 
@@ -52,7 +52,6 @@ data Scope b i v
 
 type EScope = Scope Id.EVar
 
--- TODO: Replace @Ord@ by @Eq@.
 type EFinScope n = EScope (Finite n)
 
 type TScope = Scope Id.TVar
@@ -73,9 +72,9 @@ mkBound :: i -> b -> Scope b i v
 mkBound i b = Bound i (Forget b)
 
 -- TODO: Use @HasCallstack@.
-strengthen :: Show b => String -> Scope b i v -> v
-strengthen component = \case
-  Bound _ (Forget b) -> bug component "cannot strengthen" (Just (show b))
+strengthen :: Show b => Scope b i v -> v
+strengthen = \case
+  Bound _ (Forget b) -> bugWith "cannot strengthen" b
   Free  x            -> x
 
 weaken :: v -> Scope b i v
@@ -97,7 +96,7 @@ t >>>= f = t >>= dist . fmap f
 
 
 lookupMap :: (Ord i, Pretty i) => i -> Map.Map i a -> a
-lookupMap i = Map.findWithDefault (bug "scope" "lookup failed" (Just (prettyShow i))) i
+lookupMap i = Map.findWithDefault (bugWith "lookup failed" (pretty i)) i
 
 data Pair f g a = Pair (f a) (g a)
   deriving (Functor)
@@ -134,10 +133,6 @@ instance HasEnv Void where
   type EnvOf Void = Const ()
   lookupEnv = absurd
 
-instance HasEnv Id.EVar where
-  type EnvOf Id.EVar = Map.Map Id.EVar
-  lookupEnv = lookupMap
-
 instance (HasEnvLevel i, HasEnv v) => HasEnv (Scope b i v) where
   type EnvOf (Scope b i v) = Pair (EnvLevelOf i) (EnvOf v)
   lookupEnv i (Pair env_j env_v) = case i of
@@ -156,10 +151,6 @@ baseEVar = baseName
 
 baseTVar :: BaseTVar tv => tv -> Id.TVar
 baseTVar = baseName
-
--- TODO: Remove this when it's no longer necessary.
-instance BaseName Id.EVar Id.EVar where
-  baseName = id
 
 instance BaseName b Void where
   baseName = absurd

@@ -11,3 +11,4 @@ test/*
 !test/*.ll
 !test/*.pu
 !test/*.ti
+test/test*

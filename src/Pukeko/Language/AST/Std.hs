@@ -98,13 +98,13 @@ data Expr st tv ev
     ELet Pos (Vector n (Defn st tv ev))               (Expr st tv (EFinScope n ev))
   | forall n.
     ERec Pos (Vector n (Defn st tv (EFinScope n ev))) (Expr st tv (EFinScope n ev))
-  | HasEMat st ~ 'False =>
+  | HasNested st ~ 'False =>
     ECas Pos (Expr st tv ev) (NE.NonEmpty (Case st tv ev))
-  | HasEMat st ~ 'True =>
+  | HasNested st ~ 'True =>
     EMat Pos (Expr st tv ev) (NE.NonEmpty (Altn st tv ev))
-  | forall n. (HasETyp st ~ 'True, KnownNat n) =>
+  | forall n. (HasTypes st ~ 'True, KnownNat n) =>
     ETyAbs Pos (Vector n Id.TVar) (Expr st (TFinScope n tv) ev)
-  | HasETyp st ~ 'True =>
+  | HasTypes st ~ 'True =>
     ETyApp Pos (Expr st tv ev) [StageType st tv]
 
 data Bind st tv = MkBind
@@ -144,7 +144,7 @@ mkEApp w e0 es
   | otherwise = EApp w e0 es
 
 mkETyApp ::
-  (HasETyp st ~ 'True) => Pos -> Expr st tv ev -> [StageType st tv] -> Expr st tv ev
+  (HasTypes st ~ 'True) => Pos -> Expr st tv ev -> [StageType st tv] -> Expr st tv ev
 mkETyApp w e0 ts
   | null ts   = e0
   | otherwise = ETyApp w e0 ts
@@ -463,7 +463,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     EApp _ t us ->
       maybeParens (prec > Op.aprec) $ hsep
       $ pPrintPrec lvl Op.aprec t : map (pPrintPrec lvl (Op.aprec+1)) us
-    -- TODO: Bring this back in Ap when _fun is an operator.
+    -- This could be brought back in @EApp@ when @t@ is an operator.
     -- ApOp   { _op, _arg1, _arg2 } ->
     --   let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op
     --       (prec1, prec2) =
@@ -473,7 +473,6 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     --           AssocNone  -> (_prec+1, _prec+1)
     --   in  maybeParens (prec > _prec) $
     --         pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
-    -- TODO: Avoid this code duplication.
     ELet _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
     ERec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
     ELam _ bs t ->

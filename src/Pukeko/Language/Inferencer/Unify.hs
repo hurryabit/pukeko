@@ -37,12 +37,12 @@ occursCheck uref1 t2 = case t2 of
             case uvar1 of
               UFree _ l1 ->
                 lift $ writeSTRef uref2 (UFree x2 (min l1 l2))
-              _ -> bug "type unifier" "bad case in occurs check" Nothing
+              _ -> bug "bad case in occurs check"
           ULink t2' -> occursCheck uref1 t2'
   UTVar _ -> pure ()
   UTCon _ -> pure ()
   UTArr   -> pure ()
-  UTUni{} -> bug "occurs check" "universal quantification" Nothing
+  UTUni{} -> bug "universal quantification in occurs check"
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
 unify :: Pos -> UType s tv -> UType s tv -> TU s ()
@@ -59,7 +59,7 @@ unify pos t1 t2 = do
             p2 <- lift $ prettyUType prettyNormal 0 t2
             throwDocAt pos $ quotes (pretty x1) <+> "occurs in" <+> p2
           lift $ writeSTRef uref1 (ULink t2)
-        _ -> bug "type unifier" "bad pattern in unifier" Nothing
+        _ -> bug "bad pattern in unify"
     (_, UVar _) -> unify pos t2 t1
     (UTVar x1, UTVar x2)
       | x1 == x2 -> pure ()

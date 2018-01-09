@@ -84,13 +84,13 @@ kcType k = \case
   TCon tcon -> do
     kcon_opt <- use (typeCons . at tcon)
     case kcon_opt of
-      Nothing -> bug "kind checker" "unknown type constructor" (Just (show tcon))
+      Nothing -> bugWith "unknown type constructor" tcon
       Just kcon -> unify kcon k
   TApp tf tp -> do
     ktp <- freshUVar
     kcType ktp tp
     kcType (Arrow ktp k) tf
-  TUni _ _ -> bug "kind checker" "universal quantificatio" Nothing
+  TUni _ _ -> bug "universal quantificatio"
 
 kcTypDef :: [Con.TConDecl] -> KC n s ()
 kcTypDef tcons = do
@@ -153,7 +153,7 @@ assertFree uref = do
   uvar <- liftST (readSTRef uref)
   case uvar of
     Free _ -> pure ()
-    Link _ -> bug "kind checker" "unwinding produced link" Nothing
+    Link _ -> bug "unwinding produced link"
 
 occursCheck :: STRef s (UVar s) -> Kind (Open s) -> KC n s ()
 occursCheck uref1 = \case

@@ -41,10 +41,9 @@ type family StageType st where
   StageType LambdaLifter    = NoType
   StageType CoreCompiler    = NoType
 
--- TODO: Giver proper names to these constraints.
 type HasLambda st = StageId st <=? 650
-type HasEMat   st = StageId st <=? 450
-type HasETyp   st = (400 <=? StageId st) && (StageId st <=? 400)
+type HasNested st = StageId st <=? 450
+type HasTypes  st = (400 <=? StageId st) && (StageId st <=? 400)
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
@@ -60,8 +59,8 @@ type SameTopNodes st1 st2 =
   )
 type SameNodes st1 st2 =
   ( HasLambda st1 ~ HasLambda st2
-  , HasEMat   st1 ~ HasEMat   st2
-  , HasETyp   st1 ~ HasETyp   st2
+  , HasNested st1 ~ HasNested st2
+  , HasTypes  st1 ~ HasTypes  st2
   )
 
 type SameTypes st1 st2 = (StageType st1 ~ StageType st2)

@@ -90,12 +90,12 @@ subst env t = runReaderT (subst' t) env
            -> ReaderT (Map.Map Id.TVar (UType s tv)) (ST s) (UType s tv)
     subst' = \case
       UTVar x -> do
-        let e = bug "type instantiation" "unknown variable" (Just $ show x)
+        let e = bugWith "unknown type variable in instantiation" x
         Map.findWithDefault e x <$> ask
       t@UTArr     -> pure t
       t@(UTCon _) -> pure t
       UTApp tf tp -> UTApp <$> subst' tf <*> subst' tp
-      UTUni{} -> bug "type inst" "universal quantification" Nothing
+      UTUni{} -> bug "universal quantification in instantiation"
       t0@(UVar uref) -> do
         uvar <- lift $ readSTRef uref
         case uvar of

@@ -75,7 +75,7 @@ pmMatch w rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBindCols w colMatch1 $ \case
     MkColMatch LS.Nil (LS.Cons u2 us2)
-      | LS.Nil    <- us2 -> pmExpr $ fmap (strengthen "pattern matcher") u2
+      | LS.Nil    <- us2 -> pmExpr (fmap strengthen u2)
       | LS.Cons{} <- us2 -> throwErrorAt w "overlapping patterns"
     colMatch2@(MkColMatch LS.Cons{} _) -> do
       (destCol, colMatch3) <- findDestCol w colMatch2
@@ -211,7 +211,7 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _) _)) (MkRowMatch ts rs) = do
         LS.withList (toList ixs0)$ \ixs -> do
           grpRows <- for drs2 $ \(MkDest _ ps, MkRow qs u) ->
             case LS.match ixs ps of
-              Nothing  -> bug "pattern matcher" "wrong number of patterns" Nothing
+              Nothing  -> bug "wrong number of patterns"
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (fmap weaken) u)
           let ts1 = LS.map (EVar w . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) ts
           pure $ MkGrpMatchItem con (fmap (BName w . snd) ixs0) (MkRowMatch ts1 grpRows)

@@ -36,7 +36,7 @@ data DConDecl = forall n. KnownNat n => MkDConDecl (DConDeclN n)
 
 typeOf :: TConDecl -> DConDecl -> Type Void
 typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _fields})
-  | _tname /= _tcon = bug "con decl" "type and data constructor do not match" names
+  | _tname /= _tcon = bugWith "type and data constructor do not match" (_tname, _dname)
   | otherwise       = go _params _fields
   where
     go ::
@@ -47,9 +47,7 @@ typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _field
         Just Refl ->
           let res = mkTApp (TCon _tcon) [ TVar (mkBound i x) | (i, x) <- itoList xs ]
           in  mkTUni xs (flds *~> res)
-        Nothing ->
-          bug "con decl" "type and data constructor have different arity" names
-    names = Just (show _tname ++ " & " ++ show _dname)
+        Nothing -> bug "type and data constructor have different arity" (_tname, _dname)
 
 instance Pretty TConDecl where
   pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname

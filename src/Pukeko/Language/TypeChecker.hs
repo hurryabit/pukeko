@@ -145,7 +145,7 @@ typeOfCase ::
   Type tv -> Case st tv ev -> TC tv ev (Type tv)
 typeOfCase t (MkCase w c ts bs e0) = do
   let f i = case bs Vec.! i of
-        Nothing -> bug "type checker" "reference to wildcard" Nothing
+        Nothing -> bug "reference to wildcard"
         Just x  -> x
       ps = map (maybe (PWld w) (PVar w)) (toList bs)
       e1 = fmap (first f) e0
@@ -171,9 +171,7 @@ patnEnvLevel p t0 = case p of
             let fldsProxy :: [Type (TFinScope n tv)] -> Proxy n
                 fldsProxy _ = Proxy
             in  case sameNat (Vec.plength ts0) (fldsProxy flds1) of
-                  Nothing -> do
-                    bug "type checker" "mismatching kinds for type constructor"
-                      (Just (show tcon0))
+                  Nothing -> bugWith "mismatching kinds for type constructor" tcon0
                   Just Refl -> do
                     let t_ps = map (>>= scope (ts0 Vec.!) absurd) flds1
                     Map.unions <$> zipWithM patnEnvLevel ps t_ps

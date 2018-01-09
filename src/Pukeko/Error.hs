@@ -5,6 +5,7 @@ module Pukeko.Error
   , throw
   , throwAt
   , bug
+  , bugWith
   , MonadError (..)
   , Except
   , runExcept
@@ -16,6 +17,7 @@ module Pukeko.Error
 
 import           Control.Monad.Except hiding (runExcept, runExceptT)
 import qualified Control.Monad.Except as Except
+import           Data.CallStack
 
 import Pukeko.Pos
 import Pukeko.Pretty
@@ -36,10 +38,11 @@ throwAt :: (MonadError String m, Pretty a)
         => Pos -> String -> a -> m b
 throwAt posn thing name = throwDocAt posn $ text thing <+> quotes (pretty name)
 
-bug :: String -> String -> Maybe String -> a
-bug where_ what name_opt = error $
-  "BUG! " ++ what ++ maybe "" (\name -> " (" ++ name ++ ")") name_opt ++
-  " @ " ++ where_
+bug :: HasCallStack => String -> a
+bug msg = error ("BUG! " ++ msg)
+
+bugWith :: (HasCallStack, Show b) => String -> b -> a
+bugWith msg x = bug (msg ++ " (" ++ show x ++ ")")
 
 runExcept :: MonadError e m => Except e a -> m a
 runExcept = either throwError return . Except.runExcept

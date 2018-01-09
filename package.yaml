@@ -47,6 +47,7 @@ library:
   - Pukeko.Pretty
   dependencies:
   - array
+  - call-stack
   - containers
   - fclabels
   - lens

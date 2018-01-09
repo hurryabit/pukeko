@@ -34,7 +34,7 @@ letters = Map.keys mangleTable
 mkSpec :: Assoc -> String -> Spec
 mkSpec _assoc _sym = case mangle _sym of
   Just _  -> MkSpec{ _sym, _prec = undefined, _assoc }
-  Nothing -> bug "operator table" "invalid operator name" (Just _sym)
+  Nothing -> bugWith "invalid operator name" _sym
 
 left, right, none :: String -> Spec
 left  = mkSpec AssocLeft

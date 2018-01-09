@@ -31,10 +31,10 @@ data EVar
 evar, op :: String -> EVar
 evar _name@(first:_)
   | isLower first = EVar{_name, _part = Nothing}
-evar _name = bug "ident" "invalid variable name" (Just _name)
+evar _name = bugWith "invalid variable name" _name
 op _sym = case Operator.mangle _sym of
   Just _name -> Op{_sym, _name, _part = Nothing}
-  Nothing -> bug "ident" "invalid operator symbol" (Just _sym)
+  Nothing -> bugWith "invalid operator symbol" _sym
 
 main :: EVar
 main = evar "main"
@@ -67,7 +67,7 @@ data TVar
 tvar :: String -> TVar
 tvar _name@(first:_)
   | isLower first = TVar{_name}
-tvar _name = bug "ident" "invalid type variable name" (Just _name)
+tvar _name = bugWith "invalid type variable name" _name
 
 freshTVars :: [TVar]
 freshTVars = map IVar [1..]
@@ -86,7 +86,7 @@ data TCon = TCon String
 tcon :: String -> TCon
 tcon name@(first:_)
   | isUpper first = TCon name
-tcon name = bug "ident" "invalid type constructor name" (Just name)
+tcon name = bugWith "invalid type constructor name" name
 
 instance Pretty TCon where
   pPrint (TCon name) = text name
@@ -100,7 +100,7 @@ data DCon = DCon String
 dcon :: String -> DCon
 dcon name@(first:_)
   | isUpper first = DCon name
-dcon name = bug "ident" "invalid type constructor name" (Just name)
+dcon name = bugWith "invalid type constructor name" name
 
 instance Pretty DCon where
   pPrint (DCon name) = text name

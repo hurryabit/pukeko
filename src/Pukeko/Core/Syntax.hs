@@ -81,7 +81,7 @@ instance Pretty Expr where
           pPrintPrec lvl 1 _fun : map (pPrintPrec lvl 1) _args
       Let{ _isrec, _defns, _body } ->
         case _defns of
-          [] -> bug "core printer" "empty let" Nothing
+          [] -> bug "empty let"
           defn0:defns ->
             let let_ | _isrec    = "let rec"
                      | otherwise = "let"

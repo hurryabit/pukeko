@@ -105,7 +105,7 @@ generalize t0 = do
       UTVar{} -> pure t0
       UTArr{} -> pure t0
       UTCon{} -> pure t0
-      UTUni{} -> bug "inferencer" "quantification during generalization" Nothing
+      UTUni{} -> bug "quantification during generalization"
       UTApp tf tp -> UTApp <$> go tf <*> go tp
 
 instantiate :: UType s Void -> TI v s ([UType s Void], UType s Void)
@@ -264,18 +264,16 @@ qualType = \case
   UTVar x -> do
     y_mb <- asks (x `Map.lookup`)
     case y_mb of
-      Nothing -> bug "type checker"
-                 "unknown type variable during quantification" (Just (show x))
+      Nothing -> bugWith "unknown type variable during quantification" x
       Just y  -> pure (TVar y)
   UTArr -> pure TArr
   UTCon c -> pure (TCon c)
   UTApp t1 t2 -> TApp <$> qualType t1 <*> qualType t2
-  UTUni{} -> bug "inferencer" "quantification during quantification" Nothing
+  UTUni{} -> bug "quantification during quantification"
   UVar uref -> do
     uvar <- liftST (readSTRef uref)
     case uvar of
-      UFree x _ -> bug "type checker"
-                   "free unification variable during quantification" (Just (show x))
+      UFree x _ -> bugWith "free unification variable during quantification" x
       ULink t -> qualType t
 
 qualDefn :: Defn (Aux s) Void ev -> TQ tv s (Defn Out tv ev)
@@ -300,7 +298,7 @@ qualExpr = \case
   ELet w ds e0 -> ELet w <$> traverse qualDefn ds <*> qualExpr e0
   ERec w ds e0 -> ERec w <$> traverse qualDefn ds <*> qualExpr e0
   EMat w e0 as -> EMat w <$> qualExpr e0 <*> traverse qualAltn as
-  ETyAbs _ _ _ -> bug "type checker" "type abstraction during quantification" Nothing
+  ETyAbs _ _ _ -> bug "type abstraction during quantification"
   ETyApp w e0 ts -> ETyApp w <$> qualExpr e0 <*> traverse qualType ts
 
 qualAltn :: Altn (Aux s) Void ev -> TQ tv s (Altn Out tv ev)
