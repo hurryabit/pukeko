@@ -41,7 +41,7 @@ resolveModule (MkModule info0 tops0) = do
   case Map.minViewWithKey undefnd of
     Just ((fun, (w, _)), _) -> throwAt w "declared but undefined function" fun
     Nothing -> do
-      let info1 = info0{MI._funs = MI.Present decld}
+      let info1 = info0{MI._info2funs = MI.Present decld}
       pure (MkModule info1 tops1)
 
 declareFun :: Pos -> Id.EVar -> Type Void -> FR ()

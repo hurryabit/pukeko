@@ -21,8 +21,8 @@ type In  = St.Renamer
 type Out = St.TypeResolver
 
 data TRState = MkTRState
-  { _st2tcons :: Map.Map Id.TCon Con.TConDecl
-  , _st2dcons :: Map.Map Id.DCon Con.DConDecl
+  { _st2tcons :: Map.Map Id.TCon (Some1 Con.TConDecl)
+  , _st2dcons :: Map.Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
   }
 makeLenses ''TRState
 
@@ -44,17 +44,17 @@ trType w = type2tcon $ \tcon -> do
   unless ex (throwAt w "unknown type cons" tcon)
   pure tcon
 
-insertTCon :: Pos -> Con.TConDecl -> TR ()
+insertTCon :: Pos -> Con.TConDecl n -> TR ()
 insertTCon posn tcon@Con.MkTConDecl{_tname} = do
   old <- use (st2tcons . at _tname)
   when (isJust old) $ throwAt posn "duplicate type cons" _tname
-  st2tcons . at _tname ?= tcon
+  st2tcons . at _tname ?= Some1 tcon
 
-insertDCon :: KnownNat n => Pos -> Con.DConDeclN n -> TR ()
-insertDCon posn con@Con.MkDConDeclN{_dname} = do
+insertDCon :: KnownNat n => Pos -> Con.TConDecl n -> Con.DConDecl n -> TR ()
+insertDCon posn tcon dcon@Con.MkDConDecl{_dname} = do
   old <- use (st2dcons . at _dname)
   when (isJust old) $ throwAt posn "duplicate term cons" _dname
-  st2dcons . at _dname ?= Con.MkDConDecl con
+  st2dcons . at _dname ?= Some1 (Pair1 tcon dcon)
 
 findDCon :: Pos -> Id.DCon -> TR Id.DCon
 findDCon w dcon = do
@@ -65,11 +65,11 @@ findDCon w dcon = do
 trTopLevel :: TopLevel In -> TR (TopLevel Out)
 trTopLevel top = case top of
   TLTyp w tconDecls -> do
-    for_ tconDecls (insertTCon w)
-    for_ tconDecls $ \Con.MkTConDecl{_dcons = dconDecls} -> do
-      for_ dconDecls $ \dconDecl@Con.MkDConDeclN{_fields} -> do
+    for_ tconDecls (\(Some1 tcon) -> insertTCon w tcon)
+    for_ tconDecls $ \(Some1 tcon@Con.MkTConDecl{_dcons = dconDecls}) -> do
+      for_ dconDecls $ \dcon@Con.MkDConDecl{_fields} -> do
         for_ _fields (trType w)
-        insertDCon w dconDecl
+        insertDCon w tcon dcon
     pure (TLTyp w tconDecls)
   TLVal w x t  -> TLVal w x <$> trType w t
   TLDef     d  -> TLDef <$> itraverseOf defn2dcon findDCon d

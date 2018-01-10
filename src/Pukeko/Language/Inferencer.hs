@@ -115,12 +115,12 @@ instantiate ts = do
   let env = Map.fromList (zip xs uvars)
   (,) uvars <$> liftST (subst env t0)
 
-instantiateTCon :: Id.TCon -> TI v s (UType s Void, [UType s Void], Map.Map Id.TVar (UType s Void))
-instantiateTCon tcon = do
-  Con.MkTConDecl{_params} <- findTCon tcon
-  let params = toList _params
-  t_params <- traverse (const freshUVar) params
-  return (appTCon tcon t_params, t_params, Map.fromList (zip params t_params))
+instantiateTCon ::
+  Con.TConDecl n -> TI v s (UType s Void, [UType s Void], Map.Map Id.TVar (UType s Void))
+instantiateTCon (Con.MkTConDecl tcon params0 _dcons) = do
+  let params1 = toList params0
+  t_params <- traverse (const freshUVar) params1
+  return (appTCon tcon t_params, t_params, Map.fromList (zip params1 t_params))
 
 inferPatn ::
   Patn In Void -> UType s Void -> TI v s (Patn (Aux s) Void, Map.Map Id.EVar (UType s Void))
@@ -128,11 +128,11 @@ inferPatn patn t_expr = case patn of
   PWld w   -> pure (PWld w, Map.empty)
   PVar w x -> pure (PVar w x, Map.singleton x t_expr)
   PCon w dcon (_ :: [NoType Void]) ps0 -> do
-    Con.MkDConDecl Con.MkDConDeclN{_dname, _tcon, _fields} <- findDCon dcon
+    Some1 (Pair1 tcon Con.MkDConDecl{_dname, _fields}) <- findDCon dcon
     when (length ps0 /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
       "expects" <+> int (length _fields) <+> "arguments"
-    (t_inst, t_params, env_inst) <- instantiateTCon _tcon
+    (t_inst, t_params, env_inst) <- instantiateTCon tcon
     unify w t_expr t_inst
     -- TODO: Remove this @fmap baseName@ hack.
     t_fields <- liftST $ traverse (subst env_inst . open1 . fmap baseTVar) _fields

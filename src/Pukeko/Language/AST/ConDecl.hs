@@ -1,9 +1,11 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
 module Pukeko.Language.AST.ConDecl
-  ( TConDecl (..)
+  ( Some1 (..)
+  , Pair1 (..)
+  , TConDecl (..)
   , DConDecl (..)
-  , DConDeclN (..)
   , typeOf
   ) where
 
@@ -19,23 +21,25 @@ import qualified Pukeko.Language.Ident as Id
 import           Pukeko.Language.Type
 import           Pukeko.Language.AST.Scope
 
-data TConDecl = forall n. KnownNat n => MkTConDecl
+data Some1 f = forall n. KnownNat n => Some1 (f n)
+
+data Pair1 f g a = Pair1 (f a) (g a)
+
+data TConDecl n = KnownNat n => MkTConDecl
   { _tname  :: Id.TCon
   , _params :: Vec.Vector n Id.TVar
-  , _dcons  :: [DConDeclN n]
+  , _dcons  :: [DConDecl n]
   }
 
-data DConDeclN n = MkDConDeclN
+data DConDecl n = MkDConDecl
   { _tcon   :: Id.TCon
   , _dname  :: Id.DCon
   , _tag    :: Int
   , _fields :: [Type (TFinScope n Void)]
   }
 
-data DConDecl = forall n. KnownNat n => MkDConDecl (DConDeclN n)
-
-typeOf :: TConDecl -> DConDecl -> Type Void
-typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _fields})
+typeOf :: TConDecl n -> DConDecl n -> Type Void
+typeOf MkTConDecl{_tname, _params} MkDConDecl{_tcon, _dname, _fields}
   | _tname /= _tcon = bugWith "type and data constructor do not match" (_tname, _dname)
   | otherwise       = go _params _fields
   where
@@ -49,11 +53,8 @@ typeOf MkTConDecl{_tname, _params} (MkDConDecl MkDConDeclN{_tcon, _dname, _field
           in  mkTUni xs (flds *~> res)
         Nothing -> bug "type and data constructor have different arity" (_tname, _dname)
 
-instance Pretty TConDecl where
+instance Pretty (TConDecl n) where
   pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname
 
-instance Pretty (DConDeclN n) where
-  pPrintPrec lvl prec MkDConDeclN{_dname} = pPrintPrec lvl prec _dname
-
-instance Pretty DConDecl where
-  pPrintPrec lvl prec (MkDConDecl dcon) = pPrintPrec lvl prec dcon
+instance Pretty (DConDecl n) where
+  pPrintPrec lvl prec MkDConDecl{_dname} = pPrintPrec lvl prec _dname

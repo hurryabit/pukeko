@@ -15,6 +15,9 @@ module Pukeko.Language.AST.Std
   , Altn (..)
   , Patn (..)
 
+  , Some1 (..)
+  , Pair1 (..)
+
   , mkEApp
   , mkETyApp
 
@@ -61,7 +64,7 @@ import           Pukeko.Language.AST.Classes
 import           Pukeko.Language.AST.Stage
 import           Pukeko.Language.AST.Scope
 import           Pukeko.Language.AST.ModuleInfo
-import qualified Pukeko.Language.AST.ConDecl as Con
+import           Pukeko.Language.AST.ConDecl
 
 type ModuleInfo st = GenModuleInfo (HasMICons st) (HasMIFuns st)
 
@@ -72,7 +75,7 @@ data Module st = MkModule
 
 data TopLevel st
   = HasTLTyp st ~ 'True =>
-    TLTyp Pos [Con.TConDecl]
+    TLTyp Pos [Some1 TConDecl]
   | HasTLVal st ~ 'True =>
     TLVal Pos Id.EVar (Type Void)
   | HasLambda st ~ 'True =>

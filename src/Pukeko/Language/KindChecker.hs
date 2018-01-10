@@ -92,17 +92,17 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: [Con.TConDecl] -> KC n s ()
+kcTypDef :: [Some1 Con.TConDecl] -> KC n s ()
 kcTypDef tcons = do
-  kinds <- for tcons $ \Con.MkTConDecl{_tname} -> do
+  kinds <- for tcons $ \(Some1 Con.MkTConDecl{_tname}) -> do
     kind <- freshUVar
     typeCons . at _tname ?= kind
     pure kind
-  for_ (zip tcons kinds) $ \(Con.MkTConDecl{_params, _dcons}, tconKind) -> do
+  for_ (zip tcons kinds) $ \(Some1 Con.MkTConDecl{_params, _dcons}, tconKind) -> do
     paramKinds <- traverse (const freshUVar) _params
     unify tconKind (foldr Arrow Star paramKinds)
     localize paramKinds $ do
-      for_ _dcons $ \Con.MkDConDeclN{_fields} -> do
+      for_ _dcons $ \Con.MkDConDecl{_fields} -> do
         traverse_ (kcType Star) _fields
   traverse_ close kinds
 

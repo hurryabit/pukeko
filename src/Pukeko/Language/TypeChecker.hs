@@ -129,7 +129,7 @@ patnEnvLevel p t0 = case p of
   PWld _   -> pure Map.empty
   PVar _ x -> pure (Map.singleton x t0)
   PCon w c ts1 ps -> do
-    Con.MkDConDecl (Con.MkDConDeclN tcon dcon _tag flds1) <- findDCon c
+    Some1 (Pair1 _tconDecl (Con.MkDConDecl tcon dcon _tag flds1)) <- findDCon c
     let t1 = mkTApp (TCon tcon) (toList ts1)
     unless (t0 == t1) $ throwDocAt w
       ("expected pattern of type" <+> pretty t0

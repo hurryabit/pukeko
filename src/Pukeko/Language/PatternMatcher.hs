@@ -192,12 +192,11 @@ groupCPatns ::
   Pos -> Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupCPatns w (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
-  Con.MkDConDecl Con.MkDConDeclN{_tcon = tcon} <- findDCon dcon0
-  Con.MkTConDecl{_dcons = dcons0} <- findTCon tcon
+  Some1 (Pair1 (Con.MkTConDecl tcon _params dcons0) _dconDecl) <- findDCon dcon0
   dcons1 <- case dcons0 of
     []   -> bugWith "pattern match on type without data constructors" tcon
     d:ds -> pure (d :| ds)
-  grps <- for dcons1 $ \Con.MkDConDeclN{_dname = dcon1} -> do
+  grps <- for dcons1 $ \Con.MkDConDecl{_dname = dcon1} -> do
     let drs1 = filter (\(MkCPatn dcon2 _ts _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" dcon1

@@ -71,16 +71,16 @@ rnTopLevel top = case top of
     pure [TLAsm (MkBind w x NoType) a]
 
 
-rnTConDecl :: Ps.TConDecl -> Rn ev Con.TConDecl
+rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 Con.TConDecl)
 rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
   let env = ifoldMap (flip Map.singleton) ps1
-  Con.MkTConDecl tcon ps1 <$> zipWithM (rnDConDecl tcon env) [0..] dcs0
+  Some1 <$> Con.MkTConDecl tcon ps1 <$> zipWithM (rnDConDecl tcon env) [0..] dcs0
 
 rnDConDecl ::
   forall n ev.
-  Id.TCon -> Map.Map Id.TVar (Finite n) -> Int -> Ps.DConDecl -> Rn ev (Con.DConDeclN n)
+  Id.TCon -> Map.Map Id.TVar (Finite n) -> Int -> Ps.DConDecl -> Rn ev (Con.DConDecl n)
 rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
-  Con.MkDConDeclN tcon dcon tag <$> (traverse . traverse) rnTVar ts
+  Con.MkDConDecl tcon dcon tag <$> (traverse . traverse) rnTVar ts
   where
     rnTVar :: Id.TVar -> Rn ev (TFinScope n Void)
     rnTVar x = case x `Map.lookup` env of

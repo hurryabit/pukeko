@@ -28,8 +28,12 @@ import qualified Pukeko.Language.Ident          as Id
 import           Pukeko.Language.Type
 
 class Monad m => MonadInfo i m | m -> i where
-  allTCons :: (i ~ GenModuleInfo 'True funs) => m (Map.Map Id.TCon Con.TConDecl)
-  allDCons :: (i ~ GenModuleInfo 'True funs) => m (Map.Map Id.DCon Con.DConDecl)
+  allTCons ::
+    (i ~ GenModuleInfo 'True funs) =>
+    m (Map.Map Id.TCon (Some1 Con.TConDecl))
+  allDCons ::
+    (i ~ GenModuleInfo 'True funs) =>
+    m (Map.Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl)))
   allFuns  :: (i ~ GenModuleInfo cons 'True) => m (Map.Map Id.EVar (Pos, Type Void))
 
 newtype InfoT i m a = InfoT{unInfoT :: ReaderT i m a}
@@ -48,10 +52,12 @@ mapInfoT f = InfoT . mapReaderT f . unInfoT
 info :: Monad m => (i -> a) -> InfoT i m a
 info = InfoT . asks
 
-findTCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.TCon -> m Con.TConDecl
+findTCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.TCon -> m (Some1 Con.TConDecl)
 findTCon tcon = (Map.! tcon) <$> allTCons
 
-findDCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.DCon -> m Con.DConDecl
+findDCon ::
+  MonadInfo (GenModuleInfo 'True funs) m =>
+  Id.DCon -> m (Some1 (Pair1 Con.TConDecl Con.DConDecl))
 findDCon tcon = (Map.! tcon) <$> allDCons
 
 findFun :: MonadInfo (GenModuleInfo cons 'True) m => Id.EVar -> m (Pos, Type Void)
@@ -59,8 +65,7 @@ findFun fun = (Map.! fun) <$> allFuns
 
 typeOfDCon :: MonadInfo (GenModuleInfo 'True funs) m => Id.DCon -> m (Type Void)
 typeOfDCon dcon = do
-  dconDecl@(Con.MkDConDecl Con.MkDConDeclN{_tcon}) <- findDCon dcon
-  tconDecl <- findTCon _tcon
+  Some1 (Pair1 tconDecl dconDecl) <- findDCon dcon
   pure (Con.typeOf tconDecl dconDecl)
 
 liftCatch :: Catch e m a -> Catch e (InfoT i m) a
