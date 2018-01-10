@@ -21,7 +21,7 @@ import qualified Data.Vector.Sized as Vec
 import           Pukeko.Error
 import           Pukeko.Language.Info
 import           Pukeko.Language.Type
-import           Pukeko.Language.AST.Std            hiding (Bind (..))
+import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage          as St
 import qualified Pukeko.Language.AST.ConDecl        as Con
 import qualified Pukeko.Language.Ident              as Id
@@ -74,28 +74,28 @@ pmMatch ::
   Pos -> RowMatch m n tv ev -> PM (Expr Out tv ev)
 pmMatch w rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
-  elimBindCols w colMatch1 $ \case
+  elimBPatnCols w colMatch1 $ \case
     MkColMatch LS.Nil (LS.Cons u2 us2)
       | LS.Nil    <- us2 -> pmExpr (fmap strengthen u2)
       | LS.Cons{} <- us2 -> throwErrorAt w "overlapping patterns"
     colMatch2@(MkColMatch LS.Cons{} _) -> do
-      (destCol, colMatch3) <- findDestCol w colMatch2
+      (conCol, colMatch3) <- findCPatnCol w colMatch2
       let rowMatch4 = colToRow colMatch3
-      grpMatch <- groupDests w destCol rowMatch4
+      grpMatch <- groupCPatns w conCol rowMatch4
       grpMatchExpr w grpMatch
 
 -- TODO: Do this in a more principled way.
-data Bind
+data BPatn
   = BWild Pos
   | BName Pos Id.EVar
 
-bindName :: Bind -> Maybe Id.EVar
+bindName :: BPatn -> Maybe Id.EVar
 bindName = \case
   BWild _   -> Nothing
   BName _ x -> Just x
 
-patnToBind :: Patn st tv -> Maybe Bind
-patnToBind = \case
+patnToBPatn :: Patn st tv -> Maybe BPatn
+patnToBPatn = \case
   PWld w   -> Just (BWild w)
   PVar w x -> Just (BName w x)
   PCon{}   -> Nothing
@@ -133,22 +133,22 @@ colToRow (MkColMatch cs us) =
       rs = LS.zipWith MkRow (LS.transpose us pss) us
   in  MkRowMatch ts rs
 
-elimBindCols ::
+elimBPatnCols ::
   Pos -> ColMatch m n tv ev -> (forall n'. ColMatch m n' tv ev -> PM a) -> PM a
-elimBindCols w (MkColMatch cs0 us0) k = do
-  let (cs1, bcs) = partitionEithers (map isBindCol (toList cs0))
-  us1 <- foldlM (applyBindCol w) us0 bcs
+elimBPatnCols w (MkColMatch cs0 us0) k = do
+  let (cs1, bcs) = partitionEithers (map isBPatnCol (toList cs0))
+  us1 <- foldlM (applyBPatnCol w) us0 bcs
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
   where
-    isBindCol ::
-      Col n tv ev (Patn In tv) -> Either (Col n tv ev (Patn In tv)) (Col n tv ev Bind)
-    isBindCol (MkCol t ps) =
-      case traverse patnToBind ps of
+    isBPatnCol ::
+      Col n tv ev (Patn In tv) -> Either (Col n tv ev (Patn In tv)) (Col n tv ev BPatn)
+    isBPatnCol (MkCol t ps) =
+      case traverse patnToBPatn ps of
         Just bs -> Right (MkCol t bs)
         Nothing -> Left  (MkCol t ps)
-    applyBindCol ::
-      Pos -> LS.List m (RhsExpr tv ev) -> Col m tv ev Bind -> PM (LS.List m (RhsExpr tv ev))
-    applyBindCol w rhss (MkCol t bs) = case t of
+    applyBPatnCol ::
+      Pos -> LS.List m (RhsExpr tv ev) -> Col m tv ev BPatn -> PM (LS.List m (RhsExpr tv ev))
+    applyBPatnCol w rhss (MkCol t bs) = case t of
       EVar _ x ->
         let replacePatnWithX rhs = \case
               BWild _   -> rhs
@@ -160,18 +160,18 @@ elimBindCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data Dest tv = MkDest Id.DCon [Type tv] [Patn In tv]
+data CPatn tv = MkCPatn Id.DCon [Type tv] [Patn In tv]
 
-patnToDest :: forall tv. Patn In tv -> Maybe (Dest tv)
-patnToDest = \case
+patnToCPatn :: forall tv. Patn In tv -> Maybe (CPatn tv)
+patnToCPatn = \case
   PWld{}      -> Nothing
   PVar{}      -> Nothing
-  PCon _ c ts ps -> Just (MkDest c ts ps)
+  PCon _ c ts ps -> Just (MkCPatn c ts ps)
 
-findDestCol ::
-  Pos -> ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev (Dest tv), ColMatch m n tv ev)
-findDestCol w (MkColMatch cs0 us) =
-  case find (colPatn patnToDest) cs0 of
+findCPatnCol ::
+  Pos -> ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev (CPatn tv), ColMatch m n tv ev)
+findCPatnCol w (MkColMatch cs0 us) =
+  case find (colPatn patnToCPatn) cs0 of
     Nothing       -> throwErrorAt w "cannot apply constructor rule"
     Just (c, cs1) -> pure (c, MkColMatch cs1 us)
   where
@@ -183,14 +183,14 @@ findDestCol w (MkColMatch cs0 us) =
 
 data GrpMatchItem tv ev =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon [Type tv] (Vec.Vector k Bind) (RowMatch m n tv (EFinScope k ev))
+  MkGrpMatchItem Id.DCon [Type tv] (Vec.Vector k BPatn) (RowMatch m n tv (EFinScope k ev))
 
 data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev))
 
-groupDests ::
+groupCPatns ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
-  Pos -> Col m tv ev (Dest tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
-groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _ts _) _)) (MkRowMatch es rs) = do
+  Pos -> Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
+groupCPatns w (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
   Con.MkDConDecl Con.MkDConDeclN{_tcon = tcon} <- findDCon dcon0
   Con.MkTConDecl{_dcons = dcons0} <- findTCon tcon
@@ -198,19 +198,19 @@ groupDests w (MkCol t ds@(LS.Cons (MkDest dcon0 _ts _) _)) (MkRowMatch es rs) = 
     []   -> bugWith "pattern match on type without data constructors" tcon
     d:ds -> pure (d :| ds)
   grps <- for dcons1 $ \Con.MkDConDeclN{_dname = dcon1} -> do
-    let drs1 = filter (\(MkDest dcon2 _ts _, _)-> dcon1 == dcon2) drs
+    let drs1 = filter (\(MkCPatn dcon2 _ts _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" dcon1
-      LS.Cons (MkDest con ts (traverse patnToBind -> Just bs0), MkRow qs u) LS.Nil ->
+      LS.Cons (MkCPatn con ts (traverse patnToBPatn -> Just bs0), MkRow qs u) LS.Nil ->
         Vec.withList bs0 $ \bs -> do
           let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
           let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
           let es1 = LS.map (fmap weaken) es
           pure $ MkGrpMatchItem con ts bs (MkRowMatch es1 (LS.Singleton row))
-      drs2@(LS.Cons (MkDest con ts ps0, _) _) -> Vec.withList ps0 $ \ps -> do
+      drs2@(LS.Cons (MkCPatn con ts ps0, _) _) -> Vec.withList ps0 $ \ps -> do
         ixs0 <- itraverse (\i _ -> (,) i <$> freshEVar) ps
         LS.withList (toList ixs0)$ \ixs -> do
-          grpRows <- for drs2 $ \(MkDest _ _ts ps, MkRow qs u) ->
+          grpRows <- for drs2 $ \(MkCPatn _ _ts ps, MkRow qs u) ->
             case LS.match ixs ps of
               Nothing  -> bug "wrong number of patterns"
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (fmap weaken) u)
