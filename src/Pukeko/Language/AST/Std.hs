@@ -121,7 +121,7 @@ data Case st tv ev = forall n. MkCase
   { _casePos   :: Pos
   , _caseCon   :: Id.DCon
   , _caseTArgs :: [StageType st tv]
-  , _caseBinds :: Vector n (Maybe Id.EVar)
+  , _caseBinds :: Vector n Id.EVar
   , _caseRhs   :: Expr st tv (EFinScope n ev)
   }
 
@@ -558,13 +558,9 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) wh
       ( "|"
         <+> pretty c
         <+> prettyAtType (pPrintPrecType lvl 3) ts
-        <+> hsep (fmap prettyBind bs) <+> "->"
+        <+> hsepMap pretty bs <+> "->"
       )
       2 (pPrintPrec lvl 0 e)
-    where
-      prettyBind = \case
-        Nothing -> "_"
-        Just x  -> pretty x
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
   pPrintPrec lvl _ (MkAltn _ p t) =

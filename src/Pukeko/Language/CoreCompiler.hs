@@ -70,4 +70,4 @@ ccExpr = \case
 
 ccCase :: (BaseEVar ev) => In.Case In tv ev -> CC Altn
 ccCase (In.MkCase _ _ _ bs t) =
-  MkAltn (map (fmap name) (toList bs)) <$> ccExpr t
+  MkAltn (map (Just . name) (toList bs)) <$> ccExpr t

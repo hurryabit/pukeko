@@ -6,11 +6,11 @@ let (;) = fun m1 m2 -> (>>=) m1 ((;ll1) m2)
 let fst =
       fun p ->
         match p with
-        | Pair x _ -> x
+        | Pair x fst$pm1 -> x
 let snd =
       fun p ->
         match p with
-        | Pair _ y -> y
+        | Pair snd$pm1 y -> y
 let main$ll2 =
       fun x y ->
         let p = Pair x y in

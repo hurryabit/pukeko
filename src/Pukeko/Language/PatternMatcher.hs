@@ -223,5 +223,8 @@ grpMatchExpr w (MkGrpMatch t is) =
   ECas w t <$> traverse (grpMatchItemAltn w) is
 
 grpMatchItemAltn :: Pos -> GrpMatchItem tv ev -> PM (Case Out tv ev)
-grpMatchItemAltn w (MkGrpMatchItem con ts bs rm) =
-  MkCase w con ts (fmap bindName bs) <$> pmMatch w rm
+grpMatchItemAltn w (MkGrpMatchItem con ts bs0 rm) = do
+  bs1 <- for bs0 $ \case
+    BWild _   -> freshEVar
+    BName _ x -> pure x
+  MkCase w con ts bs1 <$> pmMatch w rm

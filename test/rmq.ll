@@ -56,10 +56,11 @@ let combine =
       fun op t1 t2 ->
         match t1 with
         | RmqEmpty -> abort
-        | RmqNode s1 _ v1 _ _ ->
+        | RmqNode s1 combine$pm1 v1 combine$pm2 combine$pm3 ->
           match t2 with
           | RmqEmpty -> abort
-          | RmqNode _ e2 v2 _ _ -> RmqNode s1 e2 (op v1 v2) t1 t2
+          | RmqNode combine$pm4 e2 v2 combine$pm5 combine$pm6 ->
+            RmqNode s1 e2 (op v1 v2) t1 t2
 let build$ll1 =
       fun op run ts ->
         match ts with
@@ -67,7 +68,7 @@ let build$ll1 =
         | Cons build$pm1 build$pm2 ->
           match build$pm2 with
           | Nil -> build$pm1
-          | Cons _ _ -> run (pair (combine op) ts)
+          | Cons build$pm3 build$pm4 -> run (pair (combine op) ts)
 let build =
       fun op xs ->
         let rec run = build$ll1 op run in
