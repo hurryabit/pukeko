@@ -97,7 +97,7 @@ data Expr st tv ev
   | ENum Pos Int
   | EApp Pos (Expr st tv ev) [Expr st tv ev]
   | forall n. HasLambda st ~ 'True =>
-    ELam Pos (Vector n (Bind st tv))                  (Expr st tv (EFinScope n ev))
+    ELam Pos (Vector n (Bind st tv)) (Expr st tv (EFinScope n ev)) (StageType st tv)
   | forall n.
     ELet Pos (Vector n (Defn st tv ev))               (Expr st tv (EFinScope n ev))
   | forall n.
@@ -172,7 +172,7 @@ expr // f = case expr of
   ENum w n       -> ENum w n
   EApp w t  us   -> EApp w (t // f) (map (// f) us)
   ECas w t  cs   -> ECas w (t // f) (fmap (over' case2rhs (/// f)) cs)
-  ELam w ps t    -> ELam w ps (t /// f)
+  ELam w ps e t  -> ELam w ps (e /// f) t
   ELet w ds t    -> ELet w (over (traverse . defn2rhs) (//  f) ds) (t /// f)
   ERec w ds t    -> ERec w (over (traverse . defn2rhs) (/// f) ds) (t /// f)
   EMat w t  as   -> EMat w (t // f) (fmap (over' altn2rhs (/// f)) as)
@@ -216,7 +216,7 @@ expr2dcon f = \case
   ENum w n       -> pure (ENum w n)
   EApp w t  us   -> EApp w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
   ECas w t  cs   -> ECas w <$> expr2dcon f t <*> (traverse . case2dcon) f cs
-  ELam w bs t    -> ELam w (fmap retagBind bs) <$> expr2dcon f t
+  ELam w bs e t  -> ELam w (fmap retagBind bs) <$> expr2dcon f e <*> pure t
   ELet w ds t    -> ELet w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   ERec w ds t    -> ERec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   EMat w t  as   -> EMat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
@@ -254,7 +254,7 @@ expr2eval f = \case
   ENum w n       -> pure (ENum w n)
   EApp w t  us   -> EApp w <$> expr2eval f t <*> (traverse . expr2eval) f us
   ECas w t  cs   -> ECas w <$> expr2eval f t <*> (traverse . case2eval) f cs
-  ELam w bs t    -> ELam w (fmap retagBind bs) <$> expr2eval f t
+  ELam w bs e t  -> ELam w (fmap retagBind bs) <$> expr2eval f e <*> pure t
   ELet w ds t    -> ELet w <$> (traverse . defn2eval) f ds <*> expr2eval f t
   ERec w ds t    -> ERec w <$> (traverse . defn2eval) f ds <*> expr2eval f t
   EMat w t  as   -> EMat w <$> expr2eval f t <*> (traverse . altn2eval) f as
@@ -353,7 +353,7 @@ instance TraversableWithIndex Pos (Expr st tv) where
     ECon w c -> pure (ECon w c)
     ENum w n -> pure (ENum w n)
     EApp w e0 es -> EApp w <$> itraverse f e0 <*> (traverse . itraverse) f es
-    ELam w bs e0 -> ELam w bs <$> itraverse (traverse . f) e0
+    ELam w bs e0 t -> ELam w bs <$> itraverse (traverse . f) e0 <*> pure t
     ELet w ds e0 ->
       ELet w <$> (traverse . itraverse) f ds <*> itraverse (traverse . f) e0
     ERec w ds e0 ->
@@ -385,7 +385,7 @@ instance Functor (StageType st) => Bifunctor (Expr st) where
     ECon w c -> ECon w c
     ENum w n -> ENum w n
     EApp w e0 es -> EApp w (bimap f g e0) (map (bimap f g) es)
-    ELam w bs e0 -> ELam w (fmap (fmap f) bs) (bimap f (fmap g) e0)
+    ELam w bs e0 t -> ELam w (fmap (fmap f) bs) (bimap f (fmap g) e0) (fmap f t)
     ELet w ds e0 -> ELet w (fmap (bimap f g) ds) (bimap f (fmap g) e0)
     ERec w ds e0 -> ERec w (fmap (bimap f (fmap g)) ds) (bimap f (fmap g) e0)
     ECas w e0 cs -> ECas w (bimap f g e0) (fmap (bimap f g) cs)
@@ -427,7 +427,7 @@ instance HasPos (Expr st tv ev) where
     ENum w n       -> fmap (\w' -> ENum w' n      ) (f w)
     EApp w t  us   -> fmap (\w' -> EApp w' t  us  ) (f w)
     ECas w t  cs   -> fmap (\w' -> ECas w' t  cs  ) (f w)
-    ELam w ps t    -> fmap (\w' -> ELam w' ps t   ) (f w)
+    ELam w ps e t  -> fmap (\w' -> ELam w' ps e t ) (f w)
     ELet w ds t    -> fmap (\w' -> ELet w' ds t   ) (f w)
     ERec w ds t    -> fmap (\w' -> ERec w' ds t   ) (f w)
     EMat w ts as   -> fmap (\w' -> EMat w' ts as  ) (f w)
@@ -510,7 +510,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     --         pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
     ELet _ ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
     ERec _ ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
-    ELam _ bs e -> prettyELam lvl prec bs e
+    ELam _ bs e _t -> prettyELam lvl prec bs e
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
     --     [ "if"  <+> pPrintPrec lvl 0 _cond <+> "then"

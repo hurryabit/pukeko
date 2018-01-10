@@ -108,7 +108,7 @@ rnExpr = \case
       a:as -> EMat w <$> rnExpr e0 <*> traverse rnAltn (a NE.:| as)
   Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
     let bs2 = ifoldMap (\i (MkBind _ x NoType) -> Map.singleton x i) bs1
-    ELam w bs1 <$> localize bs2 (rnExpr e0)
+    ELam w bs1 <$> localize bs2 (rnExpr e0) <*> pure NoType
   Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
     ELet w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
   Ps.ERec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do

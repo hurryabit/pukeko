@@ -40,7 +40,7 @@ llExpr = \case
   ECas w t  cs -> ECas w <$> llExpr t <*> traverse llCase cs
   ELet w ds t -> ELet w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
   ERec w ds t -> ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
-  ELam w oldBinds rhs -> do
+  ELam w oldBinds rhs _t -> do
     lhs <- fresh
     rhs <- llExpr rhs
     let unscope = scope' (\i b -> Right (i, b)) Left

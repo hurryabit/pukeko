@@ -49,7 +49,7 @@ pmExpr = \case
   ECon w c          -> pure (ECon w c)
   ENum w n          -> pure (ENum w n)
   EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
-  ELam w bs t       -> ELam w (fmap retagBind bs) <$> pmExpr t
+  ELam w bs e t     -> ELam w (fmap retagBind bs) <$> pmExpr e <*> pure t
   ELet w ds t       -> ELet w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
   ERec w ds t       -> ERec w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
   EMat w t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do

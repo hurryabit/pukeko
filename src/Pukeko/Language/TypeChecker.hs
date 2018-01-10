@@ -65,7 +65,10 @@ typeOf = \case
         TUni{} ->
           throwErrorAt (ek^.pos) "expected type argument, but found value argument"
         _ -> throwErrorAt (ek^.pos) "unexpected value argument"
-  ELam _ bs e0 -> typeOfLambda bs e0
+  ELam _ bs e0 t0 -> do
+    let ts = fmap _bindType bs
+    withTypes ts (check e0 t0)
+    pure (toList ts *~> t0)
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
     withBinds (fmap _defnLhs ds) (typeOf e0)
@@ -89,14 +92,6 @@ typeOf = \case
       TFun{} ->
         throwErrorAt w "expected value argument, but found type argument"
       _ -> throwErrorAt w "unexpected type argument"
-
-typeOfLambda ::
-  (Typed st, IsTVar tv, IsEVar ev) =>
-  Vec.Vector n (Bind st tv) -> Expr st tv (EFinScope n ev) -> TC tv ev (Type tv)
-typeOfLambda bs e0 = do
-  let ts = fmap _bindType bs
-  t0 <- withTypes ts (typeOf e0)
-  pure (toList ts *~> t0)
 
 typeOfBranching ::
   (Typed st, IsTVar tv, IsEVar ev, HasPos branch) =>

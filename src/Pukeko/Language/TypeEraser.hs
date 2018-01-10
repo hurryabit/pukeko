@@ -38,7 +38,7 @@ eraseExpr = \case
   ECon w c      -> ECon w c
   ENum w n      -> ENum w n
   EApp w e0 es  -> EApp w (eraseExpr e0) (map eraseExpr es)
-  ELam w bs e0  -> ELam w (fmap eraseBind bs) (eraseExpr e0)
+  ELam w bs e0 _t -> ELam w (fmap eraseBind bs) (eraseExpr e0) NoType
   ELet w ds e0  -> ELet w (fmap eraseDefn ds) (eraseExpr e0)
   ERec w ds e0  -> ERec w (fmap eraseDefn ds) (eraseExpr e0)
   ECas w e0 cs  -> ECas w (eraseExpr e0) (fmap eraseCase cs)
