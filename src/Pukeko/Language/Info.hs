@@ -71,6 +71,11 @@ instance Monad m => MonadInfo i (InfoT i m) where
   allDCons = info MI.dcons
   allFuns  = info MI.funs
 
+instance MonadInfo i m => MonadInfo i (ReaderT r m) where
+  allTCons = lift allTCons
+  allDCons = lift allDCons
+  allFuns  = lift allFuns
+
 instance MonadReader r m => MonadReader r (InfoT i m) where
   ask = lift ask
   local = mapInfoT . local

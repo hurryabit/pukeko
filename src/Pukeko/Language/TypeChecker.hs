@@ -19,6 +19,7 @@ import           Pukeko.Pretty
 import           Pukeko.Error
 import           Pukeko.Pos
 import qualified Pukeko.Language.Ident     as Id
+import           Pukeko.Language.Gamma
 import           Pukeko.Language.Info
 import           Pukeko.Language.AST.Std
 import qualified Pukeko.Language.AST.Stage as St
@@ -42,37 +43,10 @@ type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
 type ModuleInfoTC = GenModuleInfo 'True 'True
 
-newtype TC tv ev a =
-  TC{unTC :: InfoT ModuleInfoTC (ReaderT (EnvOf ev (Type tv)) (Except String)) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadError String
-           , MonadInfo ModuleInfoTC
-           )
+type TC tv ev a = GammaT tv ev (InfoT ModuleInfoTC (Except String)) a
 
 runTC :: MonadError String m => TC Void Void a -> ModuleInfoTC -> m a
-runTC tc mi =
-  let env = Const ()
-  in  runExcept (runReaderT (runInfoT (unTC tc) mi) env)
-
-lookupType :: (IsEVar ev) => ev -> TC tv ev (Type tv)
-lookupType = TC . asks . lookupEnv
-
-localizeTypes ::
-  forall i tv ev a. (HasEnvLevel i, IsEVar ev) =>
-  EnvLevelOf i (Type tv) -> TC tv (EScope i ev) a -> TC tv ev a
-localizeTypes ts =
-  let f = extendEnv @i @ev ts
-  in  TC . mapInfoT (withReaderT f) . unTC
-
-localizeBinds ::
-  (St.StageType st ~ Type, HasEnvLevel i, IsEVar ev) =>
-  EnvLevelOf i (Bind st tv) -> TC tv (EScope i ev) a -> TC tv ev a
-localizeBinds = localizeTypes . fmap _bindType
-
-localizeKinds :: (IsEVar ev) => TC (TFinScope i tv) ev a -> TC tv ev a
-localizeKinds =
-  let f = fmap (fmap Free)
-  in  TC . mapInfoT (withReaderT f) . unTC
+runTC tc mi = runExcept (runInfoT (runGammaT tc) mi)
 
 typeOf :: (Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
@@ -94,14 +68,14 @@ typeOf = \case
   ELam _ bs e0 -> typeOfLambda bs e0
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
-    localizeBinds (fmap _defnLhs ds) (typeOf e0)
+    withBinds (fmap _defnLhs ds) (typeOf e0)
   ERec _ ds e0 -> do
-    localizeBinds (fmap _defnLhs ds) $ do
+    withBinds (fmap _defnLhs ds) $ do
       traverse_ checkDefn ds
       typeOf e0
   EMat _ e0 as -> typeOfBranching typeOfAltn e0 as
   ECas _ e0 cs -> typeOfBranching typeOfCase e0 cs
-  ETyAbs _ xs e0 -> localizeKinds (TUni xs <$> typeOf e0)
+  ETyAbs _ xs e0 -> withKinds (TUni xs <$> typeOf e0)
   ETyApp w e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
@@ -121,7 +95,7 @@ typeOfLambda ::
   Vec.Vector n (Bind st tv) -> Expr st tv (EFinScope n ev) -> TC tv ev (Type tv)
 typeOfLambda bs e0 = do
   let ts = fmap _bindType bs
-  t0 <- localizeTypes ts (typeOf e0)
+  t0 <- withTypes ts (typeOf e0)
   pure (toList ts *~> t0)
 
 typeOfBranching ::
@@ -143,7 +117,7 @@ typeOfAltn ::
   Type tv -> Altn st tv ev -> TC tv ev (Type tv)
 typeOfAltn t (MkAltn _ p e) = do
   env <- patnEnvLevel p t
-  localizeTypes env (typeOf e)
+  withTypes env (typeOf e)
 
 typeOfCase ::
   (Typed st, IsTVar tv, IsEVar ev) =>
@@ -198,5 +172,5 @@ checkTopLevel = \case
   TLTyp{} -> pure ()
   TLVal{} -> pure ()
   TLDef   d -> checkDefn d
-  TLSup _ _z _vs t bs e -> localizeKinds (localizeBinds bs (check e t))
+  TLSup _ _z _vs t bs e -> withKinds (withBinds bs (check e t))
   TLAsm _ _ -> pure ()
