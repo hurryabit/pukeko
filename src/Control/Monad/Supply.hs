@@ -7,11 +7,14 @@ import Control.Monad.State
 import Control.Monad.Error.Class
 import Control.Monad.Reader
 import Control.Monad.Writer.Class
-import Data.Bifunctor (second)
+import Data.Bifunctor (first, second)
 
 class Monad m => MonadSupply s m | m -> s where
   fresh :: m s
+  unfresh :: s -> m ()
   reset :: m ()
+  resetWith :: [s] -> m ()
+
 
 newtype SupplyT s m a = SupplyT{unSupplyT :: StateT ([s], [s]) m a}
   deriving ( Functor, Applicative, Monad, MonadTrans
@@ -28,8 +31,12 @@ evalSupplyT m xs = fst <$> runSupplyT m xs
 
 instance Monad m => MonadSupply s (SupplyT s m) where
   fresh = SupplyT (state (\(x:xs, ys) -> (x, (xs, ys))))
-  reset = SupplyT (state (\(_, ys) -> ((), (ys, ys))))
+  unfresh x = SupplyT (modify (first (x:)))
+  reset = SupplyT (modify (\(_, ys) -> (ys, ys)))
+  resetWith xs = SupplyT (modify (first (const xs)))
 
 instance (MonadSupply s m) => MonadSupply s (ReaderT r m) where
   fresh = lift fresh
+  unfresh = lift . unfresh
   reset = lift reset
+  resetWith = lift . resetWith

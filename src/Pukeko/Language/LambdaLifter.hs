@@ -6,7 +6,8 @@ module Pukeko.Language.LambdaLifter
 where
 
 import           Control.Lens
-import           Control.Monad.RWS
+import           Control.Monad.Supply
+import           Control.Monad.Writer
 import           Data.Bifunctor    (first)
 import           Data.Either       (partitionEithers)
 import qualified Data.Finite       as Fin
@@ -24,23 +25,10 @@ import           Pukeko.Language.Type        (NoType (..))
 type In  = St.TypeEraser
 type Out = St.LambdaLifter
 
-type State = [Id.EVar]
-
--- TODO: Use @SupplyT@.
-newtype LL a = LL{unLL :: RWS () [TopLevel Out] State a}
-  deriving ( Functor, Applicative, Monad
-           , MonadWriter [TopLevel Out]
-           , MonadState State
-           )
+type LL a = SupplyT Id.EVar (Writer [TopLevel Out]) a
 
 execLL :: LL () -> [TopLevel Out]
-execLL ll =
-  let state = []
-      ((), defns) = evalRWS (unLL ll) () state
-  in  defns
-
-freshIdent :: LL Id.EVar
-freshIdent = state $ \(ident:idents) -> (ident, idents)
+execLL ll = execWriter (evalSupplyT ll [])
 
 llExpr :: (BaseEVar v, Ord v) => Expr In Void v -> LL (Expr Out Void v)
 llExpr = \case
@@ -53,7 +41,7 @@ llExpr = \case
   ELet w ds t -> ELet w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
   ERec w ds t -> ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr t
   ELam w oldBinds rhs -> do
-    lhs <- freshIdent
+    lhs <- fresh
     rhs <- llExpr rhs
     let unscope = scope' (\i b -> Right (i, b)) Left
     let (capturedL, others) =
@@ -75,11 +63,11 @@ llCase (MkCase w c ts bs e) = MkCase w c ts bs <$> llExpr e
 llTopLevel :: TopLevel In -> LL ()
 llTopLevel = \case
   TLDef (MkDefn (MkBind w lhs _) rhs) -> do
-    put $ Id.freshEVars "ll" lhs
+    resetWith (Id.freshEVars "ll" lhs)
     case rhs of
       ELam{} -> do
         -- NOTE: Make sure this lambda gets lifted to the name it is defining.
-        modify (lhs:)
+        unfresh lhs
         void $ llExpr rhs
       _ -> do
         rhs <- llExpr rhs
