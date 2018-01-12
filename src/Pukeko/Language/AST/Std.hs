@@ -80,7 +80,7 @@ data TopLevel st
     TLVal Pos Id.EVar (Type Void)
   | HasLambda st ~ 'True =>
     TLDef     (Defn st Void Void)
-  | forall m n. (HasLambda st ~ 'False, KnownNat m) =>
+  | forall m n. (HasLambda st ~ 'False, StageType st ~ Type, KnownNat m) =>
     TLSup Pos Id.EVar
       (Vector m Id.TVar)
       (StageType st (TFinScope m Void))
@@ -469,14 +469,8 @@ instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
     TLDef     d -> "let" <+> pretty d
     TLSup _ z vs t bs e ->
       "let" <+>
-      hang (pretty z <+> dvs_t <+> equals) 2
-      (prettyETyAbs lvl prec vs (prettyELam lvl 0 bs e))
-      where
-        dt = pPrintPrecType lvl prec t
-        dvs_t
-          | isEmpty dt = empty
-          | null vs    = colon <+> dt
-          | otherwise  = colon <+> prettyTUni lvl prec vs dt
+      hang (pretty z <+> colon <+> pPrintPrecType lvl prec (mkTUni vs t) <+> equals) 2
+        (prettyETyAbs lvl prec vs (prettyELam lvl 0 bs e))
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 

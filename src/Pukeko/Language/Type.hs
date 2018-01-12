@@ -15,7 +15,6 @@ module Pukeko.Language.Type
   , vars
   , toPrenex
   , type2tcon
-  , prettyTUni
   , Void
   , absurd
   )
@@ -131,11 +130,8 @@ instance BaseTVar tv => Pretty (Type tv) where
       maybeParens (prec > 1) (pPrintPrec lvl 2 tx <+> "->" <+> pPrintPrec lvl 1 ty)
     TApp tf tx ->
       maybeParens (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
-    TUni vs tq -> prettyTUni lvl prec vs (pPrintPrec lvl 0 tq)
-
-prettyTUni :: PrettyLevel -> Rational -> Vec.Vector n Id.TVar -> Doc -> Doc
-prettyTUni _ prec vs d =
-  maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> d)
+    TUni vs tq ->
+      maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> pPrintPrec lvl 0 tq)
 
 instance BaseTVar tv => Show (Type tv) where
   show = prettyShow
