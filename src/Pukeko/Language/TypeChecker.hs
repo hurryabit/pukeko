@@ -164,5 +164,9 @@ checkTopLevel = \case
   TLTyp{} -> pure ()
   TLVal{} -> pure ()
   TLDef   d -> checkDefn d
-  TLSup _ _z _vs t bs e -> withKinds (withBinds bs (check e t))
+  TLSup w z vs t0 bs e0 -> do
+      t1 <- withKinds (withBinds bs (typeOf e0))
+      let t2 = map _bindType (toList bs) *~> t1
+      match w (mkTUni vs t0) (mkTUni vs t2)
+    `catchError` \e -> throwError ("while type checking " ++ show z ++ ":\n" ++ e)
   TLAsm _ _ -> pure ()

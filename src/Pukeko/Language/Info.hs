@@ -15,6 +15,7 @@ module Pukeko.Language.Info
 
 import           Control.Monad.Error.Class
 import           Control.Monad.State.Class
+import           Control.Monad.Writer.Class
 import           Control.Monad.Reader
 import           Control.Monad.Supply
 import qualified Control.Monad.Trans.Reader  as Reader
@@ -41,6 +42,7 @@ newtype InfoT i m a = InfoT{unInfoT :: ReaderT i m a}
            , MonadError e
            , MonadState s
            , MonadSupply s
+           , MonadWriter w
            )
 
 runInfoT :: InfoT i m a -> i -> m a

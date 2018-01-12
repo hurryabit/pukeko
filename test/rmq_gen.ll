@@ -1,71 +1,107 @@
-external (-) = "sub"
-external (*) = "mul"
-external (%) = "mod"
-external (<) = "lt"
-external (<=) = "le"
-let foldr =
-      fun f y0 xs ->
-        match xs with
-        | Nil -> y0
-        | Cons x xs -> f x (foldr f y0 xs)
-let take =
-      fun n xs ->
-        match (<=) n 0 with
-        | False ->
+external (-) : Int -> Int -> Int = "sub"
+external (*) : Int -> Int -> Int = "mul"
+external (%) : Int -> Int -> Int = "mod"
+external (<) : Int -> Int -> Bool = "lt"
+external (<=) : Int -> Int -> Bool = "le"
+let foldr$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
+      fun @a @b ->
+        fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
           match xs with
-          | Nil -> Nil
-          | Cons x xs -> Cons x (take ((-) n 1) xs)
-        | True -> Nil
-let zip_with =
-      fun f xs ys ->
-        match xs with
-        | Nil -> Nil
-        | Cons x xs ->
-          match ys with
-          | Nil -> Nil
-          | Cons y ys -> Cons (f x y) (zip_with f xs ys)
-external return = "return"
-external print = "print"
-external (>>=) = "bind"
-let (;ll1) = fun m2 x -> m2
-let (;) = fun m1 m2 -> (>>=) m1 ((;ll1) m2)
-let sequence_io$ll2 = fun x xs -> return (Cons x xs)
-let sequence_io$ll1 =
-      fun ms x -> (>>=) (sequence_io ms) (sequence_io$ll2 x)
-let sequence_io =
-      fun ms ->
-        match ms with
-        | Nil -> return Nil
-        | Cons m ms -> (>>=) m (sequence_io$ll1 ms)
-let iter_io$ll1 = fun f x m -> (;) (f x) m
-let iter_io = fun f -> foldr (iter_io$ll1 f) (return Unit)
-let gen = fun f x -> Cons x (gen f (f x))
-let split_at =
-      fun n xs ->
-        match (<=) n 0 with
-        | False ->
+          | Nil @a -> y0
+          | Cons @a x xs -> f x (foldr @a @b f y0 xs)
+let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
+      fun @a @b -> foldr$ll1 @a @b
+let take$ll1 : ∀a. Int -> List a -> List a =
+      fun @a ->
+        fun (n : Int) (xs : List a) ->
+          match (<=) n 0 with
+          | False ->
+            match xs with
+            | Nil @a -> Nil @a
+            | Cons @a x xs -> Cons @a x (take @a ((-) n 1) xs)
+          | True -> Nil @a
+let take : ∀a. Int -> List a -> List a = fun @a -> take$ll1 @a
+let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+      fun @a @b @c ->
+        fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
           match xs with
-          | Nil -> Pair Nil Nil
-          | Cons x xs ->
-            match split_at ((-) n 1) xs with
-            | Pair ys zs -> Pair (Cons x ys) zs
-        | True -> Pair Nil xs
-let random$ll1 = fun x -> (%) ((*) 91 x) 1000000007
-let random = gen random$ll1 1
-let main$ll1 =
-      fun n y z ->
-        let y = (%) y n in
-        let z = (%) z n in
+          | Nil @a -> Nil @c
+          | Cons @a x xs ->
+            match ys with
+            | Nil @b -> Nil @c
+            | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+      fun @a @b @c -> zip_with$ll1 @a @b @c
+external return : ∀a. a -> IO a = "return"
+external print : Int -> IO Unit = "print"
+external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+let (;ll1) : ∀a. IO a -> Unit -> IO a =
+      fun @a -> fun (m2 : IO a) (x : Unit) -> m2
+let (;ll2) : ∀a. IO Unit -> IO a -> IO a =
+      fun @a ->
+        fun (m1 : IO Unit) (m2 : IO a) -> (>>=) @Unit @a m1 ((;ll1) @a m2)
+let (;) : ∀a. IO Unit -> IO a -> IO a = fun @a -> (;ll2) @a
+let sequence_io$ll1 : ∀a. a -> List a -> IO (List a) =
+      fun @a ->
+        fun (x : a) (xs : List a) -> return @(List a) (Cons @a x xs)
+let sequence_io$ll2 : ∀a. List (IO a) -> a -> IO (List a) =
+      fun @a ->
+        fun (ms : List (IO a)) (x : a) ->
+          (>>=) @(List a) @(List a) (sequence_io @a ms) (sequence_io$ll1 @a x)
+let sequence_io$ll3 : ∀a. List (IO a) -> IO (List a) =
+      fun @a ->
+        fun (ms : List (IO a)) ->
+          match ms with
+          | Nil @(IO a) -> return @(List a) (Nil @a)
+          | Cons @(IO a) m ms -> (>>=) @a @(List a) m (sequence_io$ll2 @a ms)
+let sequence_io : ∀a. List (IO a) -> IO (List a) =
+      fun @a -> sequence_io$ll3 @a
+let iter_io$ll1 : ∀a. (a -> IO Unit) -> a -> IO Unit -> IO Unit =
+      fun @a ->
+        fun (f : a -> IO Unit) (x : a) (m : IO Unit) -> (;) @Unit (f x) m
+let iter_io$ll2 : ∀a. (a -> IO Unit) -> List a -> IO Unit =
+      fun @a ->
+        fun (f : a -> IO Unit) ->
+          foldr @a @(IO Unit) (iter_io$ll1 @a f) (return @Unit Unit)
+let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
+      fun @a -> iter_io$ll2 @a
+let gen$ll1 : ∀a. (a -> a) -> a -> List a =
+      fun @a -> fun (f : a -> a) (x : a) -> Cons @a x (gen @a f (f x))
+let gen : ∀a. (a -> a) -> a -> List a = fun @a -> gen$ll1 @a
+let split_at$ll1 : ∀a. Int -> List a -> Pair (List a) (List a) =
+      fun @a ->
+        fun (n : Int) (xs : List a) ->
+          match (<=) n 0 with
+          | False ->
+            match xs with
+            | Nil @a -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
+            | Cons @a x xs ->
+              match split_at @a ((-) n 1) xs with
+              | Pair @(List a) @(List a) ys zs ->
+                Pair @(List a) @(List a) (Cons @a x ys) zs
+          | True -> Pair @(List a) @(List a) (Nil @a) xs
+let split_at : ∀a. Int -> List a -> Pair (List a) (List a) =
+      fun @a -> split_at$ll1 @a
+let random$ll1 : Int -> Int =
+      fun (x : Int) -> (%) ((*) 91 x) 1000000007
+let random : List Int = gen @Int random$ll1 1
+let main$ll1 : Int -> Int -> Int -> IO Unit =
+      fun (n : Int) (y : Int) (z : Int) ->
+        let y : Int = (%) y n in
+        let z : Int = (%) z n in
         match (<) y z with
-        | False -> (;) (print z) (print y)
-        | True -> (;) (print y) (print z)
-let main$ll2 = fun x -> return Unit
-let main =
-      let n = 400000 in
-      (;) (print n) let m = 100000 in
-                    (;) (print m) (match split_at n random with
-                                   | Pair xs random ->
-                                     (;) (iter_io print xs) (match split_at m random with
-                                                             | Pair ys random ->
-                                                               let zs = take m random in
-                                                               (>>=) (sequence_io (zip_with (main$ll1 n) ys zs)) main$ll2))
+        | False -> (;) @Unit (print z) (print y)
+        | True -> (;) @Unit (print y) (print z)
+let main$ll2 : List Unit -> IO Unit =
+      fun (x : List Unit) -> return @Unit Unit
+let main : IO Unit =
+      let n : Int = 400000 in
+      (;) @Unit (print n) let m : Int = 100000 in
+                          (;) @Unit (print m) (match split_at @Int n random with
+                                               | Pair @(List Int) @(List Int) xs random ->
+                                                 (;) @Unit (iter_io @Int print xs) (match split_at @Int m random with
+                                                                                    | Pair @(List Int) @(List Int) ys random ->
+                                                                                      let zs : List Int =
+                                                                                            take @Int m random
+                                                                                      in
+                                                                                      (>>=) @(List Unit) @Unit (sequence_io @Unit (zip_with @Int @Int @(IO Unit) (main$ll1 n) ys zs)) main$ll2))

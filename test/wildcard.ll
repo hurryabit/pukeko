@@ -1,19 +1,28 @@
-external print = "print"
-external input = "input"
-external (>>=) = "bind"
-let (;ll1) = fun m2 x -> m2
-let (;) = fun m1 m2 -> (>>=) m1 ((;ll1) m2)
-let fst =
-      fun p ->
-        match p with
-        | Pair x fst$pm1 -> x
-let snd =
-      fun p ->
-        match p with
-        | Pair snd$pm1 y -> y
-let main$ll2 =
-      fun x y ->
-        let p = Pair x y in
-        (;) (print (fst p)) (print (snd p))
-let main$ll1 = fun x -> (>>=) input (main$ll2 x)
-let main = (>>=) input main$ll1
+external print : Int -> IO Unit = "print"
+external input : IO Int = "input"
+external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+let (;ll1) : ∀a. IO a -> Unit -> IO a =
+      fun @a -> fun (m2 : IO a) (x : Unit) -> m2
+let (;ll2) : ∀a. IO Unit -> IO a -> IO a =
+      fun @a ->
+        fun (m1 : IO Unit) (m2 : IO a) -> (>>=) @Unit @a m1 ((;ll1) @a m2)
+let (;) : ∀a. IO Unit -> IO a -> IO a = fun @a -> (;ll2) @a
+let fst$ll1 : ∀a b. Pair a b -> a =
+      fun @a @b ->
+        fun (p : Pair a b) ->
+          match p with
+          | Pair @a @b x fst$pm1 -> x
+let fst : ∀a b. Pair a b -> a = fun @a @b -> fst$ll1 @a @b
+let snd$ll1 : ∀a b. Pair a b -> b =
+      fun @a @b ->
+        fun (p : Pair a b) ->
+          match p with
+          | Pair @a @b snd$pm1 y -> y
+let snd : ∀a b. Pair a b -> b = fun @a @b -> snd$ll1 @a @b
+let main$ll1 : Int -> Int -> IO Unit =
+      fun (x : Int) (y : Int) ->
+        let p : Pair Int Int = Pair @Int @Int x y in
+        (;) @Unit (print (fst @Int @Int p)) (print (snd @Int @Int p))
+let main$ll2 : Int -> IO Unit =
+      fun (x : Int) -> (>>=) @Int @Unit input (main$ll1 x)
+let main : IO Unit = (>>=) @Int @Unit input main$ll2

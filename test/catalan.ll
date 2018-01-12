@@ -1,55 +1,80 @@
-external abort = "abort"
-external (+) = "add"
-external (-) = "sub"
-external (*) = "mul"
-external (%) = "mod"
-external (<=) = "le"
-let foldl =
-      fun f y0 xs ->
-        match xs with
-        | Nil -> y0
-        | Cons x xs -> foldl f (f y0 x) xs
-let nth =
-      fun xs n ->
-        match xs with
-        | Nil -> abort
-        | Cons x xs ->
-          match (<=) n 0 with
-          | False -> nth xs ((-) n 1)
-          | True -> x
-let zip_with =
-      fun f xs ys ->
-        match xs with
-        | Nil -> Nil
-        | Cons x xs ->
-          match ys with
-          | Nil -> Nil
-          | Cons y ys -> Cons (f x y) (zip_with f xs ys)
-let map =
-      fun f xs ->
-        match xs with
-        | Nil -> Nil
-        | Cons x xs -> Cons (f x) (map f xs)
-external print = "print"
-external input = "input"
-external (>>=) = "bind"
-let p = 100000007
-let mul_p = fun x y -> (%) ((*) x y) p
-let add_p = fun x y -> (%) ((+) x y) p
-let sum_p = foldl add_p 0
-let scanl$ll1 =
-      fun f scanl_f y0 xs ->
-        match xs with
-        | Nil -> Nil
-        | Cons x xs ->
-          let y0 = f y0 x in
-          Cons y0 (scanl_f y0 xs)
-let scanl =
-      fun f ->
-        let rec scanl_f = scanl$ll1 f scanl_f in
-        scanl_f
-let sols$ll1 = fun xs -> sum_p (zip_with mul_p sols xs)
-let sols$ll2 = fun xs x -> Cons x xs
-let sols = Cons 1 (map sols$ll1 (scanl sols$ll2 Nil sols))
-let main$ll1 = fun n -> print (nth sols n)
-let main = (>>=) input main$ll1
+external abort : ∀a. a = "abort"
+external (+) : Int -> Int -> Int = "add"
+external (-) : Int -> Int -> Int = "sub"
+external (*) : Int -> Int -> Int = "mul"
+external (%) : Int -> Int -> Int = "mod"
+external (<=) : Int -> Int -> Bool = "le"
+let foldl$ll1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
+      fun @a @b ->
+        fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
+          match xs with
+          | Nil @a -> y0
+          | Cons @a x xs -> foldl @a @b f (f y0 x) xs
+let foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
+      fun @a @b -> foldl$ll1 @a @b
+let nth$ll1 : ∀a. List a -> Int -> a =
+      fun @a ->
+        fun (xs : List a) (n : Int) ->
+          match xs with
+          | Nil @a -> abort @a
+          | Cons @a x xs ->
+            match (<=) n 0 with
+            | False -> nth @a xs ((-) n 1)
+            | True -> x
+let nth : ∀a. List a -> Int -> a = fun @a -> nth$ll1 @a
+let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+      fun @a @b @c ->
+        fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
+          match xs with
+          | Nil @a -> Nil @c
+          | Cons @a x xs ->
+            match ys with
+            | Nil @b -> Nil @c
+            | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+      fun @a @b @c -> zip_with$ll1 @a @b @c
+let map$ll1 : ∀a b. (a -> b) -> List a -> List b =
+      fun @a @b ->
+        fun (f : a -> b) (xs : List a) ->
+          match xs with
+          | Nil @a -> Nil @b
+          | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
+let map : ∀a b. (a -> b) -> List a -> List b =
+      fun @a @b -> map$ll1 @a @b
+external print : Int -> IO Unit = "print"
+external input : IO Int = "input"
+external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+let p : Int = 100000007
+let mul_p$ll1 : Int -> Int -> Int =
+      fun (x : Int) (y : Int) -> (%) ((*) x y) p
+let mul_p : Int -> Int -> Int = mul_p$ll1
+let add_p$ll1 : Int -> Int -> Int =
+      fun (x : Int) (y : Int) -> (%) ((+) x y) p
+let add_p : Int -> Int -> Int = add_p$ll1
+let sum_p : List Int -> Int = foldl @Int @Int add_p 0
+let scanl$ll1 : ∀a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a -> List b =
+      fun @a @b ->
+        fun (f : b -> a -> b) (scanl_f : b -> List a -> List b) (y0 : b) (xs : List a) ->
+          match xs with
+          | Nil @a -> Nil @b
+          | Cons @a x xs ->
+            let y0 : b = f y0 x in
+            Cons @b y0 (scanl_f y0 xs)
+let scanl$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> List b =
+      fun @a @b ->
+        fun (f : b -> a -> b) ->
+          let rec scanl_f : b -> List a -> List b = scanl$ll1 @a @b f scanl_f
+          in
+          scanl_f
+let scanl : ∀a b. (b -> a -> b) -> b -> List a -> List b =
+      fun @a @b -> scanl$ll2 @a @b
+let sols$ll1 : List Int -> Int =
+      fun (xs : List Int) ->
+        sum_p (zip_with @Int @Int @Int mul_p sols xs)
+let sols$ll2 : List Int -> Int -> List Int =
+      fun (xs : List Int) (x : Int) -> Cons @Int x xs
+let sols : List Int =
+      Cons @Int 1 (map @(List Int) @Int sols$ll1 (scanl @Int @(List Int) sols$ll2 (Nil @Int) sols))
+let main$ll1 : Int -> IO Unit =
+      fun (n : Int) -> print (nth @Int sols n)
+let main : IO Unit = (>>=) @Int @Unit input main$ll1

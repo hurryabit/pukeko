@@ -97,6 +97,15 @@ dist = \case
 (>>>=) :: Monad f => f (Scope b i v1) -> (v1 -> f v2) -> f (Scope b i v2)
 t >>>= f = t >>= dist . fmap f
 
+_Free :: Prism (Scope b i v1) (Scope b i v2) v1 v2
+_Free = prism Free $ \case
+  Free x -> Right x
+  Bound i b -> Left (Bound i b)
+
+_Bound :: Prism (Scope b i1 v) (Scope b i2 v) (i1, b) (i2, b)
+_Bound = prism (uncurry mkBound) $ \case
+  Free x -> Left (Free x)
+  Bound i (Forget b) -> Right (i, b)
 
 lookupMap :: (Ord i, Pretty i) => i -> Map.Map i a -> a
 lookupMap i = Map.findWithDefault (bugWith "lookup failed" (pretty i)) i
@@ -162,8 +171,6 @@ instance (BaseName b v) => BaseName b (Scope b i v) where
   baseName = \case
     Bound _ (Forget b) -> b
     Free  v            -> baseName v
-
-makePrisms ''Scope
 
 instance Bifunctor (Scope b) where
   bimap f g = \case

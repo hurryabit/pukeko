@@ -1,110 +1,158 @@
-external abort = "abort"
-let (&&) =
-      fun x y ->
+external abort : ∀a. a = "abort"
+let (&&ll1) : Bool -> Bool -> Bool =
+      fun (x : Bool) (y : Bool) ->
         match x with
         | False -> False
         | True -> y
-let (||) =
-      fun x y ->
+let (&&) : Bool -> Bool -> Bool = (&&ll1)
+let (||ll1) : Bool -> Bool -> Bool =
+      fun (x : Bool) (y : Bool) ->
         match x with
         | False -> y
         | True -> True
-external (+) = "add"
-external (-) = "sub"
-external (<) = "lt"
-external (<=) = "le"
-external (>) = "gt"
-let zip_with =
-      fun f xs ys ->
-        match xs with
-        | Nil -> Nil
-        | Cons x xs ->
-          match ys with
-          | Nil -> Nil
-          | Cons y ys -> Cons (f x y) (zip_with f xs ys)
-let replicate =
-      fun n x ->
-        match (<=) n 0 with
-        | False -> Cons x (replicate ((-) n 1) x)
-        | True -> Nil
-external return = "return"
-external print = "print"
-external input = "input"
-external (>>=) = "bind"
-let sequence_io$ll2 = fun x xs -> return (Cons x xs)
-let sequence_io$ll1 =
-      fun ms x -> (>>=) (sequence_io ms) (sequence_io$ll2 x)
-let sequence_io =
-      fun ms ->
-        match ms with
-        | Nil -> return Nil
-        | Cons m ms -> (>>=) m (sequence_io$ll1 ms)
-let nats$ll1 = fun nats_from n -> Cons n (nats_from ((+) n 1))
-let nats =
-      let rec nats_from = nats$ll1 nats_from in
+let (||) : Bool -> Bool -> Bool = (||ll1)
+external (+) : Int -> Int -> Int = "add"
+external (-) : Int -> Int -> Int = "sub"
+external (<) : Int -> Int -> Bool = "lt"
+external (<=) : Int -> Int -> Bool = "le"
+external (>) : Int -> Int -> Bool = "gt"
+let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+      fun @a @b @c ->
+        fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
+          match xs with
+          | Nil @a -> Nil @c
+          | Cons @a x xs ->
+            match ys with
+            | Nil @b -> Nil @c
+            | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+      fun @a @b @c -> zip_with$ll1 @a @b @c
+let replicate$ll1 : ∀a. Int -> a -> List a =
+      fun @a ->
+        fun (n : Int) (x : a) ->
+          match (<=) n 0 with
+          | False -> Cons @a x (replicate @a ((-) n 1) x)
+          | True -> Nil @a
+let replicate : ∀a. Int -> a -> List a = fun @a -> replicate$ll1 @a
+external return : ∀a. a -> IO a = "return"
+external print : Int -> IO Unit = "print"
+external input : IO Int = "input"
+external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+let sequence_io$ll1 : ∀a. a -> List a -> IO (List a) =
+      fun @a ->
+        fun (x : a) (xs : List a) -> return @(List a) (Cons @a x xs)
+let sequence_io$ll2 : ∀a. List (IO a) -> a -> IO (List a) =
+      fun @a ->
+        fun (ms : List (IO a)) (x : a) ->
+          (>>=) @(List a) @(List a) (sequence_io @a ms) (sequence_io$ll1 @a x)
+let sequence_io$ll3 : ∀a. List (IO a) -> IO (List a) =
+      fun @a ->
+        fun (ms : List (IO a)) ->
+          match ms with
+          | Nil @(IO a) -> return @(List a) (Nil @a)
+          | Cons @(IO a) m ms -> (>>=) @a @(List a) m (sequence_io$ll2 @a ms)
+let sequence_io : ∀a. List (IO a) -> IO (List a) =
+      fun @a -> sequence_io$ll3 @a
+let nats$ll1 : (Int -> List Int) -> Int -> List Int =
+      fun (nats_from : Int -> List Int) (n : Int) ->
+        Cons @Int n (nats_from ((+) n 1))
+let nats : List Int =
+      let rec nats_from : Int -> List Int = nats$ll1 nats_from in
       nats_from 0
-let pair =
-      fun op xs1 ->
-        match xs1 with
-        | Nil -> Nil
-        | Cons pair$pm1 pair$pm2 ->
-          match pair$pm2 with
-          | Nil -> xs1
-          | Cons x2 xs3 -> Cons (op pair$pm1 x2) (pair op xs3)
-let single = fun i x -> RmqNode i i x RmqEmpty RmqEmpty
-let combine =
-      fun op t1 t2 ->
-        match t1 with
-        | RmqEmpty -> abort
-        | RmqNode s1 combine$pm1 v1 combine$pm2 combine$pm3 ->
-          match t2 with
-          | RmqEmpty -> abort
-          | RmqNode combine$pm4 e2 v2 combine$pm5 combine$pm6 ->
-            RmqNode s1 e2 (op v1 v2) t1 t2
-let build$ll1 =
-      fun op run ts ->
-        match ts with
-        | Nil -> abort
-        | Cons build$pm1 build$pm2 ->
-          match build$pm2 with
-          | Nil -> build$pm1
-          | Cons build$pm3 build$pm4 -> run (pair (combine op) ts)
-let build =
-      fun op xs ->
-        let rec run = build$ll1 op run in
-        run (zip_with single nats xs)
-let query$ll1 =
-      fun one op q_lo q_hi aux t ->
-        match t with
-        | RmqEmpty -> one
-        | RmqNode t_lo t_hi value left right ->
-          match (||) ((<) q_hi t_lo) ((>) q_lo t_hi) with
-          | False ->
-            match (&&) ((<=) q_lo t_lo) ((<=) t_hi q_hi) with
-            | False -> op (aux left) (aux right)
-            | True -> value
-          | True -> one
-let query =
-      fun one op q_lo q_hi ->
-        let rec aux = query$ll1 one op q_lo q_hi aux in
-        aux
-let infinity = 1000000000
-let min =
-      fun x y ->
+let pair$ll1 : ∀a. (a -> a -> a) -> List a -> List a =
+      fun @a ->
+        fun (op : a -> a -> a) (xs1 : List a) ->
+          match xs1 with
+          | Nil @a -> Nil @a
+          | Cons @a pair$pm1 pair$pm2 ->
+            match pair$pm2 with
+            | Nil @a -> xs1
+            | Cons @a x2 xs3 -> Cons @a (op pair$pm1 x2) (pair @a op xs3)
+let pair : ∀a. (a -> a -> a) -> List a -> List a =
+      fun @a -> pair$ll1 @a
+let single$ll1 : ∀a. Int -> a -> RmqTree a =
+      fun @a ->
+        fun (i : Int) (x : a) ->
+          RmqNode @a i i x (RmqEmpty @a) (RmqEmpty @a)
+let single : ∀a. Int -> a -> RmqTree a = fun @a -> single$ll1 @a
+let combine$ll1 : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
+      fun @a ->
+        fun (op : a -> a -> a) (t1 : RmqTree a) (t2 : RmqTree a) ->
+          match t1 with
+          | RmqEmpty @a -> abort @(RmqTree a)
+          | RmqNode @a s1 combine$pm1 v1 combine$pm2 combine$pm3 ->
+            match t2 with
+            | RmqEmpty @a -> abort @(RmqTree a)
+            | RmqNode @a combine$pm4 e2 v2 combine$pm5 combine$pm6 ->
+              RmqNode @a s1 e2 (op v1 v2) t1 t2
+let combine : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
+      fun @a -> combine$ll1 @a
+let build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
+      fun @a ->
+        fun (op : a -> a -> a) (run : List (RmqTree a) -> RmqTree a) (ts : List (RmqTree a)) ->
+          match ts with
+          | Nil @(RmqTree a) -> abort @(RmqTree a)
+          | Cons @(RmqTree a) build$pm1 build$pm2 ->
+            match build$pm2 with
+            | Nil @(RmqTree a) -> build$pm1
+            | Cons @(RmqTree a) build$pm3 build$pm4 ->
+              run (pair @(RmqTree a) (combine @a op) ts)
+let build$ll2 : ∀a. (a -> a -> a) -> List a -> RmqTree a =
+      fun @a ->
+        fun (op : a -> a -> a) (xs : List a) ->
+          let rec run : List (RmqTree a) -> RmqTree a = build$ll1 @a op run
+          in
+          run (zip_with @Int @a @(RmqTree a) (single @a) nats xs)
+let build : ∀a. (a -> a -> a) -> List a -> RmqTree a =
+      fun @a -> build$ll2 @a
+let query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
+      fun @a ->
+        fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) (aux : RmqTree a -> a) (t : RmqTree a) ->
+          match t with
+          | RmqEmpty @a -> one
+          | RmqNode @a t_lo t_hi value left right ->
+            match (||) ((<) q_hi t_lo) ((>) q_lo t_hi) with
+            | False ->
+              match (&&) ((<=) q_lo t_lo) ((<=) t_hi q_hi) with
+              | False -> op (aux left) (aux right)
+              | True -> value
+            | True -> one
+let query$ll2 : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
+      fun @a ->
+        fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) ->
+          let rec aux : RmqTree a -> a = query$ll1 @a one op q_lo q_hi aux in
+          aux
+let query : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
+      fun @a -> query$ll2 @a
+let infinity : Int = 1000000000
+let min$ll1 : Int -> Int -> Int =
+      fun (x : Int) (y : Int) ->
         match (<=) x y with
         | False -> y
         | True -> x
-let replicate_io = fun n act -> sequence_io (replicate n act)
-let main$ll5 =
-      fun t lo hi ->
-        let res = query infinity min lo hi t in
+let min : Int -> Int -> Int = min$ll1
+let replicate_io$ll1 : ∀a. Int -> IO a -> IO (List a) =
+      fun @a ->
+        fun (n : Int) (act : IO a) ->
+          sequence_io @a (replicate @(IO a) n act)
+let replicate_io : ∀a. Int -> IO a -> IO (List a) =
+      fun @a -> replicate_io$ll1 @a
+let main$ll1 : RmqTree Int -> Int -> Int -> IO Unit =
+      fun (t : RmqTree Int) (lo : Int) (hi : Int) ->
+        let res : Int = query @Int infinity min lo hi t in
         print res
-let main$ll4 = fun t lo -> (>>=) input (main$ll5 t lo)
-let main$ll6 = fun x -> return Unit
-let main$ll3 =
-      fun m xs ->
-        let t = build min xs in
-        (>>=) (replicate_io m ((>>=) input (main$ll4 t))) main$ll6
-let main$ll2 = fun n m -> (>>=) (replicate_io n input) (main$ll3 m)
-let main$ll1 = fun n -> (>>=) input (main$ll2 n)
-let main = (>>=) input main$ll1
+let main$ll2 : RmqTree Int -> Int -> IO Unit =
+      fun (t : RmqTree Int) (lo : Int) ->
+        (>>=) @Int @Unit input (main$ll1 t lo)
+let main$ll3 : List Unit -> IO Unit =
+      fun (x : List Unit) -> return @Unit Unit
+let main$ll4 : Int -> List Int -> IO Unit =
+      fun (m : Int) (xs : List Int) ->
+        let t : RmqTree Int = build @Int min xs in
+        (>>=) @(List Unit) @Unit (replicate_io @Unit m ((>>=) @Int @Unit input (main$ll2 t))) main$ll3
+let main$ll5 : Int -> Int -> IO Unit =
+      fun (n : Int) (m : Int) ->
+        (>>=) @(List Int) @Unit (replicate_io @Int n input) (main$ll4 m)
+let main$ll6 : Int -> IO Unit =
+      fun (n : Int) -> (>>=) @Int @Unit input (main$ll5 n)
+let main : IO Unit = (>>=) @Int @Unit input main$ll6

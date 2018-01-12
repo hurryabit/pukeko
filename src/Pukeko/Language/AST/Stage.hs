@@ -25,7 +25,6 @@ type family StageId st where
   StageId KindChecker     = 300
   StageId (Inferencer t)  = 400
   StageId PatternMatcher  = 500
-  StageId TypeEraser      = 550
   StageId LambdaLifter    = 700
   StageId CoreCompiler    = 999
 
@@ -37,13 +36,12 @@ type family StageType st where
   StageType KindChecker     = NoType
   StageType (Inferencer t)  = t
   StageType PatternMatcher  = Type
-  StageType TypeEraser      = NoType
-  StageType LambdaLifter    = NoType
+  StageType LambdaLifter    = Type
   StageType CoreCompiler    = NoType
 
 type HasLambda st = StageId st <=? 650
 type HasNested st = StageId st <=? 450
-type HasTypes  st = (400 <=? StageId st) && (StageId st <=? 500)
+type HasTypes  st = 400 <=? StageId st
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for

@@ -16,7 +16,6 @@ import qualified Pukeko.Language.Parser         as Parser
 import qualified Pukeko.Language.PatternMatcher as PatternMatcher
 import qualified Pukeko.Language.Inferencer     as Inferencer
 import qualified Pukeko.Language.TypeChecker    as TypeChecker
-import qualified Pukeko.Language.TypeEraser     as TypeEraser
 import qualified Pukeko.Language.TypeResolver   as TypeResolver
 import qualified Pukeko.Language.FunResolver    as FunResolver
 
@@ -25,7 +24,8 @@ compileToCore
   => Bool
   -> Parser.Module
   -> m (CoreCompiler.Module, Module LambdaLifter.Out, Module Inferencer.Out)
-compileToCore _unsafe module_pu = do
+compileToCore unsafe module_pu = do
+  let typeCheckModule = if unsafe then pure else TypeChecker.checkModule
   module_ti <- pure module_pu
                >>= Renamer.renameModule
                >>= TypeResolver.resolveModule
@@ -34,9 +34,8 @@ compileToCore _unsafe module_pu = do
                >>= Inferencer.inferModule
   module_ll <- pure module_ti
                >>= PatternMatcher.compileModule
-               >>= TypeChecker.checkModule
-               >>= pure . TypeEraser.eraseModule
                >>= pure . LambdaLifter.liftModule
+               >>= typeCheckModule
                >>= pure . DeadCode.cleanModule
   let module_cc = CoreCompiler.compileModule module_ll
   return (module_cc, module_ll, module_ti)

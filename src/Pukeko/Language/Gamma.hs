@@ -5,6 +5,8 @@ module Pukeko.Language.Gamma where
 
 import           Control.Monad.Error.Class
 import           Control.Monad.Reader
+import           Control.Monad.Supply
+import           Control.Monad.Writer.Class
 import           Data.Functor.Const
 
 import           Pukeko.Language.AST.Std
@@ -16,7 +18,7 @@ type GammaEnv tv ev = EnvOf ev (Type tv)
 
 newtype GammaT tv ev m a = GammaT{unGammaT :: ReaderT (GammaEnv tv ev) m a}
   deriving ( Functor, Applicative, Monad, MonadTrans
-           , MonadError e
+           , MonadError e, MonadSupply s, MonadWriter w
            )
 
 deriving instance (MonadInfo i m) => MonadInfo i (GammaT tv ev m)

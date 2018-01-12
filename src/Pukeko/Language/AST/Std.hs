@@ -109,7 +109,7 @@ data Expr st tv ev
     ECas Pos (Expr st tv ev) (NE.NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
     EMat Pos (Expr st tv ev) (NE.NonEmpty (Altn st tv ev))
-  | forall n. (HasTypes st ~ 'True, HasLambda st ~ 'True, KnownNat n) =>
+  | forall n. (HasTypes st ~ 'True, KnownNat n) =>
     ETyAbs Pos (Vector n Id.TVar) (Expr st (TFinScope n tv) ev)
   | HasTypes st ~ 'True =>
     ETyApp Pos (Expr st tv ev) [StageType st tv]
@@ -475,6 +475,7 @@ instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
         dt = pPrintPrecType lvl prec t
         dvs_t
           | isEmpty dt = empty
+          | null vs    = colon <+> dt
           | otherwise  = colon <+> prettyTUni lvl prec vs dt
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
