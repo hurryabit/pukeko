@@ -49,7 +49,10 @@ module Pukeko.Language.AST.Std
   )
   where
 
-import Control.Lens
+import Control.Bilens
+import Control.Lens   hiding (firstOf)
+import Data.Bifoldable
+import Data.Bitraversable
 import Data.Vector.Sized (Vector)
 import Data.Foldable
 import qualified Data.List.NonEmpty as NE
@@ -272,35 +275,6 @@ altn2eval :: EValTraversal Altn
 altn2eval f (MkAltn w p t) =
   MkAltn w (retagPatn p) <$> expr2eval f t
 
--- type TypeTraversal t =
---   forall st1 st2 tv ev. (SameNodes st1 st2, HasETyp st1 ~ 'False) =>
---   IndexedTraversal Pos
---   -- Traversal
---   (t st1 tv ev) (t st2 tv ev) (StageType st1 tv) (StageType st2 tv)
-
--- defn2type :: TypeTraversal Defn
--- defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
-
--- expr2type :: TypeTraversal Expr
--- expr2type f = \case
---   EVar w x -> pure (EVar w x)
---   ECon w c -> pure (ECon w c)
---   ENum w n -> pure (ENum w n)
---   EApp w e1 e2 -> EApp w <$> expr2type f e1 <*> (traverse . expr2type) f e2
---   ELam w bs e0 -> ELam w <$> (traverse . bind2type) f bs <*> expr2type f e0
---   ELet w ds e0 -> ELet w <$> (traverse . defn2type) f ds <*> expr2type f e0
---   ERec w ds e0 -> ERec w <$> (traverse . defn2type) f ds <*> expr2type f e0
---   ECas w e0 cs -> ECas w <$> expr2type f e0 <*> traverse (case2type f) cs
---   EMat w e0 as -> EMat w <$> expr2type f e0 <*> traverse (altn2rhs (expr2type f)) as
-
--- case2type :: TypeTraversal Case
--- case2type f (MkCase w c ts bs e) =
---   MkCase w c <$> traverse (indexed f w) ts <*> pure bs <*> pure e
-
--- bind2type ::
---   IndexedLens Pos (Bind st1 tv) (Bind st2 tv) (StageType st1 tv) (StageType st2 tv)
--- bind2type f (MkBind w x t) = MkBind w x <$> indexed f w t
-
 patn2evar :: IndexedTraversal' Pos (Patn st tv) Id.EVar
 patn2evar f = \case
   PWld w      -> pure (PWld w)
@@ -341,73 +315,165 @@ retagPatn :: (SameTypes st1 st2) => Patn st1 tv -> Patn st2 tv
 retagPatn = over patn2dcon id
 
 
--- * Manual instances
-instance FunctorWithIndex     Pos (Defn st tv) where
-instance FoldableWithIndex    Pos (Defn st tv) where
-instance TraversableWithIndex Pos (Defn st tv) where
-  itraverse f (MkDefn b e) = MkDefn b <$> itraverse f e
+-- * Instances
 
-instance FunctorWithIndex     Pos (Expr st tv) where
-instance FoldableWithIndex    Pos (Expr st tv) where
-instance TraversableWithIndex Pos (Expr st tv) where
+-- ** {Functor, Foldable, Traversable}
+deriving instance Functor     (Defn st tv)
+deriving instance Foldable    (Defn st tv)
+deriving instance Traversable (Defn st tv)
+
+deriving instance Functor     (Expr st tv)
+deriving instance Foldable    (Expr st tv)
+deriving instance Traversable (Expr st tv)
+
+deriving instance Functor     (Case st tv)
+deriving instance Foldable    (Case st tv)
+deriving instance Traversable (Case st tv)
+
+deriving instance Functor     (Altn st tv)
+deriving instance Foldable    (Altn st tv)
+deriving instance Traversable (Altn st tv)
+
+deriving instance IsStage st => Functor     (Patn st)
+deriving instance IsStage st => Foldable    (Patn st)
+deriving instance IsStage st => Traversable (Patn st)
+
+deriving instance IsStage st => Functor     (Bind st)
+deriving instance IsStage st => Foldable    (Bind st)
+deriving instance IsStage st => Traversable (Bind st)
+
+-- * {Functor,Foldable,Traversable}WithIndex
+instance IsStage st => FunctorWithIndex     Pos (Defn st tv) where
+instance IsStage st => FoldableWithIndex    Pos (Defn st tv) where
+instance IsStage st => TraversableWithIndex Pos (Defn st tv) where
+  itraverse = ibitraverse (const pure)
+
+instance IsStage st => FunctorWithIndex     Pos (Expr st tv) where
+instance IsStage st => FoldableWithIndex    Pos (Expr st tv) where
+instance IsStage st => TraversableWithIndex Pos (Expr st tv) where
+  itraverse = ibitraverse (const pure)
+
+instance IsStage st => FunctorWithIndex     Pos (Case st tv) where
+instance IsStage st => FoldableWithIndex    Pos (Case st tv) where
+instance IsStage st => TraversableWithIndex Pos (Case st tv) where
+  itraverse = ibitraverse (const pure)
+
+instance IsStage st => FunctorWithIndex     Pos (Altn st tv) where
+instance IsStage st => FoldableWithIndex    Pos (Altn st tv) where
+instance IsStage st => TraversableWithIndex Pos (Altn st tv) where
+  itraverse = ibitraverse (const pure)
+
+instance IsStage st => FunctorWithIndex     Pos (Patn st) where
+instance IsStage st => FoldableWithIndex    Pos (Patn st) where
+instance IsStage st => TraversableWithIndex Pos (Patn st) where
   itraverse f = \case
-    EVar w x -> EVar w <$> f w x
+    PWld w   -> pure (PWld w)
+    PVar w x -> pure (PVar w x)
+    PCon w c ts ps ->
+      PCon w c
+      <$> traverse (itraverse f) ts
+      <*> traverse (itraverse f) ps
+
+instance IsStage st => FunctorWithIndex     Pos (Bind st) where
+instance IsStage st => FoldableWithIndex    Pos (Bind st) where
+instance IsStage st => TraversableWithIndex Pos (Bind st) where
+  itraverse f (MkBind w x t) = MkBind w x <$> itraverse f t
+
+-- ** Bi{functor, foldable, traversable}
+instance IsStage st => Bifunctor     (Defn st) where
+  bimap = bimapDefault
+instance IsStage st => Bifoldable    (Defn st) where
+  bifoldMap = bifoldMapDefault
+instance IsStage st => Bitraversable (Defn st) where
+  bitraverse f g = ibitraverse (const f) (const g)
+
+instance IsStage st => Bifunctor     (Expr st) where
+  bimap = bimapDefault
+instance IsStage st => Bifoldable    (Expr st) where
+  bifoldMap = bifoldMapDefault
+instance IsStage st => Bitraversable (Expr st) where
+  bitraverse f g = ibitraverse (const f) (const g)
+
+instance IsStage st => Bifunctor     (Case st) where
+  bimap = bimapDefault
+instance IsStage st => Bifoldable    (Case st) where
+  bifoldMap = bifoldMapDefault
+instance IsStage st => Bitraversable (Case st) where
+  bitraverse f g = ibitraverse (const f) (const g)
+
+instance IsStage st => Bifunctor     (Altn st) where
+  bimap = bimapDefault
+instance IsStage st => Bifoldable    (Altn st) where
+  bifoldMap = bifoldMapDefault
+instance IsStage st => Bitraversable (Altn st) where
+  bitraverse f g = ibitraverse (const f) (const g)
+
+-- ** Bi{functor, foldable, traversable}WithIndex
+instance IsStage st => BifunctorWithIndex     Pos (Defn st) where
+instance IsStage st => BifoldableWithIndex    Pos (Defn st) where
+instance IsStage st => BitraversableWithIndex Pos (Defn st) where
+  ibitraverse f g (MkDefn b e) = MkDefn <$> itraverse f b <*> ibitraverse f g e
+
+instance IsStage st => BifunctorWithIndex     Pos (Expr st) where
+instance IsStage st => BifoldableWithIndex    Pos (Expr st) where
+instance IsStage st => BitraversableWithIndex Pos (Expr st) where
+  ibitraverse f g = \case
+    EVar w x -> EVar w <$> g w x
     EVal w z -> pure (EVal w z)
     ECon w c -> pure (ECon w c)
     ENum w n -> pure (ENum w n)
-    EApp w e0 es -> EApp w <$> itraverse f e0 <*> (traverse . itraverse) f es
-    ELam w bs e0 t -> ELam w bs <$> itraverse (traverse . f) e0 <*> pure t
+    EApp w e0 es ->
+      EApp w
+      <$> ibitraverse f g e0
+      <*> traverse (ibitraverse f g) es
+    ELam w bs e0 t ->
+      ELam w
+      <$> traverse (itraverse f) bs
+      <*> ibitraverse f (traverse . g) e0
+      <*> itraverse f t
     ELet w ds e0 ->
-      ELet w <$> (traverse . itraverse) f ds <*> itraverse (traverse . f) e0
+      ELet w
+      <$> traverse (ibitraverse f g) ds
+      <*> ibitraverse f (traverse . g) e0
     ERec w ds e0 ->
       ERec w
-      <$> (traverse . itraverse) (traverse . f) ds
-      <*> itraverse (traverse . f) e0
-    ECas w e0 cs -> ECas w <$> itraverse f e0 <*> (traverse . itraverse) f cs
-    EMat w e0 as -> EMat w <$> itraverse f e0 <*> (traverse . itraverse) f as
-    ETyAbs w x e -> ETyAbs w x <$> itraverse f e
-    ETyApp w e t -> ETyApp w <$> itraverse f e <*> pure t
+      <$> traverse (ibitraverse f (traverse . g)) ds
+      <*> ibitraverse f (traverse . g) e0
+    ECas w e0 cs ->
+      ECas w
+      <$> ibitraverse f g e0
+      <*> traverse (ibitraverse f g) cs
+    EMat w e0 as ->
+      EMat w
+      <$> ibitraverse f g e0
+      <*> traverse (ibitraverse f g) as
+    ETyAbs w v e -> ETyAbs w v <$> ibitraverse (traverse . f) g e
+    ETyApp w e t ->
+      ETyApp w
+      <$> ibitraverse f g e
+      <*> traverse (itraverse f) t
 
-instance FunctorWithIndex     Pos (Case st tv) where
-instance FoldableWithIndex    Pos (Case st tv) where
-instance TraversableWithIndex Pos (Case st tv) where
-  itraverse f (MkCase w c ts bs e0) = MkCase w c ts bs <$> itraverse (traverse . f) e0
+instance IsStage st => BifunctorWithIndex     Pos (Case st) where
+instance IsStage st => BifoldableWithIndex    Pos (Case st) where
+instance IsStage st => BitraversableWithIndex Pos (Case st) where
+  ibitraverse f g (MkCase w c ts bs e) =
+    MkCase w c
+    <$> traverse (itraverse f) ts
+    <*> pure bs
+    <*> ibitraverse f (traverse . g) e
 
-instance FunctorWithIndex     Pos (Altn st tv) where
-instance FoldableWithIndex    Pos (Altn st tv) where
-instance TraversableWithIndex Pos (Altn st tv) where
-  itraverse f (MkAltn w p e0) = MkAltn w p <$> itraverse (traverse . f) e0
+instance IsStage st => BifunctorWithIndex     Pos (Altn st) where
+instance IsStage st => BifoldableWithIndex    Pos (Altn st) where
+instance IsStage st => BitraversableWithIndex Pos (Altn st) where
+  ibitraverse f g (MkAltn w p e) =
+    MkAltn w <$> itraverse f p <*> ibitraverse f (traverse . g) e
 
-instance Functor (StageType st) => Bifunctor (Defn st) where
-  bimap f g (MkDefn b e) = MkDefn (fmap f b) (bimap f g e)
-
-instance Functor (StageType st) => Bifunctor (Expr st) where
-  bimap f g = \case
-    EVar w x -> EVar w (g x)
-    EVal w z -> EVal w z
-    ECon w c -> ECon w c
-    ENum w n -> ENum w n
-    EApp w e0 es -> EApp w (bimap f g e0) (map (bimap f g) es)
-    ELam w bs e0 t -> ELam w (fmap (fmap f) bs) (bimap f (fmap g) e0) (fmap f t)
-    ELet w ds e0 -> ELet w (fmap (bimap f g) ds) (bimap f (fmap g) e0)
-    ERec w ds e0 -> ERec w (fmap (bimap f (fmap g)) ds) (bimap f (fmap g) e0)
-    ECas w e0 cs -> ECas w (bimap f g e0) (fmap (bimap f g) cs)
-    EMat w e0 as -> EMat w (bimap f g e0) (fmap (bimap f g) as)
-    ETyAbs w xs e0 -> ETyAbs w xs (bimap (fmap f) g e0)
-    ETyApp w e0 ts -> ETyApp w (bimap f g e0) (fmap (fmap f) ts)
-
-instance Functor (StageType st) => Bifunctor (Case st) where
-  bimap f g (MkCase w c ts bs e) =
-    MkCase w c (fmap (fmap f) ts) bs (bimap f (fmap g) e)
-
-instance Functor (StageType st) => Bifunctor (Altn st) where
-  bimap f g (MkAltn w p e) = MkAltn w (fmap f p) (bimap f (fmap g) e)
-
+-- ** Has{Pos, Lhs, Rhs}
 instance HasPos (TopLevel st) where
   pos f = \case
     TLTyp w tcs -> fmap (\w' -> TLTyp w' tcs) (f w)
     TLVal w x t -> fmap (\w' -> TLVal w' x t) (f w)
-    TLDef      d -> fmap TLDef (pos f d)
+    TLDef     d -> fmap TLDef (pos f d)
     TLSup w z vs t bs e -> fmap (\w' -> TLSup w' z vs t bs e) (f w)
     TLAsm b    s -> fmap (\b' -> TLAsm b'    s) (pos f b)
 
@@ -575,26 +641,3 @@ instance (BaseTVar tv, PrettyStage st) => Pretty (Patn st tv) where
         <+> hsep (map (pPrintPrec lvl 1) ps)
 
 -- * Derived instances
-deriving instance Functor     (Defn st tv)
-deriving instance Foldable    (Defn st tv)
-deriving instance Traversable (Defn st tv)
-
-deriving instance Functor     (Expr st tv)
-deriving instance Foldable    (Expr st tv)
-deriving instance Traversable (Expr st tv)
-
-deriving instance Functor     (Case st tv)
-deriving instance Foldable    (Case st tv)
-deriving instance Traversable (Case st tv)
-
-deriving instance Functor     (Altn st tv)
-deriving instance Foldable    (Altn st tv)
-deriving instance Traversable (Altn st tv)
-
-deriving instance Functor     (StageType st) => Functor     (Patn st)
-deriving instance Foldable    (StageType st) => Foldable    (Patn st)
-deriving instance Traversable (StageType st) => Traversable (Patn st)
-
-deriving instance Functor     (StageType st) => Functor     (Bind st)
-deriving instance Foldable    (StageType st) => Foldable    (Bind st)
-deriving instance Traversable (StageType st) => Traversable (Bind st)

@@ -2,8 +2,10 @@
 {-# LANGUAGE TypeOperators #-}
 module Pukeko.Language.AST.Stage where
 
+import Control.Lens
 import GHC.TypeLits
 
+import Pukeko.Pos
 import Pukeko.Language.Type (NoType, Type)
 
 data Parser
@@ -38,6 +40,8 @@ type family StageType st where
   StageType PatternMatcher  = Type
   StageType LambdaLifter    = Type
   StageType CoreCompiler    = NoType
+
+type IsStage st = TraversableWithIndex Pos (StageType st)
 
 type HasLambda st = StageId st <=? 650
 type HasNested st = StageId st <=? 450

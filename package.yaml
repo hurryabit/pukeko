@@ -47,6 +47,7 @@ library:
   - Pukeko.Pretty
   dependencies:
   - array
+  - bifunctors
   - call-stack
   - containers
   - fclabels
@@ -55,6 +56,7 @@ library:
   - mtl
   - parsec
   - pretty
+  - profunctors
   - tagged
   - transformers
   - vector

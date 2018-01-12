@@ -26,7 +26,7 @@ throwDoc :: MonadError String m => Doc -> m a
 throwDoc = throwError . render
 
 throwDocAt :: MonadError String m => Pos -> Doc -> m a
-throwDocAt posn msg = throwDoc $ text (show posn) <> colon <+> msg
+throwDocAt posn msg = throwDoc $ pretty posn <> colon <+> msg
 
 throwErrorAt :: MonadError String m => Pos -> String -> m a
 throwErrorAt posn = throwDocAt posn . text

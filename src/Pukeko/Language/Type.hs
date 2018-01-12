@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -32,6 +33,7 @@ import qualified Data.Vector.Sized as Vec
 import           GHC.TypeLits
 
 import           Pukeko.Pretty
+import           Pukeko.Pos
 import qualified Pukeko.Language.Ident as Id
 import           Pukeko.Language.AST.Scope
 
@@ -143,3 +145,18 @@ deriving instance Traversable Type
 deriving instance Functor     NoType
 deriving instance Foldable    NoType
 deriving instance Traversable NoType
+
+instance FunctorWithIndex     Pos Type where
+instance FoldableWithIndex    Pos Type where
+instance TraversableWithIndex Pos Type where
+  itraverse f = \case
+    TVar x -> TVar <$> f noPos x
+    TArr   -> pure TArr
+    TCon c -> pure (TCon c)
+    TApp tf tp -> TApp <$> itraverse f tf <*> itraverse f tp
+    TUni vs tq -> TUni vs <$> itraverse (traverse . f) tq
+
+instance FunctorWithIndex     Pos NoType where
+instance FoldableWithIndex    Pos NoType where
+instance TraversableWithIndex Pos NoType where
+  itraverse _ NoType = pure NoType

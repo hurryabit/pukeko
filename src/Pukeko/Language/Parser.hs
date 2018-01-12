@@ -52,6 +52,9 @@ pukeko@Token.TokenParser
   } =
   Token.makeTokenParser pukekoDef
 
+getPos :: Parser Pos
+getPos = mkPos <$> getPosition
+
 nat :: Parser Int
 nat = fromInteger <$> natural
 
@@ -92,26 +95,26 @@ module_ :: Parser Module
 module_ = many1 $ choice
   [ let_ TLLet TLRec
   , TLAsm
-    <$> getPosition
+    <$> getPos
     <*> (reserved "external" *> evar)
     <*> (equals *> Token.stringLiteral pukeko)
   , TLVal
-    <$> getPosition
+    <$> getPos
     <*> (reserved "val" *> evar)
     <*> asType
   , TLTyp
-    <$> getPosition
+    <$> getPos
     <*> (reserved "type" *> sepBy1 tconDecl (reserved "and"))
   ]
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
 patn, apatn :: Parser Patn
-patn  = PCon <$> getPosition <*> dcon <*> many apatn <|>
+patn  = PCon <$> getPos <*> dcon <*> many apatn <|>
         apatn
-apatn = PWld <$> getPosition <*  symbol "_"       <|>
-        PVar <$> getPosition <*> evar             <|>
-        PCon <$> getPosition <*> dcon <*> pure [] <|>
+apatn = PWld <$> getPos <*  symbol "_"       <|>
+        PVar <$> getPos <*> evar             <|>
+        PCon <$> getPos <*> dcon <*> pure [] <|>
         parens patn
 
 defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
@@ -120,7 +123,7 @@ defnValLhs = MkDefn <$> bind
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
   (.) <$> (MkDefn <$> bind)
-      <*> (ELam <$> getPosition <*> many1 bind)
+      <*> (ELam <$> getPos <*> many1 bind)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
@@ -128,13 +131,13 @@ defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
 
 altn :: Parser (Altn Id.EVar)
 altn =
-  MkAltn <$> getPosition
+  MkAltn <$> getPos
          <*> (bar *> patn)
          <*> (arrow *> expr)
 
 let_ :: (Pos -> [Defn Id.EVar] -> a) -> (Pos -> [Defn Id.EVar] -> a) -> Parser a
 let_ mkLet mkRec =
-  f <$> getPosition
+  f <$> getPos
     <*> (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
     <*> sepBy1 defn (reserved "and")
   where
@@ -143,37 +146,37 @@ let_ mkLet mkRec =
 expr, aexpr :: Parser (Expr Id.EVar)
 expr =
   (buildExpressionParser operatorTable . choice)
-  [ mkApp <$> getPosition <*> aexpr <*> many aexpr
-  , mkIf  <$> getPosition
+  [ mkApp <$> getPos <*> aexpr <*> many aexpr
+  , mkIf  <$> getPos
           <*> (reserved "if"   *> expr)
-          <*> getPosition
+          <*> getPos
           <*> (reserved "then" *> expr)
-          <*> getPosition
+          <*> getPos
           <*> (reserved "else" *> expr)
   , EMat
-    <$> getPosition
+    <$> getPos
     <*> (reserved "match" *> expr)
     <*> (reserved "with"  *> many1 altn)
   , ELam
-    <$> getPosition
+    <$> getPos
     <*> (reserved "fun" *> many1 bind)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]
   <?> "expression"
 aexpr = choice
-  [ EVar <$> getPosition <*> evar
-  , ECon <$> getPosition <*> dcon
-  , ENum <$> getPosition <*> nat
+  [ EVar <$> getPos <*> evar
+  , ECon <$> getPos <*> dcon
+  , ENum <$> getPos <*> nat
   , parens expr
   ]
 
 bind :: Parser Bind
-bind = MkBind <$> getPosition <*> evar
+bind = MkBind <$> getPos <*> evar
 
 operatorTable = map (map f) (reverse Op.table)
   where
-    f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPosition <* reservedOp _sym)) _assoc
+    f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPos <* reservedOp _sym)) _assoc
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
