@@ -58,7 +58,7 @@ mkTUni xs t
 (~>) :: Type tv -> Type tv -> Type tv
 (~>) = TFun
 
-(*~>) :: [Type tv] -> Type tv -> Type tv
+(*~>) :: Foldable t => t (Type tv) -> Type tv -> Type tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
 mkTApp :: Type tv -> [Type tv] -> Type tv

@@ -10,7 +10,7 @@ import           Control.Lens
 import           Control.Monad.Supply
 import           Control.Monad.Writer
 import qualified Data.Finite       as Fin
-import           Data.Foldable     (toList, traverse_)
+import           Data.Foldable     (traverse_)
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.Set.Lens     as Set
@@ -92,7 +92,7 @@ llExpr = \case
             rhs2 = bimap tvRename evRename rhs1
         lhs <- fresh
         let t_lhs :: Type (TFinScope m Void)
-            t_lhs = map _bindType (toList allBinds1) *~> fmap tvRename t_rhs
+            t_lhs = fmap _bindType allBinds1 *~> fmap tvRename t_rhs
         yield (TLSup w lhs tyBinds t_lhs allBinds1 rhs2)
         pure
           (mkEApp w

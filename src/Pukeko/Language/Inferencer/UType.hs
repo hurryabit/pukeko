@@ -63,7 +63,7 @@ unUTUni = \case
 (~>) :: UType s tv -> UType s tv -> UType s tv
 (~>) = UTFun
 
-(*~>) :: [UType s tv] -> UType s tv -> UType s tv
+(*~>) :: Foldable t => t (UType s tv) -> UType s tv -> UType s tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
 appN :: UType s tv -> [UType s tv] -> UType s tv

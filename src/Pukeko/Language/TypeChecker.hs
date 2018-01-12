@@ -62,7 +62,7 @@ typeOf = \case
   ELam _ bs e0 t0 -> do
     let ts = fmap _bindType bs
     withTypes ts (check e0 t0)
-    pure (toList ts *~> t0)
+    pure (ts *~> t0)
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
     withBinds (fmap _defnLhs ds) (typeOf e0)
@@ -160,7 +160,7 @@ checkTopLevel = \case
   TLDef   d -> checkDefn d
   TLSup w z vs t0 bs e0 -> do
       t1 <- withKinds (withBinds bs (typeOf e0))
-      let t2 = map _bindType (toList bs) *~> t1
+      let t2 = fmap _bindType bs *~> t1
       match w (mkTUni vs t0) (mkTUni vs t2)
     `catchError` \e -> throwError ("while type checking " ++ show z ++ ":\n" ++ e)
   TLAsm _ _ -> pure ()

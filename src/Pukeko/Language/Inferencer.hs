@@ -188,7 +188,7 @@ infer = \case
       t_binds <- traverse (const freshUVar) binds0
       (rhs1, t_rhs) <- localize t_binds (infer rhs0)
       let binds1 = Vec.zipWith (\(MkBind w' x NoType) -> MkBind w' x) binds0 t_binds
-      pure (ELam w binds1 rhs1 t_rhs, toList t_binds *~> t_rhs)
+      pure (ELam w binds1 rhs1 t_rhs, t_binds *~> t_rhs)
     ELet w defns0 rhs0 -> do
       (defns1, t_defns) <- inferLet defns0
       first (ELet w defns1) <$> localize t_defns (infer rhs0)
