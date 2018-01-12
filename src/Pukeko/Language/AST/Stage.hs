@@ -45,7 +45,7 @@ type HasTypes  st = 400 <=? StageId st
 
 type HasTLTyp st = StageId st <=? 250
 type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
-                                        -- the pretty printer
+                                       -- the pretty printer
 
 type HasMICons st = 200 <=? StageId st
 type HasMIFuns st = 250 <=? StageId st
@@ -66,6 +66,12 @@ type SameTypes st1 st2 = (StageType st1 ~ StageType st2)
 type SameModuleInfo st1 st2 =
   ( HasMICons st1 ~ HasMICons st2
   , HasMIFuns st1 ~ HasMIFuns st2
+  )
+
+type Typed st =
+  ( StageType st ~ Type
+  , HasMICons st ~ 'True
+  , HasMIFuns st ~ 'True
   )
 
 type family (&&) (x :: Bool) (y :: Bool) where

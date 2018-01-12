@@ -26,13 +26,7 @@ import qualified Pukeko.Language.AST.Stage as St
 import qualified Pukeko.Language.AST.ConDecl as Con
 import           Pukeko.Language.Type
 
-type Typed st =
-  ( St.StageType st ~ Type
-  , St.HasMICons st ~ 'True
-  , St.HasMIFuns st ~ 'True
-  )
-
-checkModule :: (MonadError String m, Typed st) => Module st -> m (Module st)
+checkModule :: (MonadError String m, St.Typed st) => Module st -> m (Module st)
 checkModule module0@(MkModule info tops) = do
   runTC (traverse_ checkTopLevel tops) info
   pure module0
@@ -48,7 +42,7 @@ type TC tv ev a = GammaT tv ev (InfoT ModuleInfoTC (Except String)) a
 runTC :: MonadError String m => TC Void Void a -> ModuleInfoTC -> m a
 runTC tc mi = runExcept (runInfoT (runGammaT tc) mi)
 
-typeOf :: (Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
+typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   EVar _ x -> lookupType x
   EVal _ z -> fmap absurd . snd <$> findFun z
@@ -94,7 +88,7 @@ typeOf = \case
       _ -> throwErrorAt w "unexpected type argument"
 
 typeOfBranching ::
-  (Typed st, IsTVar tv, IsEVar ev, HasPos branch) =>
+  (St.Typed st, IsTVar tv, IsEVar ev, HasPos branch) =>
   (Type tv -> branch -> TC tv ev (Type tv)) ->
   Expr st tv ev -> NE.NonEmpty branch -> TC tv ev (Type tv)
 typeOfBranching typeOfBranch e0 (b1 NE.:| bs) = do
@@ -108,14 +102,14 @@ typeOfBranching typeOfBranch e0 (b1 NE.:| bs) = do
   pure t1
 
 typeOfAltn ::
-  (Typed st, IsTVar tv, IsEVar ev) =>
+  (St.Typed st, IsTVar tv, IsEVar ev) =>
   Type tv -> Altn st tv ev -> TC tv ev (Type tv)
 typeOfAltn t (MkAltn _ p e) = do
   env <- patnEnvLevel p t
   withTypes env (typeOf e)
 
 typeOfCase ::
-  (Typed st, IsTVar tv, IsEVar ev) =>
+  (St.Typed st, IsTVar tv, IsEVar ev) =>
   Type tv -> Case st tv ev -> TC tv ev (Type tv)
 typeOfCase t (MkCase w c ts bs e0) = do
   let ps = map (PVar w) (toList bs)
@@ -123,7 +117,7 @@ typeOfCase t (MkCase w c ts bs e0) = do
   typeOfAltn t (MkAltn w (PCon w c ts ps) e1)
 
 patnEnvLevel ::
-  (Typed st, IsTVar tv) =>
+  (St.Typed st, IsTVar tv) =>
   Patn st tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
 patnEnvLevel p t0 = case p of
   PWld _   -> pure Map.empty
@@ -151,15 +145,15 @@ match w t0 t1 =
   unless (t0 == t1) $
     throwDocAt w ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-check :: (Typed st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
+check :: (St.Typed st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
 check e t0 = do
   t1 <- typeOf e
   match (e^.pos) t0 t1
 
-checkDefn :: (Typed st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
+checkDefn :: (St.Typed st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
 checkDefn (MkDefn (MkBind _ _ t) e) = check e t
 
-checkTopLevel :: (Typed st) => TopLevel st -> TC Void Void ()
+checkTopLevel :: (St.Typed st) => TopLevel st -> TC Void Void ()
 checkTopLevel = \case
   TLTyp{} -> pure ()
   TLVal{} -> pure ()

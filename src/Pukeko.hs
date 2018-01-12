@@ -1,12 +1,15 @@
+{-# LANGUAGE RankNTypes #-}
 module Pukeko
   ( Module (..)
   , compileToCore
   )
   where
 
-import Pukeko.Error
+import           Control.Monad ((>=>))
+import           Pukeko.Error
 
 import           Pukeko.Language.AST.Std        (Module (..))
+import           Pukeko.Language.AST.Stage      (Typed)
 import qualified Pukeko.Language.CoreCompiler   as CoreCompiler
 import qualified Pukeko.Language.DeadCode       as DeadCode
 import qualified Pukeko.Language.Renamer        as Renamer
@@ -20,22 +23,23 @@ import qualified Pukeko.Language.TypeResolver   as TypeResolver
 import qualified Pukeko.Language.FunResolver    as FunResolver
 
 compileToCore
-  :: MonadError String m
+  :: forall m. MonadError String m
   => Bool
   -> Parser.Module
   -> m (CoreCompiler.Module, Module LambdaLifter.Out, Module Inferencer.Out)
 compileToCore unsafe module_pu = do
-  let typeCheckModule = if unsafe then pure else TypeChecker.checkModule
+  let typeChecked ::
+        Typed st2 => (Module st1 -> m (Module st2)) -> Module st1 -> m (Module st2)
+      typeChecked act = act >=> if unsafe then pure else TypeChecker.checkModule
   module_ti <- pure module_pu
                >>= Renamer.renameModule
                >>= TypeResolver.resolveModule
                >>= FunResolver.resolveModule
                >>= KindChecker.checkModule
-               >>= Inferencer.inferModule
+               >>= typeChecked Inferencer.inferModule
   module_ll <- pure module_ti
-               >>= PatternMatcher.compileModule
-               >>= pure . LambdaLifter.liftModule
-               >>= typeCheckModule
-               >>= pure . DeadCode.cleanModule
+               >>= typeChecked PatternMatcher.compileModule
+               >>= typeChecked (pure . LambdaLifter.liftModule)
+               >>= typeChecked (pure . DeadCode.cleanModule)
   let module_cc = CoreCompiler.compileModule module_ll
   return (module_cc, module_ll, module_ti)
