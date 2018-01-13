@@ -10,7 +10,7 @@ let (;ll1) : ∀a. IO a -> Unit -> IO a =
 let (;ll2) : ∀a. IO Unit -> IO a -> IO a =
       fun @a ->
         fun (m1 : IO Unit) (m2 : IO a) -> (>>=) @Unit @a m1 ((;ll1) @a m2)
-let (;) : ∀a. IO Unit -> IO a -> IO a = fun @a -> (;ll2) @a
+let (;) : ∀a. IO Unit -> IO a -> IO a = (;ll2)
 let when$ll1 : Bool -> IO Unit -> IO Unit =
       fun (p : Bool) (m : IO Unit) ->
         match p with

@@ -76,7 +76,7 @@ pmMatch w rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBPatnCols w colMatch1 $ \case
     MkColMatch LS.Nil (LS.Cons u2 us2)
-      | LS.Nil    <- us2 -> pmExpr (fmap strengthen u2)
+      | LS.Nil    <- us2 -> pmExpr (fmap unsafeStrengthen u2)
       | LS.Cons{} <- us2 -> throwErrorAt w "overlapping patterns"
     colMatch2@(MkColMatch LS.Cons{} _) -> do
       (conCol, colMatch3) <- findCPatnCol w colMatch2

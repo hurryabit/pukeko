@@ -13,7 +13,7 @@ let nth$ll1 : ∀a. List a -> Int -> a =
             match (<=) n 0 with
             | False -> nth @a xs ((-) n 1)
             | True -> x
-let nth : ∀a. List a -> Int -> a = fun @a -> nth$ll1 @a
+let nth : ∀a. List a -> Int -> a = nth$ll1
 let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -24,7 +24,7 @@ let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
             | Nil @b -> Nil @c
             | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
 let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
-      fun @a @b @c -> zip_with$ll1 @a @b @c
+      zip_with$ll1
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"

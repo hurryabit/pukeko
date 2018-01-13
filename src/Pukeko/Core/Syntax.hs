@@ -77,7 +77,7 @@ instance Pretty Expr where
       Pack{ _tag, _arity } -> "Pack" <> braces (int _tag <> comma <> int _arity)
       Num{ _int } -> int _int
       Ap{ _fun, _args } ->
-        maybeParens (prec > 0) $ hsep $
+        maybeParens lvl (prec > 0) $ hsep $
           pPrintPrec lvl 1 _fun : map (pPrintPrec lvl 1) _args
       Let{ _isrec, _defns, _body } ->
         case _defns of
@@ -95,7 +95,7 @@ instance Pretty Expr where
                 , pPrintPrec lvl 0 _body
                 ]
       Match { _expr, _altns } ->
-        maybeParens (prec > 0) $ vcat $
+        maybeParens lvl (prec > 0) $ vcat $
         ("match" <+> pPrintPrec lvl 0 _expr <+> "with") :
         zipWith pPrintAltn [0..] _altns
 

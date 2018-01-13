@@ -10,8 +10,7 @@ let foldl$ll1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
           match xs with
           | Nil @a -> y0
           | Cons @a x xs -> foldl @a @b f (f y0 x) xs
-let foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-      fun @a @b -> foldl$ll1 @a @b
+let foldl : ∀a b. (b -> a -> b) -> b -> List a -> b = foldl$ll1
 let nth$ll1 : ∀a. List a -> Int -> a =
       fun @a ->
         fun (xs : List a) (n : Int) ->
@@ -21,7 +20,7 @@ let nth$ll1 : ∀a. List a -> Int -> a =
             match (<=) n 0 with
             | False -> nth @a xs ((-) n 1)
             | True -> x
-let nth : ∀a. List a -> Int -> a = fun @a -> nth$ll1 @a
+let nth : ∀a. List a -> Int -> a = nth$ll1
 let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -32,15 +31,14 @@ let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
             | Nil @b -> Nil @c
             | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
 let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
-      fun @a @b @c -> zip_with$ll1 @a @b @c
+      zip_with$ll1
 let map$ll1 : ∀a b. (a -> b) -> List a -> List b =
       fun @a @b ->
         fun (f : a -> b) (xs : List a) ->
           match xs with
           | Nil @a -> Nil @b
           | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
-let map : ∀a b. (a -> b) -> List a -> List b =
-      fun @a @b -> map$ll1 @a @b
+let map : ∀a b. (a -> b) -> List a -> List b = map$ll1
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
@@ -67,7 +65,7 @@ let scanl$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> List b =
           in
           scanl_f
 let scanl : ∀a b. (b -> a -> b) -> b -> List a -> List b =
-      fun @a @b -> scanl$ll2 @a @b
+      scanl$ll2
 let sols$ll1 : List Int -> Int =
       fun (xs : List Int) ->
         sum_p (zip_with @Int @Int @Int mul_p sols xs)

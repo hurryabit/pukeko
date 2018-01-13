@@ -6,19 +6,19 @@ let (;ll1) : ∀a. IO a -> Unit -> IO a =
 let (;ll2) : ∀a. IO Unit -> IO a -> IO a =
       fun @a ->
         fun (m1 : IO Unit) (m2 : IO a) -> (>>=) @Unit @a m1 ((;ll1) @a m2)
-let (;) : ∀a. IO Unit -> IO a -> IO a = fun @a -> (;ll2) @a
+let (;) : ∀a. IO Unit -> IO a -> IO a = (;ll2)
 let fst$ll1 : ∀a b. Pair a b -> a =
       fun @a @b ->
         fun (p : Pair a b) ->
           match p with
           | Pair @a @b x fst$pm1 -> x
-let fst : ∀a b. Pair a b -> a = fun @a @b -> fst$ll1 @a @b
+let fst : ∀a b. Pair a b -> a = fst$ll1
 let snd$ll1 : ∀a b. Pair a b -> b =
       fun @a @b ->
         fun (p : Pair a b) ->
           match p with
           | Pair @a @b snd$pm1 y -> y
-let snd : ∀a b. Pair a b -> b = fun @a @b -> snd$ll1 @a @b
+let snd : ∀a b. Pair a b -> b = snd$ll1
 let main$ll1 : Int -> Int -> IO Unit =
       fun (x : Int) (y : Int) ->
         let p : Pair Int Int = Pair @Int @Int x y in

@@ -41,7 +41,9 @@ compile write_ll write_ti write_gm no_prelude unsafe file_user = do
     Right (Pukeko.MkModule _ module_ll, Pukeko.MkModule _ module_ti, module_cc, program, nasm) -> do
       when write_ll $ do
         writeFile (file_user `replaceExtension` ".ll") $
-          (render $ vcat $ map pretty module_ll) ++ "\n"
+          (render $ vcat $ map (pPrintPrec prettyNormal 0) module_ll) ++ "\n"
+        -- writeFile (file_user `replaceExtension` ".lls") $
+        --   unlines (map show module_ll) ++ "\n"
         writeFile (file_user `replaceExtension` ".co") $
           (render $ vcat $ map pretty module_cc) ++ "\n"
       when write_ti $

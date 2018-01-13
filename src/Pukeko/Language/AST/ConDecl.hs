@@ -58,3 +58,6 @@ instance Pretty (TConDecl n) where
 
 instance Pretty (DConDecl n) where
   pPrintPrec lvl prec MkDConDecl{_dname} = pPrintPrec lvl prec _dname
+
+instance Show (Some1 f) where
+  show _ = "Some1 ..."

@@ -9,8 +9,7 @@ let foldr$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
           match xs with
           | Nil @a -> y0
           | Cons @a x xs -> f x (foldr @a @b f y0 xs)
-let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-      fun @a @b -> foldr$ll1 @a @b
+let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b = foldr$ll1
 let take$ll1 : ∀a. Int -> List a -> List a =
       fun @a ->
         fun (n : Int) (xs : List a) ->
@@ -20,7 +19,7 @@ let take$ll1 : ∀a. Int -> List a -> List a =
             | Nil @a -> Nil @a
             | Cons @a x xs -> Cons @a x (take @a ((-) n 1) xs)
           | True -> Nil @a
-let take : ∀a. Int -> List a -> List a = fun @a -> take$ll1 @a
+let take : ∀a. Int -> List a -> List a = take$ll1
 let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -31,15 +30,14 @@ let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
             | Nil @b -> Nil @c
             | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
 let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
-      fun @a @b @c -> zip_with$ll1 @a @b @c
+      zip_with$ll1
 let append$ll1 : ∀a. List a -> List a -> List a =
       fun @a ->
         fun (xs : List a) (ys : List a) ->
           match xs with
           | Nil @a -> ys
           | Cons @a x xs -> Cons @a x (append @a xs ys)
-let append : ∀a. List a -> List a -> List a =
-      fun @a -> append$ll1 @a
+let append : ∀a. List a -> List a -> List a = append$ll1
 let concat : ∀a. List (List a) -> List a =
       fun @a -> foldr @(List a) @(List a) (append @a) (Nil @a)
 let map$ll1 : ∀a b. (a -> b) -> List a -> List b =
@@ -48,14 +46,13 @@ let map$ll1 : ∀a b. (a -> b) -> List a -> List b =
           match xs with
           | Nil @a -> Nil @b
           | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
-let map : ∀a b. (a -> b) -> List a -> List b =
-      fun @a @b -> map$ll1 @a @b
+let map : ∀a b. (a -> b) -> List a -> List b = map$ll1
 let concat_map$ll1 : ∀a b. (a -> List b) -> List a -> List b =
       fun @a @b ->
         fun (f : a -> List b) (xs : List a) ->
           concat @b (map @a @(List b) f xs)
 let concat_map : ∀a b. (a -> List b) -> List a -> List b =
-      fun @a @b -> concat_map$ll1 @a @b
+      concat_map$ll1
 let length$ll1 : ∀a. a -> Int -> Int =
       fun @a -> fun (x : a) (l : Int) -> (+) 1 l
 let length : ∀a. List a -> Int =
@@ -66,7 +63,7 @@ let replicate$ll1 : ∀a. Int -> a -> List a =
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
-let replicate : ∀a. Int -> a -> List a = fun @a -> replicate$ll1 @a
+let replicate : ∀a. Int -> a -> List a = replicate$ll1
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"

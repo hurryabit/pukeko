@@ -560,7 +560,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     ECon _ c -> pretty c
     ENum _ n -> int n
     EApp _ t us ->
-      maybeParens (prec > Op.aprec) $ hsep
+      maybeParens lvl (prec > Op.aprec) $ hsep
       $ pPrintPrec lvl Op.aprec t : map (pPrintPrec lvl (Op.aprec+1)) us
     -- This could be brought back in @EApp@ when @t@ is an operator.
     -- ApOp   { _op, _arg1, _arg2 } ->
@@ -583,26 +583,26 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     --     , nest 2 (pPrintPrec lvl 0 _else)
     --     ]
     EMat _ t as ->
-      maybeParens (prec > 0) $ vcat
+      maybeParens lvl (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList as)
     ECas _ t cs ->
-      maybeParens (prec > 0) $ vcat
+      maybeParens lvl (prec > 0) $ vcat
       $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList cs)
     ETyAbs _ vs e -> prettyETyAbs lvl prec vs (pPrintPrec lvl 0 e)
     ETyApp _ e0 ts ->
-      maybeParens (prec > Op.aprec)
+      maybeParens lvl (prec > Op.aprec)
       $ pPrintPrec lvl Op.aprec e0 <+> prettyAtType (pPrintPrecType lvl 3) ts
 
 prettyELam lvl prec bs e
   | null bs   = pPrintPrec lvl prec e
   | otherwise =
-      maybeParens (prec > 0)
+      maybeParens lvl (prec > 0)
       $ hang ("fun" <+> hsepMap (pPrintPrec lvl 1) bs <+> "->") 2 (pPrintPrec lvl 0 e)
 
-prettyETyAbs _ prec vs d
-  | null vs   = maybeParens (prec > 0) d
+prettyETyAbs lvl prec vs d
+  | null vs   = maybeParens lvl (prec > 0) d
   | otherwise =
-      maybeParens (prec > 0)
+      maybeParens lvl (prec > 0)
       $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 d
 
 prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
@@ -611,7 +611,7 @@ prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 instance (BaseTVar tv, PrettyStage st) => Pretty (Bind st tv) where
   pPrintPrec lvl prec (MkBind _ z t)
     | isEmpty td = zd
-    | otherwise  = maybeParens (prec > 0) (zd <+> colon <+> td)
+    | otherwise  = maybeParens lvl (prec > 0) (zd <+> colon <+> td)
     where
       zd = pretty z
       td = pPrintPrecType lvl 0 t
@@ -635,9 +635,15 @@ instance (BaseTVar tv, PrettyStage st) => Pretty (Patn st tv) where
     PWld _      -> "_"
     PVar _ x    -> pretty x
     PCon _ c ts ps ->
-      maybeParens (prec > 0 && (not (null ts) || not (null ps)))
+      maybeParens lvl (prec > 0 && (not (null ts) || not (null ps)))
       $ pretty c
         <+> prettyAtType (pPrintPrecType lvl 3) ts
         <+> hsep (map (pPrintPrec lvl 1) ps)
 
--- * Derived instances
+deriving instance (StageType st ~ Type) => Show (TopLevel st)
+deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
+deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
+deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Case st tv ev)
+deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
+deriving instance (StageType st ~ Type, Show tv) => Show (Patn st tv)
+deriving instance (StageType st ~ Type, Show tv) => Show (Bind st tv)

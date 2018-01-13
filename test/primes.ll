@@ -13,15 +13,14 @@ let nth$ll1 : ∀a. List a -> Int -> a =
             match (<=) n 0 with
             | False -> nth @a xs ((-) n 1)
             | True -> x
-let nth : ∀a. List a -> Int -> a = fun @a -> nth$ll1 @a
+let nth : ∀a. List a -> Int -> a = nth$ll1
 let append$ll1 : ∀a. List a -> List a -> List a =
       fun @a ->
         fun (xs : List a) (ys : List a) ->
           match xs with
           | Nil @a -> ys
           | Cons @a x xs -> Cons @a x (append @a xs ys)
-let append : ∀a. List a -> List a -> List a =
-      fun @a -> append$ll1 @a
+let append : ∀a. List a -> List a -> List a = append$ll1
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
@@ -30,7 +29,7 @@ let repeat$ll1 : ∀a. List a -> List a =
         fun (xs : List a) ->
           let rec ys : List a = append @a xs ys in
           ys
-let repeat : ∀a. List a -> List a = fun @a -> repeat$ll1 @a
+let repeat : ∀a. List a -> List a = repeat$ll1
 let psums$ll1 : (Int -> List Int -> List Int) -> Int -> List Int -> List Int =
       fun (psums0 : Int -> List Int -> List Int) (n : Int) (xs : List Int) ->
         match xs with
@@ -56,8 +55,7 @@ let filter$ll2 : ∀a. (a -> Bool) -> List a -> List a =
         fun (p : a -> Bool) ->
           let rec filter_p : List a -> List a = filter$ll1 @a p filter_p in
           filter_p
-let filter : ∀a. (a -> Bool) -> List a -> List a =
-      fun @a -> filter$ll2 @a
+let filter : ∀a. (a -> Bool) -> List a -> List a = filter$ll2
 let sieve$ll1 : Int -> Int -> Bool =
       fun (p : Int) (k : Int) -> (!=) ((%) k p) 0
 let sieve$ll2 : List Int -> List Int =

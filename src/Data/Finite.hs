@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeOperators #-}
 module Data.Finite
   ( Finite
+  , absurd0
   , unsafeFromInt
   , toInt
   , shift
@@ -13,7 +14,10 @@ import Data.Proxy
 import GHC.TypeLits
 
 newtype Finite (n :: Nat) = Finite Int
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
+
+absurd0 :: Finite 0 -> a
+absurd0 (Finite _) = error "absurd0"
 
 unsafeFromInt :: Int -> Finite n
 unsafeFromInt = Finite

@@ -12,6 +12,7 @@ import           Pukeko.Language.AST.Std        (Module (..))
 import           Pukeko.Language.AST.Stage      (Typed)
 import qualified Pukeko.Language.CoreCompiler   as CoreCompiler
 import qualified Pukeko.Language.DeadCode       as DeadCode
+import qualified Pukeko.Language.EtaReducer     as EtaReducer
 import qualified Pukeko.Language.Renamer        as Renamer
 import qualified Pukeko.Language.KindChecker    as KindChecker
 import qualified Pukeko.Language.LambdaLifter   as LambdaLifter
@@ -40,6 +41,7 @@ compileToCore unsafe module_pu = do
   module_ll <- pure module_ti
                >>= typeChecked PatternMatcher.compileModule
                >>= typeChecked (pure . LambdaLifter.liftModule)
+               >>= typeChecked (pure . EtaReducer.reduceModule)
                >>= typeChecked (pure . DeadCode.cleanModule)
   let module_cc = CoreCompiler.compileModule module_ll
   return (module_cc, module_ll, module_ti)

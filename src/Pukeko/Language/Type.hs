@@ -21,7 +21,7 @@ module Pukeko.Language.Type
   )
   where
 
-import           Control.Lens
+import           Control.Lens  hiding ((.=))
 import           Control.Monad
 import           Data.Foldable (toList)
 import qualified Data.Map      as Map
@@ -54,7 +54,7 @@ pattern TFun tx ty = TApp (TApp TArr tx) ty
 
 mkTUni :: KnownNat n => Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
 mkTUni xs t
-  | null xs   = fmap strengthen t
+  | null xs   = fmap unsafeStrengthen t
   | otherwise = TUni xs t
 
 (~>) :: Type tv -> Type tv -> Type tv
@@ -129,14 +129,11 @@ instance BaseTVar tv => Pretty (Type tv) where
     TArr   -> "(->)"
     TCon c -> pretty c
     TFun tx ty ->
-      maybeParens (prec > 1) (pPrintPrec lvl 2 tx <+> "->" <+> pPrintPrec lvl 1 ty)
+      maybeParens lvl (prec > 1) (pPrintPrec lvl 2 tx <+> "->" <+> pPrintPrec lvl 1 ty)
     TApp tf tx ->
-      maybeParens (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
+      maybeParens lvl (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
     TUni vs tq ->
-      maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> pPrintPrec lvl 0 tq)
-
-instance BaseTVar tv => Show (Type tv) where
-  show = prettyShow
+      maybeParens lvl (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> pPrintPrec lvl 0 tq)
 
 deriving instance Functor     Type
 deriving instance Foldable    Type
@@ -160,3 +157,5 @@ instance FunctorWithIndex     Pos NoType where
 instance FoldableWithIndex    Pos NoType where
 instance TraversableWithIndex Pos NoType where
   itraverse _ NoType = pure NoType
+
+deriving instance Show tv => Show (Type tv)

@@ -116,14 +116,14 @@ prettyUType lvl prec = \case
   UTFun tx ty -> do
     px <- prettyUType lvl 2 tx
     py <- prettyUType lvl 1 ty
-    pure $ maybeParens (prec > 1) $ px <+> "->" <+> py
+    pure $ maybeParens lvl (prec > 1) $ px <+> "->" <+> py
   UTApp tf tx -> do
     pf <- prettyUType lvl 2 tf
     px <- prettyUType lvl 3 tx
-    pure $ maybeParens (prec > 2) $ pf <+> px
+    pure $ maybeParens lvl (prec > 2) $ pf <+> px
   UTUni xs tq -> do
     pq <- prettyUType lvl 0 tq
-    pure $ maybeParens (prec > 0) $ "∀" <> hsepMap pretty xs <> "." <+> pq
+    pure $ maybeParens lvl (prec > 0) $ "∀" <> hsepMap pretty xs <> "." <+> pq
   UVar uref -> do
     uvar <- readSTRef uref
     prettyUVar lvl prec uvar

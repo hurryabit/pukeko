@@ -6,15 +6,14 @@ let foldr$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
           match xs with
           | Nil @a -> y0
           | Cons @a x xs -> f x (foldr @a @b f y0 xs)
-let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-      fun @a @b -> foldr$ll1 @a @b
+let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b = foldr$ll1
 let replicate$ll1 : ∀a. Int -> a -> List a =
       fun @a ->
         fun (n : Int) (x : a) ->
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
-let replicate : ∀a. Int -> a -> List a = fun @a -> replicate$ll1 @a
+let replicate : ∀a. Int -> a -> List a = replicate$ll1
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -24,7 +23,7 @@ let (;ll1) : ∀a. IO a -> Unit -> IO a =
 let (;ll2) : ∀a. IO Unit -> IO a -> IO a =
       fun @a ->
         fun (m1 : IO Unit) (m2 : IO a) -> (>>=) @Unit @a m1 ((;ll1) @a m2)
-let (;) : ∀a. IO Unit -> IO a -> IO a = fun @a -> (;ll2) @a
+let (;) : ∀a. IO Unit -> IO a -> IO a = (;ll2)
 let sequence_io$ll1 : ∀a. a -> List a -> IO (List a) =
       fun @a ->
         fun (x : a) (xs : List a) -> return @(List a) (Cons @a x xs)
@@ -38,8 +37,7 @@ let sequence_io$ll3 : ∀a. List (IO a) -> IO (List a) =
           match ms with
           | Nil @(IO a) -> return @(List a) (Nil @a)
           | Cons @(IO a) m ms -> (>>=) @a @(List a) m (sequence_io$ll2 @a ms)
-let sequence_io : ∀a. List (IO a) -> IO (List a) =
-      fun @a -> sequence_io$ll3 @a
+let sequence_io : ∀a. List (IO a) -> IO (List a) = sequence_io$ll3
 let iter_io$ll1 : ∀a. (a -> IO Unit) -> a -> IO Unit -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) (x : a) (m : IO Unit) -> (;) @Unit (f x) m
@@ -47,8 +45,7 @@ let iter_io$ll2 : ∀a. (a -> IO Unit) -> List a -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) ->
           foldr @a @(IO Unit) (iter_io$ll1 @a f) (return @Unit Unit)
-let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
-      fun @a -> iter_io$ll2 @a
+let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit = iter_io$ll2
 let insert$ll1 : Int -> List Int -> List Int =
       fun (y : Int) (xs : List Int) ->
         match xs with

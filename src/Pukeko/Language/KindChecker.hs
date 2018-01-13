@@ -203,7 +203,7 @@ prettyKind prec = \case
   Arrow kf kp -> do
     df <- prettyKind True  kf
     dp <- prettyKind False kp
-    pure $ maybeParens prec (df <+> "->" <+> dp)
+    pure $ maybeParens prettyNormal prec (df <+> "->" <+> dp)
   UVar uref -> do
     uvar <- readSTRef uref
     case uvar of

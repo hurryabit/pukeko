@@ -16,6 +16,8 @@ module Pukeko.Language.AST.Scope
   , _Free
   , mkBound
   , strengthen
+  , strengthenWith
+  , unsafeStrengthen
   , weaken
   , abstract1
   , dist
@@ -74,11 +76,21 @@ scope' f g = \case
 mkBound :: i -> b -> Scope b i v
 mkBound i b = Bound i (Forget b)
 
+strengthenEither :: Scope b i v -> Either (i, b) v
+strengthenEither = \case
+  Bound i (Forget b) -> Left  (i, b)
+  Free  x            -> Right x
+
+strengthen :: Scope b i v -> Maybe v
+strengthen = either (const Nothing) Just . strengthenEither
+
+strengthenWith :: (forall j. i -> j) -> Scope b i v -> v
+strengthenWith f = either (f . fst) id . strengthenEither
+
 -- TODO: Use @HasCallstack@.
-strengthen :: Show b => Scope b i v -> v
-strengthen = \case
-  Bound _ (Forget b) -> bugWith "cannot strengthen" b
-  Free  x            -> x
+unsafeStrengthen :: Show b => Scope b i v -> v
+unsafeStrengthen =
+  either (\(_, b) -> error ("cannot strengthen " ++ show b)) id . strengthenEither
 
 weaken :: v -> Scope b i v
 weaken = Free

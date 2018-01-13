@@ -23,3 +23,6 @@ class HasPos a where
 
 instance Pretty Pos where
   pPrintPrec _ _ (Pos p) = maybe "no position" (text . show) p
+
+instance Show Pos where
+  show = prettyShow

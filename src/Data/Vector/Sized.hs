@@ -91,3 +91,5 @@ instance TraversableWithIndex (Finite n) (Vector n) where
   itraverse f (MkVector v) =
     -- TODO: Make this more efficient.
     MkVector <$> traverse (uncurry f) (V.imap (\i x -> (unsafeFromInt i, x)) v)
+
+deriving instance Show a => Show (Vector n a)
