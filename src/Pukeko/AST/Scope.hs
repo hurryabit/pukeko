@@ -36,6 +36,7 @@ module Pukeko.AST.Scope
   where
 
 import           Control.Lens
+import           Data.CallStack
 import           Data.Finite       (Finite)
 import           Data.Forget
 import qualified Data.Map          as Map
@@ -85,10 +86,8 @@ strengthen = either (const Nothing) Just . strengthenEither
 strengthenWith :: (forall j. i -> j) -> Scope b i v -> v
 strengthenWith f = either (f . fst) id . strengthenEither
 
--- TODO: Use @HasCallstack@.
-unsafeStrengthen :: Show b => Scope b i v -> v
-unsafeStrengthen =
-  either (\(_, b) -> error ("cannot strengthen " ++ show b)) id . strengthenEither
+unsafeStrengthen :: (HasCallStack, Show b) => Scope b i v -> v
+unsafeStrengthen = either (bugWith "unsafeStrengthen" . snd) id . strengthenEither
 
 weaken :: v -> Scope b i v
 weaken = Free

@@ -331,6 +331,17 @@ let f x = x
 val bad : List a
 let bad = let rec x = Cons x Nil in x
 
+-- TEST no overgeneralization
+-- FAILURE (line 5, column 5): mismatching types Int and Bool
+val f : Int
+let f =
+  let g x =
+    let h y = x in
+    if h True then 0 else h False
+  in
+  0
+
+
 -- SUBSECTION misc
 
 -- TEST function application unifies

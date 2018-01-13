@@ -117,11 +117,10 @@ instantiate ts = do
   (,) uvars <$> liftST (subst env t0)
 
 instantiateTCon ::
-  Con.TConDecl n -> TI v s (UType s Void, [UType s Void], Map.Map Id.TVar (UType s Void))
-instantiateTCon (Con.MkTConDecl tcon params0 _dcons) = do
-  let params1 = toList params0
-  t_params <- traverse (const freshUVar) params1
-  return (appTCon tcon t_params, t_params, Map.fromList (zip params1 t_params))
+  Con.TConDecl n -> TI v s (UType s Void, Vec.Vector n (UType s Void))
+instantiateTCon (Con.MkTConDecl tcon params _dcons) = do
+  t_params <- traverse (const freshUVar) params
+  return (appTCon tcon (toList t_params), t_params)
 
 inferPatn ::
   Patn In Void -> UType s Void -> TI v s (Patn (Aux s) Void, Map.Map Id.EVar (UType s Void))
@@ -133,14 +132,12 @@ inferPatn patn t_expr = case patn of
     when (length ps0 /= length _fields) $
       throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
       "expects" <+> int (length _fields) <+> "arguments"
-    (t_inst, t_params, env_inst) <- instantiateTCon tcon
+    (t_inst, t_params) <- instantiateTCon tcon
     unify w t_expr t_inst
-    -- TODO: Remove this @fmap baseName@ hack.
-    t_fields <- liftST $ traverse (subst env_inst . open1 . fmap baseTVar) _fields
+    let t_fields = map (open1 . fmap (scope absurd (t_params Vec.!))) _fields
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
-    pure (PCon w dcon t_params ps1, Map.unions binds)
+    pure (PCon w dcon (toList t_params) ps1, Map.unions binds)
 
--- TODO: Add test to ensure types are generalized properly.
 inferLet ::
   (HasEnv v) =>
   Vec.Vector n (Defn In Void v) ->
@@ -318,7 +315,6 @@ qualTopLevel = \case
   TLTyp w ds -> pure (TLTyp w ds)
   TLDef d -> TLDef <$> qualDefn d
   TLAsm (MkBind w x ts) s -> do
-    -- TODO: Avoid code duplication with qualDefn.
     t1 <- case ts of
       UTUni ys0 t0 ->
         Vec.withList (toList ys0) $ \ys1 ->

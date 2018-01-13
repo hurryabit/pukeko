@@ -75,13 +75,13 @@ appTCon = appN . UTCon
 open :: Type Void -> UType s Void
 open = open1 . fmap absurd
 
-open1 :: Type Id.TVar -> UType s Void
+open1 :: Type (UType s Void) -> UType s Void
 open1 = \case
-  TVar x -> UTVar x
+  TVar t -> t
   TArr -> UTArr
   TCon c -> UTCon c
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
-  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id (xs Vec.!)) tq))
+  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id (UTVar . (xs Vec.!))) tq))
 
 subst :: Map.Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env t = runReaderT (subst' t) env

@@ -84,7 +84,6 @@ pmMatch w rowMatch0 = do
       grpMatch <- groupCPatns w conCol rowMatch4
       grpMatchExpr w grpMatch
 
--- TODO: Do this in a more principled way.
 data BPatn
   = BWild Pos
   | BName Pos Id.EVar
