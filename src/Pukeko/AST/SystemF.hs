@@ -106,8 +106,8 @@ data Expr st tv ev
     ECas Pos (Expr st tv ev) (NE.NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
     EMat Pos (Expr st tv ev) (NE.NonEmpty (Altn st tv ev))
-  | forall n. (HasTypes st ~ 'True, KnownNat n) =>
-    ETyAbs Pos (Vector n Id.TVar) (Expr st (TFinScope n tv) ev)
+  | forall m. (HasTypes st ~ 'True, KnownNat m) =>
+    ETyAbs Pos (Vector m Id.TVar) (Expr st (TFinScope m tv) ev)
   | HasTypes st ~ 'True =>
     ETyApp Pos (Expr st tv ev) [StageType st tv]
 
@@ -619,12 +619,16 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
       maybeParens lvl (prec > Op.aprec)
       $ pPrintPrec lvl Op.aprec e0 <+> prettyAtType (pPrintPrecType lvl 3) ts
 
+prettyELam ::
+  (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
+  PrettyLevel -> Rational -> Vector n (Bind st tv) -> Expr st tv (EFinScope n ev) -> Doc
 prettyELam lvl prec bs e
   | null bs   = pPrintPrec lvl prec e
   | otherwise =
       maybeParens lvl (prec > 0)
       $ hang ("fun" <+> hsepMap (pPrintPrec lvl 1) bs <+> "->") 2 (pPrintPrec lvl 0 e)
 
+prettyETyAbs :: PrettyLevel -> Rational -> Vector m Id.TVar -> Doc -> Doc
 prettyETyAbs lvl prec vs d
   | null vs   = maybeParens lvl (prec > 0) d
   | otherwise =

@@ -32,7 +32,6 @@ default-extensions:
 ghc-options:
 - -Wall
 - -Werror
-- -Wno-missing-signatures
 - -Wno-name-shadowing
 - -Wno-partial-type-signatures
 
@@ -80,6 +79,7 @@ tests:
     other-modules: []
     source-dirs: test
     ghc-options:
+    - -Wno-missing-signatures
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
@@ -95,6 +95,7 @@ tests:
     other-modules: []
     source-dirs: test
     ghc-options:
+    - -Wno-missing-signatures
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
