@@ -21,7 +21,7 @@ newtype GammaT tv ev m a = GammaT{unGammaT :: ReaderT (GammaEnv tv ev) m a}
            , MonadError e, MonadSupply s, MonadWriter w
            )
 
-deriving instance (MonadInfo i m) => MonadInfo i (GammaT tv ev m)
+deriving instance (MonadInfo m) => MonadInfo (GammaT tv ev m)
 
 runGammaT :: GammaT Void Void m a -> m a
 runGammaT m = runReaderT (unGammaT m) (Const ())

@@ -43,16 +43,8 @@ type HasLambda st = StageId st <=? 650
 type HasNested st = StageId st <=? 450
 type HasTypes  st = 400 <=? StageId st
 
-type HasTLTyp st = StageId st <=? 250
-type HasTLVal st = StageId st <=? 275  -- NOTE: This odd number is a hack for
-                                       -- the pretty printer
-
-type HasMICons st = 200 <=? StageId st
-type HasMIFuns st = 250 <=? StageId st
-
 type SameTopNodes st1 st2 =
-  ( HasTLTyp  st1 ~ HasTLTyp  st2
-  , HasTLVal  st1 ~ HasTLVal  st2
+  ( Untyped   st1 ~ Untyped   st2
   , HasLambda st1 ~ HasLambda st2
   )
 type SameNodes st1 st2 =
@@ -63,16 +55,10 @@ type SameNodes st1 st2 =
 
 type SameTypes st1 st2 = (StageType st1 ~ StageType st2)
 
-type SameModuleInfo st1 st2 =
-  ( HasMICons st1 ~ HasMICons st2
-  , HasMIFuns st1 ~ HasMIFuns st2
-  )
-
-type Typed st =
-  ( StageType st ~ Type
-  , HasMICons st ~ 'True
-  , HasMIFuns st ~ 'True
-  )
+-- NOTE: We cannot express that @Untyped@ shall be the negation of @Typed@ in
+-- the type system, so we need to ensure this by hand.
+type Typed st = (StageType st ~ Type)
+type Untyped st = (StageId st <=? 300)
 
 type family (&&) (x :: Bool) (y :: Bool) where
   'True  && 'True  = 'True

@@ -12,7 +12,6 @@ import           GHC.TypeLits        (KnownNat)
 import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ModuleInfo as MI
 import qualified Pukeko.AST.ConDecl    as Con
 import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
@@ -32,10 +31,10 @@ newtype TR a = TR {unTR :: StateT TRState (Except String) a}
            , MonadState TRState
            )
 
-runTR :: MonadError String m => TR a -> m (a, TRState)
-runTR tr =
+evalTR :: MonadError String m => TR a -> m a
+evalTR tr =
   let st = MkTRState mempty mempty
-  in  runExcept (runStateT (unTR tr) st)
+  in  runExcept (evalStateT (unTR tr) st)
 
 -- TODO: Use proper terminology in error messages.
 trType :: Pos -> Type tv -> TR (Type tv)
@@ -76,7 +75,4 @@ trTopLevel top = case top of
   TLAsm   b a  -> pure (TLAsm (retagBind b) a)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
-resolveModule (MkModule _info0 tops0) = do
-  (tops1, MkTRState tcons1 dcons1) <- runTR (traverse trTopLevel tops0)
-  let info1 = MI.MkModuleInfo (MI.Present tcons1) (MI.Present dcons1) MI.Absent
-  pure (MkModule info1 tops1)
+resolveModule m0 = evalTR (module2tops (traverse trTopLevel) m0)

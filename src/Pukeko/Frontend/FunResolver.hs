@@ -10,7 +10,6 @@ import qualified Data.Set      as Set
 import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ModuleInfo as MI
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
@@ -35,14 +34,12 @@ runFR fr = runExcept (runStateT (unFR fr) st0)
     st0 = MkFRState mempty mempty
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
-resolveModule (MkModule info0 tops0) = do
+resolveModule (MkModule tops0) = do
   (tops1, MkFRState decld defnd) <- runFR (traverse frTopLevel tops0)
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   case Map.minViewWithKey undefnd of
     Just ((fun, (w, _)), _) -> throwAt w "declared but undefined function" fun
-    Nothing -> do
-      let info1 = info0{MI._info2funs = MI.Present decld}
-      pure (MkModule info1 tops1)
+    Nothing -> pure (MkModule tops1)
 
 declareFun :: Pos -> Id.EVar -> Type Void -> FR ()
 declareFun w fun typ = do

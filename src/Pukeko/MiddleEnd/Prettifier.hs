@@ -8,19 +8,16 @@ import qualified Data.Set      as Set
 import qualified Data.Set.Lens as Set
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage
-import           Pukeko.AST.ModuleInfo (info2funs)
 import qualified Pukeko.AST.Identifier as Id
 
-prettifyModule :: (HasTLTyp st ~ 'False, HasTLVal st ~ 'False) => Module st -> Module st
-prettifyModule (MkModule info0 tops0) =
+prettifyModule :: Module st -> Module st
+prettifyModule (MkModule tops0) =
   let xs = Set.setOf (traverse . top2lhs) tops0
       mp = cluster xs
       rename x = Map.findWithDefault x x mp
-      info1 = over info2funs (Map.mapKeys rename) info0
       tops1 = over (traverse . top2lhs) rename tops0
       tops2 = over (traverse . top2eval) rename tops1
-  in  MkModule info1 tops2
+  in  MkModule tops2
 
 cluster :: Set.Set Id.EVar -> Map.Map Id.EVar Id.EVar
 cluster xs0 =

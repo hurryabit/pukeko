@@ -1,10 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.Type
-  ( NoType (..)
+  ( IsType (..)
+  , NoType (..)
   , Type (..)
   , mkTUni
   , pattern TFun
@@ -23,21 +25,27 @@ module Pukeko.AST.Type
 
 import           Control.Lens  hiding ((.=))
 import           Control.Monad
+import           Data.CallStack
+import           Data.Finite   (absurd0)
 import           Data.Foldable (toList)
 import qualified Data.Map      as Map
-import           Data.Ratio    () -- for precedences in pretty printer
+import           Data.Proxy
 import qualified Data.Set      as Set
 import qualified Data.Set.Lens as Set
 import           Data.Type.Equality ((:~:) (Refl))
 import qualified Data.Vector.Sized as Vec
 import           GHC.TypeLits
 
+import           Pukeko.Error
 import           Pukeko.Pretty
 import           Pukeko.AST.Pos
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
 infixr 1 ~>, *~>
+
+class IsType t where
+  isType :: t tv -> Maybe (Type tv)
 
 data NoType tv = NoType
 
@@ -52,10 +60,12 @@ data Type tv
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
 
-mkTUni :: KnownNat n => Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
-mkTUni xs t
-  | null xs   = fmap unsafeStrengthen t
-  | otherwise = TUni xs t
+mkTUni ::
+  forall n tv. KnownNat n => Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
+mkTUni xs t =
+  case sameNat (Proxy @n) (Proxy @0) of
+    Nothing   -> TUni xs t
+    Just Refl -> fmap (strengthenWith absurd0) t
 
 (~>) :: Type tv -> Type tv -> Type tv
 (~>) = TFun
@@ -79,11 +89,11 @@ typeInt  = TCon (Id.tcon "Int")
 vars :: Ord tv => Type tv -> Set.Set tv
 vars = Set.setOf traversed
 
-toPrenex :: Type Id.TVar -> Type Void
+toPrenex :: HasCallStack => Type Id.TVar -> Type Void
 toPrenex t =
   Vec.withList (toList (vars t)) $ \xs ->
     let env = ifoldMap (\i x -> Map.singleton x (mkBound i x)) xs
-    in  mkTUni xs (fmap (env Map.!) t)
+    in  mkTUni xs (fmap (\x -> Map.findWithDefault (bugWith "toPrexex" x) x env) t)
 
 -- * Deep traversals
 type2tcon :: Traversal' (Type tv) Id.TCon
@@ -93,6 +103,12 @@ type2tcon f = \case
   TCon c     -> TCon <$> f c
   TApp tf tp -> TApp <$> type2tcon f tf <*> type2tcon f tp
   TUni xs tq -> TUni xs <$> type2tcon f tq
+
+instance IsType NoType where
+  isType = const Nothing
+
+instance IsType Type where
+  isType = Just
 
 instance (Eq tv) => Eq (Type tv) where
   t1 == t2 = case (t1, t2) of

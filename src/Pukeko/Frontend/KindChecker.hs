@@ -11,7 +11,6 @@ import           Control.Monad.State
 import           Control.Monad.ST
 import           Data.Foldable
 import           Data.Forget      (Forget (..))
-import           Data.Maybe       (catMaybes)
 import qualified Data.Map         as Map
 import           Data.STRef
 import           Data.Traversable
@@ -116,21 +115,19 @@ kcVal = \case
       localize env (kcType Star t)
 
 
-kcTopLevel :: TopLevel In -> KC n s (Maybe (TopLevel Out))
+kcTopLevel :: TopLevel In -> KC n s (TopLevel Out)
 kcTopLevel = \case
   TLTyp w tcons -> do
     here w (kcTypDef tcons)
-    pure Nothing
-  TLVal w _ t -> do
+    pure (TLTyp w tcons)
+  TLVal w z t -> do
     here w (kcVal t)
-    pure Nothing
-  TLDef d -> yield (TLDef (retagDefn d))
-  TLAsm   b a -> yield (TLAsm (retagBind b) a)
-  where
-    yield = pure . Just
+    pure (TLVal w z t)
+  TLDef d -> pure (TLDef (retagDefn d))
+  TLAsm b a -> pure (TLAsm (retagBind b) a)
 
 kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2tops (fmap catMaybes . traverse kcTopLevel)
+kcModule = module2tops (traverse kcTopLevel)
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule module_ = runKC (kcModule module_)

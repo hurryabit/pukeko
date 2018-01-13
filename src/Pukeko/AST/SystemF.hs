@@ -4,9 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.SystemF
-  ( GenModuleInfo (..)
-  , ModuleInfo
-  , Module (..)
+  ( Module (..)
   , TopLevel (..)
   , Defn (..)
   , Expr (..)
@@ -69,20 +67,13 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Classes
 import           Pukeko.AST.Stage
 import           Pukeko.AST.Scope
-import           Pukeko.AST.ModuleInfo
 import           Pukeko.AST.ConDecl
 
-type ModuleInfo st = GenModuleInfo (HasMICons st) (HasMIFuns st)
-
-data Module st = MkModule
-  { _moduleInfo :: GenModuleInfo (HasMICons st) (HasMIFuns st)
-  , _moduleTops :: [TopLevel st]
-  }
+data Module st = MkModule [TopLevel st]
 
 data TopLevel st
-  = HasTLTyp st ~ 'True =>
-    TLTyp Pos [Some1 TConDecl]
-  | HasTLVal st ~ 'True =>
+  = TLTyp Pos [Some1 TConDecl]
+  | Untyped st ~ 'True =>
     TLVal Pos Id.EVar (Type Void)
   | HasLambda st ~ 'True =>
     TLDef     (Defn st Void Void)
@@ -199,15 +190,13 @@ pdist w (Bound i x) = EVar w (Bound i x)
 pdist _ (Free t)    = fmap Free t
 
 -- * Lenses and traversals
-module2tops ::
-  SameModuleInfo st1 st2 =>
-  Lens (Module st1) (Module st2) [TopLevel st1] [TopLevel st2]
-module2tops f (MkModule info tops) = MkModule info <$> f tops
+module2tops :: Lens (Module st1) (Module st2) [TopLevel st1] [TopLevel st2]
+module2tops f (MkModule tops) = MkModule <$> f tops
 
-top2lhs ::
-  (HasTLTyp st ~ 'False, HasTLVal st ~ 'False) =>
-  IndexedLens' Pos (TopLevel st) Id.EVar
+top2lhs :: IndexedTraversal' Pos (TopLevel st) Id.EVar
 top2lhs f = \case
+  top@TLTyp{} -> pure top
+  top@TLVal{} -> pure top
   TLDef d -> TLDef <$> defn2lhs (bind2evar f) d
   TLSup w z vs t xs e -> (\z' -> TLSup w z' vs t xs e) <$> indexed f w z
   TLAsm b s -> (\b' -> TLAsm b' s) <$> bind2evar f b
@@ -560,11 +549,13 @@ instance PrettyType Type where
 
 type PrettyStage st = PrettyType (StageType st)
 
-instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (Module st) where
-  pPrintPrec lvl prec (MkModule _info tops) = vcat (map (pPrintPrec lvl prec) tops)
+instance (PrettyStage st) => Pretty (Module st) where
+  pPrintPrec lvl prec (MkModule tops) = vcat (map (pPrintPrec lvl prec) tops)
 
-instance (HasTLTyp st ~ 'False, PrettyStage st) => Pretty (TopLevel st) where
+instance (PrettyStage st) => Pretty (TopLevel st) where
   pPrintPrec lvl prec = \case
+    -- FIXME: Print type declarations.
+    TLTyp{} -> mempty
     TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
     TLDef     d -> "let" <+> pretty d

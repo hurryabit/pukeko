@@ -6,25 +6,21 @@ where
 
 import           Control.Lens
 import qualified Data.Graph    as G
-import qualified Data.Map      as Map
+import           Data.Maybe    (mapMaybe)
 import qualified Data.Set      as Set
 import qualified Data.Set.Lens as Set
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.ModuleInfo (info2funs)
-import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.Identifier as Id
 
-type ElimStage st = (St.HasTLTyp st ~ 'False, St.HasTLVal st ~ 'False)
-
-cleanModule :: (ElimStage st) => Module st -> Module st
-cleanModule (MkModule info0 tops0) =
-  let (g, out, in_) = G.graphFromEdges $ map (\t -> (t, t^.top2lhs, deps t)) tops0
+cleanModule :: Module st -> Module st
+cleanModule (MkModule tops0) =
+  let edges t = fmap (\lhs -> (t, lhs, deps t)) (firstOf top2lhs t)
+      (g, out, in_) = G.graphFromEdges $ mapMaybe edges tops0
       reach = Set.fromList
               $ map (view _2 . out) $ maybe [] (G.reachable g) (in_ Id.main)
       keep = (`Set.member` reach)
-      info1 = over info2funs (Map.filterWithKey (const . keep)) info0
-      tops1 = filter (keep . view top2lhs) tops0
-  in  MkModule info1 tops1
+      tops1 = filter (maybe True keep . firstOf top2lhs) tops0
+  in  MkModule tops1
   where
     deps = Set.toList . Set.setOf top2eval

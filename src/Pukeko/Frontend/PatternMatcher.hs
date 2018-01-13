@@ -29,15 +29,15 @@ import qualified Pukeko.AST.Identifier              as Id
 type In  = St.Inferencer Type
 type Out = St.PatternMatcher
 
-newtype PM a = PM{unPM :: InfoT (ModuleInfo In) (StateT [Id.EVar] (Except String)) a}
+newtype PM a = PM{unPM :: InfoT (StateT [Id.EVar] (Except String)) a}
   deriving ( Functor, Applicative, Monad
-           , MonadInfo (GenModuleInfo 'True 'True)
+           , MonadInfo
            , MonadState [Id.EVar]
            , MonadError String
            )
 
-evalPM :: MonadError String m => PM a -> ModuleInfo In -> m a
-evalPM pm decls = runExcept $ evalStateT (runInfoT (unPM pm) decls) []
+evalPM :: MonadError String m => PM a -> Module In -> m a
+evalPM pm m0 = runExcept $ evalStateT (runInfoT (unPM pm) m0) []
 
 freshEVar :: PM Id.EVar
 freshEVar = state (\(x:xs) -> (x, xs))
@@ -60,14 +60,14 @@ pmExpr = \case
 
 pmTopLevel :: TopLevel In -> PM (TopLevel Out)
 pmTopLevel = \case
+  TLTyp w ds -> pure (TLTyp w ds)
   TLDef (MkDefn b e) -> do
     put (Id.freshEVars "pm" (b^.bindEVar))
     TLDef <$> MkDefn (retagBind b) <$> pmExpr e
   TLAsm b a -> pure (TLAsm (retagBind b) a)
 
 compileModule :: MonadError String m => Module In -> m (Module Out)
-compileModule (MkModule decls tops) =
-  MkModule decls <$> evalPM (traverse pmTopLevel tops) decls
+compileModule m0 = evalPM (module2tops (traverse pmTopLevel) m0) m0
 
 pmMatch ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>

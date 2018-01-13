@@ -22,7 +22,6 @@ import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
-import qualified Pukeko.AST.ModuleInfo as MI
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
@@ -35,10 +34,10 @@ type IsTVar tv = (Ord tv, BaseTVar tv)
 type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev a =
-  GammaT tv ev (InfoT (ModuleInfo In) (SupplyT Id.EVar (Writer [TopLevel Out]))) a
+  GammaT tv ev (InfoT (SupplyT Id.EVar (Writer [TopLevel Out]))) a
 
-execLL :: LL Void Void () -> ModuleInfo In -> [TopLevel Out]
-execLL ll info = execWriter (evalSupplyT (runInfoT (runGammaT ll) info) [])
+execLL :: LL Void Void () -> Module In -> [TopLevel Out]
+execLL ll m0 = execWriter (evalSupplyT (runInfoT (runGammaT ll) m0) [])
 
 yield :: TopLevel Out -> LL tv ev ()
 yield top = tell [top]
@@ -117,19 +116,14 @@ llCase (MkCase w dcon ts0 bs e) = do
 
 llTopLevel :: TopLevel In -> LL Void Void ()
 llTopLevel = \case
+  TLTyp w ds -> yield (TLTyp w ds)
   TLDef (MkDefn (MkBind w lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" lhs)
     rhs <- llExpr rhs
     yield (TLSup w lhs Vec.empty (fmap absurd t) Vec.empty (bimap absurd absurd rhs))
   TLAsm b asm -> yield (TLAsm (retagBind b :: Bind Out Void) asm)
 
-collectFuns :: [TopLevel Out] -> Map.Map Id.EVar (Pos, Type Void)
-collectFuns = foldMap $ \case
-  TLSup w z vs t _ _ -> Map.singleton z (w, mkTUni vs t)
-  TLAsm (MkBind w z t) _ -> Map.singleton z (w, t)
-
 liftModule :: Module In -> Module Out
-liftModule (MkModule info0 tops0) =
-  let tops1 = execLL (traverse_ llTopLevel tops0) info0
-      info1 = set MI.info2funs (collectFuns tops1) info0
-  in  MkModule info1 tops1
+liftModule m0@(MkModule tops0) =
+  let tops1 = execLL (traverse_ llTopLevel tops0) m0
+  in  MkModule tops1

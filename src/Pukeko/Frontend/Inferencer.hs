@@ -14,6 +14,7 @@ import           Control.Monad.ST.Class
 import           Data.Bifunctor (first)
 import           Data.Foldable
 import qualified Data.Map         as Map
+import           Data.Maybe       (catMaybes)
 import qualified Data.Set         as Set
 import           Data.STRef
 import           Data.Traversable
@@ -43,22 +44,22 @@ data Environment v s = MkEnvironment
 makeLenses ''Environment
 
 newtype TI v s a =
-  TI{unTI :: InfoT (ModuleInfo In) (ReaderT (Environment v s) (SupplyT Id.TVar (ExceptT String (ST s)))) a}
+  TI{unTI :: InfoT (ReaderT (Environment v s) (SupplyT Id.TVar (ExceptT String (ST s)))) a}
   deriving ( Functor, Applicative, Monad
            , MonadError String
            , MonadReader (Environment v s)
            , MonadSupply Id.TVar
-           , MonadInfo (GenModuleInfo 'True 'True)
+           , MonadInfo
            )
 
 instance MonadST (TI v s) where
   type World (TI v s) = s
   liftST = TI . liftST
 
-runTI :: TI Void s a -> ModuleInfo In -> ExceptT String (ST s) a
-runTI tc info = do
+runTI :: TI Void s a -> Module In -> ExceptT String (ST s) a
+runTI tc module_ = do
   let env0 = MkEnvironment (Const ()) 0
-  evalSupplyT (runReaderT (runInfoT (unTI tc) info) env0) Id.freshTVars
+  evalSupplyT (runReaderT (runInfoT (unTI tc) module_) env0) Id.freshTVars
 
 freshUVar :: TI v s (UType s Void)
 freshUVar = do
@@ -204,8 +205,10 @@ infer = \case
         pure (MkAltn w' patn1 rhs1)
       pure (EMat w expr1 altns1, t_res)
 
-inferTopLevel :: TopLevel In -> TI Void s (TopLevel (Aux s))
+inferTopLevel :: TopLevel In -> TI Void s (Maybe (TopLevel (Aux s)))
 inferTopLevel = \case
+  TLTyp w ds -> yield (TLTyp w ds)
+  TLVal{} -> pure Nothing
   TLDef (MkDefn (MkBind w x NoType) e0) -> do
     reset
     -- NOTE: We do not instantiate the universally quantified type variables in
@@ -220,14 +223,15 @@ inferTopLevel = \case
     -- NOTE: This unification should bind all unification variables in @t1@. If
     -- it does not, the second quantification step will catch them.
     unify w t0 t1
-    pure (TLDef (MkDefn (MkBind w x t_decl) e1))
+    yield (TLDef (MkDefn (MkBind w x t_decl) e1))
   TLAsm (MkBind w x NoType) asm -> do
     t_decl <- lookupFun x
-    pure (TLAsm (MkBind w x t_decl) asm)
+    yield (TLAsm (MkBind w x t_decl) asm)
+  where
+    yield = pure . Just
 
 inferModule' :: Module In -> TI Void s (Module (Aux s))
-inferModule' (MkModule decls tops)=
-  MkModule decls <$> traverse inferTopLevel tops
+inferModule' = module2tops (\tops -> catMaybes <$> traverse inferTopLevel tops)
 
 type TQEnv tv = Map.Map Id.TVar tv
 
@@ -311,6 +315,7 @@ qualPatn = \case
 
 qualTopLevel :: TopLevel (Aux s) -> TQ Void s (TopLevel Out)
 qualTopLevel = \case
+  TLTyp w ds -> pure (TLTyp w ds)
   TLDef d -> TLDef <$> qualDefn d
   TLAsm (MkBind w x ts) s -> do
     -- TODO: Avoid code duplication with qualDefn.
@@ -325,6 +330,6 @@ qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule = (module2tops . traverse) (\top -> reset *> qualTopLevel top)
 
 inferModule :: MonadError String m => Module In -> m (Module Out)
-inferModule m0@(MkModule info0 _) = runST $ runExceptT $ do
-  m1 <- runTI (inferModule' m0) info0
+inferModule m0 = runST $ runExceptT $ do
+  m1 <- runTI (inferModule' m0) m0
   runTQ (qualModule m1)

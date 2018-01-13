@@ -27,20 +27,20 @@ import qualified Pukeko.AST.ConDecl    as Con
 import           Pukeko.AST.Type
 
 checkModule :: (MonadError String m, St.Typed st) => Module st -> m (Module st)
-checkModule module0@(MkModule info tops) = do
-  runTC (traverse_ checkTopLevel tops) info
+checkModule module0@(MkModule tops) = do
+  runTC (traverse_ checkTopLevel tops) module0
   pure module0
 
 type IsEVar ev = (HasEnv ev)
 
 type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
-type ModuleInfoTC = GenModuleInfo 'True 'True
+type TC tv ev a = GammaT tv ev (InfoT (Except String)) a
 
-type TC tv ev a = GammaT tv ev (InfoT ModuleInfoTC (Except String)) a
-
-runTC :: MonadError String m => TC Void Void a -> ModuleInfoTC -> m a
-runTC tc mi = runExcept (runInfoT (runGammaT tc) mi)
+runTC ::
+  (MonadError String m, IsType (St.StageType st)) =>
+  TC Void Void a -> Module st -> m a
+runTC tc m0 = runExcept (runInfoT (runGammaT tc) m0)
 
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case

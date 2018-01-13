@@ -8,6 +8,7 @@ import           Control.Lens
 import           Control.Monad.State
 import           Data.Foldable     (toList)
 import qualified Data.Map          as Map
+import           Data.Maybe        (catMaybes)
 
 import           Pukeko.AST.NoLambda
 import           Pukeko.AST.Classes
@@ -21,17 +22,17 @@ import           Pukeko.FrontEnd.Info
 type In = St.LambdaLifter
 
 eraseModule :: In.Module In -> Module
-eraseModule (In.MkModule decls tops) = runCC (traverse ccTopLevel tops) decls
+eraseModule m0@(In.MkModule tops) = runCC (catMaybes <$> traverse ccTopLevel tops) m0
 
 type CCState = Map.Map Id.EVar Name
 
-newtype CC a = CC{unCC :: InfoT (In.ModuleInfo In) (State CCState) a}
+newtype CC a = CC{unCC :: InfoT (State CCState) a}
   deriving ( Functor, Applicative, Monad
-           , MonadInfo (In.GenModuleInfo 'True 'True)
+           , MonadInfo
            , MonadState CCState
            )
 
-runCC :: CC a -> In.ModuleInfo In -> a
+runCC :: CC a -> In.Module In -> a
 runCC cc decls = evalState (runInfoT (unCC cc) decls) mempty
 
 name :: Id.EVar -> Name
@@ -40,13 +41,15 @@ name = MkName . Id.mangled
 bindName :: In.Bind In tv -> Name
 bindName = name . view lhs
 
-ccTopLevel :: In.TopLevel In -> CC TopLevel
+ccTopLevel :: In.TopLevel In -> CC (Maybe TopLevel)
 ccTopLevel = \case
-  In.TLSup _ z _ _ bs e -> Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
+  In.TLTyp{} -> pure Nothing
+  In.TLSup _ z _ _ bs e ->
+    Just <$> Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
   In.TLAsm b    s -> do
     let n = MkName s
     at (b^.lhs) ?= n
-    pure (Asm n)
+    pure (Just (Asm n))
 
 ccDefn :: (BaseEVar ev) => In.Defn In tv ev -> CC Defn
 ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t

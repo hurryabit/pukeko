@@ -17,7 +17,6 @@ import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
-import qualified Pukeko.AST.ModuleInfo as MI
 import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type       (NoType (..), toPrenex)
@@ -25,9 +24,7 @@ import           Pukeko.AST.Type       (NoType (..), toPrenex)
 type Out = St.Renamer
 
 renameModule :: MonadError String m => Ps.Module -> m (Module Out)
-renameModule tops = runRn $ MkModule info <$> concat <$> traverse rnTopLevel tops
-  where
-    info = MI.MkModuleInfo MI.Absent MI.Absent MI.Absent
+renameModule tops = runRn $ MkModule <$> concat <$> traverse rnTopLevel tops
 
 type RnEnv ev = Map.Map Id.EVar ev
 type RnState = Set.Set Id.EVar
