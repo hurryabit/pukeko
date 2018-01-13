@@ -1,22 +1,20 @@
 external abort : ∀a. a = "abort"
-let (&&ll1) : Bool -> Bool -> Bool =
+let (&&) : Bool -> Bool -> Bool =
       fun (x : Bool) (y : Bool) ->
         match x with
         | False -> False
         | True -> y
-let (&&) : Bool -> Bool -> Bool = (&&ll1)
-let (||ll1) : Bool -> Bool -> Bool =
+let (||) : Bool -> Bool -> Bool =
       fun (x : Bool) (y : Bool) ->
         match x with
         | False -> y
         | True -> True
-let (||) : Bool -> Bool -> Bool = (||ll1)
 external (+) : Int -> Int -> Int = "add"
 external (-) : Int -> Int -> Int = "sub"
 external (<) : Int -> Int -> Bool = "lt"
 external (<=) : Int -> Int -> Bool = "le"
 external (>) : Int -> Int -> Bool = "gt"
-let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
           match xs with
@@ -25,15 +23,12 @@ let zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
             match ys with
             | Nil @b -> Nil @c
             | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
-let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
-      zip_with$ll1
-let replicate$ll1 : ∀a. Int -> a -> List a =
+let replicate : ∀a. Int -> a -> List a =
       fun @a ->
         fun (n : Int) (x : a) ->
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
-let replicate : ∀a. Int -> a -> List a = replicate$ll1
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -45,20 +40,19 @@ let sequence_io$ll2 : ∀a. List (IO a) -> a -> IO (List a) =
       fun @a ->
         fun (ms : List (IO a)) (x : a) ->
           (>>=) @(List a) @(List a) (sequence_io @a ms) (sequence_io$ll1 @a x)
-let sequence_io$ll3 : ∀a. List (IO a) -> IO (List a) =
+let sequence_io : ∀a. List (IO a) -> IO (List a) =
       fun @a ->
         fun (ms : List (IO a)) ->
           match ms with
           | Nil @(IO a) -> return @(List a) (Nil @a)
           | Cons @(IO a) m ms -> (>>=) @a @(List a) m (sequence_io$ll2 @a ms)
-let sequence_io : ∀a. List (IO a) -> IO (List a) = sequence_io$ll3
 let nats$ll1 : (Int -> List Int) -> Int -> List Int =
       fun (nats_from : Int -> List Int) (n : Int) ->
         Cons @Int n (nats_from ((+) n 1))
 let nats : List Int =
       let rec nats_from : Int -> List Int = nats$ll1 nats_from in
       nats_from 0
-let pair$ll1 : ∀a. (a -> a -> a) -> List a -> List a =
+let pair : ∀a. (a -> a -> a) -> List a -> List a =
       fun @a ->
         fun (op : a -> a -> a) (xs1 : List a) ->
           match xs1 with
@@ -67,13 +61,11 @@ let pair$ll1 : ∀a. (a -> a -> a) -> List a -> List a =
             match pair$pm2 with
             | Nil @a -> xs1
             | Cons @a x2 xs3 -> Cons @a (op pair$pm1 x2) (pair @a op xs3)
-let pair : ∀a. (a -> a -> a) -> List a -> List a = pair$ll1
-let single$ll1 : ∀a. Int -> a -> RmqTree a =
+let single : ∀a. Int -> a -> RmqTree a =
       fun @a ->
         fun (i : Int) (x : a) ->
           RmqNode @a i i x (RmqEmpty @a) (RmqEmpty @a)
-let single : ∀a. Int -> a -> RmqTree a = single$ll1
-let combine$ll1 : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
+let combine : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
       fun @a ->
         fun (op : a -> a -> a) (t1 : RmqTree a) (t2 : RmqTree a) ->
           match t1 with
@@ -83,8 +75,6 @@ let combine$ll1 : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
             | RmqEmpty @a -> abort @(RmqTree a)
             | RmqNode @a combine$pm4 e2 v2 combine$pm5 combine$pm6 ->
               RmqNode @a s1 e2 (op v1 v2) t1 t2
-let combine : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
-      combine$ll1
 let build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
       fun @a ->
         fun (op : a -> a -> a) (run : List (RmqTree a) -> RmqTree a) (ts : List (RmqTree a)) ->
@@ -95,13 +85,12 @@ let build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (
             | Nil @(RmqTree a) -> build$pm1
             | Cons @(RmqTree a) build$pm3 build$pm4 ->
               run (pair @(RmqTree a) (combine @a op) ts)
-let build$ll2 : ∀a. (a -> a -> a) -> List a -> RmqTree a =
+let build : ∀a. (a -> a -> a) -> List a -> RmqTree a =
       fun @a ->
         fun (op : a -> a -> a) (xs : List a) ->
           let rec run : List (RmqTree a) -> RmqTree a = build$ll1 @a op run
           in
           run (zip_with @Int @a @(RmqTree a) (single @a) nats xs)
-let build : ∀a. (a -> a -> a) -> List a -> RmqTree a = build$ll2
 let query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
       fun @a ->
         fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) (aux : RmqTree a -> a) (t : RmqTree a) ->
@@ -114,26 +103,21 @@ let query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> Rm
               | False -> op (aux left) (aux right)
               | True -> value
             | True -> one
-let query$ll2 : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
+let query : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
       fun @a ->
         fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) ->
           let rec aux : RmqTree a -> a = query$ll1 @a one op q_lo q_hi aux in
           aux
-let query : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
-      query$ll2
 let infinity : Int = 1000000000
-let min$ll1 : Int -> Int -> Int =
+let min : Int -> Int -> Int =
       fun (x : Int) (y : Int) ->
         match (<=) x y with
         | False -> y
         | True -> x
-let min : Int -> Int -> Int = min$ll1
-let replicate_io$ll1 : ∀a. Int -> IO a -> IO (List a) =
+let replicate_io : ∀a. Int -> IO a -> IO (List a) =
       fun @a ->
         fun (n : Int) (act : IO a) ->
           sequence_io @a (replicate @(IO a) n act)
-let replicate_io : ∀a. Int -> IO a -> IO (List a) =
-      replicate_io$ll1
 let main$ll1 : RmqTree Int -> Int -> Int -> IO Unit =
       fun (t : RmqTree Int) (lo : Int) (hi : Int) ->
         let res : Int = query @Int infinity min lo hi t in

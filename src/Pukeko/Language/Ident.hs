@@ -5,6 +5,7 @@ module Pukeko.Language.Ident
   , main
   , isVar
   , isOp
+  , stripPart
   , freshEVars
   , mangled
   , TVar
@@ -44,6 +45,9 @@ isVar EVar{} = True
 isVar _      = False
 isOp  Op{}   = True
 isOp  _      = False
+
+stripPart :: EVar -> EVar
+stripPart x = x{_part = Nothing}
 
 freshEVars :: String -> EVar -> [EVar]
 freshEVars comp var = map (\n -> var{_part = Just (comp, n)}) [1 ..]

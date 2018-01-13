@@ -189,7 +189,7 @@ g_updcons 1, 2, 3
 g_pop 2
 g_return
 
-g_globstart main$ll2, 1
+g_globstart main$ll1, 1
 g_pushint 1000000007
 g_push 1
 g_eval
@@ -200,9 +200,9 @@ g_update 2
 g_pop 1
 g_return
 
-g_globstart main$ll1, 1
+g_globstart main$ll2, 1
 g_pushint 1
-g_pushglobal main$ll2, 1
+g_pushglobal main$ll1, 1
 g_pushglobal gen, 2
 g_mkap 2
 g_push 1
@@ -220,7 +220,7 @@ g_pop 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal main$ll1, 1
+g_pushglobal main$ll2, 1
 g_pushglobal gm$input, 1
 g_pushglobal gm$bind, 3
 g_updap 2, 1

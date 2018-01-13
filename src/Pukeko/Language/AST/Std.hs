@@ -33,6 +33,9 @@ module Pukeko.Language.AST.Std
   , altnRhs
 
   , module2tops
+  , top2lhs
+  , top2rhs
+  , top2eval
   , defn2rhs
   , defn2dcon
   , expr2eval
@@ -201,10 +204,39 @@ module2tops ::
   Lens (Module st1) (Module st2) [TopLevel st1] [TopLevel st2]
 module2tops f (MkModule info tops) = MkModule info <$> f tops
 
+top2lhs ::
+  (HasTLTyp st ~ 'False, HasTLVal st ~ 'False) =>
+  IndexedLens' Pos (TopLevel st) Id.EVar
+top2lhs f = \case
+  TLDef d -> TLDef <$> defn2lhs (bind2evar f) d
+  TLSup w z vs t xs e -> (\z' -> TLSup w z' vs t xs e) <$> indexed f w z
+  TLAsm b s -> (\b' -> TLAsm b' s) <$> bind2evar f b
+
+top2rhs ::
+  (Applicative f) =>
+  (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> TopLevel st -> f (TopLevel st)
+top2rhs f = \case
+  TLTyp w ds -> pure (TLTyp w ds)
+  TLVal w z t -> pure (TLVal w z t)
+  TLDef d -> TLDef <$> defn2rhs f d
+  TLSup w z vs t bs e -> TLSup w z vs t bs <$> f e
+  TLAsm b s -> pure (TLAsm b s)
+
+top2eval :: IndexedTraversal' Pos (TopLevel st) Id.EVar
+top2eval f = top2rhs (expr2eval f)
+
+defn2lhs :: Lens' (Defn st tv ev) (Bind st tv)
+defn2lhs = defnLhs
+
 defn2rhs ::
   (StageType st1 ~ StageType st2) =>
   Lens (Defn st1 tv ev1) (Defn st2 tv ev2) (Expr st1 tv ev1) (Expr st2 tv ev2)
 defn2rhs f (MkDefn b e) = MkDefn (retagBind b) <$> f e
+
+bind2evar ::
+  (StageType st1 ~ StageType st2) =>
+  IndexedLens Pos (Bind st1 tv) (Bind st2 tv) Id.EVar Id.EVar
+bind2evar f (MkBind w x t) = fmap (\x' -> MkBind w x' t) (indexed f w x)
 
 -- * Deep traversals
 type DConTraversal t =

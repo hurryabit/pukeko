@@ -204,7 +204,7 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$ll2, 2
+g_globstart sequence_io$ll1, 2
 g_push 1
 g_push 1
 g_cons 1, 2
@@ -213,9 +213,9 @@ g_updap 1, 3
 g_pop 2
 g_unwind
 
-g_globstart sequence_io$ll1, 2
+g_globstart sequence_io$ll2, 2
 g_push 1
-g_pushglobal sequence_io$ll2, 2
+g_pushglobal sequence_io$ll1, 2
 g_mkap 1
 g_push 1
 g_pushglobal sequence_io, 1
@@ -239,7 +239,7 @@ g_unwind
 g_label .1
 g_uncons 2
 g_push 1
-g_pushglobal sequence_io$ll1, 2
+g_pushglobal sequence_io$ll2, 2
 g_mkap 1
 g_push 1
 g_pushglobal gm$bind, 3

@@ -387,7 +387,7 @@ g_updap 1, 2
 g_pop 1
 g_unwind
 
-g_globstart solve_aux$ll2, 3
+g_globstart solve_aux$ll1, 3
 g_pushglobal gm$cons_0_0, 0
 g_push 3
 g_push 2
@@ -407,11 +407,11 @@ g_updap 2, 4
 g_pop 3
 g_unwind
 
-g_globstart solve_aux$ll1, 2
+g_globstart solve_aux$ll2, 2
 g_pushglobal ints, 0
 g_push 1
 g_push 3
-g_pushglobal solve_aux$ll2, 3
+g_pushglobal solve_aux$ll1, 3
 g_mkap 1
 g_pushglobal zip_with, 3
 g_mkap 3
@@ -441,7 +441,7 @@ g_label .1
 g_uncons 2
 g_push 0
 g_push 2
-g_pushglobal solve_aux$ll1, 2
+g_pushglobal solve_aux$ll2, 2
 g_mkap 1
 g_pushglobal concat_map, 2
 g_updap 2, 4
