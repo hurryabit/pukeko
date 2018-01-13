@@ -78,7 +78,7 @@ localize env = KC . withReaderT (const env) . unKC
 kcType :: Kind (Open s) -> Type (TFinScope n Void) -> KC n s ()
 kcType k = \case
   TVar v -> do
-    kv <- asks (Vec.! scope id absurd v)
+    kv <- asks (Vec.! scope absurd id v)
     unify kv k
   TArr -> unify (Arrow Star (Arrow Star Star)) k
   TCon tcon -> do

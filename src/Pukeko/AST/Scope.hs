@@ -65,21 +65,19 @@ type TScope1 = TScope ()
 
 type TFinScope n = TScope (Finite n)
 
-scope :: (i -> a) -> (v -> a) -> Scope b i v -> a
-scope f = scope' (const . f)
+scope :: (v -> a) -> (i -> a) -> Scope b i v -> a
+scope f g = scope' f (const . g)
 
-scope' :: (i -> b -> a) -> (v -> a) -> Scope b i v -> a
+scope' :: (v -> a) -> (i -> b -> a) -> Scope b i v -> a
 scope' f g = \case
-  Bound i (Forget b) -> f i b
-  Free  x            -> g x
+  Free  x            -> f x
+  Bound i (Forget b) -> g i b
 
 mkBound :: i -> b -> Scope b i v
 mkBound i b = Bound i (Forget b)
 
 strengthenEither :: Scope b i v -> Either (i, b) v
-strengthenEither = \case
-  Bound i (Forget b) -> Left  (i, b)
-  Free  x            -> Right x
+strengthenEither = scope' Right (\i b -> Left (i, b))
 
 strengthen :: Scope b i v -> Maybe v
 strengthen = either (const Nothing) Just . strengthenEither

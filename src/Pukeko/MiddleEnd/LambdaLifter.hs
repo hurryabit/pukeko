@@ -85,7 +85,7 @@ llExpr = \case
               (\i x -> Map.singleton x (mkBound (Fin.weaken i) (baseEVar x)))
               evCapturedV
         let evRename :: EFinScope n1 ev -> EFinScope (n0 + n1) Void
-            evRename = scope' (mkBound . Fin.shift) (evMap Map.!)
+            evRename = scope' (evMap Map.!) (mkBound . Fin.shift)
         let allBinds1 :: Vec.Vector (n0 + n1) (Bind Out (TFinScope m Void))
             allBinds1 = fmap (fmap tvRename) allBinds0
         let rhs2 :: Expr Out (TFinScope m Void) (EFinScope (n0 + n1) Void)
@@ -112,7 +112,7 @@ llCase (MkCase w dcon ts0 bs e) = do
       case Vec.matchList bs flds0 of
         Nothing    -> bug "wrong number of binds in pattern"
         Just flds1 -> do
-          let t_flds = fmap (>>= scope (ts1 Vec.!) absurd) flds1
+          let t_flds = fmap (>>= scope absurd (ts1 Vec.!)) flds1
           MkCase w dcon ts0 bs <$> withTypes t_flds (llExpr e)
 
 llTopLevel :: TopLevel In -> LL Void Void ()

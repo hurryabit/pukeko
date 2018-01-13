@@ -82,7 +82,7 @@ typeOf = \case
             ("expected" <+> int (length xs) <+> "type arguments, but found"
              <+> int (length ts1) <+> "type arguments")
           Just ts2 ->
-            pure (t1 >>= scope (ts2 Vec.!) TVar)
+            pure (t1 >>= scope TVar (ts2 Vec.!))
       TFun{} ->
         throwErrorAt w "expected value argument, but found type argument"
       _ -> throwErrorAt w "unexpected type argument"
@@ -137,7 +137,7 @@ patnEnvLevel p t0 = case p of
       case sameNat (Vec.plength ts2) (fldsProxy flds1) of
         Nothing -> bugWith "mismatching kinds for type constructor" tcon
         Just Refl -> do
-          let t_ps = map (>>= scope (ts2 Vec.!) absurd) flds1
+          let t_ps = map (>>= scope absurd (ts2 Vec.!)) flds1
           Map.unions <$> zipWithM patnEnvLevel ps t_ps
 
 match :: (IsTVar tv) => Pos -> Type tv -> Type tv -> TC tv ev ()

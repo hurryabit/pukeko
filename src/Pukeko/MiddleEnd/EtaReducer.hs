@@ -45,14 +45,14 @@ erTopLevel top = case top of
     case e0 of
       EApp _ (traverse strengthen -> Just e1) (traverse _EVar -> Just xs1)
         | Just xs2 <- Vec.matchList bs0 xs1
-        , iall (\i x -> i == scope id absurd x) xs2 ->
+        , iall (\i x -> i == scope absurd id x) xs2 ->
           erTopLevel (TLSup w z vs0 t0 Vec.empty (fmap weaken e1))
       ETyApp _
         (bitraverse strengthen strengthen -> Just e1)
         (traverse _TVar -> Just vs1)
         | null bs0
         , Just vs2 <- Vec.matchList vs0 vs1
-        , iall (\i v -> i == scope id absurd v) vs2 ->
+        , iall (\i v -> i == scope absurd id v) vs2 ->
           TLSup w z
             Vec.empty (fmap weaken (mkTUni vs0 t0))
             Vec.empty (bimap weaken weaken e1)

@@ -81,7 +81,7 @@ open1 = \case
   TArr -> UTArr
   TCon c -> UTCon c
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
-  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope (xs Vec.!) id) tq))
+  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id (xs Vec.!)) tq))
 
 subst :: Map.Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env t = runReaderT (subst' t) env

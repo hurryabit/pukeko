@@ -165,9 +165,8 @@ inferRec defns0 = do
     Vec.zipWith3M_ (\r0 -> unify (r0^.pos)) rs0 us ts1
     pure (rs1, ts1)
   (ts2, qs) <- Vec.unzip <$> traverse generalize ts1
-  let addETyApp w = scope'
+  let addETyApp w = scope' (EVar w . Free)
         (\i b -> mkETyApp w (EVar w (mkBound i b)) (map (fmap absurd) (qs Vec.! i)))
-        (EVar w . Free)
   let rs2 = fmap (// addETyApp) rs1
   let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bindType t2) ts2 ls0 rs2
   pure (defns1, ts2)
