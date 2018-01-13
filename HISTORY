@@ -46,3 +46,33 @@ Possible optimizations:
 * peephole optimization of G-code
 * batching of allocation checks
 * ...
+
+
+v0.0.2: 2018-01-13
+
+New language features:
+* user defined algbebraic data types
+* nested pattern matching for algebraic data types
+* simple input function for integers
+* higher kinded polymorphism
+* polymorphic recursion for top level functions
+
+Changes to compiler components:
+* type inferencer outputs System F
+* every stage after type inference is type checked in System F
+* use of type safe de Bruijn indices almost everywhere
+
+New examples:
+* tree sort
+* range minimum query
+* fixed point of functors
+* several expextation tests
+
+New optimizations:
+* E and R compilation schemes from SPJ's book
+* peephole optimizer
+
+Next steps:
+* bounded polymorphism
+* row polymorphism
+* an effect system
