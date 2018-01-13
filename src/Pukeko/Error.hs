@@ -19,7 +19,7 @@ import           Control.Monad.Except hiding (runExcept, runExceptT)
 import qualified Control.Monad.Except as Except
 import           Data.CallStack
 
-import Pukeko.Pos
+import Pukeko.AST.Pos
 import Pukeko.Pretty
 
 throwDoc :: MonadError String m => Doc -> m a

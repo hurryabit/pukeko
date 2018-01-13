@@ -8,14 +8,13 @@ import System.Exit
 
 import Pukeko.Pretty
 
-import qualified Pukeko
-import qualified Pukeko.Language.Parser   as Parser
-import qualified Pukeko.GMachine.Compiler as Compiler
-import qualified Pukeko.GMachine.NASM     as NASM
-import qualified Pukeko.GMachine.PeepHole as PeepHole
+import qualified Pukeko.FrontEnd.Parser as Parser
+import qualified Pukeko.FrontEnd        as FrontEnd
+import qualified Pukeko.MiddleEnd       as MiddleEnd
+import qualified Pukeko.BackEnd         as BackEnd
 
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> String -> IO ()
-compile write_ll write_ti write_gm no_prelude unsafe file_user = do
+compile write_ll write_sf _write_gm no_prelude unsafe file_user = do
   let file_prel = replaceFileName file_user "prelude.pu"
   code_user <- readFile file_user
   code_prel <-
@@ -28,29 +27,22 @@ compile write_ll write_ti write_gm no_prelude unsafe file_user = do
           if no_prelude
           then return []
           else Parser.parseModule file_prel code_prel
-        let module_ = mod_prel ++ mod_user
-        (module_cc, module_ll, module_ti) <- Pukeko.compileToCore unsafe module_
-        program <- Compiler.compile module_cc
-        program <- pure $ PeepHole.optimize program
-        nasm <- NASM.assemble program
-        return (module_ll, module_ti, module_cc, program, nasm)
+        let module_pu = mod_prel ++ mod_user
+        module_sf <- FrontEnd.run module_pu
+        (module_ll, module_lm) <- MiddleEnd.run unsafe module_sf
+        nasm <- BackEnd.run module_lm
+        return (module_sf, module_ll, nasm)
   case gprog_or_error of
     Left error -> do
       putStrLn $ "Error: " ++ error
       exitWith (ExitFailure 1)
-    Right (Pukeko.MkModule _ module_ll, Pukeko.MkModule _ module_ti, module_cc, program, nasm) -> do
+    Right (module_sf, module_ll, nasm) -> do
       when write_ll $ do
         writeFile (file_user `replaceExtension` ".ll") $
-          (render $ vcat $ map (pPrintPrec prettyNormal 0) module_ll) ++ "\n"
-        -- writeFile (file_user `replaceExtension` ".lls") $
-        --   unlines (map show module_ll) ++ "\n"
-        writeFile (file_user `replaceExtension` ".co") $
-          (render $ vcat $ map pretty module_cc) ++ "\n"
-      when write_ti $
+          render (pPrintPrec prettyNormal 0 module_ll) ++ "\n"
+      when write_sf $
         writeFile (file_user `replaceExtension` ".ti") $
-          (render $ vcat $ map pretty module_ti) ++ "\n"
-      when write_gm $
-        writeFile (file_user `replaceExtension` ".gm") (prettyShow program)
+          render (pPrintPrec prettyNormal 0 module_sf) ++ "\n"
       writeFile (file_user `replaceExtension` ".asm") nasm
       exitWith ExitSuccess
 

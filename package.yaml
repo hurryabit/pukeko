@@ -39,11 +39,10 @@ ghc-options:
 library:
   source-dirs: src
   exposed-modules:
-  - Pukeko
-  - Pukeko.GMachine.Compiler
-  - Pukeko.GMachine.NASM
-  - Pukeko.GMachine.PeepHole
-  - Pukeko.Language.Parser
+  - Pukeko.BackEnd
+  - Pukeko.FrontEnd
+  - Pukeko.FrontEnd.Parser
+  - Pukeko.MiddleEnd
   - Pukeko.Pretty
   dependencies:
   - array
@@ -77,8 +76,8 @@ executables:
     - optparse-applicative
 
 tests:
-  reject:
-    main: Reject.hs
+  frontend:
+    main: FrontEnd.hs
     source-dirs: test
     ghc-options:
     - -threaded
