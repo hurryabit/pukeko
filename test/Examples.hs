@@ -1,3 +1,5 @@
+module Examples where
+
 import Data.List (sort)
 import System.Directory (setCurrentDirectory)
 import System.Exit (ExitCode (..))

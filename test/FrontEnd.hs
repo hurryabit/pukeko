@@ -1,4 +1,6 @@
 {-# LANGUAGE ImplicitParams #-}
+module FrontEnd where
+
 import Data.Char (isSpace)
 import Data.List
 import GHC.Stack

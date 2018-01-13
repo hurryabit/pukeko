@@ -46,7 +46,6 @@ library:
   - Pukeko.Pretty
   dependencies:
   - array
-  - bifunctors
   - call-stack
   - containers
   - fclabels
@@ -62,14 +61,14 @@ library:
 
 executables:
   pukeko:
-    main: Main.hs
+    main: Main
+    other-modules: []
     source-dirs: app
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - base
     - pukeko
     - filepath
     - mtl
@@ -77,7 +76,8 @@ executables:
 
 tests:
   frontend:
-    main: FrontEnd.hs
+    main: FrontEnd
+    other-modules: []
     source-dirs: test
     ghc-options:
     - -threaded
@@ -91,7 +91,8 @@ tests:
     - pukeko
 
   examples:
-    main: Examples.hs
+    main: Examples
+    other-modules: []
     source-dirs: test
     ghc-options:
     - -threaded
