@@ -8,6 +8,7 @@ module Pukeko.AST.Surface
   , TopLevel (..)
   , TConDecl (..)
   , DConDecl (..)
+  , Type (..)
   , Defn (..)
   , Expr (..)
   , Bind (..)
@@ -19,15 +20,17 @@ module Pukeko.AST.Surface
   , mkAppOp
   , mkIf
   , mkLam
+  , mkTApp
+  , mkTFun
 
   , extend
+  , type2tvar
   )
 where
 
 import Pukeko.Prelude
 
 import qualified Pukeko.AST.Identifier as Id
-import           Pukeko.AST.Type
 
 type TCon = Id.TCon
 type DCon = Id.DCon
@@ -45,7 +48,7 @@ data Module = MkModule
 
 data TopLevel
   = TLTyp Pos (NonEmpty TConDecl)
-  | TLVal Pos Id.EVar (Type Id.TVar)
+  | TLVal Pos Id.EVar Type
   | TLLet Pos (NonEmpty (Defn Id.EVar))
   | TLRec Pos (NonEmpty (Defn Id.EVar))
   | TLAsm Pos Id.EVar String
@@ -58,8 +61,14 @@ data TConDecl = MkTConDecl
 
 data DConDecl = MkDConDecl
   { _dname  :: Id.DCon
-  , _fields :: [Type Id.TVar]
+  , _fields :: [Type]
   }
+
+data Type
+  = TVar Id.TVar
+  | TCon Id.TCon
+  | TArr
+  | TApp Type Type
 
 data Defn v = MkDefn Bind (Expr v)
 
@@ -105,3 +114,16 @@ mkLam :: Pos -> [Bind] -> Expr v -> Expr v
 mkLam w = \case
   []     -> id
   (b:bs) -> ELam w (b :| bs)
+
+mkTApp :: Type -> [Type] -> Type
+mkTApp = foldl TApp
+
+mkTFun :: Type -> Type -> Type
+mkTFun tx ty = mkTApp TArr [tx, ty]
+
+type2tvar :: Traversal' Type Id.TVar
+type2tvar f = \case
+  TVar v     -> TVar <$> f v
+  TCon c     -> pure (TCon c)
+  TArr       -> pure TArr
+  TApp tf tp -> TApp <$> type2tvar f tf <*> type2tvar f tp

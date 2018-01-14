@@ -15,7 +15,7 @@ import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
 import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Identifier as Id
-import           Pukeko.AST.Type       (NoType (..), toPrenex)
+import           Pukeko.AST.Type
 
 type Out = St.Renamer
 
@@ -49,7 +49,7 @@ rnTopLevel :: Ps.TopLevel -> Rn Void [TopLevel Out]
 rnTopLevel top = case top of
   Ps.TLTyp w tcs ->
     (:[]) . TLTyp w <$> traverse rnTConDecl tcs `catchError` throwErrorAt w
-  Ps.TLVal w x t -> pure [TLVal w x (toPrenex t)]
+  Ps.TLVal w x t -> (:[]) . TLVal w x <$> rnTypeScheme t
   Ps.TLLet _ ds0 -> do
     ds1 <- traverse rnDefn ds0
     let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
@@ -64,22 +64,29 @@ rnTopLevel top = case top of
     id <>= Set.singleton x
     pure [TLAsm (MkBind w x NoType) a]
 
-
 rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 Con.TConDecl)
 rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
-  let env = ifoldMap (flip Map.singleton) ps1
-  Some1 <$> Con.MkTConDecl tcon ps1 <$> zipWithM (rnDConDecl tcon env) [0..] dcs0
+  Some1 <$> Con.MkTConDecl tcon ps1 <$> zipWithM (rnDConDecl tcon ps1) [0..] dcs0
 
-rnDConDecl ::
-  forall n ev.
-  Id.TCon -> Map Id.TVar (Finite n) -> Int -> Ps.DConDecl -> Rn ev (Con.DConDecl n)
-rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
-  Con.MkDConDecl tcon dcon tag <$> (traverse . traverse) rnTVar ts
+rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (Con.DConDecl n)
+rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) =
+  Con.MkDConDecl tcon dcon tag <$> traverse (rnType vs) flds
+
+rnType :: Vector n Id.TVar -> Ps.Type -> Rn ev (Type (TFinScope n Void))
+rnType vs = go
   where
-    rnTVar :: Id.TVar -> Rn ev (TFinScope n Void)
-    rnTVar x = case x `Map.lookup` env of
-      Just i  -> pure (mkBound i x)
-      Nothing -> throw "unknown type variable" x
+    env = ifoldMap (\i v -> Map.singleton v (mkBound i v)) vs
+    go = \case
+      Ps.TVar x
+        | Just v <- x `Map.lookup` env -> pure (TVar v)
+        | otherwise                    -> throw "unknown type variable" x
+      Ps.TCon c -> pure (TCon c)
+      Ps.TArr   -> pure TArr
+      Ps.TApp tf tp -> TApp <$> go tf <*> go tp
+
+rnTypeScheme :: Ps.Type -> Rn ev (Type Void)
+rnTypeScheme t =
+  Vec.withList (toList (setOf Ps.type2tvar t)) $ \vs -> mkTUni vs <$> rnType vs t
 
 rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out Void ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e

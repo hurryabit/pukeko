@@ -20,7 +20,6 @@ import qualified Text.Parsec.Token as Token
 
 import           Pukeko.AST.Operator   (Spec (..))
 import           Pukeko.AST.Surface
-import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
@@ -98,10 +97,10 @@ tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
 dcon :: Parser Id.DCon
 dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
 
-type_, atype :: Parser (Type Id.TVar)
+type_, atype :: Parser Type
 type_ =
   buildExpressionParser
-    [ [ Infix (arrow *> pure (~>)) AssocRight ] ]
+    [ [ Infix (arrow *> pure mkTFun) AssocRight ] ]
     (mkTApp <$> atype <*> many atype)
   <?> "type"
 atype = choice
@@ -110,7 +109,7 @@ atype = choice
   , parens type_
   ]
 
-asType :: Parser (Type Id.TVar)
+asType :: Parser Type
 asType = reservedOp ":" *> type_
 
 module_ :: SourceName -> Parser Module

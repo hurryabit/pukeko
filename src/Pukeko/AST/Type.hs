@@ -16,7 +16,6 @@ module Pukeko.AST.Type
   , gatherTApp
   , typeInt
   , vars
-  , toPrenex
   , type2tcon
   , Void
   , absurd
@@ -27,7 +26,6 @@ import Pukeko.Prelude
 
 import           Control.Lens
 import           Data.Finite       (absurd0)
-import qualified Data.Map          as Map
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
@@ -80,12 +78,6 @@ typeInt  = TCon (Id.tcon "Int")
 
 vars :: Ord tv => Type tv -> Set tv
 vars = setOf traversed
-
-toPrenex :: HasCallStack => Type Id.TVar -> Type Void
-toPrenex t =
-  Vec.withList (toList (vars t)) $ \xs ->
-    let env = ifoldMap (\i x -> Map.singleton x (mkBound i x)) xs
-    in  mkTUni xs (fmap (\x -> Map.findWithDefault (bugWith "toPrexex" x) x env) t)
 
 -- * Deep traversals
 type2tcon :: Traversal' (Type tv) Id.TCon
