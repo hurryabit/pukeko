@@ -9,7 +9,6 @@ test/*
 !test/*.asm
 !test/*.bench
 !test/*.hs
-!test/*.ll
+!test/*.pl
 !test/*.pu
-!test/*.ti
 test/test*

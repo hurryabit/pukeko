@@ -14,16 +14,16 @@ import qualified Pukeko.MiddleEnd       as MiddleEnd
 import qualified Pukeko.BackEnd         as BackEnd
 
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> String -> IO ()
-compile write_ll write_sf _write_gm _no_prelude unsafe file = do
+compile write_pl write_sf _write_gm _no_prelude unsafe file = do
   ok_or_error <- runExceptT $ do
     package <- Parser.parsePackage file
     module_sf <- FrontEnd.run package
-    (module_ll, module_lm) <- MiddleEnd.run unsafe module_sf
+    (module_pl, module_lm) <- MiddleEnd.run unsafe module_sf
     nasm <- BackEnd.run module_lm
     liftIO $ do
-      when write_ll $ do
-        writeFile (file -<.> "ll") $
-          render (pPrintPrec prettyNormal 0 module_ll) ++ "\n"
+      when write_pl $ do
+        writeFile (file -<.> "pl") $
+          render (pPrintPrec prettyNormal 0 module_pl) ++ "\n"
       when write_sf $
         writeFile (file -<.> "ti") $
         render (pPrintPrec prettyNormal 0 module_sf) ++ "\n"
