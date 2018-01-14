@@ -4,11 +4,10 @@ module Pukeko.BackEnd.Compiler
   )
   where
 
-import Pukeko.Prelude hiding (asks, local)
+import Pukeko.Prelude
 
-import Control.Monad.RWS hiding (asks, local)
-import Data.Label.Derive
-import Data.Label.Monadic
+import           Control.Lens hiding (Context)
+import           Control.Monad.RWS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -21,7 +20,7 @@ data Context = MkContext
   { _offsets :: Map Name Int
   , _depth   :: Int
   }
-mkLabels [''Context]
+makeLenses ''Context
 
 newtype CC a = CC { unCC :: RWST Context [Inst] Int (Except String) a }
   deriving ( Functor, Applicative, Monad
@@ -72,7 +71,7 @@ whenRedex mode cc =
 
 continueRedex :: Inst -> CC ()
 continueRedex inst = do
-  d <- asks depth
+  d <- view depth
   tell [UPDATE (d+1), POP d, inst]
 
 ccExpr :: Mode -> Expr -> CC ()
@@ -103,7 +102,7 @@ ccExpr mode expr =
       whenRedex mode $ continueRedex RETURN
     Ap{ _fun, _args } -> do
       let n = length _args
-      let ccExprAt mode i expr = local depth (+i) $ ccExpr mode expr
+      let ccExprAt mode i expr = local (depth +~ i) $ ccExpr mode expr
           ccArgs mode = zipWithM_ (ccExprAt mode) [0..] (reverse _args)
       let ccDefault = do
             ccArgs Stack
@@ -142,7 +141,7 @@ ccExpr mode expr =
     Let{ _isrec = False, _defns, _body } -> do
       let n = length _defns
           (idents, rhss) = unzipDefns _defns
-      zipWithM_ (\rhs k -> local depth (+k) $ ccExpr Stack rhs) rhss [0 ..]
+      zipWithM_ (\rhs k -> local (depth +~ k) $ ccExpr Stack rhs) rhss [0 ..]
       localDecls (map Just idents) $ ccExpr mode _body
       whenStackOrEval mode $ tell [SLIDE n]
     Let{ _isrec = True, _defns, _body } -> do
@@ -177,6 +176,6 @@ ccAltn mode MkAltn{_binds, _rhs} = do
 localDecls :: [Maybe Name] -> CC a -> CC a
 localDecls binds cc = do
   let n = length binds
-  d <- asks depth
+  d <- view depth
   let offs = Map.fromList $ zipMaybe binds [d+1 ..]
-  local offsets (Map.union offs) $ local depth (+n) $ cc
+  local (offsets %~ Map.union offs) $ local (depth +~ n) $ cc

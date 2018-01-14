@@ -49,7 +49,6 @@ library:
   - array
   - call-stack
   - containers
-  - fclabels
   - lens
   - monad-st
   - mtl
