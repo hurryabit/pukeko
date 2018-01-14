@@ -69,7 +69,7 @@ typeOf = \case
     t0 <- typeOf e0
     case t0 of
       TUni xs t1 ->
-        case Vec.matchList xs ts1 of
+        case Vec.matchNonEmpty xs ts1 of
           Nothing -> throwDocAt w
             ("expected" <+> int (length xs) <+> "type arguments, but found"
              <+> int (length ts1) <+> "type arguments")

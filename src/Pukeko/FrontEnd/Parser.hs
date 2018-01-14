@@ -8,7 +8,7 @@ module Pukeko.FrontEnd.Parser
 
 import Pukeko.Prelude hiding ((<|>), many)
 
-import           Text.Parsec
+import           Text.Parsec          hiding (many1, sepBy1)
 import           Text.Parsec.Expr
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
@@ -52,6 +52,12 @@ pukeko@Token.TokenParser
   } =
   Token.makeTokenParser pukekoDef
 
+many1 :: Parser a -> Parser (NonEmpty a)
+many1 p = (:|) <$> p <*> many p
+
+sepBy1 :: Parser a -> Parser sep -> Parser (NonEmpty a)
+sepBy1 p sep = (:|) <$> p <*> many (sep *> p)
+
 getPos :: Parser Pos
 getPos = mkPos <$> getPosition
 
@@ -92,7 +98,7 @@ asType :: Parser (Type Id.TVar)
 asType = reservedOp ":" *> type_
 
 module_ :: Parser Module
-module_ = many1 $ choice
+module_ = many $ choice
   [ let_ TLLet TLRec
   , TLAsm
     <$> getPos
@@ -135,7 +141,10 @@ altn =
          <*> (bar *> patn)
          <*> (arrow *> expr)
 
-let_ :: (Pos -> [Defn Id.EVar] -> a) -> (Pos -> [Defn Id.EVar] -> a) -> Parser a
+let_ ::
+  (Pos -> (NonEmpty (Defn Id.EVar)) -> a) ->
+  (Pos -> (NonEmpty (Defn Id.EVar)) -> a) ->
+  Parser a
 let_ mkLet mkRec =
   f <$> getPos
     <*> (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
@@ -156,7 +165,7 @@ expr =
   , EMat
     <$> getPos
     <*> (reserved "match" *> expr)
-    <*> (reserved "with"  *> many1 altn)
+    <*> (reserved "with"  *> (toList <$> many1 altn))
   , ELam
     <$> getPos
     <*> (reserved "fun" *> many1 bind)
@@ -182,7 +191,7 @@ tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
   <$> tcon
   <*> many tvar
-  <*> option [] (reservedOp "=" *> many1 dconDecl)
+  <*> option [] (reservedOp "=" *> (toList <$> many1 dconDecl))
 
 dconDecl :: Parser DConDecl
 dconDecl = MkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype

@@ -32,10 +32,10 @@ type DCon = Id.DCon
 type Module = [TopLevel]
 
 data TopLevel
-  = TLTyp Pos [TConDecl]
+  = TLTyp Pos (NonEmpty TConDecl)
   | TLVal Pos Id.EVar (Type Id.TVar)
-  | TLLet Pos [Defn Id.EVar]
-  | TLRec Pos [Defn Id.EVar]
+  | TLLet Pos (NonEmpty (Defn Id.EVar))
+  | TLRec Pos (NonEmpty (Defn Id.EVar))
   | TLAsm Pos Id.EVar String
 
 data TConDecl = MkTConDecl
@@ -55,11 +55,11 @@ data Expr v
   = EVar Pos v
   | ECon Pos DCon
   | ENum Pos Int
-  | EApp Pos (Expr v) [Expr v]
+  | EApp Pos (Expr v) (NonEmpty (Expr v))
   | EMat Pos (Expr v) [Altn v]
-  | ELam Pos [Bind] (Expr v)
-  | ELet Pos [Defn v] (Expr v)
-  | ERec Pos [Defn v] (Expr v)
+  | ELam Pos (NonEmpty Bind) (Expr v)
+  | ELet Pos (NonEmpty (Defn v)) (Expr v)
+  | ERec Pos (NonEmpty (Defn v)) (Expr v)
 
 data Bind = MkBind Pos Id.EVar
 
@@ -71,14 +71,14 @@ data Patn
   | PCon Pos Id.DCon [Patn]
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
-mkApp pos fun args
-  | null args = fun
-  | otherwise = EApp pos fun args
+mkApp pos fun = \case
+  []       -> fun
+  arg:args -> EApp pos fun (arg :| args)
 
 mkAppOp :: String -> Pos -> Expr Id.EVar -> Expr Id.EVar -> Expr Id.EVar
 mkAppOp sym pos arg1 arg2 =
   let fun = EVar pos (Id.op sym)
-  in  EApp pos fun [arg1, arg2]
+  in  EApp pos fun (arg1 :| [arg2])
 
 mkIf :: Pos -> Expr v -> Pos -> Expr v -> Pos -> Expr v -> Expr v
 mkIf wt t wu u wv v =
@@ -87,6 +87,6 @@ mkIf wt t wu u wv v =
             ]
 
 mkLam :: Pos -> [Bind] -> Expr v -> Expr v
-mkLam w bs e
-  | null bs   = e
-  | otherwise = ELam w bs e
+mkLam w = \case
+  []     -> id
+  (b:bs) -> ELam w (b :| bs)

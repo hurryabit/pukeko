@@ -64,7 +64,7 @@ ccExpr = \case
     Con.Some1 (Con.Pair1 _tconDecl Con.MkDConDecl{_tag, _fields}) <- findDCon dcon
     pure $ Pack _tag (length _fields)
   In.ENum _ n     -> pure $ Num n
-  In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr us
+  In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr (toList us)
   In.ELet _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ERec _ ds t  -> Let True  <$> traverse ccDefn (toList ds) <*> ccExpr t
   In.ECas _ t  cs -> Match <$> ccExpr t <*> traverse ccCase (toList cs)

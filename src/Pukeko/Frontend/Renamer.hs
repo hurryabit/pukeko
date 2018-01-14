@@ -51,14 +51,14 @@ rnTopLevel top = case top of
   Ps.TLVal w x t -> pure [TLVal w x (toPrenex t)]
   Ps.TLLet _ ds0 -> do
     ds1 <- traverse rnDefn ds0
-    let xs = map (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
-    id <>= Set.fromList xs
-    pure (map TLDef ds1)
+    let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
+    id <>= setOf traverse xs
+    pure (map TLDef (toList ds1))
   Ps.TLRec _ ds0 -> do
-    let xs = map (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
-    id <>= Set.fromList xs
+    let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
+    id <>= setOf traverse xs
     ds1 <- traverse rnDefn ds0
-    pure (map TLDef ds1)
+    pure (map TLDef (toList ds1))
   Ps.TLAsm w x a -> do
     id <>= Set.singleton x
     pure [TLAsm (MkBind w x NoType) a]
@@ -99,12 +99,12 @@ rnExpr = \case
     case as0 of
       []   -> throwErrorAt w "pattern match without alternatives"
       a:as -> EMat w <$> rnExpr e0 <*> traverse rnAltn (a :| as)
-  Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
+  Ps.ELam w bs0 e0 -> Vec.withNonEmpty (fmap rnBind bs0) $ \bs1 -> do
     let bs2 = ifoldMap (\i (MkBind _ x NoType) -> Map.singleton x i) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0) <*> pure NoType
-  Ps.ELet w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
+  Ps.ELet w ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
     ELet w <$> traverse rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
-  Ps.ERec w ds0 e0 -> Vec.withList ds0 $ \ds1 -> do
+  Ps.ERec w ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
 rnBind :: Ps.Bind -> Bind Out Void

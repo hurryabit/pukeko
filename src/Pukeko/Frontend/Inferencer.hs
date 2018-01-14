@@ -10,6 +10,7 @@ import Pukeko.Prelude
 import           Control.Lens
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map         as Map
 import qualified Data.Set         as Set
 import           Data.STRef
@@ -170,7 +171,7 @@ infer = \case
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
       (fun1, t_fun) <- infer fun0
-      (args1, t_args) <- unzip <$> traverse infer args0
+      (args1, t_args) <- NE.unzip <$> traverse infer args0
       t_res <- freshUVar
       unify w t_fun (t_args *~> t_res)
       pure (EApp w fun1 args1, t_res)

@@ -69,7 +69,7 @@ import           Pukeko.AST.ConDecl
 data Module st = MkModule [TopLevel st]
 
 data TopLevel st
-  = TLTyp Pos [Some1 TConDecl]
+  = TLTyp Pos (NonEmpty (Some1 TConDecl))
   | Untyped st ~ 'True =>
     TLVal Pos Id.EVar (Type Void)
   | HasLambda st ~ 'True =>
@@ -92,7 +92,7 @@ data Expr st tv ev
   | EVal Pos Id.EVar
   | ECon Pos Id.DCon
   | ENum Pos Int
-  | EApp Pos (Expr st tv ev) [Expr st tv ev]
+  | EApp Pos (Expr st tv ev) (NonEmpty (Expr st tv ev))
   | forall n. HasLambda st ~ 'True =>
     ELam Pos (Vector n (Bind st tv)) (Expr st tv (EFinScope n ev)) (StageType st tv)
   | forall n.
@@ -106,7 +106,7 @@ data Expr st tv ev
   | forall m. (HasTypes st ~ 'True, KnownNat m) =>
     ETyAbs Pos (Vector m Id.TVar) (Expr st (TFinScope m tv) ev)
   | HasTypes st ~ 'True =>
-    ETyApp Pos (Expr st tv ev) [StageType st tv]
+    ETyApp Pos (Expr st tv ev) (NonEmpty (StageType st tv))
 
 data Bind st tv = MkBind
   { _bindPos  :: Pos
@@ -140,15 +140,15 @@ makeLenses ''Case
 makeLenses ''Altn
 
 mkEApp :: Pos -> Expr st tv ev -> [Expr st tv ev] -> Expr st tv ev
-mkEApp w e0 es
-  | null es   = e0
-  | otherwise = EApp w e0 es
+mkEApp w e0 = \case
+  []    -> e0
+  e1:es -> EApp w e0 (e1 :| es)
 
 mkETyApp ::
   (HasTypes st ~ 'True) => Pos -> Expr st tv ev -> [StageType st tv] -> Expr st tv ev
-mkETyApp w e0 ts
-  | null ts   = e0
-  | otherwise = ETyApp w e0 ts
+mkETyApp w e0 = \case
+  []    -> e0
+  t1:ts -> ETyApp w e0 (t1 :| ts)
 
 
 -- * Abstraction and substition
@@ -167,7 +167,7 @@ expr // f = case expr of
   EVal w z       -> EVal w z
   ECon w c       -> ECon w c
   ENum w n       -> ENum w n
-  EApp w t  us   -> EApp w (t // f) (map (// f) us)
+  EApp w t  us   -> EApp w (t // f) (fmap (// f) us)
   ECas w t  cs   -> ECas w (t // f) (fmap (over' case2rhs (/// f)) cs)
   ELam w ps e t  -> ELam w ps (e /// f) t
   ELet w ds t    -> ELet w (over (traverse . defn2rhs) (//  f) ds) (t /// f)
@@ -583,8 +583,8 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     ECon _ c -> pretty c
     ENum _ n -> int n
     EApp _ t us ->
-      maybeParens lvl (prec > Op.aprec) $ hsep
-      $ pPrintPrec lvl Op.aprec t : map (pPrintPrec lvl (Op.aprec+1)) us
+      maybeParens lvl (prec > Op.aprec)
+      $ pPrintPrec lvl Op.aprec t <+> hsepMap (pPrintPrec lvl (Op.aprec+1)) us
     -- This could be brought back in @EApp@ when @t@ is an operator.
     -- ApOp   { _op, _arg1, _arg2 } ->
     --   let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op

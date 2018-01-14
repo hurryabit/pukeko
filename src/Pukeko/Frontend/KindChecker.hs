@@ -10,6 +10,7 @@ import Pukeko.Prelude hiding (fresh)
 import           Control.Lens
 import           Control.Monad.ST
 import           Data.Forget      (Forget (..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map         as Map
 import           Data.STRef
 import qualified Data.Vector.Sized as Vec
@@ -88,13 +89,13 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: [Some1 Con.TConDecl] -> KC n s ()
+kcTypDef :: NonEmpty (Some1 Con.TConDecl) -> KC n s ()
 kcTypDef tcons = do
   kinds <- for tcons $ \(Some1 Con.MkTConDecl{_tname}) -> do
     kind <- freshUVar
     typeCons . at _tname ?= kind
     pure kind
-  for_ (zip tcons kinds) $ \(Some1 Con.MkTConDecl{_params, _dcons}, tconKind) -> do
+  for_ (NE.zip tcons kinds) $ \(Some1 Con.MkTConDecl{_params, _dcons}, tconKind) -> do
     paramKinds <- traverse (const freshUVar) _params
     unify tconKind (foldr Arrow Star paramKinds)
     localize paramKinds $ do

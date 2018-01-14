@@ -10,7 +10,9 @@ module Data.Vector.Sized
   , empty
   , plength
   , withList
+  , withNonEmpty
   , matchList
+  , matchNonEmpty
   , zip
   , zip3
   , zipWith
@@ -23,6 +25,7 @@ module Data.Vector.Sized
 where
 
 import           Prelude hiding ((++), zip, zip3, zipWith, zipWith3, unzip)
+import qualified Data.List.NonEmpty as NE
 
 import           Control.Lens.Indexed
 import           Data.Finite
@@ -52,11 +55,17 @@ withList xs k =
     Nothing -> error "You gave me a list of negative length. Well done!"
   where v = V.fromList xs
 
+withNonEmpty :: NE.NonEmpty a -> (forall n. KnownNat n => Vector n a -> r) -> r
+withNonEmpty xs = withList (NE.toList xs)
+
 matchList :: Vector n a -> [b] -> Maybe (Vector n b)
 matchList (MkVector v0) xs
   | V.length v0 == V.length v = Just (MkVector v)
   | otherwise                 = Nothing
   where v = V.fromList xs
+
+matchNonEmpty :: Vector n a -> NE.NonEmpty b -> Maybe (Vector n b)
+matchNonEmpty v = matchList v . NE.toList
 
 zip :: Vector n a -> Vector n b -> Vector n (a, b)
 zip (MkVector xs) (MkVector ys) = MkVector (V.zip xs ys)
