@@ -7,7 +7,6 @@ module Pukeko.BackEnd.Compiler
 import Pukeko.Prelude
 
 import           Control.Lens hiding (Context)
-import           Control.Monad.RWS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

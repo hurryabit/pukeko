@@ -1,3 +1,5 @@
+import std/prelude
+
 val nats : List Int
 let nats =
   let rec nats_from n = Cons n (nats_from (n+1)) in

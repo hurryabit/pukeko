@@ -1,3 +1,5 @@
+import std/prelude
+
 val p : Int
 let p = 100000007
 

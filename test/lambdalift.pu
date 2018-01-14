@@ -1,3 +1,5 @@
+import std/io
+
 val g : Int -> Int -> Int -> Int -> Int
 let g a b c d = a
 

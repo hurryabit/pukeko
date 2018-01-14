@@ -1,3 +1,5 @@
+import std/prelude
+
 val diff : List Int -> List Int -> List Int
 let rec diff xs ys =
   match xs with

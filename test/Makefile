@@ -42,7 +42,7 @@ all: $(EXECUTABLES)
 
 asm: $(ASSEMBLES)
 
-%.asm: %.pu prelude.pu
+%.asm: %.pu std/*.pu
 	$(COMP) $<
 
 %.pp.asm: %.asm

@@ -3,7 +3,8 @@ module Pukeko.AST.Surface
   ( -- * Types
     TCon
   , DCon
-  , Module
+  , Package (..)
+  , Module (..)
   , TopLevel (..)
   , TConDecl (..)
   , DConDecl (..)
@@ -18,6 +19,8 @@ module Pukeko.AST.Surface
   , mkAppOp
   , mkIf
   , mkLam
+
+  , extend
   )
 where
 
@@ -29,7 +32,16 @@ import           Pukeko.AST.Type
 type TCon = Id.TCon
 type DCon = Id.DCon
 
-type Module = [TopLevel]
+data Package = MkPackage
+  { _pkg2root    :: FilePath
+  , _pkg2modules :: [Module]
+  }
+
+data Module = MkModule
+  { _mod2file    :: FilePath
+  , _mod2imports :: [FilePath]
+  , _mod2decls   :: [TopLevel]
+  }
 
 data TopLevel
   = TLTyp Pos (NonEmpty TConDecl)
@@ -69,6 +81,9 @@ data Patn
   = PWld Pos
   | PVar Pos Id.EVar
   | PCon Pos Id.DCon [Patn]
+
+extend :: Module -> Package -> Package
+extend mdl (MkPackage _ mdls) = MkPackage (_mod2file mdl) (mdls ++ [mdl])
 
 mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
 mkApp pos fun = \case

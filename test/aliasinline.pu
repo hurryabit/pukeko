@@ -1,3 +1,5 @@
+import std/io
+
 val h : c -> c
 let h z = (fun u -> u) z
 

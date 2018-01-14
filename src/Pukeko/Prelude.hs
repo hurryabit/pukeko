@@ -39,12 +39,14 @@ import Control.Lens          as X
 import Control.Monad         as X
 import Control.Monad.Except  as X hiding (runExcept, runExceptT)
 import Control.Monad.Reader  as X
+import Control.Monad.RWS     as X
 import Control.Monad.State   as X
 import Control.Monad.Supply  as X
 import Control.Monad.Writer  as X
 
 import Data.Bifunctor        as X
 import Data.CallStack        as X (HasCallStack)
+import Data.DList            as X (DList)
 import Data.Either           as X (partitionEithers)
 import Data.Foldable         as X
 import Data.Functor.Identity as X

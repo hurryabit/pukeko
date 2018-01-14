@@ -1,3 +1,5 @@
+import std/prelude
+
 val repeat : List a -> List a
 let repeat xs =
   let rec ys = append xs ys in

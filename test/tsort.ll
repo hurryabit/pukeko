@@ -24,21 +24,6 @@ let replicate : ∀a. Int -> a -> List a =
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
-let insert_tree : Int -> Tree Int -> Tree Int =
-      fun (x : Int) (t : Tree Int) ->
-        match t with
-        | Leaf @Int -> Branch @Int (Leaf @Int) x (Leaf @Int)
-        | Branch @Int l y r ->
-          match (<=) x y with
-          | False -> Branch @Int l y (insert_tree x r)
-          | True -> Branch @Int (insert_tree x l) y r
-let in_order : ∀a. Tree a -> List a =
-      fun @a ->
-        fun (t : Tree a) ->
-          match t with
-          | Leaf @a -> Nil @a
-          | Branch @a l x r ->
-            append @a (in_order @a l) (Cons @a x (in_order @a r))
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -68,6 +53,21 @@ let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) ->
           foldr @a @(IO Unit) (iter_io$ll1 @a f) (return @Unit Unit)
+let insert_tree : Int -> Tree Int -> Tree Int =
+      fun (x : Int) (t : Tree Int) ->
+        match t with
+        | Leaf @Int -> Branch @Int (Leaf @Int) x (Leaf @Int)
+        | Branch @Int l y r ->
+          match (<=) x y with
+          | False -> Branch @Int l y (insert_tree x r)
+          | True -> Branch @Int (insert_tree x l) y r
+let in_order : ∀a. Tree a -> List a =
+      fun @a ->
+        fun (t : Tree a) ->
+          match t with
+          | Leaf @a -> Nil @a
+          | Branch @a l x r ->
+            append @a (in_order @a l) (Cons @a x (in_order @a r))
 let tsort$ll1 : Tree Int -> Int -> Tree Int =
       fun (t : Tree Int) (x : Int) -> insert_tree x t
 let tsort : List Int -> List Int =

@@ -49,6 +49,8 @@ library:
   - array
   - call-stack
   - containers
+  - dlist
+  - filepath
   - lens
   - monad-st
   - mtl
@@ -85,6 +87,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - directory
     - hspec
     - hspec-core
     - HUnit

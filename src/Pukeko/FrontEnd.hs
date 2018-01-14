@@ -20,7 +20,7 @@ import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
 
 type Module = SystemF.Module Stage.PatternMatcher
 
-run :: MonadError String m => Parser.Module -> m Module
+run :: MonadError String m => Parser.Package -> m Module
 run =
   Renamer.renameModule
   >=> TypeResolver.resolveModule

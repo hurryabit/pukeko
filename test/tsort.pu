@@ -1,3 +1,6 @@
+import std/prelude
+import std/tree
+
 val tsort : List Int -> List Int
 let tsort xs = in_order (foldl (fun t x -> insert_tree x t) Leaf xs)
 

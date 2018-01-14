@@ -2,13 +2,18 @@
 -- | Implementation of the parser.
 module Pukeko.FrontEnd.Parser
   ( Module
+  , Package
+  , parseInput
   , parseModule
+  , parsePackage
+  , extend
   )
   where
 
 import Pukeko.Prelude hiding ((<|>), many)
 
-import           Text.Parsec          hiding (many1, sepBy1)
+import           System.FilePath as Sys
+import           Text.Parsec
 import           Text.Parsec.Expr
 import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
@@ -18,10 +23,20 @@ import           Pukeko.AST.Surface
 import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
+import           Pukeko.FrontEnd.Parser.Build (build)
 
-parseModule :: MonadError String m => String -> String -> m Module
-parseModule file code =
-  either (throwError . show) return $ parse (whiteSpace *> module_ <* eof) file code
+parseInput :: MonadError String m => SourceName -> String -> m Module
+parseInput source =
+  either (throwError . show) pure . parse (module_ source <* eof) source
+
+parseModule :: (MonadError String m, MonadIO m) => FilePath -> m Module
+parseModule file = do
+  liftIO (putStr (file ++ " "))
+  code <- liftIO (readFile file)
+  parseInput file code
+
+parsePackage :: (MonadError String m, MonadIO m) => FilePath -> m Package
+parsePackage file = build parseModule file <* liftIO (putStrLn "")
 
 type Parser = Parsec String ()
 
@@ -34,6 +49,7 @@ pukekoDef = haskellStyle
       , "match", "with"
       , "type"
       , "external"
+      , "import"
       ]
   , Token.opStart  = oneOf Op.letters
   , Token.opLetter = oneOf Op.letters
@@ -52,11 +68,11 @@ pukeko@Token.TokenParser
   } =
   Token.makeTokenParser pukekoDef
 
-many1 :: Parser a -> Parser (NonEmpty a)
-many1 p = (:|) <$> p <*> many p
+many1NE :: Parser a -> Parser (NonEmpty a)
+many1NE p = (:|) <$> p <*> many p
 
-sepBy1 :: Parser a -> Parser sep -> Parser (NonEmpty a)
-sepBy1 p sep = (:|) <$> p <*> many (sep *> p)
+sepBy1NE :: Parser a -> Parser sep -> Parser (NonEmpty a)
+sepBy1NE p sep = (:|) <$> p <*> many (sep *> p)
 
 getPos :: Parser Pos
 getPos = mkPos <$> getPosition
@@ -97,21 +113,32 @@ atype = choice
 asType :: Parser (Type Id.TVar)
 asType = reservedOp ":" *> type_
 
-module_ :: Parser Module
-module_ = many $ choice
-  [ let_ TLLet TLRec
-  , TLAsm
-    <$> getPos
-    <*> (reserved "external" *> evar)
-    <*> (equals *> Token.stringLiteral pukeko)
-  , TLVal
-    <$> getPos
-    <*> (reserved "val" *> evar)
-    <*> asType
-  , TLTyp
-    <$> getPos
-    <*> (reserved "type" *> sepBy1 tconDecl (reserved "and"))
-  ]
+module_ :: SourceName -> Parser Module
+module_ source = do
+  imps <- many import_
+  whiteSpace
+  decls <- many $ choice
+    [ let_ TLLet TLRec
+    , TLAsm
+      <$> getPos
+      <*> (reserved "external" *> evar)
+      <*> (equals *> Token.stringLiteral pukeko)
+    , TLVal
+      <$> getPos
+      <*> (reserved "val" *> evar)
+      <*> asType
+    , TLTyp
+      <$> getPos
+      <*> (reserved "type" *> sepBy1NE tconDecl (reserved "and"))
+    ]
+  pure (MkModule source imps decls)
+
+import_ :: Parser FilePath
+import_ = do
+  reserved "import"
+  comps <- sepBy1 (many1 (lower <|> digit <|> char '_')) (char '/')
+  void endOfLine
+  pure (Sys.joinPath comps Sys.<.> "pu")
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
@@ -129,7 +156,7 @@ defnValLhs = MkDefn <$> bind
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
   (.) <$> (MkDefn <$> bind)
-      <*> (ELam <$> getPos <*> many1 bind)
+      <*> (ELam <$> getPos <*> many1NE bind)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
@@ -148,7 +175,7 @@ let_ ::
 let_ mkLet mkRec =
   f <$> getPos
     <*> (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
-    <*> sepBy1 defn (reserved "and")
+    <*> sepBy1NE defn (reserved "and")
   where
     f w mk = mk w
 
@@ -168,7 +195,7 @@ expr =
     <*> (reserved "with"  *> (toList <$> many1 altn))
   , ELam
     <$> getPos
-    <*> (reserved "fun" *> many1 bind)
+    <*> (reserved "fun" *> many1NE bind)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]

@@ -6,6 +6,7 @@ import Pukeko.Prelude hiding ((<|>), many)
 import Data.Char (isSpace)
 import Data.List
 import GHC.Stack
+import System.Directory (setCurrentDirectory)
 import Test.Hspec
 import Test.Hspec.Core.Spec
 import Text.Parsec
@@ -13,11 +14,11 @@ import Text.Parsec
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 
-shouldFail :: Parser.Module -> String -> String -> Expectation
+shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
-        module_ <- Parser.parseModule "<input>" code
-        FrontEnd.run (prelude ++ module_)
+        module_ <- Parser.parseInput "<input>" code
+        FrontEnd.run (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> expectationFailure "should fail, but succeeded"
@@ -25,18 +26,18 @@ shouldFail prelude expect code = do
       Nothing -> expectationFailure "error does not start with \"<input>\""
       Just actual -> actual `shouldBe` expect
 
-shouldSucceed :: Parser.Module -> String -> Expectation
+shouldSucceed :: Parser.Package -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
-        module_ <- Parser.parseModule "<input>" code
-        FrontEnd.run (prelude ++ module_)
+        module_ <- Parser.parseInput "<input>" code
+        FrontEnd.run (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> return ()
     Left error ->
       expectationFailure $ "should succeed, but failed: " ++ error
 
-type Parser a = Parsec [String] Parser.Module a
+type Parser a = Parsec [String] Parser.Package a
 
 line :: (String -> Maybe a) -> Parser a
 line f = tokenPrim id (\pos _ _ -> incSourceLine pos 1) f
@@ -84,11 +85,14 @@ section = describe <$> pragma "SECTION" <*> manySpec subsection
 spec :: Parser Spec
 spec = skipEmpty *> manySpec section <* eof
 
+runEIO :: ExceptT String IO a -> IO a
+runEIO m = runExceptT m >>= either fail pure
+
 main :: IO ()
 main = do
-  let prelFile = "test/prelude.pu"
-      testFile = "test/frontend.pu"
-  prel <- readFile prelFile
+  setCurrentDirectory "test"
+  let prelFile = "std/prelude.pu"
+      testFile = "frontend.pu"
   cont <- lines <$> readFile testFile
-  prelude <- either fail return $ Parser.parseModule prelFile prel
+  prelude <- runEIO (Parser.parsePackage prelFile)
   either (fail . show) hspec $ runParser spec prelude testFile cont

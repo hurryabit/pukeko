@@ -19,8 +19,9 @@ import           Pukeko.AST.Type       (NoType (..), toPrenex)
 
 type Out = St.Renamer
 
-renameModule :: MonadError String m => Ps.Module -> m (Module Out)
-renameModule tops = runRn $ MkModule <$> concat <$> traverse rnTopLevel tops
+renameModule :: MonadError String m => Ps.Package -> m (Module Out)
+renameModule (Ps.MkPackage _ modules) =
+  runRn $ MkModule <$> concat <$> traverse rnTopLevel (concatMap Ps._mod2decls modules)
 
 type RnEnv ev = Map Id.EVar ev
 type RnState = Set Id.EVar

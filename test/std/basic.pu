@@ -1,0 +1,10 @@
+-- Fundamental functions
+val abort : a
+external abort = "abort"
+
+-- Fundamental types
+type Unit =
+  | Unit
+
+type Pair a b =
+  | Pair a b

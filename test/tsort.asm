@@ -128,81 +128,6 @@ g_pop 2
 g_unwind
 g_label .2
 
-g_globstart insert_tree, 2
-g_push 1
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 1
-g_pushglobal gm$cons_0_0, 0
-g_push 1
-g_pushglobal gm$cons_0_0, 0
-g_updcons 1, 3, 3
-g_pop 2
-g_return
-g_jump .2
-g_label .1
-g_uncons 3
-g_push 1
-g_eval
-g_push 4
-g_eval
-g_leq
-g_jumpcase .3, .4
-g_label .3
-g_pop 1
-g_push 2
-g_push 4
-g_pushglobal insert_tree, 2
-g_mkap 2
-g_push 2
-g_push 2
-g_updcons 1, 3, 6
-g_pop 5
-g_return
-g_jump .5
-g_label .4
-g_pop 1
-g_push 2
-g_push 2
-g_push 2
-g_push 6
-g_pushglobal insert_tree, 2
-g_mkap 2
-g_updcons 1, 3, 6
-g_pop 5
-g_return
-g_jump .5
-g_label .5
-g_jump .2
-g_label .2
-
-g_globstart in_order, 1
-g_push 0
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 1
-g_pushglobal gm$cons_0_0, 0
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
-g_uncons 3
-g_push 2
-g_pushglobal in_order, 1
-g_mkap 1
-g_push 2
-g_cons 1, 2
-g_push 1
-g_pushglobal in_order, 1
-g_mkap 1
-g_pushglobal append, 2
-g_updap 2, 5
-g_pop 4
-g_unwind
-g_label .2
-
 g_globstart gm$return, 2
 g_updcons 0, 2, 1
 g_return
@@ -310,6 +235,81 @@ g_pushglobal foldr, 3
 g_updap 2, 2
 g_pop 1
 g_unwind
+
+g_globstart insert_tree, 2
+g_push 1
+g_eval
+g_jumpcase .0, .1
+g_label .0
+g_pop 1
+g_pushglobal gm$cons_0_0, 0
+g_push 1
+g_pushglobal gm$cons_0_0, 0
+g_updcons 1, 3, 3
+g_pop 2
+g_return
+g_jump .2
+g_label .1
+g_uncons 3
+g_push 1
+g_eval
+g_push 4
+g_eval
+g_leq
+g_jumpcase .3, .4
+g_label .3
+g_pop 1
+g_push 2
+g_push 4
+g_pushglobal insert_tree, 2
+g_mkap 2
+g_push 2
+g_push 2
+g_updcons 1, 3, 6
+g_pop 5
+g_return
+g_jump .5
+g_label .4
+g_pop 1
+g_push 2
+g_push 2
+g_push 2
+g_push 6
+g_pushglobal insert_tree, 2
+g_mkap 2
+g_updcons 1, 3, 6
+g_pop 5
+g_return
+g_jump .5
+g_label .5
+g_jump .2
+g_label .2
+
+g_globstart in_order, 1
+g_push 0
+g_eval
+g_jumpcase .0, .1
+g_label .0
+g_pop 1
+g_pushglobal gm$cons_0_0, 0
+g_update 2
+g_pop 1
+g_unwind
+g_label .1
+g_uncons 3
+g_push 2
+g_pushglobal in_order, 1
+g_mkap 1
+g_push 2
+g_cons 1, 2
+g_push 1
+g_pushglobal in_order, 1
+g_mkap 1
+g_pushglobal append, 2
+g_updap 2, 5
+g_pop 4
+g_unwind
+g_label .2
 
 g_globstart tsort$ll1, 2
 g_push 0
