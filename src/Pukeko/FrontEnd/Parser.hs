@@ -46,7 +46,7 @@ pukekoDef = haskellStyle
       , "val", "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
-      , "type"
+      , "type", "class", "instance"
       , "external"
       , "import"
       ]
@@ -62,6 +62,9 @@ pukeko@Token.TokenParser
   , Token.natural
   , Token.identifier
   , Token.parens
+  , Token.braces
+  , Token.colon
+  , Token.comma
   , Token.symbol
   , Token.whiteSpace
   } =
@@ -79,12 +82,11 @@ getPos = mkPos <$> getPosition
 nat :: Parser Int
 nat = fromInteger <$> natural
 
-equals, arrow, darrow, bar, colon :: Parser ()
+equals, arrow, darrow, bar :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
 darrow  = reservedOp "=>"
 bar     = reservedOp "|"
-colon   = reservedOp ":"
 
 evar :: Parser Id.EVar
 evar = Id.evar <$> (lookAhead lower *> identifier)
@@ -114,11 +116,12 @@ atype = choice
   , parens type_
   ]
 
-typeScheme :: Parser TypeScheme
-typeScheme =
-  MkTypeScheme
+typeCstr :: Parser TypeCstr
+typeCstr = MkTypeCstr
   <$> option [] (try (parens (many ((,) <$> clss <*> tvar)) <* darrow))
-  <*> type_
+
+typeScheme :: Parser TypeScheme
+typeScheme = MkTypeScheme <$> typeCstr <*> type_
 
 module_ :: SourceName -> Parser Module
 module_ source = do
@@ -127,6 +130,8 @@ module_ source = do
   decls <- many $ choice
     [ DType <$> (reserved "type"     *> sepBy1NE tconDecl (reserved "and"))
     , DSign <$> (reserved "val"      *> signDecl)
+    , DClss <$> (reserved "class"    *> clssDecl)
+    , DInst <$> (reserved "instance" *> instDecl)
     , let_ (const DLet) (const DRec)
     , DPrim <$> (reserved "external" *> primDecl)
     ]
@@ -218,7 +223,7 @@ tconDecl = MkTConDecl
   <$> getPos
   <*> tcon
   <*> many tvar
-  <*> option [] (reservedOp "=" *> (toList <$> many1 dconDecl))
+  <*> option [] (equals *> (toList <$> many1 dconDecl))
 
 dconDecl :: Parser DConDecl
 dconDecl = MkDConDecl <$> getPos <*> (reservedOp "|" *> dcon) <*> many atype
@@ -229,8 +234,27 @@ signDecl = MkSignDecl
   <*> evar
   <*> (colon *> typeScheme)
 
+clssDecl :: Parser ClssDecl
+clssDecl = MkClssDecl
+  <$> getPos
+  <*> clss
+  <*> tvar
+  <*> (colon *> record signDecl)
+
+instDecl :: Parser InstDecl
+instDecl = do
+  w       <- getPos
+  c       <- clss
+  (t, vs) <- (,) <$> tcon <*> pure [] <|> parens ((,) <$> tcon <*> many tvar)
+  q       <- equals *> typeCstr
+  ds      <- record defn
+  pure (MkInstDecl w c t vs q ds)
+
 primDecl :: Parser PrimDecl
 primDecl = MkPrimDecl
   <$> getPos
   <*> evar
   <*> (equals *> Token.stringLiteral pukeko)
+
+record :: Parser a -> Parser [a]
+record p = braces (sepBy p comma)

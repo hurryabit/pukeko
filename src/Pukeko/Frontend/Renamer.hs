@@ -50,6 +50,8 @@ rnDecl top = case top of
   Ps.DType ts ->
     (:[]) . DType <$> for ts (\t -> here (Ps._tcon2pos t) (rnTConDecl t))
   Ps.DSign (Ps.MkSignDecl w z t) -> (:[]) . DSign <$> MkSignDecl w z <$> rnTypeScheme t
+  Ps.DClss _ -> pure []
+  Ps.DInst _ -> pure []
   Ps.DLet ds0 -> do
     ds1 <- traverse rnDefn ds0
     let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
@@ -85,7 +87,7 @@ rnType vs = go
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
 rnTypeScheme :: Ps.TypeScheme -> Rn ev (Type Void)
-rnTypeScheme (Ps.MkTypeScheme qs t) =
+rnTypeScheme (Ps.MkTypeScheme (Ps.MkTypeCstr qs) t) =
   -- FIXME: Fail if there are type variables that are only used in the constraints.
   Vec.withList (toList (setOf Ps.type2tvar t)) $ \vs ->
     let mp = foldl (\acc (c, v) -> Map.insertWith (<>) v (Set.singleton c) acc) mempty qs

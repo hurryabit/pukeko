@@ -6,11 +6,14 @@ module Pukeko.AST.Surface
   , Package (..)
   , Module (..)
   , Decl (..)
-  , SignDecl (..)
   , TConDecl (..)
   , DConDecl (..)
+  , SignDecl (..)
+  , ClssDecl (..)
+  , InstDecl (..)
   , PrimDecl (..)
   , Type (..)
+  , TypeCstr (..)
   , TypeScheme (..)
   , Defn (..)
   , Expr (..)
@@ -52,6 +55,8 @@ data Module = MkModule
 data Decl
   = DType (NonEmpty TConDecl)
   | DSign SignDecl
+  | DClss ClssDecl
+  | DInst InstDecl
   | DLet  (NonEmpty (Defn Id.EVar))
   | DRec  (NonEmpty (Defn Id.EVar))
   | DPrim PrimDecl
@@ -75,6 +80,22 @@ data SignDecl = MkSignDecl
   , _sign2type :: TypeScheme
   }
 
+data ClssDecl = MkClssDecl
+  { _clss2pos   :: Pos
+  , _clss2name  :: Id.Clss
+  , _clss2prm   :: Id.TVar
+  , _clss2mthds :: [SignDecl]
+  }
+
+data InstDecl = MkInstDecl
+  { _inst2pos   :: Pos
+  , _inst2clss  :: Id.Clss
+  , _inst2tcon  :: Id.TCon
+  , _inst2tvars :: [Id.TVar]
+  , _inst2cstr  :: TypeCstr
+  , _inst2defns :: [Defn Id.EVar]
+  }
+
 data PrimDecl = MkPrimDecl
   { _prim2pos  :: Pos
   , _prim2func :: Id.EVar
@@ -87,7 +108,9 @@ data Type
   | TArr
   | TApp Type Type
 
-data TypeScheme = MkTypeScheme [(Id.Clss, Id.TVar)] Type
+data TypeCstr = MkTypeCstr [(Id.Clss, Id.TVar)]
+
+data TypeScheme = MkTypeScheme TypeCstr Type
 
 data Defn v = MkDefn Bind (Expr v)
 
@@ -153,8 +176,11 @@ deriving instance Show Decl
 deriving instance Show TConDecl
 deriving instance Show DConDecl
 deriving instance Show SignDecl
+deriving instance Show ClssDecl
+deriving instance Show InstDecl
 deriving instance Show PrimDecl
 deriving instance Show Type
+deriving instance Show TypeCstr
 deriving instance Show TypeScheme
 deriving instance Show v => Show (Defn v)
 deriving instance Show v => Show (Expr v)
