@@ -5,9 +5,11 @@ module Pukeko.AST.Surface
   , DCon
   , Package (..)
   , Module (..)
-  , TopLevel (..)
+  , Decl (..)
+  , SignDecl (..)
   , TConDecl (..)
   , DConDecl (..)
+  , PrimDecl (..)
   , Type (..)
   , TypeScheme (..)
   , Defn (..)
@@ -44,25 +46,39 @@ data Package = MkPackage
 data Module = MkModule
   { _mod2file    :: FilePath
   , _mod2imports :: [FilePath]
-  , _mod2decls   :: [TopLevel]
+  , _mod2decls   :: [Decl]
   }
 
-data TopLevel
-  = TLTyp Pos (NonEmpty TConDecl)
-  | TLVal Pos Id.EVar TypeScheme
-  | TLLet Pos (NonEmpty (Defn Id.EVar))
-  | TLRec Pos (NonEmpty (Defn Id.EVar))
-  | TLAsm Pos Id.EVar String
+data Decl
+  = DType (NonEmpty TConDecl)
+  | DSign SignDecl
+  | DLet  (NonEmpty (Defn Id.EVar))
+  | DRec  (NonEmpty (Defn Id.EVar))
+  | DPrim PrimDecl
 
 data TConDecl = MkTConDecl
-  { _tname  :: Id.TCon
-  , _params :: [Id.TVar]
-  , _dcons  :: [DConDecl]
+  { _tcon2pos   :: Pos
+  , _tcon2name  :: Id.TCon
+  , _tcon2prms  :: [Id.TVar]
+  , _tcon2dcons :: [DConDecl]
   }
 
 data DConDecl = MkDConDecl
-  { _dname  :: Id.DCon
-  , _fields :: [Type]
+  { _dcon2pos  :: Pos
+  , _dcon2name :: Id.DCon
+  , _dcon2flds :: [Type]
+  }
+
+data SignDecl = MkSignDecl
+  { _sign2pos  :: Pos
+  , _sign2func :: Id.EVar
+  , _sign2type :: TypeScheme
+  }
+
+data PrimDecl = MkPrimDecl
+  { _prim2pos  :: Pos
+  , _prim2func :: Id.EVar
+  , _prim2prim :: String
   }
 
 data Type
@@ -71,7 +87,7 @@ data Type
   | TArr
   | TApp Type Type
 
-data TypeScheme = MkTypeScheme [(Id.TCls, Id.TVar)] Type
+data TypeScheme = MkTypeScheme [(Id.Clss, Id.TVar)] Type
 
 data Defn v = MkDefn Bind (Expr v)
 
@@ -133,9 +149,11 @@ type2tvar f = \case
 
 
 deriving instance Show Module
-deriving instance Show TopLevel
+deriving instance Show Decl
 deriving instance Show TConDecl
 deriving instance Show DConDecl
+deriving instance Show SignDecl
+deriving instance Show PrimDecl
 deriving instance Show Type
 deriving instance Show TypeScheme
 deriving instance Show v => Show (Defn v)

@@ -18,9 +18,9 @@ import qualified Data.Vector.Sized as Vec
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 import           Pukeko.AST.SystemF
-import qualified Pukeko.AST.Stage          as St
-import qualified Pukeko.AST.ConDecl        as Con
-import qualified Pukeko.AST.Identifier              as Id
+import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.ConDecl
+import qualified Pukeko.AST.Identifier as Id
 
 type In  = St.Inferencer Type
 type Out = St.PatternMatcher
@@ -45,25 +45,25 @@ pmExpr = \case
   ECon w c          -> pure (ECon w c)
   ENum w n          -> pure (ENum w n)
   EApp w t  us      -> EApp w <$> pmExpr t <*> traverse pmExpr us
-  ELam w bs e t     -> ELam w (fmap retagBind bs) <$> pmExpr e <*> pure t
-  ELet w ds t       -> ELet w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
-  ERec w ds t       -> ERec w <$> (traverse . defn2rhs) pmExpr ds <*> pmExpr t
+  ELam w bs e t     -> ELam w bs <$> pmExpr e <*> pure t
+  ELet w ds t       -> ELet w <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t
+  ERec w ds t       -> ERec w <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t
   EMat w t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch w (mkRowMatch1 t1 as1)
   ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
   ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
 
-pmTopLevel :: TopLevel In -> PM (TopLevel Out)
-pmTopLevel = \case
-  TLTyp w ds -> pure (TLTyp w ds)
-  TLDef (MkDefn b e) -> do
-    put (Id.freshEVars "pm" (b^.bindEVar))
-    TLDef <$> MkDefn (retagBind b) <$> pmExpr e
-  TLAsm b a -> pure (TLAsm (retagBind b) a)
+pmDecl :: Decl In -> PM (Decl Out)
+pmDecl = \case
+  DType ds -> pure (DType ds)
+  DDefn (MkDefn b e) -> do
+    put (Id.freshEVars "pm" (b^.bind2evar))
+    DDefn <$> MkDefn b <$> pmExpr e
+  DPrim p -> pure (DPrim p)
 
 compileModule :: MonadError String m => Module In -> m (Module Out)
-compileModule m0 = evalPM (module2tops (traverse pmTopLevel) m0) m0
+compileModule m0 = evalPM (module2decls (traverse pmDecl) m0) m0
 
 pmMatch ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
@@ -97,7 +97,7 @@ patnToBPatn = \case
 
 type RhsExpr tv ev = Expr In tv (EScope Id.EVar ev)
 
-data Row n tv ev = MkRow (LS.List n (Patn In tv)) (RhsExpr tv ev)
+data Row n tv ev = MkRow (LS.List n (Patn Type tv)) (RhsExpr tv ev)
 
 data RowMatch m n tv ev =
   MkRowMatch (LS.List n (Expr Out tv ev)) (LS.List m (Row n tv ev))
@@ -111,7 +111,7 @@ mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 data Col m tv ev a = MkCol (Expr Out tv ev) (LS.List m a)
 
 data ColMatch m n tv ev =
-  MkColMatch (LS.List n (Col m tv ev (Patn In tv))) (LS.List m (RhsExpr tv ev))
+  MkColMatch (LS.List n (Col m tv ev (Patn Type tv))) (LS.List m (RhsExpr tv ev))
 
 colPatn :: Traversal (Col m tv ev a) (Col m tv ev b) a b
 colPatn f (MkCol t ps) = MkCol t <$> traverse f ps
@@ -136,7 +136,7 @@ elimBPatnCols w (MkColMatch cs0 us0) k = do
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
   where
     isBPatnCol ::
-      Col n tv ev (Patn In tv) -> Either (Col n tv ev (Patn In tv)) (Col n tv ev BPatn)
+      Col n tv ev (Patn Type tv) -> Either (Col n tv ev (Patn Type tv)) (Col n tv ev BPatn)
     isBPatnCol (MkCol t ps) =
       case traverse patnToBPatn ps of
         Just bs -> Right (MkCol t bs)
@@ -155,9 +155,9 @@ elimBPatnCols w (MkColMatch cs0 us0) k = do
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwErrorAt w "pattern match too simple, use a let binding instead"
 
-data CPatn tv = MkCPatn Id.DCon [Type tv] [Patn In tv]
+data CPatn tv = MkCPatn Id.DCon [Type tv] [Patn Type tv]
 
-patnToCPatn :: forall tv. Patn In tv -> Maybe (CPatn tv)
+patnToCPatn :: forall tv. Patn Type tv -> Maybe (CPatn tv)
 patnToCPatn = \case
   PWld{}      -> Nothing
   PVar{}      -> Nothing
@@ -187,11 +187,11 @@ groupCPatns ::
   Pos -> Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupCPatns w (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
-  Some1 (Pair1 (Con.MkTConDecl tcon _params dcons0) _dconDecl) <- findDCon dcon0
+  Some1 (Pair1 (MkTConDecl _ tcon _params dcons0) _dconDecl) <- findDCon dcon0
   dcons1 <- case dcons0 of
     []   -> bugWith "pattern match on type without data constructors" tcon
     d:ds -> pure (d :| ds)
-  grps <- for dcons1 $ \Con.MkDConDecl{_dname = dcon1} -> do
+  grps <- for dcons1 $ \MkDConDecl{_dcon2name = dcon1} -> do
     let drs1 = filter (\(MkCPatn dcon2 _ts _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwAt w "unmatched constructor" dcon1

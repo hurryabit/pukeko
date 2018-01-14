@@ -15,12 +15,12 @@ import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 
 checkModule :: (MonadError String m, St.Typed st) => Module st -> m (Module st)
 checkModule module0@(MkModule tops) = do
-  runTC (traverse_ checkTopLevel tops) module0
+  runTC (traverse_ checkDecl tops) module0
   pure module0
 
 type IsEVar ev = (HasEnv ev)
@@ -37,7 +37,7 @@ runTC tc m0 = runExcept (runInfoT (runGammaT tc) m0)
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   EVar _ x -> lookupType x
-  EVal _ z -> fmap absurd . snd <$> findFun z
+  EVal _ z -> fmap absurd . _sign2type <$> findSign z
   ECon _ c -> fmap absurd <$> typeOfDCon c
   ENum _ _ -> pure typeInt
   EApp _ e0 es -> do
@@ -49,21 +49,21 @@ typeOf = \case
           check ek tx
           pure ty
         TUni{} ->
-          throwErrorAt (ek^.pos) "expected type argument, but found value argument"
-        _ -> throwErrorAt (ek^.pos) "unexpected value argument"
+          throwErrorAt (ek^.expr2pos) "expected type argument, but found value argument"
+        _ -> throwErrorAt (ek^.expr2pos) "unexpected value argument"
   ELam _ bs e0 t0 -> do
-    let ts = fmap _bindType bs
+    let ts = fmap _bind2type bs
     withTypes ts (check e0 t0)
     pure (ts *~> t0)
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
-    withBinds (fmap _defnLhs ds) (typeOf e0)
+    withBinds (fmap _defn2bind ds) (typeOf e0)
   ERec _ ds e0 -> do
-    withBinds (fmap _defnLhs ds) $ do
+    withBinds (fmap _defn2bind ds) $ do
       traverse_ checkDefn ds
       typeOf e0
-  EMat _ e0 as -> typeOfBranching typeOfAltn e0 as
-  ECas _ e0 cs -> typeOfBranching typeOfCase e0 cs
+  EMat _ e0 as -> typeOfBranching _altn2pos typeOfAltn e0 as
+  ECas _ e0 cs -> typeOfBranching _case2pos typeOfCase e0 cs
   ETyAbs _ qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
   ETyApp w e0 ts1 -> do
     t0 <- typeOf e0
@@ -80,16 +80,17 @@ typeOf = \case
       _ -> throwErrorAt w "unexpected type argument"
 
 typeOfBranching ::
-  (St.Typed st, IsTVar tv, IsEVar ev, HasPos branch) =>
+  (St.Typed st, IsTVar tv, IsEVar ev) =>
+  (branch -> Pos) ->
   (Type tv -> branch -> TC tv ev (Type tv)) ->
   Expr st tv ev -> NonEmpty branch -> TC tv ev (Type tv)
-typeOfBranching typeOfBranch e0 (b1 :| bs) = do
+typeOfBranching pos typeOfBranch e0 (b1 :| bs) = do
   t0 <- typeOf e0
   t1 <- typeOfBranch t0 b1
   for_ bs $ \b2 -> do
     t2 <- typeOfBranch t0 b2
     unless (t1 == t2) $
-      throwDocAt (b2^.pos)
+      throwDocAt (pos b2)
         ("expected type" <+> pretty t1 <> ", but found type" <+> pretty t2)
   pure t1
 
@@ -109,13 +110,12 @@ typeOfCase t (MkCase w c ts bs e0) = do
   typeOfAltn t (MkAltn w (PCon w c ts ps) e1)
 
 patnEnvLevel ::
-  (St.Typed st, IsTVar tv) =>
-  Patn st tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
+  (IsTVar tv) => Patn Type tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
 patnEnvLevel p t0 = case p of
   PWld _   -> pure Map.empty
   PVar _ x -> pure (Map.singleton x t0)
   PCon w c ts1 ps -> do
-    Some1 (Pair1 _tconDecl (Con.MkDConDecl tcon dcon _tag flds1)) <- findDCon c
+    Some1 (Pair1 _tconDecl (MkDConDecl _ tcon dcon _tag flds1)) <- findDCon c
     let t1 = mkTApp (TCon tcon) (toList ts1)
     unless (t0 == t1) $ throwDocAt w
       ("expected pattern of type" <+> pretty t0
@@ -140,19 +140,19 @@ match w t0 t1 =
 check :: (St.Typed st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
 check e t0 = do
   t1 <- typeOf e
-  match (e^.pos) t0 t1
+  match (e^.expr2pos) t0 t1
 
 checkDefn :: (St.Typed st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
 checkDefn (MkDefn (MkBind _ _ t) e) = check e t
 
-checkTopLevel :: (St.Typed st) => TopLevel st -> TC Void Void ()
-checkTopLevel = \case
-  TLTyp{} -> pure ()
-  TLVal{} -> pure ()
-  TLDef   d -> checkDefn d
-  TLSup w z qvs t0 bs e0 -> do
+checkDecl :: (St.Typed st) => Decl st -> TC Void Void ()
+checkDecl = \case
+  DType{} -> pure ()
+  DSign{} -> pure ()
+  DDefn   d -> checkDefn d
+  DSupC (MkSupCDecl w z qvs t0 bs e0) -> do
       t1 <- withQVars qvs (withBinds bs (typeOf e0))
-      let t2 = fmap _bindType bs *~> t1
+      let t2 = fmap _bind2type bs *~> t1
       match w (mkTUni qvs t0) (mkTUni qvs t2)
     `catchError` \e -> throwError ("while type checking " ++ show z ++ ":\n" ++ e)
-  TLAsm _ _ -> pure ()
+  DPrim _ -> pure ()

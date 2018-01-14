@@ -34,19 +34,19 @@ runFR fr = runExcept (runStateT (unFR fr) st0)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
 resolveModule (MkModule tops0) = do
-  (tops1, MkFRState decld defnd) <- runFR (traverse frTopLevel tops0)
+  (tops1, MkFRState decld defnd) <- runFR (traverse frDecl tops0)
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   case Map.minViewWithKey undefnd of
     Just ((fun, (w, _)), _) -> throwAt w "declared but undefined function" fun
     Nothing -> pure (MkModule tops1)
 
-declareFun :: Pos -> Id.EVar -> Type Void -> FR ()
-declareFun w fun typ = do
+declareFun :: SignDecl -> FR ()
+declareFun (MkSignDecl w fun typ) = do
   dup <- uses declared (has (ix fun))
   when dup (throwAt w "duplicate declaration of function" fun)
   declared . at fun ?= (w, typ)
 
-defineFun :: Bind In Void -> FR ()
+defineFun :: Bind NoType Void -> FR ()
 defineFun (MkBind w fun NoType) = do
   ex <- uses declared (has (ix fun))
   unless ex (throwAt w "undeclared function" fun)
@@ -54,15 +54,15 @@ defineFun (MkBind w fun NoType) = do
   when dup (throwAt w "duplicate definition of function" fun)
   defined . contains fun .= True
 
-frTopLevel :: TopLevel In -> FR (TopLevel Out)
-frTopLevel = \case
-  TLTyp w tcs -> pure (TLTyp w tcs)
-  TLVal w x t -> do
-    declareFun w x t
-    pure (TLVal w x t)
-  TLDef d -> do
-    defineFun (d^.defnLhs)
-    pure (TLDef (retagDefn d))
-  TLAsm b s -> do
-    defineFun b
-    pure (TLAsm (retagBind b) s)
+frDecl :: Decl In -> FR (Decl Out)
+frDecl = \case
+  DType tcs -> pure (DType tcs)
+  DSign s -> do
+    declareFun s
+    pure (DSign s)
+  DDefn d -> do
+    defineFun (d^.defn2bind)
+    pure (DDefn (retagDefn d))
+  DPrim p -> do
+    defineFun (p^.prim2bind)
+    pure (DPrim p)

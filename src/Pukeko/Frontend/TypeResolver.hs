@@ -8,7 +8,7 @@ import           Control.Lens
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
 
@@ -16,8 +16,8 @@ type In  = St.Renamer
 type Out = St.TypeResolver
 
 data TRState = MkTRState
-  { _st2tcons :: Map Id.TCon (Some1 Con.TConDecl)
-  , _st2dcons :: Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
+  { _st2tcons :: Map Id.TCon (Some1 TConDecl)
+  , _st2dcons :: Map Id.DCon (Some1 (Pair1 TConDecl DConDecl))
   }
 makeLenses ''TRState
 
@@ -39,17 +39,17 @@ trType w = type2tcon $ \tcon -> do
   unless ex (throwAt w "unknown type cons" tcon)
   pure tcon
 
-insertTCon :: Pos -> Con.TConDecl n -> TR ()
-insertTCon posn tcon@Con.MkTConDecl{_tname} = do
-  old <- use (st2tcons . at _tname)
-  when (isJust old) $ throwAt posn "duplicate type cons" _tname
-  st2tcons . at _tname ?= Some1 tcon
+insertTCon :: TConDecl n -> TR ()
+insertTCon tcon@MkTConDecl{_tcon2pos = w, _tcon2name = tname} = do
+  old <- use (st2tcons . at tname)
+  when (isJust old) $ throwAt w "duplicate type cons" tname
+  st2tcons . at tname ?= Some1 tcon
 
-insertDCon :: KnownNat n => Pos -> Con.TConDecl n -> Con.DConDecl n -> TR ()
-insertDCon posn tcon dcon@Con.MkDConDecl{_dname} = do
-  old <- use (st2dcons . at _dname)
-  when (isJust old) $ throwAt posn "duplicate term cons" _dname
-  st2dcons . at _dname ?= Some1 (Pair1 tcon dcon)
+insertDCon :: KnownNat n => TConDecl n -> DConDecl n -> TR ()
+insertDCon tcon dcon@MkDConDecl{_dcon2pos = w, _dcon2name = dname} = do
+  old <- use (st2dcons . at dname)
+  when (isJust old) $ throwAt w "duplicate term cons" dname
+  st2dcons . at dname ?= Some1 (Pair1 tcon dcon)
 
 findDCon :: Pos -> Id.DCon -> TR Id.DCon
 findDCon w dcon = do
@@ -57,18 +57,18 @@ findDCon w dcon = do
   unless ex (throwAt w "unknown term cons" dcon)
   pure dcon
 
-trTopLevel :: TopLevel In -> TR (TopLevel Out)
-trTopLevel top = case top of
-  TLTyp w tconDecls -> do
-    for_ tconDecls (\(Some1 tcon) -> insertTCon w tcon)
-    for_ tconDecls $ \(Some1 tcon@Con.MkTConDecl{_dcons = dconDecls}) -> do
-      for_ dconDecls $ \dcon@Con.MkDConDecl{_fields} -> do
-        for_ _fields (trType w)
-        insertDCon w tcon dcon
-    pure (TLTyp w tconDecls)
-  TLVal w x t  -> TLVal w x <$> trType w t
-  TLDef     d  -> TLDef <$> itraverseOf defn2dcon findDCon d
-  TLAsm   b a  -> pure (TLAsm (retagBind b) a)
+trDecl :: Decl In -> TR (Decl Out)
+trDecl top = case top of
+  DType tconDecls -> do
+    for_ tconDecls (\(Some1 tcon) -> insertTCon tcon)
+    for_ tconDecls $ \(Some1 tcon@MkTConDecl{_tcon2dcons = dconDecls}) -> do
+      for_ dconDecls $ \dcon@MkDConDecl{_dcon2pos = w, _dcon2flds = flds} -> do
+        for_ flds (trType w)
+        insertDCon tcon dcon
+    pure (DType tconDecls)
+  DSign (MkSignDecl w x t)  -> DSign <$> MkSignDecl w x <$> trType w t
+  DDefn d -> DDefn <$> itraverseOf defn2dcon findDCon d
+  DPrim p -> pure (DPrim p)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)
-resolveModule m0 = evalTR (module2tops (traverse trTopLevel) m0)
+resolveModule m0 = evalTR (module2decls (traverse trDecl) m0)

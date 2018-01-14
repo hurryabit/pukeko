@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -5,7 +6,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.SystemF
   ( Module (..)
-  , TopLevel (..)
+  , Decl (..)
+  , SignDecl (..)
+  , SupCDecl (..)
+  , PrimDecl (..)
   , Defn (..)
   , Expr (..)
   , Bind (..)
@@ -22,28 +26,24 @@ module Pukeko.AST.SystemF
   , abstract
   , (//)
 
-  , bindEVar
-  , bindType
-  , defnLhs
-  , caseCon
-  , caseTArgs
-  , altnPatn
-  , altnRhs
-
-  , module2tops
-  , top2lhs
-  , top2rhs
-  , top2eval
-  , defn2rhs
+  , module2decls
+  , decl2func
+  , sign2func
+  , sign2type
+  , prim2bind
+  , defn2bind
+  , defn2expr
+  , defn2exprSt
   , defn2dcon
+  , expr2pos
+  , bind2evar
+  , bind2type
+
+  , decl2eval
   , expr2eval
   , patn2evar
-  , case2rhs
-  , altn2rhs
 
   , retagDefn
-  , retagExpr
-  , retagBind
 
   , Pos
   , module Pukeko.AST.Scope
@@ -61,30 +61,45 @@ import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
-import           Pukeko.AST.Classes
 import           Pukeko.AST.Stage
 import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
 
-data Module st = MkModule [TopLevel st]
+data Module st = MkModule
+  { _module2decls :: [Decl st]
+  }
 
-data TopLevel st
-  = TLTyp Pos (NonEmpty (Some1 TConDecl))
-  | Untyped st ~ 'True =>
-    TLVal Pos Id.EVar (Type Void)
-  | HasLambda st ~ 'True =>
-    TLDef     (Defn st Void Void)
+data Decl st
+  =                         DType (NonEmpty (Some1 TConDecl))
+  | Untyped   st ~ 'True => DSign SignDecl
+  | HasLambda st ~ 'True => DDefn (Defn st Void Void)
   | forall m n. (HasLambda st ~ 'False, StageType st ~ Type, KnownNat m) =>
-    TLSup Pos Id.EVar
-      (Vector m QVar)
-      (StageType st (TFinScope m Void))
-      (Vector n (Bind st (TFinScope m Void)))
-      (Expr st (TFinScope m Void) (EFinScope n Void))
-  | TLAsm     (Bind st Void) String
+                            DSupC (SupCDecl st m n)
+  |                         DPrim (PrimDecl (StageType st))
+
+data SignDecl = MkSignDecl
+  { _sign2pos  :: Pos
+  , _sign2func :: Id.EVar
+  , _sign2type :: Type Void
+  }
+
+data SupCDecl st m n = MkSupCDecl
+  { _supc2pos   :: Pos
+  , _supc2func  :: Id.EVar
+  , _supc2tprms :: Vector m QVar
+  , _supc2type  :: StageType st (TFinScope m Void)
+  , _supc2eprms :: Vector n (Bind (StageType st) (TFinScope m Void))
+  , _supc2expr  :: Expr st (TFinScope m Void) (EFinScope n Void)
+  }
+
+data PrimDecl ty = MkPrimDecl
+  { _prim2bind :: Bind ty Void
+  , _prim2extn :: String
+  }
 
 data Defn st tv ev = MkDefn
-  { _defnLhs :: Bind st tv
-  , _defnRhs :: Expr st tv ev
+  { _defn2bind :: Bind (StageType st) tv
+  , _defn2expr :: Expr st tv ev
   }
 
 data Expr st tv ev
@@ -94,9 +109,9 @@ data Expr st tv ev
   | ENum Pos Int
   | EApp Pos (Expr st tv ev) (NonEmpty (Expr st tv ev))
   | forall n. HasLambda st ~ 'True =>
-    ELam Pos (Vector n (Bind st tv)) (Expr st tv (EFinScope n ev)) (StageType st tv)
+    ELam Pos (Vector n (Bind (StageType st) tv)) (Expr st tv (EFinScope n ev)) (StageType st tv)
   | forall n.
-    ELet Pos (Vector n (Defn st tv ev))               (Expr st tv (EFinScope n ev))
+    ELet Pos (Vector n (Defn st tv ev)) (Expr st tv (EFinScope n ev))
   | forall n.
     ERec Pos (Vector n (Defn st tv (EFinScope n ev))) (Expr st tv (EFinScope n ev))
   | HasNested st ~ 'False =>
@@ -108,32 +123,36 @@ data Expr st tv ev
   | HasTypes st ~ 'True =>
     ETyApp Pos (Expr st tv ev) (NonEmpty (StageType st tv))
 
-data Bind st tv = MkBind
-  { _bindPos  :: Pos
-  , _bindEVar :: Id.EVar
-  , _bindType :: StageType st tv
+data Bind ty tv = MkBind
+  { _bind2pos  :: Pos
+  , _bind2evar :: Id.EVar
+  , _bind2type :: ty tv
   }
 
 data Case st tv ev = forall n. MkCase
-  { _casePos   :: Pos
-  , _caseCon   :: Id.DCon
-  , _caseTArgs :: [StageType st tv]
-  , _caseBinds :: Vector n Id.EVar
-  , _caseRhs   :: Expr st tv (EFinScope n ev)
+  { _case2pos   :: Pos
+  , _case2dcon  :: Id.DCon
+  , _case2targs :: [StageType st tv]
+  , _case2binds :: Vector n Id.EVar
+  , _case2expr  :: Expr st tv (EFinScope n ev)
   }
 
 data Altn st tv ev = MkAltn
-  { _altnPos  :: Pos
-  , _altnPatn :: Patn st tv
-  , _altnRhs  :: Expr st tv (EScope Id.EVar ev)
+  { _altn2pos  :: Pos
+  , _altn2patn :: Patn (StageType st) tv
+  , _altn2expr :: Expr st tv (EScope Id.EVar ev)
   }
 
-data Patn st tv
+data Patn ty tv
   = PWld Pos
   | PVar Pos Id.EVar
-  | PCon Pos Id.DCon [StageType st tv] [Patn st tv]
+  | PCon Pos Id.DCon [ty tv] [Patn ty tv]
 
 -- * Derived optics
+makeLenses ''Module
+makeLenses ''SignDecl
+makeLenses ''SupCDecl
+makeLenses ''PrimDecl
 makeLenses ''Defn
 makeLenses ''Bind
 makeLenses ''Case
@@ -168,11 +187,11 @@ expr // f = case expr of
   ECon w c       -> ECon w c
   ENum w n       -> ENum w n
   EApp w t  us   -> EApp w (t // f) (fmap (// f) us)
-  ECas w t  cs   -> ECas w (t // f) (fmap (over' case2rhs (/// f)) cs)
+  ECas w t  cs   -> ECas w (t // f) (fmap (over' case2expr (/// f)) cs)
   ELam w ps e t  -> ELam w ps (e /// f) t
-  ELet w ds t    -> ELet w (over (traverse . defn2rhs) (//  f) ds) (t /// f)
-  ERec w ds t    -> ERec w (over (traverse . defn2rhs) (/// f) ds) (t /// f)
-  EMat w t  as   -> EMat w (t // f) (fmap (over' altn2rhs (/// f)) as)
+  ELet w ds t    -> ELet w (over (traverse . defn2expr) (//  f) ds) (t /// f)
+  ERec w ds t    -> ERec w (over (traverse . defn2expr) (/// f) ds) (t /// f)
+  EMat w t  as   -> EMat w (t // f) (fmap (over altn2expr (/// f)) as)
   ETyAbs _ _ _   -> error "THIS IS NOT IMPLEMENTED"
   ETyApp w e t   -> ETyApp w (e // f) t
 
@@ -187,42 +206,35 @@ pdist w (Bound i x) = EVar w (Bound i x)
 pdist _ (Free t)    = fmap Free t
 
 -- * Lenses and traversals
-module2tops :: Lens (Module st1) (Module st2) [TopLevel st1] [TopLevel st2]
+module2tops :: Lens (Module st1) (Module st2) [Decl st1] [Decl st2]
 module2tops f (MkModule tops) = MkModule <$> f tops
 
-top2lhs :: IndexedTraversal' Pos (TopLevel st) Id.EVar
-top2lhs f = \case
-  top@TLTyp{} -> pure top
-  top@TLVal{} -> pure top
-  TLDef d -> TLDef <$> defn2lhs (bind2evar f) d
-  TLSup w z vs t xs e -> (\z' -> TLSup w z' vs t xs e) <$> indexed f w z
-  TLAsm b s -> (\b' -> TLAsm b' s) <$> bind2evar f b
+decl2func :: Traversal' (Decl st) Id.EVar
+decl2func f = \case
+  top@DType{} -> pure top
+  top@DSign{} -> pure top
+  DDefn d -> DDefn <$> defn2bind (bind2evar f) d
+  DSupC s -> DSupC <$> supc2func f s
+  DPrim p -> DPrim <$> prim2bind (bind2evar f) p
 
-top2rhs ::
+decl2expr ::
   (Applicative f) =>
-  (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> TopLevel st -> f (TopLevel st)
-top2rhs f = \case
-  TLTyp w ds -> pure (TLTyp w ds)
-  TLVal w z t -> pure (TLVal w z t)
-  TLDef d -> TLDef <$> defn2rhs f d
-  TLSup w z vs t bs e -> TLSup w z vs t bs <$> f e
-  TLAsm b s -> pure (TLAsm b s)
+  (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> Decl st -> f (Decl st)
+decl2expr f = \case
+  DType ts -> pure (DType ts)
+  DSign s  -> pure (DSign s)
+  DDefn d  -> DDefn <$> defn2expr f d
+  DSupC s  -> DSupC <$> supc2expr f s
+  DPrim p  -> pure (DPrim p)
 
-top2eval :: IndexedTraversal' Pos (TopLevel st) Id.EVar
-top2eval f = top2rhs (expr2eval f)
+decl2eval :: IndexedTraversal' Pos (Decl st) Id.EVar
+decl2eval f = decl2expr (expr2eval f)
 
-defn2lhs :: Lens' (Defn st tv ev) (Bind st tv)
-defn2lhs = defnLhs
-
-defn2rhs ::
+defn2exprSt ::
   (StageType st1 ~ StageType st2) =>
   Lens (Defn st1 tv ev1) (Defn st2 tv ev2) (Expr st1 tv ev1) (Expr st2 tv ev2)
-defn2rhs f (MkDefn b e) = MkDefn (retagBind b) <$> f e
+defn2exprSt f (MkDefn b e) = MkDefn b <$> f e
 
-bind2evar ::
-  (StageType st1 ~ StageType st2) =>
-  IndexedLens Pos (Bind st1 tv) (Bind st2 tv) Id.EVar Id.EVar
-bind2evar f (MkBind w x t) = fmap (\x' -> MkBind w x' t) (indexed f w x)
 
 -- * Deep traversals
 type DConTraversal t =
@@ -230,7 +242,7 @@ type DConTraversal t =
   IndexedTraversal Pos (t st1 tv ev) (t st2 tv ev) Id.DCon Id.DCon
 
 defn2dcon :: DConTraversal Defn
-defn2dcon f (MkDefn b e) = MkDefn (retagBind b) <$> expr2dcon f e
+defn2dcon f (MkDefn b e) = MkDefn b <$> expr2dcon f e
 
 expr2dcon :: DConTraversal Expr
 expr2dcon f = \case
@@ -239,25 +251,38 @@ expr2dcon f = \case
   ECon w c       -> ECon w <$> indexed f w c
   ENum w n       -> pure (ENum w n)
   EApp w t  us   -> EApp w <$> expr2dcon f t <*> (traverse . expr2dcon) f us
-  ECas w t  cs   -> ECas w <$> expr2dcon f t <*> (traverse . case2dcon) f cs
-  ELam w bs e t  -> ELam w (fmap retagBind bs) <$> expr2dcon f e <*> pure t
+  ECas w t  cs   -> ECas w <$> expr2dcon f t <*> (traverse . case2dconIx) f cs
+  ELam w bs e t  -> ELam w bs <$> expr2dcon f e <*> pure t
   ELet w ds t    -> ELet w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   ERec w ds t    -> ERec w <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   EMat w t  as   -> EMat w <$> expr2dcon f t <*> (traverse . altn2dcon) f as
   ETyAbs w x e   -> ETyAbs w x <$> expr2dcon f e
   ETyApp w e t   -> ETyApp w <$> expr2dcon f e <*> pure t
 
-case2dcon :: DConTraversal Case
-case2dcon f (MkCase w c ts bs e) =
+expr2pos :: Lens' (Expr st tv ev) Pos
+expr2pos f = \case
+    EVar w x       -> fmap (\w' -> EVar w' x      ) (f w)
+    EVal w z       -> fmap (\w' -> EVal w' z      ) (f w)
+    ECon w c       -> fmap (\w' -> ECon w' c      ) (f w)
+    ENum w n       -> fmap (\w' -> ENum w' n      ) (f w)
+    EApp w t  us   -> fmap (\w' -> EApp w' t  us  ) (f w)
+    ECas w t  cs   -> fmap (\w' -> ECas w' t  cs  ) (f w)
+    ELam w ps e t  -> fmap (\w' -> ELam w' ps e t ) (f w)
+    ELet w ds t    -> fmap (\w' -> ELet w' ds t   ) (f w)
+    ERec w ds t    -> fmap (\w' -> ERec w' ds t   ) (f w)
+    EMat w ts as   -> fmap (\w' -> EMat w' ts as  ) (f w)
+    ETyAbs w x e   -> fmap (\w' -> ETyAbs w' x e  ) (f w)
+    ETyApp w e t   -> fmap (\w' -> ETyApp w' e t  ) (f w)
+
+case2dconIx :: DConTraversal Case
+case2dconIx f (MkCase w c ts bs e) =
   MkCase w <$> indexed f w c <*> pure ts <*> pure bs <*> expr2dcon f e
 
 altn2dcon :: DConTraversal Altn
 altn2dcon f (MkAltn w p t) =
   MkAltn w <$> patn2dcon f p <*> expr2dcon f t
 
-patn2dcon ::
-  (SameTypes st1 st2) =>
-  IndexedTraversal Pos (Patn st1 tv) (Patn st2 tv) Id.DCon Id.DCon
+patn2dcon :: IndexedTraversal Pos (Patn ty tv) (Patn ty tv) Id.DCon Id.DCon
 patn2dcon f = \case
   PWld w      -> pure (PWld w)
   PVar w x    -> pure (PVar w x)
@@ -267,9 +292,6 @@ type EValTraversal t =
   forall st1 st2 tv ev. (SameNodes st1 st2, SameTypes st1 st2) =>
   IndexedTraversal Pos (t st1 tv ev) (t st2 tv ev) Id.EVar Id.EVar
 
-defn2eval :: EValTraversal Defn
-defn2eval f (MkDefn b e) = MkDefn (retagBind b) <$> expr2eval f e
-
 expr2eval :: EValTraversal Expr
 expr2eval f = \case
   EVar w x       -> pure (EVar w x)
@@ -278,20 +300,20 @@ expr2eval f = \case
   ENum w n       -> pure (ENum w n)
   EApp w t  us   -> EApp w <$> expr2eval f t <*> (traverse . expr2eval) f us
   ECas w t  cs   -> ECas w <$> expr2eval f t <*> (traverse . case2eval) f cs
-  ELam w bs e t  -> ELam w (fmap retagBind bs) <$> expr2eval f e <*> pure t
-  ELet w ds t    -> ELet w <$> (traverse . defn2eval) f ds <*> expr2eval f t
-  ERec w ds t    -> ERec w <$> (traverse . defn2eval) f ds <*> expr2eval f t
+  ELam w bs e t  -> ELam w bs <$> expr2eval f e <*> pure t
+  ELet w ds t    ->
+    ELet w <$> (traverse . defn2exprSt . expr2eval) f ds <*> expr2eval f t
+  ERec w ds t    ->
+    ERec w <$> (traverse . defn2exprSt . expr2eval) f ds <*> expr2eval f t
   EMat w t  as   -> EMat w <$> expr2eval f t <*> (traverse . altn2eval) f as
   ETyAbs w x e   -> ETyAbs w x <$> expr2eval f e
   ETyApp w e t   -> ETyApp w <$> expr2eval f e <*> pure t
 
 case2eval :: EValTraversal Case
-case2eval f (MkCase w c ts bs e) =
-  MkCase w c <$> pure ts <*> pure bs <*> expr2eval f e
+case2eval f (MkCase w c ts bs e) = MkCase w c ts bs <$> expr2eval f e
 
 altn2eval :: EValTraversal Altn
-altn2eval f (MkAltn w p t) =
-  MkAltn w (retagPatn p) <$> expr2eval f t
+altn2eval f (MkAltn w p t) = MkAltn w p <$> expr2eval f t
 
 patn2evar :: IndexedTraversal' Pos (Patn st tv) Id.EVar
 patn2evar f = \case
@@ -309,28 +331,12 @@ over' ::
    (forall i. g (s i v1) ->           g (s i v2))  -> f v1 ->           f v2
 over' l f = runIdentity . l (Identity . f)
 
-case2rhs ::
-  (SameTypes st1 st2) =>
-  EScopedLens (Case st1 tv) (Case st2 tv) (Expr st1 tv) (Expr st2 tv)
-case2rhs f (MkCase w c ts bs e) = MkCase w c ts bs <$> f e
-
-altn2rhs ::
-  (SameTypes st1 st2) =>
-  EScopedLens (Altn st1 tv) (Altn st2 tv) (Expr st1 tv) (Expr st2 tv)
-altn2rhs f (MkAltn w p t) = MkAltn w (retagPatn p) <$> f t
+case2expr :: EScopedLens (Case st tv) (Case st tv) (Expr st tv) (Expr st tv)
+case2expr f (MkCase w c ts bs e) = MkCase w c ts bs <$> f e
 
 -- * Retagging
 retagDefn :: (SameNodes st1 st2, SameTypes st1 st2) => Defn st1 tv ev -> Defn st2 tv ev
 retagDefn = over defn2dcon id
-
-retagExpr :: (SameNodes st1 st2, SameTypes st1 st2) => Expr st1 tv ev -> Expr st2 tv ev
-retagExpr = over expr2dcon id
-
-retagBind :: (SameTypes st1 st2) => Bind st1 tv -> Bind st2 tv
-retagBind (MkBind w x t) = MkBind w x t
-
-retagPatn :: (SameTypes st1 st2) => Patn st1 tv -> Patn st2 tv
-retagPatn = over patn2dcon id
 
 
 -- * Instances
@@ -352,13 +358,13 @@ deriving instance Functor     (Altn st tv)
 deriving instance Foldable    (Altn st tv)
 deriving instance Traversable (Altn st tv)
 
-deriving instance IsStage st => Functor     (Patn st)
-deriving instance IsStage st => Foldable    (Patn st)
-deriving instance IsStage st => Traversable (Patn st)
+deriving instance Functor     ty => Functor     (Patn ty)
+deriving instance Foldable    ty => Foldable    (Patn ty)
+deriving instance Traversable ty => Traversable (Patn ty)
 
-deriving instance IsStage st => Functor     (Bind st)
-deriving instance IsStage st => Foldable    (Bind st)
-deriving instance IsStage st => Traversable (Bind st)
+deriving instance Functor     ty => Functor     (Bind ty)
+deriving instance Foldable    ty => Foldable    (Bind ty)
+deriving instance Traversable ty => Traversable (Bind ty)
 
 -- * {Functor,Foldable,Traversable}WithIndex
 instance IsStage st => FunctorWithIndex     Pos (Defn st tv) where
@@ -381,9 +387,9 @@ instance IsStage st => FoldableWithIndex    Pos (Altn st tv) where
 instance IsStage st => TraversableWithIndex Pos (Altn st tv) where
   itraverse = ibitraverse (const pure)
 
-instance IsStage st => FunctorWithIndex     Pos (Patn st) where
-instance IsStage st => FoldableWithIndex    Pos (Patn st) where
-instance IsStage st => TraversableWithIndex Pos (Patn st) where
+instance TraversableWithIndex Pos ty => FunctorWithIndex     Pos (Patn ty) where
+instance TraversableWithIndex Pos ty => FoldableWithIndex    Pos (Patn ty) where
+instance TraversableWithIndex Pos ty => TraversableWithIndex Pos (Patn ty) where
   itraverse f = \case
     PWld w   -> pure (PWld w)
     PVar w x -> pure (PVar w x)
@@ -392,9 +398,9 @@ instance IsStage st => TraversableWithIndex Pos (Patn st) where
       <$> traverse (itraverse f) ts
       <*> traverse (itraverse f) ps
 
-instance IsStage st => FunctorWithIndex     Pos (Bind st) where
-instance IsStage st => FoldableWithIndex    Pos (Bind st) where
-instance IsStage st => TraversableWithIndex Pos (Bind st) where
+instance TraversableWithIndex Pos ty => FunctorWithIndex     Pos (Bind ty) where
+instance TraversableWithIndex Pos ty => FoldableWithIndex    Pos (Bind ty) where
+instance TraversableWithIndex Pos ty => TraversableWithIndex Pos (Bind ty) where
   itraverse f (MkBind w x t) = MkBind w x <$> itraverse f t
 
 -- ** Bi{functor, foldable, traversable}
@@ -486,54 +492,6 @@ instance IsStage st => BitraversableWithIndex Pos (Altn st) where
   ibitraverse f g (MkAltn w p e) =
     MkAltn w <$> itraverse f p <*> ibitraverse f (traverse . g) e
 
--- ** Has{Pos, Lhs, Rhs}
-instance HasPos (TopLevel st) where
-  pos f = \case
-    TLTyp w tcs -> fmap (\w' -> TLTyp w' tcs) (f w)
-    TLVal w x t -> fmap (\w' -> TLVal w' x t) (f w)
-    TLDef     d -> fmap TLDef (pos f d)
-    TLSup w z vs t bs e -> fmap (\w' -> TLSup w' z vs t bs e) (f w)
-    TLAsm b    s -> fmap (\b' -> TLAsm b'    s) (pos f b)
-
-instance HasPos (Defn st tv ev) where
-  pos = defnLhs . bindPos
-
-instance HasLhs (Defn st tv ev) where
-  type Lhs (Defn st tv ev) = Id.EVar
-  lhs = defnLhs . bindEVar
-
-instance HasRhs (Defn st tv ev) where
-  type Rhs (Defn st tv ev) = Expr st tv ev
-  rhs = defnRhs
-
-instance HasPos (Expr st tv ev) where
-  pos f = \case
-    EVar w x       -> fmap (\w' -> EVar w' x      ) (f w)
-    EVal w z       -> fmap (\w' -> EVal w' z      ) (f w)
-    ECon w c       -> fmap (\w' -> ECon w' c      ) (f w)
-    ENum w n       -> fmap (\w' -> ENum w' n      ) (f w)
-    EApp w t  us   -> fmap (\w' -> EApp w' t  us  ) (f w)
-    ECas w t  cs   -> fmap (\w' -> ECas w' t  cs  ) (f w)
-    ELam w ps e t  -> fmap (\w' -> ELam w' ps e t ) (f w)
-    ELet w ds t    -> fmap (\w' -> ELet w' ds t   ) (f w)
-    ERec w ds t    -> fmap (\w' -> ERec w' ds t   ) (f w)
-    EMat w ts as   -> fmap (\w' -> EMat w' ts as  ) (f w)
-    ETyAbs w x e   -> fmap (\w' -> ETyAbs w' x e  ) (f w)
-    ETyApp w e t   -> fmap (\w' -> ETyApp w' e t  ) (f w)
-
-instance HasPos (Bind st tv) where
-  pos = bindPos
-
-instance HasLhs (Bind st tv) where
-  type Lhs (Bind st tv) = Id.EVar
-  lhs = bindEVar
-
-instance HasPos (Altn st tv ev) where
-  pos = altnPos
-
-instance HasPos (Case st tv ev) where
-  pos = casePos
-
 -- * Pretty printing
 class PrettyType f where
   pPrintPrecType :: (BaseTVar tv) => PrettyLevel -> Rational -> f tv -> Doc
@@ -549,19 +507,19 @@ type PrettyStage st = PrettyType (StageType st)
 instance (PrettyStage st) => Pretty (Module st) where
   pPrintPrec lvl prec (MkModule tops) = vcat (map (pPrintPrec lvl prec) tops)
 
-instance (PrettyStage st) => Pretty (TopLevel st) where
+instance (PrettyStage st) => Pretty (Decl st) where
   pPrintPrec lvl _ = \case
-    TLTyp _ (dcon0 :| dcons) ->
+    DType (dcon0 :| dcons) ->
       "type" <+> pPrintPrec lvl 0 dcon0 $$
       vcat (map (\dcon -> "and " <+> pPrintPrec lvl 0 dcon) dcons)
-    TLVal _ x t ->
+    DSign (MkSignDecl _ x t) ->
       "val" <+> pretty x <+> colon <+> pretty t
-    TLDef     d -> "let" <+> pretty d
-    TLSup _ z qvs t bs e ->
+    DDefn d -> "let" <+> pretty d
+    DSupC (MkSupCDecl _ z qvs t bs e) ->
       "let" <+>
       hang (pretty z <+> colon <+> pPrintPrecType lvl 0 (mkTUni qvs t) <+> equals) 2
         (prettyETyAbs lvl 0 qvs (prettyELam lvl 0 bs e))
-    TLAsm   b s ->
+    DPrim (MkPrimDecl b s) ->
       hsep ["external", pretty b, equals, text (show s)]
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
@@ -619,7 +577,8 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
 
 prettyELam ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  PrettyLevel -> Rational -> Vector n (Bind st tv) -> Expr st tv (EFinScope n ev) -> Doc
+  PrettyLevel -> Rational ->
+  Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> Doc
 prettyELam lvl prec bs e
   | null bs   = pPrintPrec lvl prec e
   | otherwise =
@@ -636,7 +595,7 @@ prettyETyAbs lvl prec qvs d
 prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
-instance (BaseTVar tv, PrettyStage st) => Pretty (Bind st tv) where
+instance (BaseTVar tv, PrettyType ty) => Pretty (Bind ty tv) where
   pPrintPrec lvl prec (MkBind _ z t)
     | isEmpty td = zd
     | otherwise  = maybeParens lvl (prec > 0) (zd <+> colon <+> td)
@@ -658,7 +617,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Altn st tv ev) wh
   pPrintPrec lvl _ (MkAltn _ p t) =
     hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
 
-instance (BaseTVar tv, PrettyStage st) => Pretty (Patn st tv) where
+instance (BaseTVar tv, PrettyType ty) => Pretty (Patn ty tv) where
   pPrintPrec lvl prec = \case
     PWld _      -> "_"
     PVar _ x    -> pretty x
@@ -668,10 +627,13 @@ instance (BaseTVar tv, PrettyStage st) => Pretty (Patn st tv) where
         <+> prettyAtType (pPrintPrecType lvl 3) ts
         <+> hsep (map (pPrintPrec lvl 1) ps)
 
-deriving instance (StageType st ~ Type) => Show (TopLevel st)
+deriving instance (StageType st ~ Type) => Show (Decl st)
+deriving instance                          Show SignDecl
+deriving instance (StageType st ~ Type) => Show (SupCDecl st m n)
+deriving instance                          Show (PrimDecl Type)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Case st tv ev)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
-deriving instance (StageType st ~ Type, Show tv) => Show (Patn st tv)
-deriving instance (StageType st ~ Type, Show tv) => Show (Bind st tv)
+deriving instance (                     Show tv) => Show (Patn Type tv)
+deriving instance (                     Show tv) => Show (Bind Type tv)

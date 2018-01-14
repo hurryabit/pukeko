@@ -99,8 +99,8 @@ tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
 dcon :: Parser Id.DCon
 dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
 
-tcls :: Parser Id.TCls
-tcls = Id.tcls <$> (lookAhead upper *> Token.identifier pukeko)
+clss :: Parser Id.Clss
+clss = Id.clss <$> (lookAhead upper *> Token.identifier pukeko)
 
 type_, atype :: Parser Type
 type_ =
@@ -117,7 +117,7 @@ atype = choice
 typeScheme :: Parser TypeScheme
 typeScheme =
   MkTypeScheme
-  <$> option [] (try (parens (many ((,) <$> tcls <*> tvar)) <* darrow))
+  <$> option [] (try (parens (many ((,) <$> clss <*> tvar)) <* darrow))
   <*> type_
 
 module_ :: SourceName -> Parser Module
@@ -125,18 +125,10 @@ module_ source = do
   imps <- many import_
   whiteSpace
   decls <- many $ choice
-    [ let_ TLLet TLRec
-    , TLAsm
-      <$> getPos
-      <*> (reserved "external" *> evar)
-      <*> (equals *> Token.stringLiteral pukeko)
-    , TLVal
-      <$> getPos
-      <*> (reserved "val" *> evar)
-      <*> (colon *> typeScheme)
-    , TLTyp
-      <$> getPos
-      <*> (reserved "type" *> sepBy1NE tconDecl (reserved "and"))
+    [ DType <$> (reserved "type"     *> sepBy1NE tconDecl (reserved "and"))
+    , DSign <$> (reserved "val"      *> signDecl)
+    , let_ (const DLet) (const DRec)
+    , DPrim <$> (reserved "external" *> primDecl)
     ]
   pure (MkModule source imps decls)
 
@@ -176,8 +168,8 @@ altn =
          <*> (arrow *> expr)
 
 let_ ::
-  (Pos -> (NonEmpty (Defn Id.EVar)) -> a) ->
-  (Pos -> (NonEmpty (Defn Id.EVar)) -> a) ->
+  (Pos -> NonEmpty (Defn Id.EVar) -> a) ->
+  (Pos -> NonEmpty (Defn Id.EVar) -> a) ->
   Parser a
 let_ mkLet mkRec =
   f <$> getPos
@@ -223,9 +215,22 @@ operatorTable = map (map f) (reverse Op.table)
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
-  <$> tcon
+  <$> getPos
+  <*> tcon
   <*> many tvar
   <*> option [] (reservedOp "=" *> (toList <$> many1 dconDecl))
 
 dconDecl :: Parser DConDecl
-dconDecl = MkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype
+dconDecl = MkDConDecl <$> getPos <*> (reservedOp "|" *> dcon) <*> many atype
+
+signDecl :: Parser SignDecl
+signDecl = MkSignDecl
+  <$> getPos
+  <*> evar
+  <*> (colon *> typeScheme)
+
+primDecl :: Parser PrimDecl
+primDecl = MkPrimDecl
+  <$> getPos
+  <*> evar
+  <*> (equals *> Token.stringLiteral pukeko)

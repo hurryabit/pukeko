@@ -19,7 +19,7 @@ import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Scope      as Sc
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type       hiding ((*~>))
@@ -54,7 +54,7 @@ runTI tc module_ = do
   let env0 = MkEnvironment (Const ()) 0
   evalSupplyT (runReaderT (runInfoT (unTI tc) module_) env0) Id.freshTVars
 
-freshQualUVar :: Set Id.TCls -> TI v s (UType s Void)
+freshQualUVar :: Set Id.Clss -> TI v s (UType s Void)
 freshQualUVar q = do
   v <- fresh
   l <- view level
@@ -78,7 +78,7 @@ lookupVar :: (HasEnv v) => v -> TI v s (UType s Void)
 lookupVar = views locals . Sc.lookupEnv
 
 lookupFun :: Id.EVar -> TI v s (UType s Void)
-lookupFun x = open . snd <$> findFun x
+lookupFun x = open . _sign2type <$> findSign x
 
 generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
 generalize t0 = do
@@ -112,24 +112,24 @@ instantiate ts = do
   (,) (map snd env) <$> liftST (subst (Map.fromList env) t0)
 
 instantiateTCon ::
-  Con.TConDecl n -> TI v s (UType s Void, Vector n (UType s Void))
-instantiateTCon (Con.MkTConDecl tcon params _dcons) = do
+  TConDecl n -> TI v s (UType s Void, Vector n (UType s Void))
+instantiateTCon (MkTConDecl _ tcon params _dcons) = do
   t_params <- traverse (const freshUVar) params
   return (appTCon tcon (toList t_params), t_params)
 
 inferPatn ::
-  Patn In Void -> UType s Void -> TI v s (Patn (Aux s) Void, Map Id.EVar (UType s Void))
+  Patn NoType Void -> UType s Void -> TI v s (Patn (UType s) Void, Map Id.EVar (UType s Void))
 inferPatn patn t_expr = case patn of
   PWld w   -> pure (PWld w, Map.empty)
   PVar w x -> pure (PVar w x, Map.singleton x t_expr)
   PCon w dcon (_ :: [NoType Void]) ps0 -> do
-    Some1 (Pair1 tcon Con.MkDConDecl{_dname, _fields}) <- findDCon dcon
-    when (length ps0 /= length _fields) $
-      throwDocAt w $ "term cons" <+> quotes (pretty _dname) <+>
-      "expects" <+> int (length _fields) <+> "arguments"
+    Some1 (Pair1 tcon MkDConDecl{_dcon2name = dname, _dcon2flds = flds}) <- findDCon dcon
+    when (length ps0 /= length flds) $
+      throwDocAt w $ "term cons" <+> quotes (pretty dname) <+>
+      "expects" <+> int (length flds) <+> "arguments"
     (t_inst, t_params) <- instantiateTCon tcon
     unify w t_expr t_inst
-    let t_fields = map (open1 . fmap (scope absurd (t_params Vec.!))) _fields
+    let t_fields = map (open1 . fmap (scope absurd (t_params Vec.!))) flds
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
     pure (PCon w dcon (toList t_params) ps1, Map.unions binds)
 
@@ -142,7 +142,7 @@ inferLet defns0 = do
   (rs1, ts1) <- Vec.unzip <$> local (level +~ 1) (traverse infer rs0)
   (ts2, _qs) <- Vec.unzip <$> traverse generalize ts1
   -- let ls1 = Vec.zipWith (set bindType) ts2 ls0
-  let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bindType t2) ts2 ls0 rs1
+  let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bind2type t2) ts2 ls0 rs1
   pure (defns1, ts2)
 
 inferRec ::
@@ -155,13 +155,13 @@ inferRec defns0 = do
   (rs1, ts1) <- local (level +~ 1) $ do
     us <- traverse (const freshUVar) ls0
     (rs1, ts1) <- Vec.unzip <$> localize us (traverse infer rs0)
-    Vec.zipWith3M_ (\r0 -> unify (r0^.pos)) rs0 us ts1
+    Vec.zipWith3M_ (\r0 -> unify (r0^.expr2pos)) rs0 us ts1
     pure (rs1, ts1)
   (ts2, qs) <- Vec.unzip <$> traverse generalize ts1
   let addETyApp w = scope' (EVar w . Free)
         (\i b -> mkETyApp w (EVar w (mkBound i b)) (map (fmap absurd) (qs Vec.! i)))
   let rs2 = fmap (// addETyApp) rs1
-  let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bindType t2) ts2 ls0 rs2
+  let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bind2type t2) ts2 ls0 rs2
   pure (defns1, ts2)
 
 infer :: (HasEnv v) => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
@@ -197,11 +197,11 @@ infer = \case
         pure (MkAltn w' patn1 rhs1)
       pure (EMat w expr1 altns1, t_res)
 
-inferTopLevel :: TopLevel In -> TI Void s (Maybe (TopLevel (Aux s)))
-inferTopLevel = \case
-  TLTyp w ds -> yield (TLTyp w ds)
-  TLVal{} -> pure Nothing
-  TLDef (MkDefn (MkBind w x NoType) e0) -> do
+inferDecl :: Decl In -> TI Void s (Maybe (Decl (Aux s)))
+inferDecl = \case
+  DType ds -> yield (DType ds)
+  DSign{} -> pure Nothing
+  DDefn (MkDefn (MkBind w x NoType) e0) -> do
     reset
     -- NOTE: We do not instantiate the universally quantified type variables in
     -- prenex position of @t_decl@. Turning them into unification variables
@@ -215,15 +215,15 @@ inferTopLevel = \case
     -- NOTE: This unification should bind all unification variables in @t1@. If
     -- it does not, the second quantification step will catch them.
     unify w t0 t1
-    yield (TLDef (MkDefn (MkBind w x t_decl) e1))
-  TLAsm (MkBind w x NoType) asm -> do
-    t_decl <- lookupFun x
-    yield (TLAsm (MkBind w x t_decl) asm)
+    yield (DDefn (MkDefn (MkBind w x t_decl) e1))
+  DPrim (MkPrimDecl (MkBind w z NoType) s) -> do
+    t <- lookupFun z
+    yield (DPrim (MkPrimDecl (MkBind w z t) s))
   where
     yield = pure . Just
 
 inferModule' :: Module In -> TI Void s (Module (Aux s))
-inferModule' = module2tops (\tops -> catMaybes <$> traverse inferTopLevel tops)
+inferModule' = module2decls (\tops -> catMaybes <$> traverse inferDecl tops)
 
 type TQEnv tv = Map Id.TVar tv
 
@@ -302,26 +302,26 @@ qualExpr = \case
 qualAltn :: Altn (Aux s) Void ev -> TQ tv s (Altn Out tv ev)
 qualAltn (MkAltn w p e) = MkAltn w <$> qualPatn p <*> qualExpr e
 
-qualPatn :: Patn (Aux s) Void -> TQ tv s (Patn Out tv)
+qualPatn :: Patn (UType s) Void -> TQ tv s (Patn Type tv)
 qualPatn = \case
   PWld w -> pure (PWld w)
   PVar w x -> pure (PVar w x)
   PCon w c ts ps -> PCon w c <$> traverse qualType ts <*> traverse qualPatn ps
 
-qualTopLevel :: TopLevel (Aux s) -> TQ Void s (TopLevel Out)
-qualTopLevel = \case
-  TLTyp w ds -> pure (TLTyp w ds)
-  TLDef d -> TLDef <$> qualDefn d
-  TLAsm (MkBind w x ts) s -> do
+qualDecl :: Decl (Aux s) -> TQ Void s (Decl Out)
+qualDecl = \case
+  DType ds -> pure (DType ds)
+  DDefn d -> DDefn <$> qualDefn d
+  DPrim (MkPrimDecl (MkBind w x ts) s) -> do
     t1 <- case ts of
       UTUni ys0 t0 ->
         Vec.withList (toList ys0) $ \ys1 ->
           localizeTQ ys1 (\ys2 -> TUni ys2 <$> qualType t0)
       t0 -> qualType t0
-    pure (TLAsm (MkBind w x t1) s)
+    pure (DPrim (MkPrimDecl (MkBind w x t1) s))
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
-qualModule = (module2tops . traverse) (\top -> reset *> qualTopLevel top)
+qualModule = (module2decls . traverse) (\top -> reset *> qualDecl top)
 
 inferModule :: MonadError String m => Module In -> m (Module Out)
 inferModule m0 = runST $ runExceptT $ do

@@ -11,20 +11,19 @@ import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.Classes
 import qualified Pukeko.AST.Identifier as Id
 
 inlineModule :: Module st -> Module st
 inlineModule (MkModule tops0) =
   let ls = mapMaybe topLink tops0
       uf = unionFind ls
-      tops1 = over (traverse . top2eval) (\x -> Map.findWithDefault x x uf) tops0
+      tops1 = over (traverse . decl2eval) (\x -> Map.findWithDefault x x uf) tops0
   in  MkModule tops1
 
-topLink :: TopLevel st -> Maybe (Id.EVar, Id.EVar)
+topLink :: Decl st -> Maybe (Id.EVar, Id.EVar)
 topLink = \case
-  TLDef (MkDefn b (EVal _ x)) -> Just (b^.lhs, x)
-  TLSup _ z vs _ xs (EVal _ x)
+  DDefn (MkDefn b (EVal _ x)) -> Just (b^.bind2evar, x)
+  DSupC (MkSupCDecl _ z vs _ xs (EVal _ x))
     | null vs && null xs -> Just (z, x)
   _ -> Nothing
 

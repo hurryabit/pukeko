@@ -18,7 +18,7 @@ import qualified Data.Vector.Sized as Vec
 import           Pukeko.Pretty
 import           Pukeko.AST.SystemF    hiding (Free)
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
@@ -73,18 +73,20 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: NonEmpty (Some1 Con.TConDecl) -> KC n s ()
+kcTypDef :: NonEmpty (Some1 TConDecl) -> KC n s ()
 kcTypDef tcons = do
-  kinds <- for tcons $ \(Some1 Con.MkTConDecl{_tname}) -> do
+  kinds <- for tcons $ \(Some1 MkTConDecl{_tcon2name = tname}) -> do
     kind <- freshUVar
-    at _tname ?= kind
+    at tname ?= kind
     pure kind
-  for_ (NE.zip tcons kinds) $ \(Some1 Con.MkTConDecl{_params, _dcons}, tconKind) -> do
-    paramKinds <- traverse (const freshUVar) _params
-    unify tconKind (foldr Arrow Star paramKinds)
-    localize paramKinds $ do
-      for_ _dcons $ \Con.MkDConDecl{_fields} -> do
-        traverse_ (kcType Star) _fields
+  for_ (NE.zip tcons kinds) $
+    \(Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}, tconKind) -> do
+      paramKinds <- traverse (const freshUVar) prms
+      unify tconKind (foldr Arrow Star paramKinds)
+      localize paramKinds $ do
+        -- TODO: Rewrite this in terms of @forOf_@.
+        for_ dcons $ \MkDConDecl{_dcon2pos = w, _dcon2flds = flds} -> do
+          here w (traverse_ (kcType Star) flds)
   traverse_ close kinds
 
 kcVal :: Type Void -> KC n s ()
@@ -97,19 +99,19 @@ kcVal = \case
       localize env (kcType Star t)
 
 
-kcTopLevel :: TopLevel In -> KC n s (TopLevel Out)
-kcTopLevel = \case
-  TLTyp w tcons -> do
-    here w (kcTypDef tcons)
-    pure (TLTyp w tcons)
-  TLVal w z t -> do
+kcDecl :: Decl In -> KC n s (Decl Out)
+kcDecl = \case
+  DType tcons -> do
+    (kcTypDef tcons)
+    pure (DType tcons)
+  DSign (MkSignDecl w z t) -> do
     here w (kcVal t)
-    pure (TLVal w z t)
-  TLDef d -> pure (TLDef (retagDefn d))
-  TLAsm b a -> pure (TLAsm (retagBind b) a)
+    pure (DSign (MkSignDecl w z t))
+  DDefn d -> pure (DDefn (retagDefn d))
+  DPrim p -> pure (DPrim p)
 
 kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2tops (traverse (\top -> reset *> kcTopLevel top))
+kcModule = module2decls (traverse (\top -> reset *> kcDecl top))
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule module_ = runKC (kcModule module_)

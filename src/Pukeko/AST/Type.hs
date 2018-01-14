@@ -58,7 +58,7 @@ pattern TFun tx ty = TApp (TApp TArr tx) ty
 --
 -- The set of constraints is not considered in comparison operations.
 data QVar = MkQVar
-  { _qvar2cstr :: Set Id.TCls
+  { _qvar2cstr :: Set Id.Clss
     -- ^ The set of type class constraints on the type variable.
   , _qvar2tvar :: Id.TVar
   }

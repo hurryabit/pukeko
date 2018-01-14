@@ -15,8 +15,8 @@ module Pukeko.AST.Identifier
   , tcon
   , DCon
   , dcon
-  , TCls
-  , tcls
+  , Clss
+  , clss
   )
 where
 
@@ -114,16 +114,16 @@ instance Pretty DCon where
 instance Show DCon where
   show = prettyShow
 
-data TCls = TCls String
+data Clss = Clss String
   deriving (Eq, Ord)
 
-tcls :: String -> TCls
-tcls name@(first:_)
-  | isUpper first = TCls name
-tcls name = bugWith "invalid type class name" name
+clss :: String -> Clss
+clss name@(first:_)
+  | isUpper first = Clss name
+clss name = bugWith "invalid type class name" name
 
-instance Pretty TCls where
-  pPrint (TCls name) = text name
+instance Pretty Clss where
+  pPrint (Clss name) = text name
 
-instance Show TCls where
+instance Show Clss where
   show = prettyShow

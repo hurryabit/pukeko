@@ -31,7 +31,6 @@ default-extensions:
 - TemplateHaskell
 - TypeFamilies
 ghc-options:
-- -O0
 - -Wall
 - -Werror
 - -Wno-name-shadowing

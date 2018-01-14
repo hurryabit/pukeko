@@ -9,10 +9,10 @@ import Pukeko.Prelude
 import           Control.Lens
 
 import           Pukeko.AST.NoLambda
-import           Pukeko.AST.Classes
 import           Pukeko.AST.Scope
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.SystemF    as In
+import qualified Pukeko.AST.Type       as In
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Info
@@ -20,7 +20,7 @@ import           Pukeko.FrontEnd.Info
 type In = St.LambdaLifter
 
 eraseModule :: In.Module In -> Module
-eraseModule m0@(In.MkModule tops) = runCC (catMaybes <$> traverse ccTopLevel tops) m0
+eraseModule m0@(In.MkModule tops) = runCC (catMaybes <$> traverse ccDecl tops) m0
 
 type CCState = Map Id.EVar Name
 
@@ -36,17 +36,17 @@ runCC cc decls = evalState (runInfoT (unCC cc) decls) mempty
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
 
-bindName :: In.Bind In tv -> Name
-bindName = name . view lhs
+bindName :: In.Bind In.Type tv -> Name
+bindName = name . In._bind2evar
 
-ccTopLevel :: In.TopLevel In -> CC (Maybe TopLevel)
-ccTopLevel = \case
-  In.TLTyp{} -> pure Nothing
-  In.TLSup _ z _ _ bs e ->
+ccDecl :: In.Decl In -> CC (Maybe TopLevel)
+ccDecl = \case
+  In.DType{} -> pure Nothing
+  In.DSupC (In.MkSupCDecl _ z _ _ bs e) ->
     Just <$> Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
-  In.TLAsm b    s -> do
+  In.DPrim (In.MkPrimDecl b s) -> do
     let n = MkName s
-    at (b^.lhs) ?= n
+    at (In._bind2evar b) ?= n
     pure (Just (Asm n))
 
 ccDefn :: (BaseEVar ev) => In.Defn In tv ev -> CC Defn
@@ -61,8 +61,8 @@ ccExpr = \case
       Nothing -> pure (Global (name z))
       Just s  -> pure (External s)
   In.ECon _ dcon  -> do
-    Con.Some1 (Con.Pair1 _tconDecl Con.MkDConDecl{_tag, _fields}) <- findDCon dcon
-    pure $ Pack _tag (length _fields)
+    Some1 (Pair1 _tcon MkDConDecl{_dcon2tag = tag, _dcon2flds = flds}) <- findDCon dcon
+    pure $ Pack tag (length flds)
   In.ENum _ n     -> pure $ Num n
   In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr (toList us)
   In.ELet _ ds t  -> Let False <$> traverse ccDefn (toList ds) <*> ccExpr t

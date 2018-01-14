@@ -7,7 +7,7 @@ module Pukeko.FrontEnd.Info
   , mapInfoT
   , findTCon
   , findDCon
-  , findFun
+  , findSign
   , typeOfDCon
   , liftCatch
   ) where
@@ -21,20 +21,20 @@ import qualified Data.Map                    as Map
 
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Stage
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
 class Monad m => MonadInfo m where
-  allTCons :: m (Map Id.TCon (Some1 Con.TConDecl))
-  allDCons :: m (Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl)))
-  allFuns  :: m (Map Id.EVar (Pos, Type Void))
+  allTCons :: m (Map Id.TCon (Some1 TConDecl))
+  allDCons :: m (Map Id.DCon (Some1 (Pair1 TConDecl DConDecl)))
+  allSigns :: m (Map Id.EVar SignDecl)
 
 
 data ModuleInfo = MkModuleInfo
-  { _info2tcons :: Map Id.TCon (Some1 Con.TConDecl)
-  , _info2dcons :: Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
-  , _info2funs  :: Map Id.EVar (Pos, Type Void)
+  { _info2tcons :: Map Id.TCon (Some1 TConDecl)
+  , _info2dcons :: Map Id.DCon (Some1 (Pair1 TConDecl DConDecl))
+  , _info2signs :: Map Id.EVar SignDecl
   }
 
 newtype InfoT m a = InfoT{unInfoT :: ReaderT ModuleInfo m a}
@@ -58,20 +58,20 @@ mapInfoT f = InfoT . mapReaderT f . unInfoT
 info :: Monad m => (ModuleInfo -> a) -> InfoT m a
 info = InfoT . asks
 
-findTCon :: (HasCallStack, MonadInfo m) => Id.TCon -> m (Some1 Con.TConDecl)
+findTCon :: (HasCallStack, MonadInfo m) => Id.TCon -> m (Some1 TConDecl)
 findTCon tcon = Map.findWithDefault (bugWith "findTCon" tcon) tcon <$> allTCons
 
 findDCon ::
-  (HasCallStack, MonadInfo m) => Id.DCon -> m (Some1 (Pair1 Con.TConDecl Con.DConDecl))
+  (HasCallStack, MonadInfo m) => Id.DCon -> m (Some1 (Pair1 TConDecl DConDecl))
 findDCon dcon = Map.findWithDefault (bugWith "findDCon" dcon) dcon <$> allDCons
 
-findFun :: (HasCallStack, MonadInfo m) => Id.EVar -> m (Pos, Type Void)
-findFun fun = Map.findWithDefault (bugWith "findFun" fun) fun <$> allFuns
+findSign :: (HasCallStack, MonadInfo m) => Id.EVar -> m SignDecl
+findSign fun = Map.findWithDefault (bugWith "findFun" fun) fun <$> allSigns
 
 typeOfDCon :: MonadInfo m => Id.DCon -> m (Type Void)
 typeOfDCon dcon = do
   Some1 (Pair1 tconDecl dconDecl) <- findDCon dcon
-  pure (Con.typeOf tconDecl dconDecl)
+  pure (typeOfDConDecl tconDecl dconDecl)
 
 liftCatch :: Catch e m a -> Catch e (InfoT m) a
 liftCatch f m h = InfoT $ Reader.liftCatch f (unInfoT m) (unInfoT . h)
@@ -79,33 +79,34 @@ liftCatch f m h = InfoT $ Reader.liftCatch f (unInfoT m) (unInfoT . h)
 collectInfo :: forall st. (IsType (StageType st)) => Module st -> ModuleInfo
 collectInfo (MkModule tops) = foldMap f tops
   where
-    f :: TopLevel st -> ModuleInfo
+    f :: Decl st -> ModuleInfo
     f = \case
-      TLTyp _ ds -> foldMap g ds
+      DType ds -> foldMap g ds
         where
-          g :: Some1 Con.TConDecl -> ModuleInfo
-          g (Some1 tcon@(Con.MkTConDecl tname _ dcons)) =
+          g :: Some1 TConDecl -> ModuleInfo
+          g (Some1 tcon@(MkTConDecl _ tname _ dcons)) =
             MkModuleInfo (Map.singleton tname (Some1 tcon)) (foldMap h dcons) mempty
             where
-              h dcon@(Con.MkDConDecl _ dname _ _) =
+              h dcon@(MkDConDecl _ _ dname _ _) =
                 Map.singleton dname (Some1 (Pair1 tcon dcon))
-      TLVal w z t -> val w z (Just t)
-      TLDef (MkDefn (MkBind w z t) _) -> val w z (isType t)
-      TLSup w z xs t _ _ -> val w z (Just (mkTUni xs t))
-      TLAsm (MkBind w z t) _ -> val w z (isType t)
+      DSign s -> sign (Just s)
+      DDefn (MkDefn (MkBind w z t) _) -> sign (MkSignDecl w z <$> isType t)
+      DSupC (MkSupCDecl w z xs t _ _) -> sign (Just (MkSignDecl w z (mkTUni xs t)))
+      DPrim (MkPrimDecl (MkBind w z t) _) -> sign (MkSignDecl w z <$> isType t)
       where
-        val w z t_mb =
-          MkModuleInfo mempty mempty (maybe mempty (Map.singleton z . (,) w) t_mb)
+        sign :: Maybe SignDecl -> ModuleInfo
+        sign =
+          MkModuleInfo mempty mempty . maybe mempty (\s -> Map.singleton (s^.sign2func) s)
 
 instance Monad m => MonadInfo (InfoT m) where
   allTCons = info _info2tcons
   allDCons = info _info2dcons
-  allFuns  = info _info2funs
+  allSigns = info _info2signs
 
 instance MonadInfo m => MonadInfo (ReaderT r m) where
   allTCons = lift allTCons
   allDCons = lift allDCons
-  allFuns  = lift allFuns
+  allSigns = lift allSigns
 
 instance MonadReader r m => MonadReader r (InfoT m) where
   ask = lift ask

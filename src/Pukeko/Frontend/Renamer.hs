@@ -12,7 +12,7 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
-import qualified Pukeko.AST.ConDecl    as Con
+import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
@@ -21,7 +21,7 @@ type Out = St.Renamer
 
 renameModule :: MonadError String m => Ps.Package -> m (Module Out)
 renameModule (Ps.MkPackage _ modules) =
-  runRn $ MkModule <$> concat <$> traverse rnTopLevel (concatMap Ps._mod2decls modules)
+  runRn $ MkModule <$> concat <$> traverse rnDecl (concatMap Ps._mod2decls modules)
 
 type RnEnv ev = Map Id.EVar ev
 type RnState = Set Id.EVar
@@ -45,32 +45,32 @@ localizeDefns :: Vector n (Ps.Defn _) -> Rn (EFinScope n ev) a -> Rn ev a
 localizeDefns =
   localize . ifoldMap (\i (Ps.MkDefn (Ps.MkBind _ x) _) -> Map.singleton x i)
 
-rnTopLevel :: Ps.TopLevel -> Rn Void [TopLevel Out]
-rnTopLevel top = case top of
-  Ps.TLTyp w tcs ->
-    (:[]) . TLTyp w <$> traverse rnTConDecl tcs `catchError` throwErrorAt w
-  Ps.TLVal w x t -> (:[]) . TLVal w x <$> rnTypeScheme t
-  Ps.TLLet _ ds0 -> do
+rnDecl :: Ps.Decl -> Rn Void [Decl Out]
+rnDecl top = case top of
+  Ps.DType ts ->
+    (:[]) . DType <$> for ts (\t -> here (Ps._tcon2pos t) (rnTConDecl t))
+  Ps.DSign (Ps.MkSignDecl w z t) -> (:[]) . DSign <$> MkSignDecl w z <$> rnTypeScheme t
+  Ps.DLet ds0 -> do
     ds1 <- traverse rnDefn ds0
     let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
     id <>= setOf traverse xs
-    pure (map TLDef (toList ds1))
-  Ps.TLRec _ ds0 -> do
+    pure (map DDefn (toList ds1))
+  Ps.DRec ds0 -> do
     let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
     id <>= setOf traverse xs
     ds1 <- traverse rnDefn ds0
-    pure (map TLDef (toList ds1))
-  Ps.TLAsm w x a -> do
-    id <>= Set.singleton x
-    pure [TLAsm (MkBind w x NoType) a]
+    pure (map DDefn (toList ds1))
+  Ps.DPrim (Ps.MkPrimDecl w z s) -> do
+    id <>= Set.singleton z
+    pure [DPrim (MkPrimDecl (MkBind w z NoType) s)]
 
-rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 Con.TConDecl)
-rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
-  Some1 <$> Con.MkTConDecl tcon ps1 <$> zipWithM (rnDConDecl tcon ps1) [0..] dcs0
+rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 TConDecl)
+rnTConDecl (Ps.MkTConDecl w tcon prms0 dcons) = Vec.withList prms0 $ \prms1 -> do
+  Some1 <$> MkTConDecl w tcon prms1 <$> zipWithM (rnDConDecl tcon prms1) [0..] dcons
 
-rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (Con.DConDecl n)
-rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) =
-  Con.MkDConDecl tcon dcon tag <$> traverse (rnType vs) flds
+rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (DConDecl n)
+rnDConDecl tcon vs tag (Ps.MkDConDecl w dcon flds) =
+  MkDConDecl w tcon dcon tag <$> traverse (rnType vs) flds
 
 rnType :: Vector n Id.TVar -> Ps.Type -> Rn ev (Type (TFinScope n Void))
 rnType vs = go
@@ -119,7 +119,7 @@ rnExpr = \case
   Ps.ERec w ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
-rnBind :: Ps.Bind -> Bind Out Void
+rnBind :: Ps.Bind -> Bind NoType Void
 rnBind (Ps.MkBind w x) = MkBind w x NoType
 
 rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
@@ -128,7 +128,7 @@ rnAltn (Ps.MkAltn w p0 e) = do
   let bs = Map.fromSet id (setOf patn2evar p1)
   MkAltn w p1 <$> localize bs (rnExpr e)
 
-rnPatn :: Ps.Patn -> Patn Out Void
+rnPatn :: Ps.Patn -> Patn NoType Void
 rnPatn = \case
   Ps.PWld w      -> PWld w
   Ps.PVar w x    -> PVar w x
