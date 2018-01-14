@@ -76,7 +76,7 @@ data TopLevel st
     TLDef     (Defn st Void Void)
   | forall m n. (HasLambda st ~ 'False, StageType st ~ Type, KnownNat m) =>
     TLSup Pos Id.EVar
-      (Vector m Id.TVar)
+      (Vector m QVar)
       (StageType st (TFinScope m Void))
       (Vector n (Bind st (TFinScope m Void)))
       (Expr st (TFinScope m Void) (EFinScope n Void))
@@ -104,7 +104,7 @@ data Expr st tv ev
   | HasNested st ~ 'True =>
     EMat Pos (Expr st tv ev) (NonEmpty (Altn st tv ev))
   | forall m. (HasTypes st ~ 'True, KnownNat m) =>
-    ETyAbs Pos (Vector m Id.TVar) (Expr st (TFinScope m tv) ev)
+    ETyAbs Pos (Vector m QVar) (Expr st (TFinScope m tv) ev)
   | HasTypes st ~ 'True =>
     ETyApp Pos (Expr st tv ev) (NonEmpty (StageType st tv))
 
@@ -557,10 +557,10 @@ instance (PrettyStage st) => Pretty (TopLevel st) where
     TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
     TLDef     d -> "let" <+> pretty d
-    TLSup _ z vs t bs e ->
+    TLSup _ z qvs t bs e ->
       "let" <+>
-      hang (pretty z <+> colon <+> pPrintPrecType lvl 0 (mkTUni vs t) <+> equals) 2
-        (prettyETyAbs lvl 0 vs (prettyELam lvl 0 bs e))
+      hang (pretty z <+> colon <+> pPrintPrecType lvl 0 (mkTUni qvs t) <+> equals) 2
+        (prettyETyAbs lvl 0 qvs (prettyELam lvl 0 bs e))
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 
@@ -626,12 +626,12 @@ prettyELam lvl prec bs e
       maybeParens lvl (prec > 0)
       $ hang ("fun" <+> hsepMap (pPrintPrec lvl 1) bs <+> "->") 2 (pPrintPrec lvl 0 e)
 
-prettyETyAbs :: PrettyLevel -> Rational -> Vector m Id.TVar -> Doc -> Doc
-prettyETyAbs lvl prec vs d
-  | null vs   = maybeParens lvl (prec > 0) d
+prettyETyAbs :: PrettyLevel -> Rational -> Vector m QVar -> Doc -> Doc
+prettyETyAbs lvl prec qvs d
+  | null qvs   = maybeParens lvl (prec > 0) d
   | otherwise =
       maybeParens lvl (prec > 0)
-      $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 d
+      $ hang ("fun" <+> prettyAtType prettyQVar qvs <+> "->") 2 d
 
 prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList

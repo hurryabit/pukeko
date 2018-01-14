@@ -64,7 +64,7 @@ typeOf = \case
       typeOf e0
   EMat _ e0 as -> typeOfBranching typeOfAltn e0 as
   ECas _ e0 cs -> typeOfBranching typeOfCase e0 cs
-  ETyAbs _ xs e0 -> withKinds (TUni xs <$> typeOf e0)
+  ETyAbs _ qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
   ETyApp w e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
@@ -150,9 +150,9 @@ checkTopLevel = \case
   TLTyp{} -> pure ()
   TLVal{} -> pure ()
   TLDef   d -> checkDefn d
-  TLSup w z vs t0 bs e0 -> do
-      t1 <- withKinds (withBinds bs (typeOf e0))
+  TLSup w z qvs t0 bs e0 -> do
+      t1 <- withQVars qvs (withBinds bs (typeOf e0))
       let t2 = fmap _bindType bs *~> t1
-      match w (mkTUni vs t0) (mkTUni vs t2)
+      match w (mkTUni qvs t0) (mkTUni qvs t2)
     `catchError` \e -> throwError ("while type checking " ++ show z ++ ":\n" ++ e)
   TLAsm _ _ -> pure ()

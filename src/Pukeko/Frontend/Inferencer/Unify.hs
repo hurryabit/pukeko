@@ -10,6 +10,7 @@ import           Control.Monad.ST
 import           Data.STRef
 
 import           Pukeko.Pretty
+import           Pukeko.AST.Type (QVar (..))
 import           Pukeko.FrontEnd.Inferencer.UType
 
 type TU s = ExceptT String (ST s)
@@ -53,10 +54,10 @@ unify pos t1 t2 = do
     (UVar uref1, _) -> do
       uvar1 <- lift $ readSTRef uref1
       case uvar1 of
-        UFree x1 _ -> do
+        UFree (MkQVar _ v1) _ -> do
           occursCheck uref1 t2 `catchError` \_ -> do
             p2 <- lift $ prettyUType prettyNormal 0 t2
-            throwDocAt pos $ quotes (pretty x1) <+> "occurs in" <+> p2
+            throwDocAt pos $ quotes (pretty v1) <+> "occurs in" <+> p2
           lift $ writeSTRef uref1 (ULink t2)
         _ -> bug "bad pattern in unify"
     (_, UVar _) -> unify pos t2 t1

@@ -37,7 +37,7 @@ yield :: TopLevel Out -> LL tv ev ()
 yield top = tell [top]
 
 llExpr ::
-  forall tv ev. (IsTVar tv, IsEVar ev) =>
+  forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
   Expr In tv ev -> LL tv ev (Expr Out tv ev)
 llExpr = \case
   EVar w x -> pure (EVar w x)
@@ -65,8 +65,8 @@ llExpr = \case
       let tvCapturedL :: [tv]
           tvCapturedL = Set.toList (setOf (traverse . bindType . traverse) allBinds0)
       Vec.withList tvCapturedL $ \(tvCapturedV :: Vector m tv) -> do
-        let tyBinds :: Vector m Id.TVar
-            tyBinds = fmap baseTVar tvCapturedV
+        tyBinds :: Vector m QVar <-
+          traverse (\v -> MkQVar <$> lookupKind v <*> pure (baseTVar v)) tvCapturedV
         let tvMap :: Map tv (TFinScope m Void)
             tvMap =
               ifoldMap (\j v -> Map.singleton v (mkBound j (baseTVar v))) tvCapturedV
@@ -94,9 +94,9 @@ llExpr = \case
               (map TVar tvCapturedL))
             (map (EVar w) evCapturedL))
   ETyApp w e0 ts -> ETyApp w <$> llExpr e0 <*> pure ts
-  ETyAbs w vs e0 -> ETyAbs w vs <$> withKinds (llExpr e0)
+  ETyAbs w qvs e0 -> ETyAbs w qvs <$> withQVars qvs (llExpr e0)
 
-llCase :: (IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)
+llCase :: (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)
 llCase (MkCase w dcon ts0 bs e) = do
   Some1 (Pair1 (Con.MkTConDecl _ vs _) (Con.MkDConDecl _ _ _ flds0)) <- findDCon dcon
   case Vec.matchList vs ts0 of

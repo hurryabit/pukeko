@@ -31,7 +31,8 @@ import Prelude               as X
 import Control.Applicative   as X
 import Control.Lens          as X
        ( Iso, Lens, Lens', Traversal, Traversal', Prism, Prism'
-       , (^.), over
+       , (^.), (%~)
+       , over, view, views
        , iso, prism
        , iall, ifoldMap, itoList, itraverse
        , makeLenses, makePrisms
@@ -49,6 +50,7 @@ import Data.CallStack        as X (HasCallStack)
 import Data.DList            as X (DList)
 import Data.Either           as X (partitionEithers)
 import Data.Foldable         as X
+import Data.Function         as X
 import Data.Functor.Identity as X
 import Data.List             as X (sort)
 import Data.Map              as X (Map)

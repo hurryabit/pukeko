@@ -9,6 +9,7 @@ module Pukeko.AST.Surface
   , TConDecl (..)
   , DConDecl (..)
   , Type (..)
+  , TypeScheme (..)
   , Defn (..)
   , Expr (..)
   , Bind (..)
@@ -48,7 +49,7 @@ data Module = MkModule
 
 data TopLevel
   = TLTyp Pos (NonEmpty TConDecl)
-  | TLVal Pos Id.EVar Type
+  | TLVal Pos Id.EVar TypeScheme
   | TLLet Pos (NonEmpty (Defn Id.EVar))
   | TLRec Pos (NonEmpty (Defn Id.EVar))
   | TLAsm Pos Id.EVar String
@@ -69,6 +70,8 @@ data Type
   | TCon Id.TCon
   | TArr
   | TApp Type Type
+
+data TypeScheme = MkTypeScheme [(Id.TCls, Id.TVar)] Type
 
 data Defn v = MkDefn Bind (Expr v)
 
@@ -127,3 +130,16 @@ type2tvar f = \case
   TCon c     -> pure (TCon c)
   TArr       -> pure TArr
   TApp tf tp -> TApp <$> type2tvar f tf <*> type2tvar f tp
+
+
+deriving instance Show Module
+deriving instance Show TopLevel
+deriving instance Show TConDecl
+deriving instance Show DConDecl
+deriving instance Show Type
+deriving instance Show TypeScheme
+deriving instance Show v => Show (Defn v)
+deriving instance Show v => Show (Expr v)
+deriving instance Show v => Show (Altn v)
+deriving instance Show Patn
+deriving instance Show Bind

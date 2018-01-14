@@ -84,9 +84,13 @@ rnType vs = go
       Ps.TArr   -> pure TArr
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
-rnTypeScheme :: Ps.Type -> Rn ev (Type Void)
-rnTypeScheme t =
-  Vec.withList (toList (setOf Ps.type2tvar t)) $ \vs -> mkTUni vs <$> rnType vs t
+rnTypeScheme :: Ps.TypeScheme -> Rn ev (Type Void)
+rnTypeScheme (Ps.MkTypeScheme qs t) =
+  -- FIXME: Fail if there are type variables that are only used in the constraints.
+  Vec.withList (toList (setOf Ps.type2tvar t)) $ \vs ->
+    let mp = foldl (\acc (c, v) -> Map.insertWith (<>) v (Set.singleton c) acc) mempty qs
+        qvs = fmap (\v -> MkQVar (Map.findWithDefault mempty v mp) v) vs
+    in mkTUni qvs <$> rnType vs t
 
 rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out Void ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e

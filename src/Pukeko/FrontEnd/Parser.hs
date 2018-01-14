@@ -52,7 +52,7 @@ pukekoDef = haskellStyle
       ]
   , Token.opStart  = oneOf Op.letters
   , Token.opLetter = oneOf Op.letters
-  , Token.reservedOpNames = ["=", "->", ":", ".", "|"]
+  , Token.reservedOpNames = ["->", "=>", "=", ":", ".", "|"]
   }
 
 pukeko@Token.TokenParser
@@ -79,10 +79,12 @@ getPos = mkPos <$> getPosition
 nat :: Parser Int
 nat = fromInteger <$> natural
 
-equals, arrow, bar :: Parser ()
+equals, arrow, darrow, bar, colon :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
+darrow  = reservedOp "=>"
 bar     = reservedOp "|"
+colon   = reservedOp ":"
 
 evar :: Parser Id.EVar
 evar = Id.evar <$> (lookAhead lower *> identifier)
@@ -97,6 +99,9 @@ tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
 dcon :: Parser Id.DCon
 dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
 
+tcls :: Parser Id.TCls
+tcls = Id.tcls <$> (lookAhead upper *> Token.identifier pukeko)
+
 type_, atype :: Parser Type
 type_ =
   buildExpressionParser
@@ -109,8 +114,11 @@ atype = choice
   , parens type_
   ]
 
-asType :: Parser Type
-asType = reservedOp ":" *> type_
+typeScheme :: Parser TypeScheme
+typeScheme =
+  MkTypeScheme
+  <$> option [] (try (parens (many ((,) <$> tcls <*> tvar)) <* darrow))
+  <*> type_
 
 module_ :: SourceName -> Parser Module
 module_ source = do
@@ -125,7 +133,7 @@ module_ source = do
     , TLVal
       <$> getPos
       <*> (reserved "val" *> evar)
-      <*> asType
+      <*> (colon *> typeScheme)
     , TLTyp
       <$> getPos
       <*> (reserved "type" *> sepBy1NE tconDecl (reserved "and"))

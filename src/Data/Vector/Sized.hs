@@ -25,10 +25,11 @@ module Data.Vector.Sized
 where
 
 import           Prelude hiding ((++), zip, zip3, zipWith, zipWith3, unzip)
-import qualified Data.List.NonEmpty as NE
 
+import           Control.Lens.At
 import           Control.Lens.Indexed
 import           Data.Finite
+import qualified Data.List.NonEmpty as NE
 import           Data.Proxy
 import qualified Data.Vector as V
 import           GHC.TypeLits
@@ -100,5 +101,11 @@ instance TraversableWithIndex (Finite n) (Vector n) where
   itraverse f (MkVector v) =
     -- TODO: Make this more efficient.
     MkVector <$> traverse (uncurry f) (V.imap (\i x -> (unsafeFromInt i, x)) v)
+
+type instance Index   (Vector n a) = Finite n
+type instance IxValue (Vector n a) = a
+
+instance Ixed (Vector n a) where
+  ix i f (MkVector v) = MkVector <$> ix (toInt i) f v
 
 deriving instance Show a => Show (Vector n a)

@@ -8,6 +8,7 @@ module Pukeko.AST.Type
   ( IsType (..)
   , NoType (..)
   , Type (..)
+  , QVar (..)
   , mkTUni
   , pattern TFun
   , (~>)
@@ -16,9 +17,11 @@ module Pukeko.AST.Type
   , gatherTApp
   , typeInt
   , vars
+  , qvar2cstr
+  , qvar2tvar
   , type2tcon
-  , Void
-  , absurd
+  , prettyTUni
+  , prettyQVar
   )
   where
 
@@ -45,13 +48,28 @@ data Type tv
   | TCon Id.TCon
   | TApp (Type tv) (Type tv)
   | forall n. KnownNat n =>
-    TUni (Vector n Id.TVar) (Type (TFinScope n tv))
+    TUni (Vector n QVar) (Type (TFinScope n tv))
 
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
 
-mkTUni ::
-  forall n tv. KnownNat n => Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
+-- | A type variable which is qualified by some (potentially empty) type class
+-- constraints. Used in universal quantification in types.
+--
+-- The set of constraints is not considered in comparison operations.
+data QVar = MkQVar
+  { _qvar2cstr :: Set Id.TCls
+    -- ^ The set of type class constraints on the type variable.
+  , _qvar2tvar :: Id.TVar
+  }
+
+-- instance Eq QVar where
+--   (==) = (==) `on` _qvar2tvar
+
+-- instance Ord QVar where
+--   compare = compare `on` _qvar2tvar
+
+mkTUni :: forall n tv. KnownNat n => Vector n QVar -> Type (TFinScope n tv) -> Type tv
 mkTUni xs t =
   case sameNat (Proxy @n) (Proxy @0) of
     Nothing   -> TUni xs t
@@ -103,7 +121,7 @@ instance (Eq tv) => Eq (Type tv) where
     (TUni xs1 tq1, TUni xs2 tq2) ->
       case sameNat (Vec.plength xs1) (Vec.plength xs2) of
         Nothing   -> False
-        Just Refl -> tq1 == tq2
+        Just Refl -> and (Vec.zipWith ((==) `on` _qvar2cstr) xs1 xs2) && tq1 == tq2
     (TVar{}, _) -> False
     (TArr{}, _) -> False
     (TCon{}, _) -> False
@@ -132,8 +150,24 @@ instance BaseTVar tv => Pretty (Type tv) where
       maybeParens lvl (prec > 1) (pPrintPrec lvl 2 tx <+> "->" <+> pPrintPrec lvl 1 ty)
     TApp tf tx ->
       maybeParens lvl (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
-    TUni vs tq ->
-      maybeParens lvl (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> pPrintPrec lvl 0 tq)
+    TUni qvs tq -> prettyTUni lvl prec qvs (pPrintPrec lvl 0 tq)
+
+prettyTUni :: Foldable t => PrettyLevel -> Rational -> t QVar -> Doc -> Doc
+prettyTUni lvl prec qvs tq =
+  maybeParens lvl (prec > 0)
+  ("∀" <> hsepMap (pretty . _qvar2tvar) qvs <> "." <+> qs1 <+> tq)
+  where
+    qs0 = [ pretty q <+> pretty v | MkQVar qs v <- toList qvs, q <- toList qs ]
+    qs1
+      | null qs0  = mempty
+      | otherwise = parens (hsep (punctuate "," qs0)) <+> "=>"
+
+prettyQVar :: QVar -> Doc
+prettyQVar (MkQVar q v)
+  | null q    = pretty v
+  | otherwise = parens (pretty v <+> "|" <+> hsepMap pretty q)
+
+makeLenses ''QVar
 
 deriving instance Functor     Type
 deriving instance Foldable    Type
@@ -158,4 +192,5 @@ instance FoldableWithIndex    Pos NoType where
 instance TraversableWithIndex Pos NoType where
   itraverse _ NoType = pure NoType
 
+deriving instance Show QVar
 deriving instance Show tv => Show (Type tv)

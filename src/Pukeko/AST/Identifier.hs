@@ -15,6 +15,8 @@ module Pukeko.AST.Identifier
   , tcon
   , DCon
   , dcon
+  , TCls
+  , tcls
   )
 where
 
@@ -104,10 +106,24 @@ data DCon = DCon String
 dcon :: String -> DCon
 dcon name@(first:_)
   | isUpper first = DCon name
-dcon name = bugWith "invalid type constructor name" name
+dcon name = bugWith "invalid data constructor name" name
 
 instance Pretty DCon where
   pPrint (DCon name) = text name
 
 instance Show DCon where
+  show = prettyShow
+
+data TCls = TCls String
+  deriving (Eq, Ord)
+
+tcls :: String -> TCls
+tcls name@(first:_)
+  | isUpper first = TCls name
+tcls name = bugWith "invalid type class name" name
+
+instance Pretty TCls where
+  pPrint (TCls name) = text name
+
+instance Show TCls where
   show = prettyShow

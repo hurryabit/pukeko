@@ -45,7 +45,7 @@ typeOf MkTConDecl{_tname, _params} MkDConDecl{_tcon, _dname, _fields}
       case sameNat (Proxy @n1) (Proxy @n2) of
         Just Refl ->
           let res = mkTApp (TCon _tcon) [ TVar (mkBound i x) | (i, x) <- itoList xs ]
-          in  mkTUni xs (flds *~> res)
+          in  mkTUni (fmap (MkQVar mempty) xs) (flds *~> res)
         Nothing -> bug "type and data constructor have different arity" (_tname, _dname)
 
 instance Pretty (TConDecl n) where

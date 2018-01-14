@@ -12,7 +12,6 @@ import           Control.Monad.ST
 import           Control.Monad.ST.Class
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map         as Map
-import qualified Data.Set         as Set
 import           Data.STRef
 import qualified Data.Vector.Sized as Vec
 
@@ -23,7 +22,7 @@ import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
 import qualified Pukeko.AST.Scope      as Sc
 import qualified Pukeko.AST.Identifier as Id
-import           Pukeko.AST.Type       (NoType (..), Type (..), typeInt)
+import           Pukeko.AST.Type       hiding ((*~>))
 import           Pukeko.FrontEnd.Inferencer.UType
 import qualified Pukeko.FrontEnd.Inferencer.Unify as U
 
@@ -55,11 +54,14 @@ runTI tc module_ = do
   let env0 = MkEnvironment (Const ()) 0
   evalSupplyT (runReaderT (runInfoT (unTI tc) module_) env0) Id.freshTVars
 
-freshUVar :: TI v s (UType s Void)
-freshUVar = do
-  x <- fresh
+freshQualUVar :: Set Id.TCls -> TI v s (UType s Void)
+freshQualUVar q = do
+  v <- fresh
   l <- view level
-  UVar <$> liftST (newSTRef (UFree x l))
+  UVar <$> liftST (newSTRef (UFree (MkQVar q v) l))
+
+freshUVar :: TI v s (UType s Void)
+freshUVar = freshQualUVar mempty
 
 unify :: Pos -> UType s Void -> UType s Void -> TI v s ()
 unify w t1 t2 = TI $ lift $ lift $ lift $ U.unify w t1 t2
@@ -80,20 +82,20 @@ lookupFun x = open . snd <$> findFun x
 
 generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
 generalize t0 = do
-  (t1, xs1) <- runWriterT (go t0)
-  let xs2 = toList xs1
-  pure (mkUTUni xs2 t1, map UTVar xs2)
+  (t1, qvs1) <- runWriterT (go t0)
+  let qvs2 = map (\(v, q) -> MkQVar q v) (Map.toList qvs1)
+  pure (mkUTUni qvs2 t1, map (UTVar . _qvar2tvar) qvs2)
   where
     go t0 = case t0 of
       (UVar uref) -> do
         uvar <- lift (liftST (readSTRef uref))
         cur_level <- view level
         case uvar of
-          UFree x l
+          UFree (MkQVar q v) l
             | l > cur_level -> do
-                let t1 = UTVar x
+                let t1 = UTVar v
                 lift (liftST (writeSTRef uref (ULink t1)))
-                tell (Set.singleton x)
+                tell (Map.singleton v q)
                 pure t1
             | otherwise     -> pure t0
           ULink t1 -> go t1
@@ -105,10 +107,9 @@ generalize t0 = do
 
 instantiate :: UType s Void -> TI v s ([UType s Void], UType s Void)
 instantiate ts = do
-  let (xs, t0) = unUTUni ts
-  uvars <- traverse (const freshUVar) xs
-  let env = Map.fromList (zip xs uvars)
-  (,) uvars <$> liftST (subst env t0)
+  let (qvs, t0) = unUTUni ts
+  env <- traverse (\(MkQVar q v) -> (,) v <$> freshQualUVar q) qvs
+  (,) (map snd env) <$> liftST (subst (Map.fromList env) t0)
 
 instantiateTCon ::
   Con.TConDecl n -> TI v s (UType s Void, Vector n (UType s Void))
@@ -244,12 +245,15 @@ runTQ tq = evalSupplyT (runReaderT (unTQ tq) mempty) tvars
     tvars = map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars
 
 localizeTQ ::
-  Vector n Id.TVar ->
-  (Vector n Id.TVar -> TQ (TFinScope n tv) s a) ->
+  Vector n QVar ->
+  (Vector n QVar -> TQ (TFinScope n tv) s a) ->
   TQ tv s a
 localizeTQ xs m = do
-  ys <- traverse (const fresh) xs
-  let env1 = ifoldMap (\i (x, y) -> Map.singleton x (mkBound i y)) (Vec.zip xs ys)
+  ys <- traverse (qvar2tvar (const fresh)) xs
+  let env1 =
+        ifoldMap
+          (\i (x, y) -> Map.singleton (x^.qvar2tvar) (mkBound i (y^.qvar2tvar)))
+          (Vec.zip xs ys)
   let upd env0 = env1 <> fmap Free env0
   (TQ . withReaderT upd . unTQ) (m ys)
 

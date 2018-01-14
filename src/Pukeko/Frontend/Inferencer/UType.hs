@@ -27,14 +27,15 @@ import qualified Data.Map           as Map
 import qualified Data.Vector.Sized  as Vec
 
 import           Pukeko.Pretty
-import           Pukeko.AST.Type       (Type (..))
+import           Pukeko.AST.Type       (Type (..), QVar (..), prettyTUni, prettyQVar)
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
 infixr 1 ~>, *~>
 
 data UVar s tv
-  = UFree Id.TVar Int  -- NOTE: The @Int@ is the level of this unification variable.
+  = UFree QVar Int
+    -- NOTE: The @Int@ is the level of this unification variable.
   | ULink (UType s tv)
 
 data UType s tv
@@ -42,18 +43,18 @@ data UType s tv
   | UTArr
   | UTCon Id.TCon
   | UTApp (UType s tv) (UType s tv)
-  | UTUni (NonEmpty Id.TVar) (UType s tv)
+  | UTUni (NonEmpty QVar) (UType s tv)
   | UVar (STRef s (UVar s tv))
 
 pattern UTFun :: UType s tv -> UType s tv -> UType s tv
 pattern UTFun tx ty = UTApp (UTApp UTArr tx) ty
 
-mkUTUni :: [Id.TVar] -> UType s tv -> UType s tv
+mkUTUni :: [QVar] -> UType s tv -> UType s tv
 mkUTUni xs0 t0 = case xs0 of
   [] -> t0
   x:xs -> UTUni (x :| xs) t0
 
-unUTUni :: UType s tv -> ([Id.TVar], UType s tv)
+unUTUni :: UType s tv -> ([QVar], UType s tv)
 unUTUni = \case
   UTUni (x :| xs) t -> (x:xs, t)
   t                    -> ([],   t)
@@ -79,7 +80,9 @@ open1 = \case
   TArr -> UTArr
   TCon c -> UTCon c
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
-  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id (UTVar . (xs Vec.!))) tq))
+  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id utvar) tq))
+    where
+      utvar = UTVar . _qvar2tvar . (xs Vec.!)
 
 subst :: Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env t = runReaderT (subst' t) env
@@ -103,8 +106,8 @@ subst env t = runReaderT (subst' t) env
 -- * Pretty printing
 prettyUVar :: PrettyLevel -> Rational -> UVar s tv -> ST s Doc
 prettyUVar lvl prec = \case
-  UFree x _ -> pure (pretty x)
-  ULink t   -> prettyUType lvl prec t
+  UFree qv _ -> pure (prettyQVar qv)
+  ULink t    -> prettyUType lvl prec t
 
 prettyUType :: PrettyLevel -> Rational -> UType s tv -> ST s Doc
 prettyUType lvl prec = \case
@@ -119,9 +122,7 @@ prettyUType lvl prec = \case
     pf <- prettyUType lvl 2 tf
     px <- prettyUType lvl 3 tx
     pure $ maybeParens lvl (prec > 2) $ pf <+> px
-  UTUni xs tq -> do
-    pq <- prettyUType lvl 0 tq
-    pure $ maybeParens lvl (prec > 0) $ "∀" <> hsepMap pretty xs <> "." <+> pq
+  UTUni qvs tq -> prettyTUni lvl prec qvs <$> prettyUType lvl 0 tq
   UVar uref -> do
     uvar <- readSTRef uref
     prettyUVar lvl prec uvar
