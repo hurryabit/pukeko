@@ -1,8 +1,22 @@
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (+) : Int -> Int -> Int = "add"
 external (-) : Int -> Int -> Int = "sub"
 external (==) : Int -> Int -> Bool = "eq"
 external (<) : Int -> Int -> Bool = "lt"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
@@ -55,9 +69,13 @@ let replicate : ∀a. Int -> a -> List a =
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
+type IO a
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+type Option a =
+       | None
+       | Some a
 let diff : List Int -> List Int -> List Int =
       fun (xs : List Int) (ys : List Int) ->
         match xs with

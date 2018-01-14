@@ -1,3 +1,15 @@
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Int
+type List a =
+       | Nil
+       | Cons a (List a)
+type IO a
 external print : Int -> IO Unit = "print"
 let id : ∀a. a -> a =
       fun @a ->

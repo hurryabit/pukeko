@@ -1,7 +1,21 @@
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (-) : Int -> Int -> Int = "sub"
 external (*) : Int -> Int -> Int = "mul"
 external (%) : Int -> Int -> Int = "mod"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
@@ -17,6 +31,7 @@ let take : ∀a. Int -> List a -> List a =
             | Nil @a -> Nil @a
             | Cons @a x xs -> Cons @a x (take @a ((-) n 1) xs)
           | True -> Nil @a
+type IO a
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -33,6 +48,9 @@ let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) ->
           foldr @a @(IO Unit) (iter_io$ll1 @a f) (return @Unit Unit)
+type Option a =
+       | None
+       | Some a
 let gen : ∀a. (a -> a) -> a -> List a =
       fun @a -> fun (f : a -> a) (x : a) -> Cons @a x (gen @a f (f x))
 let main$ll1 : Int -> Int =

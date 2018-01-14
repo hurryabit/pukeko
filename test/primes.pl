@@ -1,9 +1,23 @@
 external abort : ∀a. a = "abort"
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (+) : Int -> Int -> Int = "add"
 external (-) : Int -> Int -> Int = "sub"
 external (%) : Int -> Int -> Int = "mod"
 external (!=) : Int -> Int -> Bool = "ne"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let nth : ∀a. List a -> Int -> a =
       fun @a ->
         fun (xs : List a) (n : Int) ->
@@ -19,9 +33,13 @@ let append : ∀a. List a -> List a -> List a =
           match xs with
           | Nil @a -> ys
           | Cons @a x xs -> Cons @a x (append @a xs ys)
+type IO a
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+type Option a =
+       | None
+       | Some a
 let repeat : ∀a. List a -> List a =
       fun @a ->
         fun (xs : List a) ->

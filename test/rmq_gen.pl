@@ -1,8 +1,22 @@
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (-) : Int -> Int -> Int = "sub"
 external (*) : Int -> Int -> Int = "mul"
 external (%) : Int -> Int -> Int = "mod"
 external (<) : Int -> Int -> Bool = "lt"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
@@ -27,6 +41,7 @@ let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
             match ys with
             | Nil @b -> Nil @c
             | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+type IO a
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
@@ -55,6 +70,9 @@ let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) ->
           foldr @a @(IO Unit) (iter_io$ll1 @a f) (return @Unit Unit)
+type Option a =
+       | None
+       | Some a
 let gen : ∀a. (a -> a) -> a -> List a =
       fun @a -> fun (f : a -> a) (x : a) -> Cons @a x (gen @a f (f x))
 let split_at : ∀a. Int -> List a -> Pair (List a) (List a) =

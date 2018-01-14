@@ -14,6 +14,7 @@ import Pukeko.Prelude
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 import           Pukeko.AST.Scope
+import           Pukeko.Pretty
 
 data Some1 f = forall n. KnownNat n => Some1 (f n)
 
@@ -48,10 +49,31 @@ typeOf MkTConDecl{_tname, _params} MkDConDecl{_tcon, _dname, _fields}
         Nothing -> bug "type and data constructor have different arity" (_tname, _dname)
 
 instance Pretty (TConDecl n) where
-  pPrintPrec lvl prec MkTConDecl{_tname} = pPrintPrec lvl prec _tname
+  pPrintPrec lvl _ (MkTConDecl tname prms dcons)
+    | null dcons =
+        pPrintPrec lvl 0 tname <+> hsepMap (pPrintPrec lvl 0) prms
+    | otherwise  =
+        pPrintPrec lvl 0 tname <+> hsepMap (pPrintPrec lvl 0) prms <+> equals $$
+        nest 2 (vcat (map (pPrintPrec lvl 0) dcons))
 
 instance Pretty (DConDecl n) where
-  pPrintPrec lvl prec MkDConDecl{_dname} = pPrintPrec lvl prec _dname
+  pPrintPrec lvl _ (MkDConDecl _ dname _ flds) =
+    "|" <+> pPrintPrec lvl 0 dname <+> hsepMap (pPrintPrec lvl 3) flds
 
-instance Show (Some1 f) where
-  show _ = "Some1 ..."
+instance Pretty (Some1 TConDecl) where
+  pPrintPrec lvl prec (Some1 tcon) = pPrintPrec lvl prec tcon
+
+instance Pretty (Some1 DConDecl) where
+  pPrintPrec lvl prec (Some1 dcon) = pPrintPrec lvl prec dcon
+
+instance Show (Some1 TConDecl) where
+  show (Some1 tcon) = show tcon
+
+instance Show (Some1 DConDecl) where
+  show (Some1 dcon) = show dcon
+
+instance (Show (f a), Show (g a)) => Show (Pair1 f g a) where
+  show (Pair1 x y) = show (x, y)
+
+deriving instance Show (TConDecl n)
+deriving instance Show (DConDecl n)

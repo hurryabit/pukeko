@@ -1,4 +1,11 @@
 external abort : ∀a. a = "abort"
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
 let (&&) : Bool -> Bool -> Bool =
       fun (x : Bool) (y : Bool) ->
         match x with
@@ -9,11 +16,18 @@ let (||) : Bool -> Bool -> Bool =
         match x with
         | False -> y
         | True -> True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (+) : Int -> Int -> Int = "add"
 external (-) : Int -> Int -> Int = "sub"
 external (<) : Int -> Int -> Bool = "lt"
 external (<=) : Int -> Int -> Bool = "le"
 external (>) : Int -> Int -> Bool = "gt"
+type List a =
+       | Nil
+       | Cons a (List a)
 let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       fun @a @b @c ->
         fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -29,6 +43,7 @@ let replicate : ∀a. Int -> a -> List a =
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
+type IO a
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -46,6 +61,9 @@ let sequence_io : ∀a. List (IO a) -> IO (List a) =
           match ms with
           | Nil @(IO a) -> return @(List a) (Nil @a)
           | Cons @(IO a) m ms -> (>>=) @a @(List a) m (sequence_io$ll2 @a ms)
+type Option a =
+       | None
+       | Some a
 let nats$ll1 : (Int -> List Int) -> Int -> List Int =
       fun (nats_from : Int -> List Int) (n : Int) ->
         Cons @Int n (nats_from ((+) n 1))
@@ -61,6 +79,9 @@ let pair : ∀a. (a -> a -> a) -> List a -> List a =
             match pair$pm2 with
             | Nil @a -> xs1
             | Cons @a x2 xs3 -> Cons @a (op pair$pm1 x2) (pair @a op xs3)
+type RmqTree a =
+       | RmqEmpty
+       | RmqNode Int Int a (RmqTree a) (RmqTree a)
 let single : ∀a. Int -> a -> RmqTree a =
       fun @a ->
         fun (i : Int) (x : a) ->

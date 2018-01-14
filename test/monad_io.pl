@@ -1,6 +1,18 @@
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Int
 external (-) : Int -> Int -> Int = "sub"
 external (>=) : Int -> Int -> Bool = "ge"
 external (>) : Int -> Int -> Bool = "gt"
+type List a =
+       | Nil
+       | Cons a (List a)
+type IO a
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"

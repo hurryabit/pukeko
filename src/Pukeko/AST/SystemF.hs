@@ -550,16 +550,17 @@ instance (PrettyStage st) => Pretty (Module st) where
   pPrintPrec lvl prec (MkModule tops) = vcat (map (pPrintPrec lvl prec) tops)
 
 instance (PrettyStage st) => Pretty (TopLevel st) where
-  pPrintPrec lvl prec = \case
-    -- FIXME: Print type declarations.
-    TLTyp{} -> mempty
+  pPrintPrec lvl _ = \case
+    TLTyp _ (dcon0 :| dcons) ->
+      "type" <+> pPrintPrec lvl 0 dcon0 $$
+      vcat (map (\dcon -> "and " <+> pPrintPrec lvl 0 dcon) dcons)
     TLVal _ x t ->
       "val" <+> pretty x <+> colon <+> pretty t
     TLDef     d -> "let" <+> pretty d
     TLSup _ z vs t bs e ->
       "let" <+>
-      hang (pretty z <+> colon <+> pPrintPrecType lvl prec (mkTUni vs t) <+> equals) 2
-        (prettyETyAbs lvl prec vs (prettyELam lvl 0 bs e))
+      hang (pretty z <+> colon <+> pPrintPrecType lvl 0 (mkTUni vs t) <+> equals) 2
+        (prettyETyAbs lvl 0 vs (prettyELam lvl 0 bs e))
     TLAsm   b s ->
       hsep ["external", pretty b, equals, text (show s)]
 

@@ -1,9 +1,23 @@
 external abort : ∀a. a = "abort"
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (+) : Int -> Int -> Int = "add"
 external (-) : Int -> Int -> Int = "sub"
 external (*) : Int -> Int -> Int = "mul"
 external (%) : Int -> Int -> Int = "mod"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
@@ -34,9 +48,13 @@ let map : ∀a b. (a -> b) -> List a -> List b =
           match xs with
           | Nil @a -> Nil @b
           | Cons @a x xs -> Cons @b (f x) (map @a @b f xs)
+type IO a
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+type Option a =
+       | None
+       | Some a
 let p : Int = 100000007
 let mul_p : Int -> Int -> Int =
       fun (x : Int) (y : Int) -> (%) ((*) x y) p

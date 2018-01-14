@@ -1,5 +1,19 @@
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (-) : Int -> Int -> Int = "sub"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
       fun @a @b ->
         fun (f : a -> b -> b) (y0 : b) (xs : List a) ->
@@ -24,6 +38,7 @@ let replicate : ∀a. Int -> a -> List a =
           match (<=) n 0 with
           | False -> Cons @a x (replicate @a ((-) n 1) x)
           | True -> Nil @a
+type IO a
 external return : ∀a. a -> IO a = "return"
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
@@ -53,6 +68,12 @@ let iter_io : ∀a. (a -> IO Unit) -> List a -> IO Unit =
       fun @a ->
         fun (f : a -> IO Unit) ->
           foldr @a @(IO Unit) (iter_io$ll1 @a f) (return @Unit Unit)
+type Option a =
+       | None
+       | Some a
+type Tree a =
+       | Leaf
+       | Branch (Tree a) a (Tree a)
 let insert_tree : Int -> Tree Int -> Tree Int =
       fun (x : Int) (t : Tree Int) ->
         match t with

@@ -1,9 +1,23 @@
 external abort : ∀a. a = "abort"
+type Unit =
+       | Unit
+type Pair a b =
+       | Pair a b
+type Bool =
+       | False
+       | True
+type Choice a b =
+       | First a
+       | Second b
+type Int
 external (+) : Int -> Int -> Int = "add"
 external (-) : Int -> Int -> Int = "sub"
 external (*) : Int -> Int -> Int = "mul"
 external (<) : Int -> Int -> Bool = "lt"
 external (<=) : Int -> Int -> Bool = "le"
+type List a =
+       | Nil
+       | Cons a (List a)
 let nth : ∀a. List a -> Int -> a =
       fun @a ->
         fun (xs : List a) (n : Int) ->
@@ -22,9 +36,13 @@ let zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
             match ys with
             | Nil @b -> Nil @c
             | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+type IO a
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
 external (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+type Option a =
+       | None
+       | Some a
 let prime : Int = (+) ((*) 1000000 1000000) 39
 let add_mod_prime : Int -> Int -> Int =
       fun (x : Int) (y : Int) ->
