@@ -5,13 +5,13 @@ module Pukeko.FrontEnd.KindChecker
   ( checkModule
   ) where
 
-import Pukeko.Prelude hiding (fresh)
+import Pukeko.Prelude
 
 import           Control.Lens
 import           Control.Monad.ST
+import           Control.Monad.ST.Class
 import           Data.Forget      (Forget (..))
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map         as Map
 import           Data.STRef
 import qualified Data.Vector.Sized as Vec
 
@@ -38,39 +38,23 @@ data Kind a where
 
 type KCEnv n s = Vector n (Kind (Open s))
 
-data KCState s = MkKCState
-  { _typeCons :: Map Id.TCon (Kind (Open s))
-  , _fresh    :: [Id.TVar]
-  }
-makeLenses ''KCState
+type KCState s = Map Id.TCon (Kind (Open s))
 
-newtype KC n s a =
-  KC{unKC :: ReaderT (KCEnv n s) (StateT (KCState s) (ExceptT String (ST s))) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadError String
-           , MonadReader (KCEnv n s)
-           , MonadState (KCState s)
-           )
+type KC n s = (RWST (KCEnv n s) () (KCState s) (SupplyT Id.TVar (ExceptT String (ST s))))
 
 runKC :: MonadError String m => (forall n s. KC n s a) -> m a
-runKC kc = runST (runExceptT (evalStateT (runReaderT (unKC kc) env0) st0))
+runKC kc = runST (runExceptT (evalSupplyT (fst <$> evalRWST kc env0 mempty) sup0))
   where
-    st0 = MkKCState
-      { _typeCons = Map.empty
-      , _fresh    = Id.freshTVars
-      }
+    sup0 = Id.freshTVars
     env0 = Vec.empty
-
-liftST :: ST s a -> KC n s a
-liftST = KC . lift . lift . lift
 
 freshUVar :: KC n s (Kind (Open s))
 freshUVar = do
-  v <- fresh %%= (\(v:vs) -> (v, vs))
+  v <- fresh
   UVar <$> liftST (newSTRef (Free (Forget v)))
 
 localize :: Vector n (Kind (Open s)) -> KC n s a -> KC m s a
-localize env = KC . withReaderT (const env) . unKC
+localize env = withRWST (\_ -> (,) env)
 
 kcType :: Kind (Open s) -> Type (TFinScope n Void) -> KC n s ()
 kcType k = \case
@@ -79,7 +63,7 @@ kcType k = \case
     unify kv k
   TArr -> unify (Arrow Star (Arrow Star Star)) k
   TCon tcon -> do
-    kcon_opt <- use (typeCons . at tcon)
+    kcon_opt <- use (at tcon)
     case kcon_opt of
       Nothing -> bugWith "unknown type constructor" tcon
       Just kcon -> unify kcon k
@@ -93,7 +77,7 @@ kcTypDef :: NonEmpty (Some1 Con.TConDecl) -> KC n s ()
 kcTypDef tcons = do
   kinds <- for tcons $ \(Some1 Con.MkTConDecl{_tname}) -> do
     kind <- freshUVar
-    typeCons . at _tname ?= kind
+    at _tname ?= kind
     pure kind
   for_ (NE.zip tcons kinds) $ \(Some1 Con.MkTConDecl{_params, _dcons}, tconKind) -> do
     paramKinds <- traverse (const freshUVar) _params
@@ -125,7 +109,7 @@ kcTopLevel = \case
   TLAsm b a -> pure (TLAsm (retagBind b) a)
 
 kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2tops (traverse kcTopLevel)
+kcModule = module2tops (traverse (\top -> reset *> kcTopLevel top))
 
 checkModule :: MonadError String m => Module In -> m (Module Out)
 checkModule module_ = runKC (kcModule module_)

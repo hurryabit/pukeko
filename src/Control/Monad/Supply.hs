@@ -7,7 +7,7 @@ import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error.Class
 import Control.Monad.Reader
-import Control.Monad.Writer.Class
+import Control.Monad.RWS
 import Data.Bifunctor (first, second)
 import Data.Function
 import Data.Tuple
@@ -43,3 +43,14 @@ instance (MonadSupply s m) => MonadSupply s (ReaderT r m) where
   unfresh = lift . unfresh
   reset = lift reset
   resetWith = lift . resetWith
+
+instance (MonadSupply t m, Monoid w) => MonadSupply t (RWST r w s m) where
+  fresh = lift fresh
+  unfresh = lift . unfresh
+  reset = lift reset
+  resetWith = lift . resetWith
+
+instance MonadState s m => MonadState s (SupplyT t m) where
+  get = lift get
+  put = lift . put
+  state = lift . state

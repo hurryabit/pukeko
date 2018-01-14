@@ -56,13 +56,13 @@ type Typ =
 -- SUBSECTION type definition
 
 -- TEST underapplication in one definition
--- FAILURE (line 1, column 1): cannot unify kinds _236 -> * and *
+-- FAILURE (line 1, column 1): cannot unify kinds _3 -> * and *
 type Typ1 a
 and Typ2 =
   | Con Typ1
 
 -- TEST underapplication in recursive definition
--- FAILURE (line 1, column 1): cannot unify kinds _236 -> * and *
+-- FAILURE (line 1, column 1): cannot unify kinds _3 -> * and *
 type Typ a b =
   | Con (Typ a)
 
@@ -72,18 +72,18 @@ type Typ =
   | Con List
 
 -- TEST overapplication in one definition
--- FAILURE (line 1, column 1): cannot unify kinds * and _239 -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and _6 -> *
 type Typ1 a
 and Typ2 a =
   | Con (Typ1 a a)
 
 -- TEST overapplication in recursive definition
--- FAILURE (line 1, column 1): cannot unify kinds * and _237 -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and _4 -> *
 type Typ a =
   | Con (Typ a a)
 
 -- TEST overapplication in two definitions
--- FAILURE (line 1, column 1): cannot unify kinds * and _236 -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and _3 -> *
 type Typ a =
   | Con (Int a)
 
@@ -103,12 +103,12 @@ type Typ f =
   | Con (f f)
 
 -- TEST type variable of kinds * and * -> *
--- FAILURE (line 1, column 1): cannot unify kinds * and _237 -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and _4 -> *
 type Typ f a =
   | Con f (f a)
 
 -- TEST type variable of kinds * -> * and * -> * -> *
--- FAILURE (line 1, column 1): cannot unify kinds _238 -> * and *
+-- FAILURE (line 1, column 1): cannot unify kinds _5 -> * and *
 type Typ f a b =
   | Con (f a b) (f a)
 
