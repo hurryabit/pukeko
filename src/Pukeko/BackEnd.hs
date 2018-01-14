@@ -3,9 +3,8 @@ module Pukeko.BackEnd
   , run
   ) where
 
-import           Control.Monad ((>=>))
+import Pukeko.Prelude
 
-import           Pukeko.Error
 import qualified Pukeko.AST.NoLambda     as Lambda
 import qualified Pukeko.BackEnd.Compiler as Compiler
 import qualified Pukeko.BackEnd.NASM     as NASM

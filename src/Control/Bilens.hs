@@ -3,12 +3,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Control.Bilens where
 
+import Control.Applicative
 import Control.Lens.Indexed
 import Data.Bifoldable
 import Data.Bifunctor
 import Data.Bitraversable
 import Data.Coerce
-import Data.Functor.Const
+import Data.Function
 import Data.Functor.Identity
 import Data.Monoid
 import Data.Profunctor.Unsafe

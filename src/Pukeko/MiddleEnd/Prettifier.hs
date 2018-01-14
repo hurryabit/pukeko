@@ -2,24 +2,25 @@ module Pukeko.MiddleEnd.Prettifier
   ( prettifyModule
   ) where
 
-import           Control.Lens
+import Pukeko.Prelude
+
+-- import           Control.Lens
 import qualified Data.Map      as Map
 import qualified Data.Set      as Set
-import qualified Data.Set.Lens as Set
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Identifier as Id
 
 prettifyModule :: Module st -> Module st
 prettifyModule (MkModule tops0) =
-  let xs = Set.setOf (traverse . top2lhs) tops0
+  let xs = setOf (traverse . top2lhs) tops0
       mp = cluster xs
       rename x = Map.findWithDefault x x mp
       tops1 = over (traverse . top2lhs) rename tops0
       tops2 = over (traverse . top2eval) rename tops1
   in  MkModule tops2
 
-cluster :: Set.Set Id.EVar -> Map.Map Id.EVar Id.EVar
+cluster :: Set Id.EVar -> Map Id.EVar Id.EVar
 cluster xs0 =
   let mp =
         foldl

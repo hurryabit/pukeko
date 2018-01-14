@@ -2,14 +2,10 @@ module Pukeko.FrontEnd.TypeResolver
   ( resolveModule
   ) where
 
-import           Control.Lens
-import           Control.Monad.State
-import           Data.Foldable       (for_)
-import qualified Data.Map            as Map
-import           Data.Maybe          (isJust)
-import           GHC.TypeLits        (KnownNat)
+import Pukeko.Prelude
 
-import           Pukeko.Error
+import           Control.Lens
+
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
@@ -20,8 +16,8 @@ type In  = St.Renamer
 type Out = St.TypeResolver
 
 data TRState = MkTRState
-  { _st2tcons :: Map.Map Id.TCon (Some1 Con.TConDecl)
-  , _st2dcons :: Map.Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
+  { _st2tcons :: Map Id.TCon (Some1 Con.TConDecl)
+  , _st2dcons :: Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
   }
 makeLenses ''TRState
 

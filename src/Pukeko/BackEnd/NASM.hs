@@ -3,11 +3,11 @@ module Pukeko.BackEnd.NASM
   )
 where
 
+import Pukeko.Prelude
+
 import Data.List (isPrefixOf, intercalate)
-import Data.Map (Map)
 import qualified Data.Map as Map
 
-import Pukeko.Error
 import Pukeko.BackEnd.GCode
 
 assemble :: MonadError String m => Program -> m String

@@ -2,12 +2,11 @@ module Pukeko.FrontEnd.FunResolver
   ( resolveModule
   ) where
 
-import           Control.Lens
-import           Control.Monad.State
-import qualified Data.Map      as Map
-import qualified Data.Set      as Set
+import Pukeko.Prelude
 
-import           Pukeko.Error
+import           Control.Lens
+import qualified Data.Map      as Map
+
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.Identifier as Id
@@ -17,8 +16,8 @@ type In  = St.TypeResolver
 type Out = St.FunResolver
 
 data FRState = MkFRState
-  { _declared :: Map.Map Id.EVar (Pos, Type Void)
-  , _defined  :: Set.Set Id.EVar
+  { _declared :: Map Id.EVar (Pos, Type Void)
+  , _defined  :: Set Id.EVar
   }
 makeLenses ''FRState
 

@@ -6,19 +6,13 @@ module Pukeko.MiddleEnd.LambdaLifter
   )
 where
 
-import           Control.Lens
-import           Control.Monad.Supply
-import           Control.Monad.Writer
+import Pukeko.Prelude
+
 import qualified Data.Finite       as Fin
-import           Data.Foldable     (traverse_)
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
-import qualified Data.Set.Lens     as Set
-import           Data.Traversable  (for)
 import qualified Data.Vector.Sized as Vec
-import           GHC.TypeLits
 
-import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
@@ -59,33 +53,33 @@ llExpr = \case
   ERec w ds e0 ->
     withBinds (fmap _defnLhs ds) $
       ERec w <$> (traverse . defn2rhs) llExpr ds <*> llExpr e0
-  ELam w (oldBinds :: Vec.Vector n1 (Bind In tv)) rhs0 (t_rhs :: Type tv) -> do
+  ELam w (oldBinds :: Vector n1 (Bind In tv)) rhs0 (t_rhs :: Type tv) -> do
     rhs1 :: Expr Out tv (EFinScope n1 ev) <- withBinds oldBinds (llExpr rhs0)
     let evCapturedL :: [ev]
-        evCapturedL = Set.toList (Set.setOf (traverse . _Free) rhs1)
-    Vec.withList evCapturedL $ \(evCapturedV :: Vec.Vector n0 ev) -> do
-      newBinds :: Vec.Vector n0 (Bind Out tv) <-
+        evCapturedL = Set.toList (setOf (traverse . _Free) rhs1)
+    Vec.withList evCapturedL $ \(evCapturedV :: Vector n0 ev) -> do
+      newBinds :: Vector n0 (Bind Out tv) <-
         for evCapturedV $ \x -> MkBind w (baseEVar x) <$> lookupType x
-      let allBinds0 :: Vec.Vector (n0 + n1) (Bind Out tv)
+      let allBinds0 :: Vector (n0 + n1) (Bind Out tv)
           allBinds0 = newBinds Vec.++ fmap retagBind oldBinds
       let tvCapturedL :: [tv]
-          tvCapturedL = Set.toList (Set.setOf (traverse . bindType . traverse) allBinds0)
-      Vec.withList tvCapturedL $ \(tvCapturedV :: Vec.Vector m tv) -> do
-        let tyBinds :: Vec.Vector m Id.TVar
+          tvCapturedL = Set.toList (setOf (traverse . bindType . traverse) allBinds0)
+      Vec.withList tvCapturedL $ \(tvCapturedV :: Vector m tv) -> do
+        let tyBinds :: Vector m Id.TVar
             tyBinds = fmap baseTVar tvCapturedV
-        let tvMap :: Map.Map tv (TFinScope m Void)
+        let tvMap :: Map tv (TFinScope m Void)
             tvMap =
               ifoldMap (\j v -> Map.singleton v (mkBound j (baseTVar v))) tvCapturedV
         let tvRename :: tv -> TFinScope m Void
             tvRename = (tvMap Map.!)
-        let evMap :: Map.Map ev (EFinScope (n0 + n1) Void)
+        let evMap :: Map ev (EFinScope (n0 + n1) Void)
             evMap =
               ifoldMap
               (\i x -> Map.singleton x (mkBound (Fin.weaken i) (baseEVar x)))
               evCapturedV
         let evRename :: EFinScope n1 ev -> EFinScope (n0 + n1) Void
             evRename = scope' (evMap Map.!) (mkBound . Fin.shift)
-        let allBinds1 :: Vec.Vector (n0 + n1) (Bind Out (TFinScope m Void))
+        let allBinds1 :: Vector (n0 + n1) (Bind Out (TFinScope m Void))
             allBinds1 = fmap (fmap tvRename) allBinds0
         let rhs2 :: Expr Out (TFinScope m Void) (EFinScope (n0 + n1) Void)
             rhs2 = bimap tvRename evRename rhs1

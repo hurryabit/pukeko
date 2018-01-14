@@ -3,6 +3,8 @@ module Pukeko.BackEnd.PeepHole
   )
   where
 
+import Pukeko.Prelude
+
 import Pukeko.BackEnd.GCode
 
 optimize :: Program -> Program

@@ -8,12 +8,11 @@ module Pukeko.AST.Operator
   )
 where
 
-import Data.Map (Map)
-import Data.Ratio ()
-import Text.Parsec.Expr (Assoc (..))
-import qualified Data.Map as Map
+import Pukeko.Prelude
 
-import Pukeko.Error
+import Text.Parsec.Expr (Assoc (..))
+
+import qualified Data.Map as Map
 
 data Spec = MkSpec{ _sym :: String, _prec :: Rational, _assoc :: Assoc }
 

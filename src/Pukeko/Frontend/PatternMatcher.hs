@@ -7,18 +7,14 @@ module Pukeko.FrontEnd.PatternMatcher
   )
 where
 
-import           Control.Lens
-import           Control.Monad.State
-import           Data.Bifunctor   (second)
-import           Data.Either      (partitionEithers)
-import           Data.Foldable    (foldlM, toList)
+import Pukeko.Prelude
+
+-- import           Control.Lens
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Sized  as LS
 import qualified Data.Map         as Map
-import           Data.Traversable (for)
 import qualified Data.Vector.Sized as Vec
 
-import           Pukeko.Error
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 import           Pukeko.AST.SystemF
@@ -182,7 +178,7 @@ findCPatnCol w (MkColMatch cs0 us) =
 
 data GrpMatchItem tv ev =
   forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon [Type tv] (Vec.Vector k BPatn) (RowMatch m n tv (EFinScope k ev))
+  MkGrpMatchItem Id.DCon [Type tv] (Vector k BPatn) (RowMatch m n tv (EFinScope k ev))
 
 data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev))
 

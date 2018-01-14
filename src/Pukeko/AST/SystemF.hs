@@ -50,16 +50,13 @@ module Pukeko.AST.SystemF
   )
   where
 
+import Pukeko.Prelude
+
 import Control.Bilens
 import Control.Lens   hiding (firstOf)
 import Data.Bifoldable
 import Data.Bitraversable
-import Data.Vector.Sized (Vector)
-import Data.Foldable
-import qualified Data.List.NonEmpty as NE
-import           GHC.TypeLits
 
-import           Pukeko.AST.Pos
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
 import qualified Pukeko.AST.Identifier as Id
@@ -103,9 +100,9 @@ data Expr st tv ev
   | forall n.
     ERec Pos (Vector n (Defn st tv (EFinScope n ev))) (Expr st tv (EFinScope n ev))
   | HasNested st ~ 'False =>
-    ECas Pos (Expr st tv ev) (NE.NonEmpty (Case st tv ev))
+    ECas Pos (Expr st tv ev) (NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
-    EMat Pos (Expr st tv ev) (NE.NonEmpty (Altn st tv ev))
+    EMat Pos (Expr st tv ev) (NonEmpty (Altn st tv ev))
   | forall m. (HasTypes st ~ 'True, KnownNat m) =>
     ETyAbs Pos (Vector m Id.TVar) (Expr st (TFinScope m tv) ev)
   | HasTypes st ~ 'True =>

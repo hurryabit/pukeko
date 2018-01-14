@@ -7,6 +7,8 @@ module Pukeko.BackEnd.GCode
   )
 where
 
+import Pukeko.Prelude
+
 import Pukeko.AST.NoLambda (Name (..))
 import Pukeko.Pretty
 

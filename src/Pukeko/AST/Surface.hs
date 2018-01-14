@@ -21,7 +21,8 @@ module Pukeko.AST.Surface
   )
 where
 
-import           Pukeko.AST.Pos
+import Pukeko.Prelude
+
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 

@@ -1,6 +1,8 @@
 {-# LANGUAGE ImplicitParams #-}
 module FrontEnd where
 
+import Pukeko.Prelude hiding ((<|>), many)
+
 import Data.Char (isSpace)
 import Data.List
 import GHC.Stack

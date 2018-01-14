@@ -11,9 +11,8 @@ module Pukeko.AST.NoLambda
   )
 where
 
-import Data.Maybe (catMaybes)
+import Pukeko.Prelude
 
-import Pukeko.Error
 import Pukeko.Pretty
 
 newtype Name = MkName{unName :: String}

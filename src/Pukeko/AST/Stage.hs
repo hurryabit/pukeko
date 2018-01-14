@@ -2,10 +2,10 @@
 {-# LANGUAGE TypeOperators #-}
 module Pukeko.AST.Stage where
 
-import Control.Lens
-import GHC.TypeLits
+import Pukeko.Prelude
 
-import Pukeko.AST.Pos
+import Control.Lens
+
 import Pukeko.AST.Type (NoType, Type)
 
 data Parser

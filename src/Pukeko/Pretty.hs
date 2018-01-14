@@ -8,26 +8,16 @@ module Pukeko.Pretty
   , hsepMap
   , maybeParens
   , pattern High
-  , module Data.Monoid
   , module Text.PrettyPrint.HughesPJClass
   )
   where
 
-import Data.Foldable
-import Data.Monoid
-import Data.Void
-import Text.PrettyPrint.HughesPJClass hiding ((<>), (<+>), hsep, first, maybeParens)
+import Pukeko.Prelude
 
+import           Text.PrettyPrint.HughesPJClass hiding ( (<>), (<+>)
+                                                       , empty, hsep, first, maybeParens
+                                                       )
 import qualified Text.PrettyPrint.HughesPJClass as PP
-
-infixr 6 <+>
-
-(<+>) :: Doc -> Doc -> Doc
-(<+>) = (PP.<+>)
-{-# INLINE (<+>) #-}
-
-pretty :: Pretty a => a -> Doc
-pretty = pPrint
 
 hsep :: (Foldable t) => t Doc -> Doc
 hsep = PP.hsep . toList

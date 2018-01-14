@@ -4,20 +4,12 @@ module Pukeko.FrontEnd.TypeChecker
   ( checkModule
   ) where
 
-import           Control.Lens
-import           Control.Monad.Reader
-import           Data.Bifunctor       (first)
-import           Data.Foldable
-import qualified Data.List.NonEmpty   as NE
+import Pukeko.Prelude
+
 import qualified Data.Map             as Map
-import           Data.Proxy           (Proxy (..))
-import           Data.Type.Equality   ((:~:) (..))
 import qualified Data.Vector.Sized    as Vec
-import           GHC.TypeLits
 
 import           Pukeko.Pretty
-import           Pukeko.Error
-import           Pukeko.AST.Pos
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
@@ -90,8 +82,8 @@ typeOf = \case
 typeOfBranching ::
   (St.Typed st, IsTVar tv, IsEVar ev, HasPos branch) =>
   (Type tv -> branch -> TC tv ev (Type tv)) ->
-  Expr st tv ev -> NE.NonEmpty branch -> TC tv ev (Type tv)
-typeOfBranching typeOfBranch e0 (b1 NE.:| bs) = do
+  Expr st tv ev -> NonEmpty branch -> TC tv ev (Type tv)
+typeOfBranching typeOfBranch e0 (b1 :| bs) = do
   t0 <- typeOf e0
   t1 <- typeOfBranch t0 b1
   for_ bs $ \b2 -> do

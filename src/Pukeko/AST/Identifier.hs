@@ -18,9 +18,9 @@ module Pukeko.AST.Identifier
   )
 where
 
+import Pukeko.Prelude
 import Data.Char (isLower, isUpper)
 
-import Pukeko.Error
 import Pukeko.Pretty
 import qualified Pukeko.AST.Operator as Operator
 
@@ -57,8 +57,8 @@ mangled var = (_name :: EVar -> _) var ++ maybe "" (\(comp, n) -> '$':comp ++ sh
 
 instance Pretty EVar where
   pPrint var = case var of
-    EVar{_name, _part} -> text _name <> maybe empty (\(comp, n) -> "$" <> text comp <> int n) _part
-    Op  {_sym , _part} -> parens (text _sym <> maybe empty (\(comp, n) -> text comp <> int n) _part)
+    EVar{_name, _part} -> text _name <> maybe mempty (\(comp, n) -> "$" <> text comp <> int n) _part
+    Op  {_sym , _part} -> parens (text _sym <> maybe mempty (\(comp, n) -> text comp <> int n) _part)
 
 instance Show EVar where
   show = prettyShow

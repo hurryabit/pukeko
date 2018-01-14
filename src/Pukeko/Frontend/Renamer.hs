@@ -3,17 +3,13 @@ module Pukeko.FrontEnd.Renamer
   ( renameModule
   ) where
 
+import Pukeko.Prelude
+
 import           Control.Lens
-import           Control.Monad.Reader
-import           Control.Monad.State
-import           Data.Finite       (Finite)
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
-import qualified Data.Set.Lens     as Set
 import qualified Data.Vector.Sized as Vec
 
-import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.ConDecl    as Con
@@ -26,8 +22,8 @@ type Out = St.Renamer
 renameModule :: MonadError String m => Ps.Module -> m (Module Out)
 renameModule tops = runRn $ MkModule <$> concat <$> traverse rnTopLevel tops
 
-type RnEnv ev = Map.Map Id.EVar ev
-type RnState = Set.Set Id.EVar
+type RnEnv ev = Map Id.EVar ev
+type RnState = Set Id.EVar
 
 newtype Rn ev a = Rn{unRn :: ReaderT (RnEnv ev) (StateT RnState (Except String)) a}
   deriving ( Functor, Applicative, Monad
@@ -39,12 +35,12 @@ newtype Rn ev a = Rn{unRn :: ReaderT (RnEnv ev) (StateT RnState (Except String))
 runRn :: MonadError String m => Rn Void a -> m a
 runRn ix = runExcept (evalStateT (runReaderT (unRn ix) Map.empty) Set.empty)
 
-localize :: Map.Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
+localize :: Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
 localize bs = Rn . withReaderT upd . unRn
   where
     upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
-localizeDefns :: Vec.Vector n (Ps.Defn _) -> Rn (EFinScope n ev) a -> Rn ev a
+localizeDefns :: Vector n (Ps.Defn _) -> Rn (EFinScope n ev) a -> Rn ev a
 localizeDefns =
   localize . ifoldMap (\i (Ps.MkDefn (Ps.MkBind _ x) _) -> Map.singleton x i)
 
@@ -75,7 +71,7 @@ rnTConDecl (Ps.MkTConDecl tcon ps0 dcs0) = Vec.withList ps0 $ \ps1 -> do
 
 rnDConDecl ::
   forall n ev.
-  Id.TCon -> Map.Map Id.TVar (Finite n) -> Int -> Ps.DConDecl -> Rn ev (Con.DConDecl n)
+  Id.TCon -> Map Id.TVar (Finite n) -> Int -> Ps.DConDecl -> Rn ev (Con.DConDecl n)
 rnDConDecl tcon env tag (Ps.MkDConDecl dcon ts) =
   Con.MkDConDecl tcon dcon tag <$> (traverse . traverse) rnTVar ts
   where
@@ -102,7 +98,7 @@ rnExpr = \case
   Ps.EMat w e0  as0 ->
     case as0 of
       []   -> throwErrorAt w "pattern match without alternatives"
-      a:as -> EMat w <$> rnExpr e0 <*> traverse rnAltn (a NE.:| as)
+      a:as -> EMat w <$> rnExpr e0 <*> traverse rnAltn (a :| as)
   Ps.ELam w bs0 e0 -> Vec.withList (map rnBind bs0) $ \bs1 -> do
     let bs2 = ifoldMap (\i (MkBind _ x NoType) -> Map.singleton x i) bs1
     ELam w bs1 <$> localize bs2 (rnExpr e0) <*> pure NoType
@@ -117,7 +113,7 @@ rnBind (Ps.MkBind w x) = MkBind w x NoType
 rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
 rnAltn (Ps.MkAltn w p0 e) = do
   let p1 = rnPatn p0
-  let bs = Map.fromSet id (Set.setOf patn2evar p1)
+  let bs = Map.fromSet id (setOf patn2evar p1)
   MkAltn w p1 <$> localize bs (rnExpr e)
 
 rnPatn :: Ps.Patn -> Patn Out Void

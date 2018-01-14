@@ -4,14 +4,14 @@ module Pukeko.BackEnd.Compiler
   )
   where
 
+import Pukeko.Prelude hiding (asks, local)
+
 import Control.Monad.RWS hiding (asks, local)
 import Data.Label.Derive
 import Data.Label.Monadic
-import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Pukeko.Error
 import Pukeko.BackEnd.Info
 import Pukeko.AST.NoLambda
 import Pukeko.BackEnd.GCode

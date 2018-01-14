@@ -35,17 +35,12 @@ module Pukeko.AST.Scope
   )
   where
 
-import           Control.Lens
-import           Data.CallStack
-import           Data.Finite       (Finite)
+import Pukeko.Prelude
+
 import           Data.Forget
 import qualified Data.Map          as Map
 import qualified Data.Vector.Sized as Vec
-import           Data.Void
-import           GHC.TypeLits      (Nat)
 
-import           Pukeko.Error      (bugWith)
-import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
 
 -- NOTE: The order of the constructors is chosen such that the derived @Ord@
@@ -116,7 +111,7 @@ _Bound = prism (uncurry mkBound) $ \case
   Free x -> Left (Free x)
   Bound i (Forget b) -> Right (i, b)
 
-lookupMap :: (Ord i, Pretty i) => i -> Map.Map i a -> a
+lookupMap :: (Ord i, Pretty i) => i -> Map i a -> a
 lookupMap i = Map.findWithDefault (bugWith "lookup failed" (pretty i)) i
 
 data Pair f g a = Pair (f a) (g a)
@@ -135,11 +130,11 @@ class (Functor (EnvLevelOf i)) => HasEnvLevel i where
   lookupEnvLevel :: i -> EnvLevelOf i a -> a
 
 instance HasEnvLevel Id.EVar where
-  type EnvLevelOf Id.EVar = Map.Map Id.EVar
+  type EnvLevelOf Id.EVar = Map Id.EVar
   lookupEnvLevel = lookupMap
 
 instance HasEnvLevel (Finite n) where
-  type EnvLevelOf (Finite n) = Vec.Vector n
+  type EnvLevelOf (Finite n) = Vector n
   lookupEnvLevel = flip (Vec.!)
 
 instance HasEnvLevel () where

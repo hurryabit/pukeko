@@ -6,13 +6,13 @@ module Pukeko.FrontEnd.Parser
   )
   where
 
-import Text.Parsec
-import Text.Parsec.Expr
-import Text.Parsec.Language
+import Pukeko.Prelude hiding ((<|>), many)
+
+import           Text.Parsec
+import           Text.Parsec.Expr
+import           Text.Parsec.Language
 import qualified Text.Parsec.Token as Token
 
-import           Pukeko.Error
-import           Pukeko.AST.Pos
 import           Pukeko.AST.Operator   (Spec (..))
 import           Pukeko.AST.Surface
 import           Pukeko.AST.Type

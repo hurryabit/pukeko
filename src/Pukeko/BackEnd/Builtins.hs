@@ -7,10 +7,10 @@ module Pukeko.BackEnd.Builtins
   )
   where
 
-import Data.Map (Map)
+import Pukeko.Prelude
+
 import qualified Data.Map as Map
 
-import Pukeko.Error
 import Pukeko.Pretty
 import Pukeko.BackEnd.GCode
 

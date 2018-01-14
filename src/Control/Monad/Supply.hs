@@ -3,11 +3,14 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Supply where
 
+import Control.Applicative
 import Control.Monad.State
 import Control.Monad.Error.Class
 import Control.Monad.Reader
 import Control.Monad.Writer.Class
 import Data.Bifunctor (first, second)
+import Data.Function
+import Data.Tuple
 
 class Monad m => MonadSupply s m | m -> s where
   fresh :: m s

@@ -1,6 +1,7 @@
 module Examples where
 
-import Data.List (sort)
+import Pukeko.Prelude
+
 import System.Directory (setCurrentDirectory)
 import System.Exit (ExitCode (..))
 import System.Process (callCommand, readProcessWithExitCode)

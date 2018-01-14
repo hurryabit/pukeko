@@ -18,16 +18,14 @@ module Pukeko.FrontEnd.Inferencer.UType
   )
   where
 
-import           Control.Monad.Reader
-import           Control.Monad.ST
-import           Data.Coerce       (coerce)
-import           Data.Foldable     (toList)
-import           Data.STRef
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Map          as Map
-import qualified Data.Vector.Sized as Vec
+import Pukeko.Prelude
 
-import           Pukeko.Error
+import           Control.Monad.ST
+import           Data.Coerce        (coerce)
+import           Data.STRef
+import qualified Data.Map           as Map
+import qualified Data.Vector.Sized  as Vec
+
 import           Pukeko.Pretty
 import           Pukeko.AST.Type       (Type (..))
 import qualified Pukeko.AST.Identifier as Id
@@ -44,7 +42,7 @@ data UType s tv
   | UTArr
   | UTCon Id.TCon
   | UTApp (UType s tv) (UType s tv)
-  | UTUni (NE.NonEmpty Id.TVar) (UType s tv)
+  | UTUni (NonEmpty Id.TVar) (UType s tv)
   | UVar (STRef s (UVar s tv))
 
 pattern UTFun :: UType s tv -> UType s tv -> UType s tv
@@ -53,11 +51,11 @@ pattern UTFun tx ty = UTApp (UTApp UTArr tx) ty
 mkUTUni :: [Id.TVar] -> UType s tv -> UType s tv
 mkUTUni xs0 t0 = case xs0 of
   [] -> t0
-  x:xs -> UTUni (x NE.:| xs) t0
+  x:xs -> UTUni (x :| xs) t0
 
 unUTUni :: UType s tv -> ([Id.TVar], UType s tv)
 unUTUni = \case
-  UTUni (x NE.:| xs) t -> (x:xs, t)
+  UTUni (x :| xs) t -> (x:xs, t)
   t                    -> ([],   t)
 
 (~>) :: UType s tv -> UType s tv -> UType s tv
@@ -83,11 +81,11 @@ open1 = \case
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
   TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id (UTVar . (xs Vec.!))) tq))
 
-subst :: Map.Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
+subst :: Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env t = runReaderT (subst' t) env
   where
     subst' :: UType s tv
-           -> ReaderT (Map.Map Id.TVar (UType s tv)) (ST s) (UType s tv)
+           -> ReaderT (Map Id.TVar (UType s tv)) (ST s) (UType s tv)
     subst' = \case
       UTVar x -> do
         let e = bugWith "unknown type variable in instantiation" x

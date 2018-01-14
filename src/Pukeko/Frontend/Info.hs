@@ -12,18 +12,13 @@ module Pukeko.FrontEnd.Info
   , liftCatch
   ) where
 
+import Pukeko.Prelude
+
 import           Control.Lens
-import           Control.Monad.Error.Class
-import           Control.Monad.State.Class
-import           Control.Monad.Writer.Class
-import           Control.Monad.Reader
-import           Control.Monad.Supply
 import qualified Control.Monad.Trans.Reader  as Reader
 import           Control.Monad.Signatures    (Catch)
-import           Data.CallStack
 import qualified Data.Map                    as Map
 
-import           Pukeko.Error
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Stage
 import qualified Pukeko.AST.ConDecl    as Con
@@ -31,15 +26,15 @@ import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
 class Monad m => MonadInfo m where
-  allTCons :: m (Map.Map Id.TCon (Some1 Con.TConDecl))
-  allDCons :: m (Map.Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl)))
-  allFuns  :: m (Map.Map Id.EVar (Pos, Type Void))
+  allTCons :: m (Map Id.TCon (Some1 Con.TConDecl))
+  allDCons :: m (Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl)))
+  allFuns  :: m (Map Id.EVar (Pos, Type Void))
 
 
 data ModuleInfo = MkModuleInfo
-  { _info2tcons :: Map.Map Id.TCon (Some1 Con.TConDecl)
-  , _info2dcons :: Map.Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
-  , _info2funs  :: Map.Map Id.EVar (Pos, Type Void)
+  { _info2tcons :: Map Id.TCon (Some1 Con.TConDecl)
+  , _info2dcons :: Map Id.DCon (Some1 (Pair1 Con.TConDecl Con.DConDecl))
+  , _info2funs  :: Map Id.EVar (Pos, Type Void)
   }
 
 newtype InfoT m a = InfoT{unInfoT :: ReaderT ModuleInfo m a}

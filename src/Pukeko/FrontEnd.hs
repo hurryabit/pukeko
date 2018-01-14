@@ -5,8 +5,7 @@ module Pukeko.FrontEnd
   )
   where
 
-import           Control.Monad ((>=>))
-import           Pukeko.Error
+import Pukeko.Prelude
 
 import qualified Pukeko.AST.SystemF             as SystemF
 import qualified Pukeko.AST.Stage               as Stage

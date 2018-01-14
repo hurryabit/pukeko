@@ -4,11 +4,11 @@ module Pukeko.MiddleEnd.DeadCode
   )
 where
 
+import Pukeko.Prelude
+
 import           Control.Lens
 import qualified Data.Graph    as G
-import           Data.Maybe    (mapMaybe)
 import qualified Data.Set      as Set
-import qualified Data.Set.Lens as Set
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Identifier as Id
@@ -23,4 +23,4 @@ cleanModule (MkModule tops0) =
       tops1 = filter (maybe True keep . firstOf top2lhs) tops0
   in  MkModule tops1
   where
-    deps = Set.toList . Set.setOf top2eval
+    deps = Set.toList . setOf top2eval

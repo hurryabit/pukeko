@@ -4,12 +4,11 @@ module Pukeko.FrontEnd.Inferencer.Unify
   )
 where
 
-import           Control.Monad.Except
+import Pukeko.Prelude
+
 import           Control.Monad.ST
 import           Data.STRef
 
-import           Pukeko.Error
-import           Pukeko.AST.Pos
 import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Inferencer.UType
 

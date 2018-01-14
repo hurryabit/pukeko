@@ -4,8 +4,8 @@ module Pukeko.BackEnd.Info
   )
 where
 
-import Data.Monoid
-import Data.Set (Set)
+import Pukeko.Prelude
+
 import qualified Data.Set as Set
 
 import Pukeko.AST.NoLambda

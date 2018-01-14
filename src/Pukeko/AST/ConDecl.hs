@@ -9,14 +9,8 @@ module Pukeko.AST.ConDecl
   , typeOf
   ) where
 
-import           Control.Lens       (itoList)
-import           Data.Proxy         (Proxy (Proxy))
-import           Data.Type.Equality ((:~:) (Refl))
-import qualified Data.Vector.Sized as Vec
-import           GHC.TypeLits
+import Pukeko.Prelude
 
-import           Pukeko.Error
-import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 import           Pukeko.AST.Scope
@@ -27,7 +21,7 @@ data Pair1 f g a = Pair1 (f a) (g a)
 
 data TConDecl n = KnownNat n => MkTConDecl
   { _tname  :: Id.TCon
-  , _params :: Vec.Vector n Id.TVar
+  , _params :: Vector n Id.TVar
   , _dcons  :: [DConDecl n]
   }
 
@@ -45,7 +39,7 @@ typeOf MkTConDecl{_tname, _params} MkDConDecl{_tcon, _dname, _fields}
   where
     go ::
       forall n1 n2. (KnownNat n1, KnownNat n2) =>
-      Vec.Vector n1 Id.TVar -> [Type (TFinScope n2 Void)] -> Type Void
+      Vector n1 Id.TVar -> [Type (TFinScope n2 Void)] -> Type Void
     go xs flds =
       case sameNat (Proxy @n1) (Proxy @n2) of
         Just Refl ->

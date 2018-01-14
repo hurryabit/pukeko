@@ -5,7 +5,7 @@ module Pukeko.MiddleEnd
   )
   where
 
-import           Pukeko.Error
+import Pukeko.Prelude
 
 import qualified Pukeko.AST.NoLambda           as Lambda
 import qualified Pukeko.AST.SystemF            as SystemF

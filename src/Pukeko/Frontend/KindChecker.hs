@@ -5,18 +5,15 @@ module Pukeko.FrontEnd.KindChecker
   ( checkModule
   ) where
 
+import Pukeko.Prelude hiding (fresh)
+
 import           Control.Lens
-import           Control.Monad.Reader
-import           Control.Monad.State
 import           Control.Monad.ST
-import           Data.Foldable
 import           Data.Forget      (Forget (..))
 import qualified Data.Map         as Map
 import           Data.STRef
-import           Data.Traversable
 import qualified Data.Vector.Sized as Vec
 
-import           Pukeko.Error
 import           Pukeko.Pretty
 import           Pukeko.AST.SystemF    hiding (Free)
 import qualified Pukeko.AST.Stage      as St
@@ -38,10 +35,10 @@ data Kind a where
   Arrow :: Kind a -> Kind a -> Kind a
   UVar  :: STRef s (UVar s) -> Kind (Open s)
 
-type KCEnv n s = Vec.Vector n (Kind (Open s))
+type KCEnv n s = Vector n (Kind (Open s))
 
 data KCState s = MkKCState
-  { _typeCons :: Map.Map Id.TCon (Kind (Open s))
+  { _typeCons :: Map Id.TCon (Kind (Open s))
   , _fresh    :: [Id.TVar]
   }
 makeLenses ''KCState
@@ -71,7 +68,7 @@ freshUVar = do
   v <- fresh %%= (\(v:vs) -> (v, vs))
   UVar <$> liftST (newSTRef (Free (Forget v)))
 
-localize :: Vec.Vector n (Kind (Open s)) -> KC n s a -> KC m s a
+localize :: Vector n (Kind (Open s)) -> KC n s a -> KC m s a
 localize env = KC . withReaderT (const env) . unKC
 
 kcType :: Kind (Open s) -> Type (TFinScope n Void) -> KC n s ()

@@ -2,14 +2,12 @@ module Pukeko.MiddleEnd.AliasInliner
   ( inlineModule
   ) where
 
-import           Control.Lens      hiding (indices)
+import Pukeko.Prelude hiding (join)
+
 import           Control.Monad.ST
 import qualified Data.Array        as A
 import qualified Data.Array.ST     as A
-import           Data.Foldable
 import qualified Data.Map          as Map
-import           Data.Maybe        (mapMaybe)
-import           Data.Monoid
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.SystemF
@@ -31,12 +29,12 @@ topLink = \case
   _ -> Nothing
 
 data UnionFind st a = UnionFind
-  { indices :: Map.Map a Int
+  { indices :: Map a Int
   , names   :: A.Array Int a
   , links   :: A.STArray st Int Int
   }
 
-newUnionFind :: Ord a => Set.Set a -> ST s (UnionFind s a)
+newUnionFind :: Ord a => Set a -> ST s (UnionFind s a)
 newUnionFind xs = do
   let is = Map.fromList (zip (toList xs) [0..])
   let bnds = (0, Map.size is - 1)
@@ -63,7 +61,7 @@ join' uf i j = do
 join :: Ord a => UnionFind s a -> a -> a -> ST s ()
 join uf x y = join' uf (indices uf Map.! x) (indices uf Map.! y)
 
-unionFind :: Ord a => [(a, a)] -> Map.Map a a
+unionFind :: Ord a => [(a, a)] -> Map a a
 unionFind xys = runST $ do
   let xs = foldMap (\(x, y) -> Set.singleton x <> Set.singleton y) xys
   uf <- newUnionFind xs

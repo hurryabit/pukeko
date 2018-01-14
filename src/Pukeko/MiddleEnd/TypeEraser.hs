@@ -4,11 +4,9 @@ module Pukeko.MiddleEnd.TypeEraser
   )
 where
 
+import Pukeko.Prelude
+
 import           Control.Lens
-import           Control.Monad.State
-import           Data.Foldable     (toList)
-import qualified Data.Map          as Map
-import           Data.Maybe        (catMaybes)
 
 import           Pukeko.AST.NoLambda
 import           Pukeko.AST.Classes
@@ -24,7 +22,7 @@ type In = St.LambdaLifter
 eraseModule :: In.Module In -> Module
 eraseModule m0@(In.MkModule tops) = runCC (catMaybes <$> traverse ccTopLevel tops) m0
 
-type CCState = Map.Map Id.EVar Name
+type CCState = Map Id.EVar Name
 
 newtype CC a = CC{unCC :: InfoT (State CCState) a}
   deriving ( Functor, Applicative, Monad

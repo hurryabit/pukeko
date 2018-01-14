@@ -23,22 +23,14 @@ module Pukeko.AST.Type
   )
   where
 
-import           Control.Lens  hiding ((.=))
-import           Control.Monad
-import           Data.CallStack
-import           Data.Finite   (absurd0)
-import           Data.Foldable (toList)
-import qualified Data.Map      as Map
-import           Data.Proxy
-import qualified Data.Set      as Set
-import qualified Data.Set.Lens as Set
-import           Data.Type.Equality ((:~:) (Refl))
-import qualified Data.Vector.Sized as Vec
-import           GHC.TypeLits
+import Pukeko.Prelude
 
-import           Pukeko.Error
+import           Control.Lens
+import           Data.Finite       (absurd0)
+import qualified Data.Map          as Map
+import qualified Data.Vector.Sized as Vec
+
 import           Pukeko.Pretty
-import           Pukeko.AST.Pos
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
@@ -55,13 +47,13 @@ data Type tv
   | TCon Id.TCon
   | TApp (Type tv) (Type tv)
   | forall n. KnownNat n =>
-    TUni (Vec.Vector n Id.TVar) (Type (TFinScope n tv))
+    TUni (Vector n Id.TVar) (Type (TFinScope n tv))
 
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
 
 mkTUni ::
-  forall n tv. KnownNat n => Vec.Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
+  forall n tv. KnownNat n => Vector n Id.TVar -> Type (TFinScope n tv) -> Type tv
 mkTUni xs t =
   case sameNat (Proxy @n) (Proxy @0) of
     Nothing   -> TUni xs t
@@ -86,8 +78,8 @@ gatherTApp = go []
 typeInt :: Type tv
 typeInt  = TCon (Id.tcon "Int")
 
-vars :: Ord tv => Type tv -> Set.Set tv
-vars = Set.setOf traversed
+vars :: Ord tv => Type tv -> Set tv
+vars = setOf traversed
 
 toPrenex :: HasCallStack => Type Id.TVar -> Type Void
 toPrenex t =

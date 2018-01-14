@@ -5,8 +5,8 @@ module Data.Forget
   )
 where
 
-import Control.Lens
-import Data.Bifunctor
+import Prelude
+import Control.Lens (Iso, iso)
 
 newtype Forget a = Forget{_remember :: a}
 
@@ -21,6 +21,3 @@ instance Ord (Forget a) where
 
 instance Show a => Show (Forget a) where
   showsPrec lvl (Forget x) = showsPrec lvl x
-
-instance Read a => Read (Forget a) where
-  readsPrec lvl = map (first Forget) . readsPrec lvl

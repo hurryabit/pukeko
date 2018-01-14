@@ -10,6 +10,7 @@ module Data.Finite
   )
 where
 
+import Prelude
 import Data.Proxy
 import GHC.TypeLits
 

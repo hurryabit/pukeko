@@ -1,7 +1,7 @@
 module Main where
 
-import Control.Monad
-import Data.Monoid
+import Pukeko.Prelude
+
 import Options.Applicative
 import System.FilePath
 import System.Exit

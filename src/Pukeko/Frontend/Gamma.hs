@@ -3,11 +3,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.FrontEnd.Gamma where
 
-import           Control.Monad.Error.Class
-import           Control.Monad.Reader
-import           Control.Monad.Supply
-import           Control.Monad.Writer.Class
-import           Data.Functor.Const
+import Pukeko.Prelude
 
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Stage     (StageType)

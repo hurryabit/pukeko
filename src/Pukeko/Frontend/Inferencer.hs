@@ -5,23 +5,16 @@ module Pukeko.FrontEnd.Inferencer
   )
 where
 
+import Pukeko.Prelude
+
 import           Control.Lens
-import           Control.Monad.Reader
-import           Control.Monad.Supply
-import           Control.Monad.Writer
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
-import           Data.Bifunctor (first)
-import           Data.Foldable
 import qualified Data.Map         as Map
-import           Data.Maybe       (catMaybes)
 import qualified Data.Set         as Set
 import           Data.STRef
-import           Data.Traversable
 import qualified Data.Vector.Sized as Vec
 
-import           Pukeko.Error
-import           Pukeko.AST.Pos
 import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.SystemF
@@ -117,13 +110,13 @@ instantiate ts = do
   (,) uvars <$> liftST (subst env t0)
 
 instantiateTCon ::
-  Con.TConDecl n -> TI v s (UType s Void, Vec.Vector n (UType s Void))
+  Con.TConDecl n -> TI v s (UType s Void, Vector n (UType s Void))
 instantiateTCon (Con.MkTConDecl tcon params _dcons) = do
   t_params <- traverse (const freshUVar) params
   return (appTCon tcon (toList t_params), t_params)
 
 inferPatn ::
-  Patn In Void -> UType s Void -> TI v s (Patn (Aux s) Void, Map.Map Id.EVar (UType s Void))
+  Patn In Void -> UType s Void -> TI v s (Patn (Aux s) Void, Map Id.EVar (UType s Void))
 inferPatn patn t_expr = case patn of
   PWld w   -> pure (PWld w, Map.empty)
   PVar w x -> pure (PVar w x, Map.singleton x t_expr)
@@ -140,8 +133,8 @@ inferPatn patn t_expr = case patn of
 
 inferLet ::
   (HasEnv v) =>
-  Vec.Vector n (Defn In Void v) ->
-  TI v s (Vec.Vector n (Defn (Aux s) Void v), Vec.Vector n (UType s Void))
+  Vector n (Defn In Void v) ->
+  TI v s (Vector n (Defn (Aux s) Void v), Vector n (UType s Void))
 inferLet defns0 = do
   let (ls0, rs0) = Vec.unzip (fmap (\(MkDefn l r) -> (l, r)) defns0)
   (rs1, ts1) <- Vec.unzip <$> local (level +~ 1) (traverse infer rs0)
@@ -152,9 +145,9 @@ inferLet defns0 = do
 
 inferRec ::
   (HasEnv v) =>
-  Vec.Vector n (Defn In Void (EFinScope n v)) ->
-  TI v s ( Vec.Vector n (Defn (Aux s) Void (EFinScope n v))
-         , Vec.Vector n (UType s Void))
+  Vector n (Defn In Void (EFinScope n v)) ->
+  TI v s ( Vector n (Defn (Aux s) Void (EFinScope n v))
+         , Vector n (UType s Void))
 inferRec defns0 = do
   let (ls0, rs0) = Vec.unzip (fmap (\(MkDefn l r) -> (l, r)) defns0)
   (rs1, ts1) <- local (level +~ 1) $ do
@@ -230,7 +223,7 @@ inferTopLevel = \case
 inferModule' :: Module In -> TI Void s (Module (Aux s))
 inferModule' = module2tops (\tops -> catMaybes <$> traverse inferTopLevel tops)
 
-type TQEnv tv = Map.Map Id.TVar tv
+type TQEnv tv = Map Id.TVar tv
 
 newtype TQ tv s a =
   TQ{unTQ :: ReaderT (TQEnv tv) (SupplyT Id.TVar (ExceptT String (ST s))) a}
@@ -250,8 +243,8 @@ runTQ tq = evalSupplyT (runReaderT (unTQ tq) mempty) tvars
     tvars = map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars
 
 localizeTQ ::
-  Vec.Vector n Id.TVar ->
-  (Vec.Vector n Id.TVar -> TQ (TFinScope n tv) s a) ->
+  Vector n Id.TVar ->
+  (Vector n Id.TVar -> TQ (TFinScope n tv) s a) ->
   TQ tv s a
 localizeTQ xs m = do
   ys <- traverse (const fresh) xs
