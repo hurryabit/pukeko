@@ -111,6 +111,9 @@ llCase (MkCase w dcon ts0 bs e) = do
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType ds -> yield (DType ds)
+  -- FIXME: Erase type classes when converting to dictionary passing style.
+  DClss _ -> pure ()
+  DInst _ -> pure ()
   DDefn (MkDefn (MkBind w lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" lhs)
     rhs <- llExpr rhs

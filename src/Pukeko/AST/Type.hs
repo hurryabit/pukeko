@@ -20,6 +20,7 @@ module Pukeko.AST.Type
   , qvar2cstr
   , qvar2tvar
   , type2tcon
+  , prettyTypeCstr
   , prettyTUni
   , prettyQVar
   )
@@ -81,7 +82,7 @@ mkTUni xs t =
 (*~>) :: Foldable t => t (Type tv) -> Type tv -> Type tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
-mkTApp :: Type tv -> [Type tv] -> Type tv
+mkTApp :: (Foldable t) => Type tv -> t (Type tv) -> Type tv
 mkTApp = foldl TApp
 
 gatherTApp :: Type tv -> (Type tv, [Type tv])
@@ -152,15 +153,17 @@ instance BaseTVar tv => Pretty (Type tv) where
       maybeParens lvl (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
     TUni qvs tq -> prettyTUni lvl prec qvs (pPrintPrec lvl 0 tq)
 
+prettyTypeCstr :: Foldable t => t QVar -> Doc
+prettyTypeCstr qvs
+  | null qs   = mempty
+  | otherwise = parens (hsep (punctuate "," qs)) <+> "=>"
+  where
+    qs = [ pretty c <+> pretty v | MkQVar q v <- toList qvs, c <- toList q ]
+
 prettyTUni :: Foldable t => PrettyLevel -> Rational -> t QVar -> Doc -> Doc
 prettyTUni lvl prec qvs tq =
   maybeParens lvl (prec > 0)
-  ("∀" <> hsepMap (pretty . _qvar2tvar) qvs <> "." <+> qs1 <+> tq)
-  where
-    qs0 = [ pretty q <+> pretty v | MkQVar qs v <- toList qvs, q <- toList qs ]
-    qs1
-      | null qs0  = mempty
-      | otherwise = parens (hsep (punctuate "," qs0)) <+> "=>"
+  ("∀" <> hsepMap (pretty . _qvar2tvar) qvs <> "." <+> prettyTypeCstr qvs <+> tq)
 
 prettyQVar :: QVar -> Doc
 prettyQVar (MkQVar q v)

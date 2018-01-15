@@ -57,6 +57,9 @@ findDCon w dcon = do
   unless ex (throwAt w "unknown term cons" dcon)
   pure dcon
 
+trDefn :: Defn In tv ev -> TR (Defn Out tv ev)
+trDefn = itraverseOf defn2dcon findDCon
+
 trDecl :: Decl In -> TR (Decl Out)
 trDecl top = case top of
   DType tconDecls -> do
@@ -67,7 +70,10 @@ trDecl top = case top of
         insertDCon tcon dcon
     pure (DType tconDecls)
   DSign (MkSignDecl w x t)  -> DSign <$> MkSignDecl w x <$> trType w t
-  DDefn d -> DDefn <$> itraverseOf defn2dcon findDCon d
+  -- FIXME: Resolve types in class declarations and instance definitions.
+  DClss c -> pure (DClss c)
+  DInst i -> DInst <$> inst2defn trDefn i
+  DDefn d -> DDefn <$> trDefn d
   DPrim p -> pure (DPrim p)
 
 resolveModule :: MonadError String m => Module In -> m (Module Out)

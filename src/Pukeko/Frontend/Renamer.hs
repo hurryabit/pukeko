@@ -6,6 +6,7 @@ module Pukeko.FrontEnd.Renamer
 import Pukeko.Prelude
 
 import           Control.Lens
+import qualified Data.Finite       as Fin
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.Vector.Sized as Vec
@@ -49,9 +50,17 @@ rnDecl :: Ps.Decl -> Rn Void [Decl Out]
 rnDecl top = case top of
   Ps.DType ts ->
     (:[]) . DType <$> for ts (\t -> here (Ps._tcon2pos t) (rnTConDecl t))
-  Ps.DSign (Ps.MkSignDecl w z t) -> (:[]) . DSign <$> MkSignDecl w z <$> rnTypeScheme t
-  Ps.DClss _ -> pure []
-  Ps.DInst _ -> pure []
+  Ps.DSign s -> (:[]) . DSign <$> rnSignDecl mempty s
+  Ps.DClss (Ps.MkClssDecl w c v ms0) -> do
+    let env = Map.singleton v (mkBound Fin.zero v)
+    ms1 <- traverse (rnSignDecl env) ms0
+    id <>= setOf (traverse . sign2func) ms1
+    pure [DClss (MkClssDecl w c v ms1)]
+  Ps.DInst (Ps.MkInstDecl w c t vs0 qs ds0) -> do
+    Vec.withList vs0 $ \vs1 -> do
+      qvs <- rnTypeCstr vs1 qs
+      ds1 <- traverse rnDefn ds0
+      pure [DInst (MkInstDecl w c t qvs ds1)]
   Ps.DLet ds0 -> do
     ds1 <- traverse rnDefn ds0
     let xs = fmap (\(Ps.MkDefn (Ps.MkBind _ x) _) -> x) ds0
@@ -72,12 +81,16 @@ rnTConDecl (Ps.MkTConDecl w tcon prms0 dcons) = Vec.withList prms0 $ \prms1 -> d
 
 rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (DConDecl n)
 rnDConDecl tcon vs tag (Ps.MkDConDecl w dcon flds) =
-  MkDConDecl w tcon dcon tag <$> traverse (rnType vs) flds
-
-rnType :: Vector n Id.TVar -> Ps.Type -> Rn ev (Type (TFinScope n Void))
-rnType vs = go
+  MkDConDecl w tcon dcon tag <$> traverse (rnType env) flds
   where
-    env = ifoldMap (\i v -> Map.singleton v (mkBound i v)) vs
+    env = finRenamer vs
+
+rnSignDecl :: Map Id.TVar tv -> Ps.SignDecl -> Rn ev (SignDecl tv)
+rnSignDecl env (Ps.MkSignDecl w z t) = MkSignDecl w z <$> rnTypeScheme env t
+
+rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)
+rnType env = go
+  where
     go = \case
       Ps.TVar x
         | Just v <- x `Map.lookup` env -> pure (TVar v)
@@ -86,18 +99,24 @@ rnType vs = go
       Ps.TArr   -> pure TArr
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
-rnTypeScheme :: Ps.TypeScheme -> Rn ev (Type Void)
-rnTypeScheme (Ps.MkTypeScheme (Ps.MkTypeCstr qs) t) =
-  -- FIXME: Fail if there are type variables that are only used in the constraints.
-  Vec.withList (toList (setOf Ps.type2tvar t)) $ \vs ->
-    let mp = foldl (\acc (c, v) -> Map.insertWith (<>) v (Set.singleton c) acc) mempty qs
-        qvs = fmap (\v -> MkQVar (Map.findWithDefault mempty v mp) v) vs
-    in mkTUni qvs <$> rnType vs t
+rnTypeCstr :: Vector n Id.TVar -> Ps.TypeCstr -> Rn ev (Vector n QVar)
+rnTypeCstr vs (Ps.MkTypeCstr qs) = do
+  -- FIXME: Fail if there are constraints on variables that are not in @vs0@. In
+  -- the worst case they could constrain the type variable of a class
+  -- declaration.
+  let mp = foldl (\acc (c, v) -> Map.insertWith (<>) v (Set.singleton c) acc) mempty qs
+  pure (fmap (\v -> MkQVar (Map.findWithDefault mempty v mp) v) vs)
 
-rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out Void ev)
+rnTypeScheme :: Map Id.TVar tv -> Ps.TypeScheme -> Rn ev (Type tv)
+rnTypeScheme env (Ps.MkTypeScheme qs t) = do
+  let vs0 = setOf Ps.type2tvar t `Set.difference` Map.keysSet env
+  Vec.withList (toList vs0) $ \vs1 ->
+    mkTUni <$> rnTypeCstr vs1 qs <*> rnType (fmap weaken env <> finRenamer vs1) t
+
+rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out tv ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
-rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out Void ev)
+rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
 rnExpr = \case
   Ps.EVar w x -> do
     y_mb <- view (at x)
@@ -121,16 +140,16 @@ rnExpr = \case
   Ps.ERec w ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec w <$> traverse rnDefn ds1 <*> rnExpr e0
 
-rnBind :: Ps.Bind -> Bind NoType Void
+rnBind :: Ps.Bind -> Bind NoType tv
 rnBind (Ps.MkBind w x) = MkBind w x NoType
 
-rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out Void ev)
+rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out tv ev)
 rnAltn (Ps.MkAltn w p0 e) = do
   let p1 = rnPatn p0
   let bs = Map.fromSet id (setOf patn2evar p1)
   MkAltn w p1 <$> localize bs (rnExpr e)
 
-rnPatn :: Ps.Patn -> Patn NoType Void
+rnPatn :: Ps.Patn -> Patn NoType tv
 rnPatn = \case
   Ps.PWld w      -> PWld w
   Ps.PVar w x    -> PVar w x

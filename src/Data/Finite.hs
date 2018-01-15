@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeOperators #-}
 module Data.Finite
   ( Finite
+  , zero
   , absurd0
   , unsafeFromInt
   , toInt
@@ -16,6 +17,9 @@ import GHC.TypeLits
 
 newtype Finite (n :: Nat) = Finite Int
   deriving (Eq, Ord, Show)
+
+zero :: (1 <= n) => Finite n
+zero = Finite 0
 
 absurd0 :: Finite 0 -> a
 absurd0 (Finite _) = error "absurd0"

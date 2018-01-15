@@ -8,6 +8,7 @@ module Data.Vector.Sized
   , (!)
   , (++)
   , empty
+  , singleton
   , plength
   , withList
   , withNonEmpty
@@ -45,6 +46,9 @@ MkVector v ++ MkVector w = MkVector (v V.++ w)
 
 empty :: Vector 0 a
 empty = MkVector V.empty
+
+singleton :: a -> Vector 1 a
+singleton = MkVector . V.singleton
 
 plength :: Vector n a -> Proxy n
 plength _ = Proxy

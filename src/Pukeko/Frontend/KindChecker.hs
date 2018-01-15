@@ -107,6 +107,9 @@ kcDecl = \case
   DSign (MkSignDecl w z t) -> do
     here w (kcVal t)
     pure (DSign (MkSignDecl w z t))
+  -- FIXME: Check kinds in type class declarations and instance definitions.
+  DClss c -> pure (DClss c)
+  DInst i -> DInst <$> inst2defn (pure . retagDefn) i
   DDefn d -> pure (DDefn (retagDefn d))
   DPrim p -> pure (DPrim p)
 

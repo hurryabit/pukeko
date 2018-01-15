@@ -149,6 +149,9 @@ checkDecl :: (St.Typed st) => Decl st -> TC Void Void ()
 checkDecl = \case
   DType{} -> pure ()
   DSign{} -> pure ()
+  DClss{} -> pure ()
+  -- FIXME: Check types in method definitions.
+  DInst{} -> pure ()
   DDefn   d -> checkDefn d
   DSupC (MkSupCDecl w z qvs t0 bs e0) -> do
       t1 <- withQVars qvs (withBinds bs (typeOf e0))

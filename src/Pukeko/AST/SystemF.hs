@@ -8,6 +8,8 @@ module Pukeko.AST.SystemF
   ( Module (..)
   , Decl (..)
   , SignDecl (..)
+  , ClssDecl (..)
+  , InstDecl (..)
   , SupCDecl (..)
   , PrimDecl (..)
   , Defn (..)
@@ -28,14 +30,17 @@ module Pukeko.AST.SystemF
 
   , module2decls
   , decl2func
+  , sign2pos
   , sign2func
   , sign2type
+  , inst2defn
   , prim2bind
   , defn2bind
   , defn2expr
   , defn2exprSt
   , defn2dcon
   , expr2pos
+  , bind2pos
   , bind2evar
   , bind2type
 
@@ -71,16 +76,33 @@ data Module st = MkModule
 
 data Decl st
   =                         DType (NonEmpty (Some1 TConDecl))
-  | Untyped   st ~ 'True => DSign SignDecl
+  | Untyped   st ~ 'True => DSign (SignDecl Void)
+  | HasLambda st ~ 'True => DClss ClssDecl
+  | HasLambda st ~ 'True => DInst (InstDecl st)
   | HasLambda st ~ 'True => DDefn (Defn st Void Void)
   | forall m n. (HasLambda st ~ 'False, StageType st ~ Type, KnownNat m) =>
                             DSupC (SupCDecl st m n)
   |                         DPrim (PrimDecl (StageType st))
 
-data SignDecl = MkSignDecl
+data SignDecl tv = MkSignDecl
   { _sign2pos  :: Pos
   , _sign2func :: Id.EVar
-  , _sign2type :: Type Void
+  , _sign2type :: Type tv
+  }
+
+data ClssDecl = MkClssDecl
+  { _clss2pos   :: Pos
+  , _clss2name  :: Id.Clss
+  , _clss2prm   :: Id.TVar
+  , _clss2mthds :: [SignDecl (TFinScope 1 Void)]
+  }
+
+data InstDecl st = forall n. MkInstDecl
+  { _inst2pos   :: Pos
+  , _inst2clss  :: Id.Clss
+  , _inst2tcon  :: Id.TCon
+  , _inst2qvars :: Vector n QVar
+  , _inst2defns :: [Defn st (TFinScope n Void) Void]
   }
 
 data SupCDecl st m n = MkSupCDecl
@@ -151,6 +173,8 @@ data Patn ty tv
 -- * Derived optics
 makeLenses ''Module
 makeLenses ''SignDecl
+makeLenses ''ClssDecl
+makeLenses ''InstDecl
 makeLenses ''SupCDecl
 makeLenses ''PrimDecl
 makeLenses ''Defn
@@ -209,10 +233,20 @@ pdist _ (Free t)    = fmap Free t
 module2tops :: Lens (Module st1) (Module st2) [Decl st1] [Decl st2]
 module2tops f (MkModule tops) = MkModule <$> f tops
 
+inst2defn ::
+  (Applicative f) =>
+  (forall n. Defn st1 (TFinScope n Void) Void -> f (Defn st2 (TFinScope n Void) Void)) ->
+  InstDecl st1 -> f (InstDecl st2)
+inst2defn f (MkInstDecl w c t qs ds) = MkInstDecl w c t qs <$> traverse f ds
+
+-- | Travere over the names of all the functions defined in either a 'DDefn', a
+-- 'DSupC' or a 'DPrim'.
 decl2func :: Traversal' (Decl st) Id.EVar
-decl2func f = \case
-  top@DType{} -> pure top
-  top@DSign{} -> pure top
+decl2func f top = case top of
+  DType{} -> pure top
+  DSign{} -> pure top
+  DClss{} -> pure top
+  DInst{} -> pure top
   DDefn d -> DDefn <$> defn2bind (bind2evar f) d
   DSupC s -> DSupC <$> supc2func f s
   DPrim p -> DPrim <$> prim2bind (bind2evar f) p
@@ -220,12 +254,14 @@ decl2func f = \case
 decl2expr ::
   (Applicative f) =>
   (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> Decl st -> f (Decl st)
-decl2expr f = \case
-  DType ts -> pure (DType ts)
-  DSign s  -> pure (DSign s)
-  DDefn d  -> DDefn <$> defn2expr f d
-  DSupC s  -> DSupC <$> supc2expr f s
-  DPrim p  -> pure (DPrim p)
+decl2expr f top = case top of
+  DType{} -> pure top
+  DSign{} -> pure top
+  DClss{} -> pure top
+  DInst i -> DInst <$> inst2defn (defn2expr f) i
+  DDefn d -> DDefn <$> defn2expr f d
+  DSupC s -> DSupC <$> supc2expr f s
+  DPrim p -> pure (DPrim p)
 
 decl2eval :: IndexedTraversal' Pos (Decl st) Id.EVar
 decl2eval f = decl2expr (expr2eval f)
@@ -512,8 +548,15 @@ instance (PrettyStage st) => Pretty (Decl st) where
     DType (dcon0 :| dcons) ->
       "type" <+> pPrintPrec lvl 0 dcon0 $$
       vcat (map (\dcon -> "and " <+> pPrintPrec lvl 0 dcon) dcons)
-    DSign (MkSignDecl _ x t) ->
-      "val" <+> pretty x <+> colon <+> pretty t
+    DSign s -> "val" <+> pretty s
+    DClss (MkClssDecl _ c v ms) ->
+      "class" <+> pretty c <+> pretty v <+> colon $$ prettyBlock lvl ms
+    DInst (MkInstDecl _ c t0 qvs ds) ->
+      "instance" <+> pretty c <+> pPrintPrec lvl 0 t1 <+> prettyTypeCstr qvs
+      $$ prettyBlock lvl ds
+      where
+        t1 :: Type (TFinScope _ Void)
+        t1 = mkTApp (TCon t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
     DDefn d -> "let" <+> pretty d
     DSupC (MkSupCDecl _ z qvs t bs e) ->
       "let" <+>
@@ -521,6 +564,14 @@ instance (PrettyStage st) => Pretty (Decl st) where
         (prettyETyAbs lvl 0 qvs (prettyELam lvl 0 bs e))
     DPrim (MkPrimDecl b s) ->
       hsep ["external", pretty b, equals, text (show s)]
+
+prettyBlock :: (Foldable t, Pretty a) => PrettyLevel -> t a -> Doc
+prettyBlock lvl xs = case map (pPrintPrec lvl 0) (toList xs) of
+  []     -> "{}"
+  d0:ds -> "{" <+> d0 $+$ vcat (map (\d -> "," <+> d) ds) $+$ "}"
+
+instance (BaseTVar tv) => Pretty (SignDecl tv) where
+  pPrintPrec lvl _ (MkSignDecl _ x t) = pretty x <+> colon <+> pPrintPrec lvl 0 t
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
   pPrintPrec lvl _ (MkDefn b t) =
@@ -628,7 +679,9 @@ instance (BaseTVar tv, PrettyType ty) => Pretty (Patn ty tv) where
         <+> hsep (map (pPrintPrec lvl 1) ps)
 
 deriving instance (StageType st ~ Type) => Show (Decl st)
-deriving instance                          Show SignDecl
+deriving instance (Show tv)             => Show (SignDecl tv)
+deriving instance                          Show (ClssDecl)
+deriving instance (StageType st ~ Type) => Show (InstDecl st)
 deriving instance (StageType st ~ Type) => Show (SupCDecl st m n)
 deriving instance                          Show (PrimDecl Type)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)

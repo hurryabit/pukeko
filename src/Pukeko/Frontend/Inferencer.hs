@@ -201,6 +201,9 @@ inferDecl :: Decl In -> TI Void s (Maybe (Decl (Aux s)))
 inferDecl = \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
+  DClss c -> yield (DClss c)
+  -- FIXME: Do type inference for type class instances.
+  DInst{} -> pure Nothing
   DDefn (MkDefn (MkBind w x NoType) e0) -> do
     reset
     -- NOTE: We do not instantiate the universally quantified type variables in
@@ -311,6 +314,9 @@ qualPatn = \case
 qualDecl :: Decl (Aux s) -> TQ Void s (Decl Out)
 qualDecl = \case
   DType ds -> pure (DType ds)
+  DClss c -> pure (DClss c)
+  -- FIXME: Do type inference for type class instances.
+  DInst{} -> undefined
   DDefn d -> DDefn <$> qualDefn d
   DPrim (MkPrimDecl (MkBind w x ts) s) -> do
     t1 <- case ts of

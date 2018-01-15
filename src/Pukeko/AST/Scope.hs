@@ -8,7 +8,7 @@ module Pukeko.AST.Scope
   , EScope
   , EFinScope
   , TScope
-  , TScope1
+  , TOneScope
   , TFinScope
   , scope
   , scope'
@@ -22,6 +22,7 @@ module Pukeko.AST.Scope
   , abstract1
   , dist
   , (>>>=)
+  , finRenamer
   , extendEnv
   , HasEnvLevel (..)
   , HasEnv (..)
@@ -29,9 +30,6 @@ module Pukeko.AST.Scope
   , BaseTVar
   , baseEVar
   , baseTVar
-  , Void
-  , absurd
-  , Nat
   )
   where
 
@@ -57,7 +55,7 @@ type EFinScope n = EScope (Finite n)
 
 type TScope = Scope Id.TVar
 
-type TScope1 = TScope ()
+type TOneScope = TScope ()
 
 type TFinScope n = TScope (Finite n)
 
@@ -110,6 +108,9 @@ _Bound :: Prism (Scope b i1 v) (Scope b i2 v) (i1, b) (i2, b)
 _Bound = prism (uncurry mkBound) $ \case
   Free x -> Left (Free x)
   Bound i (Forget b) -> Right (i, b)
+
+finRenamer :: Ord b => Vector n b -> Map b (Scope b (Finite n) tv)
+finRenamer = ifoldMap (\i b -> Map.singleton b (mkBound i b))
 
 lookupMap :: (Ord i, Pretty i) => i -> Map i a -> a
 lookupMap i = Map.findWithDefault (bugWith "lookup failed" (pretty i)) i

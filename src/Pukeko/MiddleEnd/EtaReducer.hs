@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 module Pukeko.MiddleEnd.EtaReducer
@@ -12,10 +13,12 @@ import           Data.Finite        (absurd0)
 import qualified Data.Vector.Sized  as Vec
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage   (StageType)
+import           Pukeko.AST.Stage   (HasLambda, StageType)
 import           Pukeko.AST.Type
 
-reduceModule :: Module st -> Module st
+type ERStage st = (HasLambda st ~ 'False)
+
+reduceModule :: ERStage st => Module st -> Module st
 reduceModule = over (module2decls . traverse) erDecl
 
 _EVar :: Expr st tv ev -> Maybe ev
@@ -28,12 +31,11 @@ _TVar = \case
   TVar v -> Just v
   _      -> Nothing
 
-erDecl :: forall st. Decl st -> Decl st
+erDecl :: forall st. ERStage st => Decl st -> Decl st
 erDecl top = case top of
   DType{} -> top
   DSign{} -> top
   DPrim{} -> top
-  DDefn{} -> top
   DSupC (MkSupCDecl w z
     (vs0 :: Vector m0 QVar)
     (t0 :: Type (TFinScope m0 Void))

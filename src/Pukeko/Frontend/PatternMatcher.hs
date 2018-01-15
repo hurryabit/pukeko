@@ -54,12 +54,17 @@ pmExpr = \case
   ETyAbs w xs e0 -> ETyAbs w xs <$> pmExpr e0
   ETyApp w e0 t  -> ETyApp w <$> pmExpr e0 <*> pure t
 
+pmDefn :: Defn In tv ev -> PM (Defn Out tv ev)
+pmDefn (MkDefn b e) = do
+    put (Id.freshEVars "pm" (b^.bind2evar))
+    MkDefn b <$> pmExpr e
+
 pmDecl :: Decl In -> PM (Decl Out)
 pmDecl = \case
   DType ds -> pure (DType ds)
-  DDefn (MkDefn b e) -> do
-    put (Id.freshEVars "pm" (b^.bind2evar))
-    DDefn <$> MkDefn b <$> pmExpr e
+  DClss c -> pure (DClss c)
+  DInst i -> DInst <$> inst2defn pmDefn i
+  DDefn d -> DDefn <$> pmDefn d
   DPrim p -> pure (DPrim p)
 
 compileModule :: MonadError String m => Module In -> m (Module Out)

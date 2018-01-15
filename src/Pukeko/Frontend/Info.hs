@@ -28,13 +28,13 @@ import           Pukeko.AST.Type
 class Monad m => MonadInfo m where
   allTCons :: m (Map Id.TCon (Some1 TConDecl))
   allDCons :: m (Map Id.DCon (Some1 (Pair1 TConDecl DConDecl)))
-  allSigns :: m (Map Id.EVar SignDecl)
+  allSigns :: m (Map Id.EVar (SignDecl Void))
 
 
 data ModuleInfo = MkModuleInfo
   { _info2tcons :: Map Id.TCon (Some1 TConDecl)
   , _info2dcons :: Map Id.DCon (Some1 (Pair1 TConDecl DConDecl))
-  , _info2signs :: Map Id.EVar SignDecl
+  , _info2signs :: Map Id.EVar (SignDecl Void)
   }
 
 newtype InfoT m a = InfoT{unInfoT :: ReaderT ModuleInfo m a}
@@ -65,7 +65,7 @@ findDCon ::
   (HasCallStack, MonadInfo m) => Id.DCon -> m (Some1 (Pair1 TConDecl DConDecl))
 findDCon dcon = Map.findWithDefault (bugWith "findDCon" dcon) dcon <$> allDCons
 
-findSign :: (HasCallStack, MonadInfo m) => Id.EVar -> m SignDecl
+findSign :: (HasCallStack, MonadInfo m) => Id.EVar -> m (SignDecl Void)
 findSign fun = Map.findWithDefault (bugWith "findFun" fun) fun <$> allSigns
 
 typeOfDCon :: MonadInfo m => Id.DCon -> m (Type Void)
@@ -90,11 +90,14 @@ collectInfo (MkModule tops) = foldMap f tops
               h dcon@(MkDConDecl _ _ dname _ _) =
                 Map.singleton dname (Some1 (Pair1 tcon dcon))
       DSign s -> sign (Just s)
+      -- FIXME: Collect functions declared in type class.
+      DClss _ -> mempty
+      DInst _ -> mempty
       DDefn (MkDefn (MkBind w z t) _) -> sign (MkSignDecl w z <$> isType t)
       DSupC (MkSupCDecl w z xs t _ _) -> sign (Just (MkSignDecl w z (mkTUni xs t)))
       DPrim (MkPrimDecl (MkBind w z t) _) -> sign (MkSignDecl w z <$> isType t)
       where
-        sign :: Maybe SignDecl -> ModuleInfo
+        sign :: Maybe (SignDecl Void) -> ModuleInfo
         sign =
           MkModuleInfo mempty mempty . maybe mempty (\s -> Map.singleton (s^.sign2func) s)
 
