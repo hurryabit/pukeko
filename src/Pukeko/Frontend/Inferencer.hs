@@ -20,81 +20,49 @@ import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Scope      as Sc
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type       hiding ((*~>))
 import           Pukeko.FrontEnd.Inferencer.UType
-import qualified Pukeko.FrontEnd.Inferencer.Unify as U
+import           Pukeko.FrontEnd.Inferencer.Gamma
+import           Pukeko.FrontEnd.Inferencer.Unify
 
 type In    = St.KindChecker
 type Out   = St.Inferencer Type
 type Aux s = St.Inferencer (UType s)
 
-data Environment v s = MkEnvironment
-  { _locals :: Sc.EnvOf v (UType s Void)
-  , _level  :: Int
-  }
-makeLenses ''Environment
-
-newtype TI v s a =
-  TI{unTI :: InfoT (ReaderT (Environment v s) (SupplyT Id.TVar (ExceptT String (ST s)))) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadError String
-           , MonadReader (Environment v s)
-           , MonadSupply Id.TVar
-           , MonadInfo
-           )
-
-instance MonadST (TI v s) where
-  type World (TI v s) = s
-  liftST = TI . liftST
+type TI ev s = TU s ev
 
 runTI :: TI Void s a -> Module In -> ExceptT String (ST s) a
-runTI tc module_ = do
-  let env0 = MkEnvironment (Const ()) 0
-  evalSupplyT (runReaderT (runInfoT (unTI tc) module_) env0) Id.freshTVars
+runTI tc module_ = runInfoT (runGammaT tc Id.freshTVars) module_
 
 freshQualUVar :: Set Id.Clss -> TI v s (UType s Void)
 freshQualUVar q = do
   v <- fresh
-  l <- view level
+  l <- getTLevel
   UVar <$> liftST (newSTRef (UFree (MkQVar q v) l))
 
 freshUVar :: TI v s (UType s Void)
 freshUVar = freshQualUVar mempty
 
-unify :: Pos -> UType s Void -> UType s Void -> TI v s ()
-unify w t1 t2 = TI $ lift $ lift $ lift $ U.unify w t1 t2
+lookupFunc :: Id.EVar -> TI v s (UType s Void)
+lookupFunc x = open . _sign2type <$> findInfo info2signs x
 
-localize ::
-  forall i v s a.
-  (HasEnvLevel i, HasEnv v) =>
-  EnvLevelOf i (UType s Void) ->
-  TI (EScope i v) s a ->
-  TI v s a
-localize ts = TI . mapInfoT (withReaderT (locals %~ Sc.extendEnv @i @v ts)) . unTI
-
-lookupVar :: (HasEnv v) => v -> TI v s (UType s Void)
-lookupVar = views locals . Sc.lookupEnv
-
-lookupFun :: Id.EVar -> TI v s (UType s Void)
-lookupFun x = open . _sign2type <$> findInfo info2signs x
-
-generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
+generalize :: forall s ev. UType s Void -> TI ev s (UType s Void, [UType s Void])
 generalize t0 = do
   (t1, qvs1) <- runWriterT (go t0)
   let qvs2 = map (\(v, q) -> MkQVar q v) (Map.toList qvs1)
   pure (mkUTUni qvs2 t1, map (UTVar . _qvar2tvar) qvs2)
   where
+    go :: UType s Void -> WriterT (Map Id.TVar (Set Id.Clss)) (TI ev s) (UType s Void)
     go t0 = case t0 of
       (UVar uref) -> do
-        uvar <- lift (liftST (readSTRef uref))
-        cur_level <- view level
+        uvar <- liftST (readSTRef uref)
+        cur_level <- lift getTLevel
         case uvar of
           UFree (MkQVar q v) l
             | l > cur_level -> do
                 let t1 = UTVar v
-                lift (liftST (writeSTRef uref (ULink t1)))
+                liftST (writeSTRef uref (ULink t1))
                 tell (Map.singleton v q)
                 pure t1
             | otherwise     -> pure t0
@@ -140,7 +108,7 @@ inferLet ::
   TI v s (Vector n (Defn (Aux s) Void v), Vector n (UType s Void))
 inferLet defns0 = do
   let (ls0, rs0) = Vec.unzip (fmap (\(MkDefn l r) -> (l, r)) defns0)
-  (rs1, ts1) <- Vec.unzip <$> local (level +~ 1) (traverse infer rs0)
+  (rs1, ts1) <- Vec.unzip <$> withinTScope (traverse infer rs0)
   (ts2, _qs) <- Vec.unzip <$> traverse generalize ts1
   -- let ls1 = Vec.zipWith (set bindType) ts2 ls0
   let defns1 = Vec.zipWith3 (\t2 -> MkDefn . set bind2type t2) ts2 ls0 rs1
@@ -153,9 +121,9 @@ inferRec ::
          , Vector n (UType s Void))
 inferRec defns0 = do
   let (ls0, rs0) = Vec.unzip (fmap (\(MkDefn l r) -> (l, r)) defns0)
-  (rs1, ts1) <- local (level +~ 1) $ do
+  (rs1, ts1) <- withinTScope $ do
     us <- traverse (const freshUVar) ls0
-    (rs1, ts1) <- Vec.unzip <$> localize us (traverse infer rs0)
+    (rs1, ts1) <- Vec.unzip <$> withinEScope us (traverse infer rs0)
     Vec.zipWith3M_ (\r0 -> unify (r0^.expr2pos)) rs0 us ts1
     pure (rs1, ts1)
   (ts2, qs) <- Vec.unzip <$> traverse generalize ts1
@@ -167,8 +135,8 @@ inferRec defns0 = do
 
 infer :: (HasEnv v) => Expr In Void v -> TI v s (Expr (Aux s) Void v, UType s Void)
 infer = \case
-    EVar w x -> first (mkETyApp w (EVar w x)) <$> (lookupVar x >>= instantiate)
-    EVal w z -> first (mkETyApp w (EVal w z)) <$> (lookupFun z >>= instantiate)
+    EVar w x -> first (mkETyApp w (EVar w x)) <$> (lookupEVar x >>= instantiate)
+    EVal w z -> first (mkETyApp w (EVal w z)) <$> (lookupFunc z >>= instantiate)
     ECon w c -> first (mkETyApp w (ECon w c)) <$> (typeOfDCon c >>= instantiate . open)
     ENum w n -> pure (ENum w n, open typeInt)
     EApp w fun0 args0 -> do
@@ -179,21 +147,21 @@ infer = \case
       pure (EApp w fun1 args1, t_res)
     ELam w binds0 rhs0 NoType -> do
       t_binds <- traverse (const freshUVar) binds0
-      (rhs1, t_rhs) <- localize t_binds (infer rhs0)
+      (rhs1, t_rhs) <- withinEScope t_binds (infer rhs0)
       let binds1 = Vec.zipWith (\(MkBind w' x NoType) -> MkBind w' x) binds0 t_binds
       pure (ELam w binds1 rhs1 t_rhs, t_binds *~> t_rhs)
     ELet w defns0 rhs0 -> do
       (defns1, t_defns) <- inferLet defns0
-      first (ELet w defns1) <$> localize t_defns (infer rhs0)
+      first (ELet w defns1) <$> withinEScope t_defns (infer rhs0)
     ERec w defns0 rhs0 -> do
       (defns1, t_defns) <- inferRec defns0
-      first (ERec w defns1) <$> localize t_defns (infer rhs0)
+      first (ERec w defns1) <$> withinEScope t_defns (infer rhs0)
     EMat w expr0 altns0 -> do
       (expr1, t_expr) <- infer expr0
       t_res <- freshUVar
       altns1 <- for altns0 $ \(MkAltn w' patn0 rhs0) -> do
         (patn1, t_binds) <- inferPatn patn0 t_expr
-        (rhs1, t_rhs) <- localize t_binds (infer rhs0)
+        (rhs1, t_rhs) <- withinEScope t_binds (infer rhs0)
         unify w t_res t_rhs
         pure (MkAltn w' patn1 rhs1)
       pure (EMat w expr1 altns1, t_res)
@@ -213,7 +181,7 @@ inferDecl = \case
     --
     -- val f : a -> b
     -- let f = fun x -> x
-    t_decl <- lookupFun x
+    t_decl <- lookupFunc x
     let (_, t0) = unUTUni t_decl
     (e1, t1) <- infer e0
     -- NOTE: This unification should bind all unification variables in @t1@. If
@@ -221,7 +189,7 @@ inferDecl = \case
     unify w t0 t1
     yield (DDefn (MkDefn (MkBind w x t_decl) e1))
   DPrim (MkPrimDecl (MkBind w z NoType) s) -> do
-    t <- lookupFun z
+    t <- lookupFunc z
     yield (DPrim (MkPrimDecl (MkBind w z t) s))
   where
     yield = pure . Just

@@ -100,6 +100,7 @@ data ClssDecl = MkClssDecl
 data InstDecl st = forall n. MkInstDecl
   { _inst2pos   :: Pos
   , _inst2clss  :: Id.Clss
+    -- FIXME: There's no way to define instances on (->).
   , _inst2tcon  :: Id.TCon
   , _inst2qvars :: Vector n QVar
   , _inst2defns :: [Defn st (TFinScope n Void) Void]

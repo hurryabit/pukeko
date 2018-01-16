@@ -102,6 +102,9 @@ instance Monad m => MonadInfo (InfoT m) where
 instance MonadInfo m => MonadInfo (ReaderT r m) where
   askInfo = lift askInfo
 
+instance MonadInfo m => MonadInfo (SupplyT s m) where
+  askInfo = lift askInfo
+
 instance MonadReader r m => MonadReader r (InfoT m) where
   ask = lift ask
   local = mapInfoT . local
