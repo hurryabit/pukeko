@@ -78,7 +78,7 @@ lookupVar :: (HasEnv v) => v -> TI v s (UType s Void)
 lookupVar = views locals . Sc.lookupEnv
 
 lookupFun :: Id.EVar -> TI v s (UType s Void)
-lookupFun x = open . _sign2type <$> findSign x
+lookupFun x = open . _sign2type <$> findInfo info2signs x
 
 generalize :: UType s Void -> TI v s (UType s Void, [UType s Void])
 generalize t0 = do
@@ -123,7 +123,8 @@ inferPatn patn t_expr = case patn of
   PWld w   -> pure (PWld w, Map.empty)
   PVar w x -> pure (PVar w x, Map.singleton x t_expr)
   PCon w dcon (_ :: [NoType Void]) ps0 -> do
-    Some1 (Pair1 tcon MkDConDecl{_dcon2name = dname, _dcon2flds = flds}) <- findDCon dcon
+    Some1 (Pair1 tcon MkDConDecl{_dcon2name = dname, _dcon2flds = flds}) <-
+      findInfo info2dcons dcon
     when (length ps0 /= length flds) $
       throwDocAt w $ "term cons" <+> quotes (pretty dname) <+>
       "expects" <+> int (length flds) <+> "arguments"

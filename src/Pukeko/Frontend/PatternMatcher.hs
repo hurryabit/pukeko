@@ -192,7 +192,7 @@ groupCPatns ::
   Pos -> Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupCPatns w (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
-  Some1 (Pair1 (MkTConDecl _ tcon _params dcons0) _dconDecl) <- findDCon dcon0
+  Some1 (Pair1 (MkTConDecl _ tcon _params dcons0) _dconDecl) <- findInfo info2dcons dcon0
   dcons1 <- case dcons0 of
     []   -> bugWith "pattern match on type without data constructors" tcon
     d:ds -> pure (d :| ds)

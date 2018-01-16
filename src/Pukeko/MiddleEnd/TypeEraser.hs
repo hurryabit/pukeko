@@ -61,7 +61,8 @@ ccExpr = \case
       Nothing -> pure (Global (name z))
       Just s  -> pure (External s)
   In.ECon _ dcon  -> do
-    Some1 (Pair1 _tcon MkDConDecl{_dcon2tag = tag, _dcon2flds = flds}) <- findDCon dcon
+    Some1 (Pair1 _tcon MkDConDecl{_dcon2tag = tag, _dcon2flds = flds}) <-
+      findInfo info2dcons dcon
     pure $ Pack tag (length flds)
   In.ENum _ n     -> pure $ Num n
   In.EApp _ t us  -> Ap <$> ccExpr t <*> traverse ccExpr (toList us)

@@ -8,6 +8,9 @@ module Pukeko.AST.ConDecl
   , TConDecl (..)
   , DConDecl (..)
   , tcon2pos
+  , tcon2name
+  , tcon2dcons
+  , dcon2name
   , typeOfDConDecl
   ) where
 

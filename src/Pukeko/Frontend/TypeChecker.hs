@@ -37,7 +37,7 @@ runTC tc m0 = runExcept (runInfoT (runGammaT tc) m0)
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   EVar _ x -> lookupType x
-  EVal _ z -> fmap absurd . _sign2type <$> findSign z
+  EVal _ z -> fmap absurd . _sign2type <$> findInfo info2signs z
   ECon _ c -> fmap absurd <$> typeOfDCon c
   ENum _ _ -> pure typeInt
   EApp _ e0 es -> do
@@ -115,7 +115,7 @@ patnEnvLevel p t0 = case p of
   PWld _   -> pure Map.empty
   PVar _ x -> pure (Map.singleton x t0)
   PCon w c ts1 ps -> do
-    Some1 (Pair1 _tconDecl (MkDConDecl _ tcon dcon _tag flds1)) <- findDCon c
+    Some1 (Pair1 _tconDecl (MkDConDecl _ tcon dcon _tag flds1)) <- findInfo info2dcons c
     let t1 = mkTApp (TCon tcon) (toList ts1)
     unless (t0 == t1) $ throwDocAt w
       ("expected pattern of type" <+> pretty t0

@@ -98,7 +98,8 @@ llExpr = \case
 
 llCase :: (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)
 llCase (MkCase w dcon ts0 bs e) = do
-  Some1 (Pair1 (MkTConDecl _ _ vs _) (MkDConDecl _ _ _ _ flds0)) <- findDCon dcon
+  Some1 (Pair1 (MkTConDecl _ _ vs _) (MkDConDecl _ _ _ _ flds0)) <-
+    findInfo info2dcons dcon
   case Vec.matchList vs ts0 of
     Nothing  -> bug "wrong number of type arguments for type constructor"
     Just ts1 ->
