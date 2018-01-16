@@ -23,6 +23,7 @@ module Pukeko.AST.Type
   , prettyTypeCstr
   , prettyTUni
   , prettyQVar
+  , renameType
   )
   where
 
@@ -30,6 +31,8 @@ import Pukeko.Prelude
 
 import           Control.Lens
 import           Data.Finite       (absurd0)
+import qualified Data.Map          as Map
+import qualified Data.Set          as Set
 import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
@@ -197,3 +200,35 @@ instance TraversableWithIndex Pos NoType where
 
 deriving instance Show QVar
 deriving instance Show tv => Show (Type tv)
+
+newtype Boxed tv = Box{unBox :: tv}
+  deriving (Eq, Ord)
+
+instance Ord tv => HasEnv (Boxed tv) where
+  type EnvOf (Boxed tv) = Map (Boxed tv)
+  lookupEnv v = (Map.! v)
+
+renameType :: (BaseTVar tv, Ord tv) => Type tv -> Type tv
+renameType t0 =
+  let t1 = fmap Box t0
+      vs = setOf traverse t1
+      nvs = Set.fromList [Id.tvar [c] | c <- ['a' .. 'z']]
+            `Set.difference` Set.map (baseTVar . unBox) vs
+      -- env0 :: Map tv tv
+      env0 = Map.fromSet id vs
+      sup0 = Set.toList nvs ++ Id.freshTVars
+  in fmap unBox (runIdentity (evalSupplyT (runReaderT (go t1) env0) sup0))
+  where
+    go ::
+      forall tv. (HasEnv tv) =>
+      Type tv -> ReaderT (EnvOf tv tv) (SupplyT Id.TVar Identity) (Type tv)
+    go = \case
+      TVar v -> TVar <$> asks (lookupEnv v)
+      TArr -> pure TArr
+      TCon c -> pure (TCon c)
+      TApp tf tp -> TApp <$> go tf <*> go tp
+      TUni (qvs0 :: Vector n QVar) tq -> do
+        qvs1 <- traverse (qvar2tvar (const fresh)) qvs0
+        let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
+        withReaderT (\env0 -> extendEnv @(Finite n) @tv env1 (fmap weaken env0)) $
+          TUni qvs1 <$> go tq

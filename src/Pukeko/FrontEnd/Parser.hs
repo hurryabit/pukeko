@@ -118,7 +118,7 @@ atype = choice
 
 typeCstr :: Parser TypeCstr
 typeCstr = MkTypeCstr
-  <$> option [] (try (parens (many ((,) <$> clss <*> tvar)) <* darrow))
+  <$> option [] (try (parens (sepBy1 ((,) <$> clss <*> tvar) comma) <* darrow))
 
 typeScheme :: Parser TypeScheme
 typeScheme = MkTypeScheme <$> typeCstr <*> type_

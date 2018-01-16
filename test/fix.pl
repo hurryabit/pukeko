@@ -63,29 +63,29 @@ type Option a =
 let id : ∀a. a -> a = fun @a -> fun (x : a) -> x
 type Fix f =
        | Fix (f (Fix f))
-let cata : ∀a b. ((Fix b -> a) -> b (Fix b) -> b a) -> (b a -> a) -> Fix b -> a =
-      fun @a @b ->
-        fun (fmap : (Fix b -> a) -> b (Fix b) -> b a) (f : b a -> a) (x : Fix b) ->
+let cata : ∀a f. ((Fix f -> a) -> f (Fix f) -> f a) -> (f a -> a) -> Fix f -> a =
+      fun @a @f ->
+        fun (fmap : (Fix f -> a) -> f (Fix f) -> f a) (f : f a -> a) (x : Fix f) ->
           match x with
-          | Fix @b y -> f (fmap (cata @a @b fmap f) y)
-let ana : ∀a b. ((a -> Fix b) -> b a -> b (Fix b)) -> (a -> b a) -> a -> Fix b =
-      fun @a @b ->
-        fun (fmap : (a -> Fix b) -> b a -> b (Fix b)) (f : a -> b a) (x : a) ->
-          Fix @b (fmap (ana @a @b fmap f) (f x))
-let mapFix : ∀a b c. ((a -> b) -> (Fix (c a) -> Fix (c b)) -> c a (Fix (c a)) -> c b (Fix (c b))) -> (a -> b) -> Fix (c a) -> Fix (c b) =
-      fun @a @b @c ->
-        fun (bimap : (a -> b) -> (Fix (c a) -> Fix (c b)) -> c a (Fix (c a)) -> c b (Fix (c b))) (f : a -> b) (x : Fix (c a)) ->
+          | Fix @f y -> f (fmap (cata @a @f fmap f) y)
+let ana : ∀a f. ((a -> Fix f) -> f a -> f (Fix f)) -> (a -> f a) -> a -> Fix f =
+      fun @a @f ->
+        fun (fmap : (a -> Fix f) -> f a -> f (Fix f)) (f : a -> f a) (x : a) ->
+          Fix @f (fmap (ana @a @f fmap f) (f x))
+let mapFix : ∀a b f. ((a -> b) -> (Fix (f a) -> Fix (f b)) -> f a (Fix (f a)) -> f b (Fix (f b))) -> (a -> b) -> Fix (f a) -> Fix (f b) =
+      fun @a @b @f ->
+        fun (bimap : (a -> b) -> (Fix (f a) -> Fix (f b)) -> f a (Fix (f a)) -> f b (Fix (f b))) (f : a -> b) (x : Fix (f a)) ->
           match x with
-          | Fix @(c a) y -> Fix @(c b) (bimap f (mapFix @a @b @c bimap f) y)
+          | Fix @(f a) y -> Fix @(f b) (bimap f (mapFix @a @b @f bimap f) y)
 type ListF a b =
        | NilF
        | ConsF a b
-let bimapListF : ∀a b c d. (a -> b) -> (c -> d) -> ListF a c -> ListF b d =
-      fun @a @b @c @d ->
-        fun (f : a -> b) (g : c -> d) (x : ListF a c) ->
+let bimapListF : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
+      fun @a1 @a2 @b1 @b2 ->
+        fun (f : a1 -> a2) (g : b1 -> b2) (x : ListF a1 b1) ->
           match x with
-          | NilF @a @c -> NilF @b @d
-          | ConsF @a @c y z -> ConsF @b @d (f y) (g z)
+          | NilF @a1 @b1 -> NilF @a2 @b2
+          | ConsF @a1 @b1 y z -> ConsF @a2 @b2 (f y) (g z)
 let mapFixList : ∀a b. (a -> b) -> Fix (ListF a) -> Fix (ListF b) =
       fun @a @b ->
         mapFix @a @b @ListF (bimapListF @a @b @(Fix (ListF a)) @(Fix (ListF b)))

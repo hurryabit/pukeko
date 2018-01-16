@@ -176,9 +176,13 @@ checkDecl = \case
   DType{} -> pure ()
   DSign{} -> pure ()
   DClss{} -> pure ()
-  -- FIXME: Check types in method definitions.
-  DInst{} -> pure ()
-  DDefn   d -> checkDefn d
+  DInst (MkInstDecl _ _ tcon qvs ds) -> do
+    let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
+    withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
+      (_, MkSignDecl _ _ t_mthd) <- findInfo info2mthds (b^.bind2evar)
+      let t_decl = renameType (t_mthd >>= scope absurd (const t_inst))
+      check e t_decl
+  DDefn d -> checkDefn d
   DSupC (MkSupCDecl w z qvs t0 bs e0) -> do
       t1 <- withQVars qvs (withBinds bs (typeOf e0))
       let t2 = fmap _bind2type bs *~> t1

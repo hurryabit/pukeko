@@ -5,6 +5,7 @@ module Pukeko.FrontEnd.Info
   , info2tcons
   , info2dcons
   , info2signs
+  , info2mthds
   , info2insts
   , InfoT
   , runInfoT
@@ -35,6 +36,7 @@ data ModuleInfo = MkModuleInfo
   { _info2tcons :: Map Id.TCon (Some1 TConDecl)
   , _info2dcons :: Map Id.DCon (Some1 (Pair1 TConDecl DConDecl))
   , _info2signs :: Map Id.EVar (SignDecl Void)
+  , _info2mthds :: Map Id.EVar (ClssDecl, SignDecl (TFinScope 1 Void))
   , _info2insts :: Map (Id.Clss, Id.TCon) [QVar]
   }
 
@@ -81,10 +83,10 @@ collectInfo (MkModule tops) = foldFor tops $ \case
               item info2dcons (dcon^.dcon2name) (Some1 (Pair1 tcon dcon))
       in  item info2tcons (tcon^.tcon2name) (Some1 tcon) <> dis
   DSign s -> sign s
-  DClss (MkClssDecl _ c v ms) ->
-    foldFor ms $ \(MkSignDecl w z t0) ->
+  DClss clss@(MkClssDecl _ c v ms) ->
+    foldFor ms $ \mthd@(MkSignDecl w z t0) ->
       let t1 = mkTUni (Vec.singleton (MkQVar (Set.singleton c) v)) t0
-      in  sign (MkSignDecl w z t1)
+      in  sign (MkSignDecl w z t1) <> item info2mthds z (clss, mthd)
   -- FIXME: Collect type class instances.
   DInst (MkInstDecl _ c t qvs _) -> item info2insts (c, t) (toList qvs)
   DDefn (MkDefn b _) -> signBind b
@@ -115,6 +117,6 @@ instance MonadReader r m => MonadReader r (InfoT m) where
   reader = lift . reader
 
 instance Monoid ModuleInfo where
-  mempty = MkModuleInfo mempty mempty mempty mempty
+  mempty = MkModuleInfo mempty mempty mempty mempty mempty
   mi1 `mappend` mi2 =
     ((mi1^._MkModuleInfo) `mappend` (mi2^._MkModuleInfo))^.re _MkModuleInfo

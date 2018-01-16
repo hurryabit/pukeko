@@ -34,7 +34,7 @@ import Control.Lens          as X
        , (^.), (%~)
        , over, view, views
        , iso, prism
-       , iall, ifoldMap, itoList, itraverse
+       , iall, ifoldMap, imap, itoList, itraverse
        , makeLenses, makePrisms
        )
 import Control.Monad         as X
@@ -58,6 +58,7 @@ import Data.Maybe            as X (catMaybes, isJust, isNothing, mapMaybe)
 import Data.Monoid           as X (Monoid (..), (<>))
 import Data.List.NonEmpty    as X (NonEmpty (..))
 import Data.Proxy            as X (Proxy (..))
+import Data.Sequence         as X (Seq)
 import Data.Set              as X (Set)
 import Data.Set.Lens         as X (setOf)
 import Data.Traversable      as X

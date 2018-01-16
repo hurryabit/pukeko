@@ -22,10 +22,11 @@ module Data.Vector.Sized
   , zipWithM_
   , zipWith3M_
   , unzip
+  , unzip3
   )
 where
 
-import           Prelude hiding ((++), zip, zip3, zipWith, zipWith3, unzip)
+import           Prelude hiding ((++), zip, zip3, zipWith, zipWith3, unzip, unzip3)
 
 import           Control.Lens.At
 import           Control.Lens.Indexed
@@ -98,6 +99,11 @@ unzip :: Vector n (a, b) -> (Vector n a, Vector n b)
 unzip (MkVector xys) = (MkVector xs, MkVector ys)
   where
     (xs, ys) = V.unzip xys
+
+unzip3 :: Vector n (a, b, c) -> (Vector n a, Vector n b, Vector n c)
+unzip3 (MkVector xyzs) = (MkVector xs, MkVector ys, MkVector zs)
+  where
+    (xs, ys, zs) = V.unzip3 xyzs
 
 instance FunctorWithIndex (Finite n) (Vector n)
 instance FoldableWithIndex (Finite n) (Vector n)

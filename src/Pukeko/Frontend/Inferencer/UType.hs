@@ -6,10 +6,12 @@ module Pukeko.FrontEnd.Inferencer.UType
   , UVar (..)
   , mkUTUni
   , unUTUni
+  , unUTUni1
   , (~>)
   , (*~>)
   , appN
   , appTCon
+  , unUTApp
   , open
   , open1
   , subst
@@ -27,14 +29,14 @@ import qualified Data.Map           as Map
 import qualified Data.Vector.Sized  as Vec
 
 import           Pukeko.Pretty
-import           Pukeko.AST.Type       (Type (..), QVar (..), prettyTUni, prettyQVar)
+import           Pukeko.AST.Type       (Type (..), QVar (..), prettyTUni)
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
 infixr 1 ~>, *~>
 
 data UVar s tv
-  = UFree QVar Int
+  = UFree Id.TVar Int
     -- NOTE: The @Int@ is the level of this unification variable.
   | ULink (UType s tv)
 
@@ -54,10 +56,18 @@ mkUTUni xs0 t0 = case xs0 of
   [] -> t0
   x:xs -> UTUni (x :| xs) t0
 
-unUTUni :: UType s tv -> ([QVar], UType s tv)
-unUTUni = \case
-  UTUni (x :| xs) t -> (x:xs, t)
-  t                    -> ([],   t)
+-- FIXME: Follow links.
+unUTUni1 :: UType s tv -> ([QVar], UType s tv)
+unUTUni1 = \case
+  UTUni qvs t1 -> (toList qvs, t1)
+  t0 -> ([], t0)
+
+unUTUni :: UType s tv -> ([[QVar]], UType s tv)
+unUTUni = go []
+  where
+    go qvss = \case
+      UTUni qvs t -> go (toList qvs:qvss) t
+      t -> (reverse qvss, t)
 
 (~>) :: UType s tv -> UType s tv -> UType s tv
 (~>) = UTFun
@@ -71,10 +81,22 @@ appN = foldl UTApp
 appTCon :: Id.TCon -> [UType s tv] -> UType s tv
 appTCon = appN . UTCon
 
-open :: Type Void -> UType s Void
-open = open1 . fmap absurd
+unUTApp :: UType s tv -> ST s (UType s tv, [UType s tv])
+unUTApp = go []
+  where
+    go tps = \case
+      UTApp tf tp -> go (tp:tps) tf
+      t0@(UVar uref) -> do
+        uvar <- readSTRef uref
+        case uvar of
+          ULink t1 -> go tps t1
+          UFree{}  -> pure (t0, tps)
+      t0           -> pure (t0, tps)
 
-open1 :: Type (UType s Void) -> UType s Void
+open :: (BaseTVar tv) => Type tv -> UType s tv
+open = open1 . fmap (UTVar . baseTVar)
+
+open1 :: Type (UType s tv) -> UType s tv
 open1 = \case
   TVar t -> t
   TArr -> UTArr
@@ -85,29 +107,31 @@ open1 = \case
       utvar = UTVar . _qvar2tvar . (xs Vec.!)
 
 subst :: Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
-subst env t = runReaderT (subst' t) env
+subst env = go
   where
-    subst' :: UType s tv
-           -> ReaderT (Map Id.TVar (UType s tv)) (ST s) (UType s tv)
-    subst' = \case
+    go = \case
       UTVar x -> do
         let e = bugWith "unknown type variable in instantiation" x
-        Map.findWithDefault e x <$> ask
+        pure (Map.findWithDefault e x env)
       t@UTArr     -> pure t
       t@(UTCon _) -> pure t
-      UTApp tf tp -> UTApp <$> subst' tf <*> subst' tp
-      UTUni{} -> bug "universal quantification in instantiation"
+      UTApp tf tp -> UTApp <$> go tf <*> go tp
+      t0@(UTUni _qvs _t1) -> do
+        p0 <- prettyUType prettyNormal 0 t0
+        bug ("quantification during instantiation: " ++ render p0)
+        -- let vs = setOf (traverse . qvar2tvar) qvs
+        -- subst (env `Map.difference` Map.fromSet (const ()) vs) t1
       t0@(UVar uref) -> do
-        uvar <- lift $ readSTRef uref
+        uvar <- readSTRef uref
         case uvar of
           UFree _ _ -> pure t0
-          ULink t1  -> subst' t1
+          ULink t1  -> go  t1
 
 -- * Pretty printing
 prettyUVar :: PrettyLevel -> Rational -> UVar s tv -> ST s Doc
 prettyUVar lvl prec = \case
-  UFree qv _ -> pure (prettyQVar qv)
-  ULink t    -> prettyUType lvl prec t
+  UFree v _ -> pure (pretty v)
+  ULink t   -> prettyUType lvl prec t
 
 prettyUType :: PrettyLevel -> Rational -> UType s tv -> ST s Doc
 prettyUType lvl prec = \case

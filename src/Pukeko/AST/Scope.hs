@@ -30,6 +30,7 @@ module Pukeko.AST.Scope
   , BaseTVar
   , baseEVar
   , baseTVar
+  , baseTVarIx
   )
   where
 
@@ -157,7 +158,10 @@ instance (HasEnvLevel i, HasEnv v) => HasEnv (Scope b i v) where
     Free  v   -> lookupEnv v env_v
 
 class BaseName b v where
-  baseName :: v -> b
+  baseNameIx :: v -> (b, Int)
+
+baseName :: BaseName b v => v -> b
+baseName = fst . baseNameIx
 
 type BaseEVar ev = (BaseName Id.EVar ev)
 
@@ -166,16 +170,19 @@ type BaseTVar tv = (BaseName Id.TVar tv)
 baseEVar :: BaseEVar ev => ev -> Id.EVar
 baseEVar = baseName
 
+baseTVarIx :: BaseTVar tv => tv -> (Id.TVar, Int)
+baseTVarIx = baseNameIx
+
 baseTVar :: BaseTVar tv => tv -> Id.TVar
 baseTVar = baseName
 
 instance BaseName b Void where
-  baseName = absurd
+  baseNameIx = absurd
 
 instance (BaseName b v) => BaseName b (Scope b i v) where
-  baseName = \case
-    Bound _ (Forget b) -> b
-    Free  v            -> baseName v
+  baseNameIx = \case
+    Bound _ (Forget b) -> (b, 0)
+    Free  v            -> second succ (baseNameIx v)
 
 instance Bifunctor (Scope b) where
   bimap f g = \case

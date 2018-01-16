@@ -553,7 +553,7 @@ instance (PrettyStage st) => Pretty (Decl st) where
     DClss (MkClssDecl _ c v ms) ->
       "class" <+> pretty c <+> pretty v <+> colon $$ prettyBlock lvl ms
     DInst (MkInstDecl _ c t0 qvs ds) ->
-      "instance" <+> pretty c <+> pPrintPrec lvl 0 t1 <+> prettyTypeCstr qvs
+      "instance" <+> pretty c <+> pPrintPrec lvl 3 t1 <+> prettyTypeCstr qvs
       $$ prettyBlock lvl ds
       where
         t1 :: Type (TFinScope _ Void)

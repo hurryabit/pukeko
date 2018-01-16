@@ -11,5 +11,5 @@ type List a =
        | Cons a (List a)
 type IO a
 external return : ∀a. a -> IO a = "return"
-let h : ∀a. a -> a = fun @a -> fun (u : a) -> u
+let h : ∀c. c -> c = fun @c -> fun (u : c) -> u
 let main : IO Unit = return @Unit (h @Unit (h @Unit Unit))
