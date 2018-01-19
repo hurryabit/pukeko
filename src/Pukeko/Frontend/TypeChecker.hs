@@ -7,6 +7,7 @@ module Pukeko.FrontEnd.TypeChecker
 import Pukeko.Prelude
 
 import qualified Data.Map             as Map
+import qualified Data.Set             as Set
 import qualified Data.Vector.Sized    as Vec
 
 import           Pukeko.Pretty
@@ -68,16 +69,41 @@ typeOf = \case
   ETyApp w e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
-      TUni xs t1 ->
-        case Vec.matchNonEmpty xs ts1 of
+      TUni qvs t1 ->
+        case Vec.matchNonEmpty qvs ts1 of
           Nothing -> throwDocAt w
-            ("expected" <+> int (length xs) <+> "type arguments, but found"
+            ("expected" <+> int (length qvs) <+> "type arguments, but found"
              <+> int (length ts1) <+> "type arguments")
-          Just ts2 ->
+          Just ts2 -> do
+            here w (Vec.zipWithM_ satisfiesCstrs ts2 qvs)
             pure (t1 >>= scope TVar (ts2 Vec.!))
       TFun{} ->
         throwErrorAt w "expected value argument, but found type argument"
       _ -> throwErrorAt w "unexpected type argument"
+
+satisfiesCstrs :: (IsTVar tv) => Type tv -> QVar -> TC tv ev ()
+satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
+
+satisfiesCstr :: (IsTVar tv) => Type tv -> Id.Clss -> TC tv ev ()
+satisfiesCstr t0 clss = do
+  let (t1, tps) = gatherTApp t0
+  let throwNoInst = throwDoc ("no instance for" <+> pretty clss <+> parens (pretty t1))
+  case t1 of
+    TCon tcon -> do
+      qvs_mb <- lookupInfo info2insts (clss, tcon)
+      case qvs_mb of
+        Nothing -> throwNoInst
+        Just qvs -> do
+          unless (length tps == length qvs) $
+            -- NOTE: This should be caught by the kind checker.
+            bugWith "mitmatching number of type arguments for instance" (clss, tcon)
+          zipWithM_ satisfiesCstrs tps qvs
+    TVar v
+      | null tps -> do
+          qual <- lookupKind v
+          unless (clss `Set.member` qual) throwNoInst
+    _ -> throwNoInst
+
 
 typeOfBranching ::
   (St.Typed st, IsTVar tv, IsEVar ev) =>

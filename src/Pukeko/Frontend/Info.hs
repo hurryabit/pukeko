@@ -9,6 +9,7 @@ module Pukeko.FrontEnd.Info
   , InfoT
   , runInfoT
   , mapInfoT
+  , lookupInfo
   , findInfo
   , typeOfDCon
   , liftCatch
@@ -56,6 +57,9 @@ runInfoT act = runReaderT (unInfoT act) . collectInfo
 
 mapInfoT :: (m a -> n b) -> InfoT m a -> InfoT n b
 mapInfoT f = InfoT . mapReaderT f . unInfoT
+
+lookupInfo :: (MonadInfo m, Ord k) => Lens' ModuleInfo (Map k v) -> k -> m (Maybe v)
+lookupInfo l k = Map.lookup k . view l <$> askInfo
 
 findInfo :: (MonadInfo m, Ord k, Show k) => Lens' ModuleInfo (Map k v) -> k -> m v
 findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k . view l <$> askInfo
