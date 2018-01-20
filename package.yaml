@@ -94,6 +94,23 @@ tests:
     - parsec
     - pukeko
 
+  golden-frontend:
+    main: GoldenFrontEnd
+    other-modules: []
+    source-dirs: test
+    ghc-options:
+    - -Wno-missing-signatures
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - directory
+    - tasty
+    - tasty-golden
+    - HUnit
+    - parsec
+    - pukeko
+
   examples:
     main: Examples
     other-modules: []

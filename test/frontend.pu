@@ -93,7 +93,7 @@ type Typ a =
   | Con b
 
 -- XTEST repeated type variable
--- FAILURE bla bla bla
+-- SUCCESS
 type Typ a a =
   | Con a
 
