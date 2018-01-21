@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 module Data.Vector.Sized
   ( -- * Types
@@ -12,8 +13,12 @@ module Data.Vector.Sized
   , plength
   , withList
   , withNonEmpty
+  , fromList
+  , fromList'
   , matchList
+  , matchList'
   , matchNonEmpty
+  , accum
   , zip
   , zip3
   , zipWith
@@ -30,9 +35,12 @@ import           Prelude hiding ((++), zip, zip3, zipWith, zipWith3, unzip, unzi
 
 import           Control.Lens.At
 import           Control.Lens.Indexed
+import           Data.Bifunctor
+import           Data.CallStack
 import           Data.Finite
 import qualified Data.List.NonEmpty as NE
 import           Data.Proxy
+import           Data.Type.Equality
 import qualified Data.Vector as V
 import           GHC.TypeLits
 
@@ -64,14 +72,33 @@ withList xs k =
 withNonEmpty :: NE.NonEmpty a -> (forall n. KnownNat n => Vector n a -> r) -> r
 withNonEmpty xs = withList (NE.toList xs)
 
+fromList :: forall n a. (KnownNat n) => [a] -> Maybe (Vector n a)
+fromList xs0 = withList xs0 $ \(xs1 :: Vector m a) ->
+  case sameNat (Proxy @n) (Proxy @m) of
+    Nothing -> Nothing
+    Just Refl -> Just xs1
+
+fromList' :: (HasCallStack, KnownNat n) => [a] -> Vector n a
+fromList' xs0 = case fromList xs0 of
+  Just xs1 -> xs1
+  Nothing -> error "Data.Vector.Sized.fromList': length mismatch"
+
 matchList :: Vector n a -> [b] -> Maybe (Vector n b)
 matchList (MkVector v0) xs
   | V.length v0 == V.length v = Just (MkVector v)
   | otherwise                 = Nothing
   where v = V.fromList xs
 
+matchList' :: (HasCallStack) => Vector n a -> [b] -> Vector n b
+matchList' v0 xs = case matchList v0 xs of
+  Just v1 -> v1
+  Nothing -> error "Data.Vector.Sized.matchList': length mismatch"
+
 matchNonEmpty :: Vector n a -> NE.NonEmpty b -> Maybe (Vector n b)
 matchNonEmpty v = matchList v . NE.toList
+
+accum :: (a -> b -> a) -> Vector n a -> [(Finite n, b)] -> Vector n a
+accum f (MkVector v) = MkVector . V.accum f v . map (first toInt)
 
 zip :: Vector n a -> Vector n b -> Vector n (a, b)
 zip (MkVector xs) (MkVector ys) = MkVector (V.zip xs ys)

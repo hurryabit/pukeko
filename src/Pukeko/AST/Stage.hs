@@ -15,7 +15,8 @@ data KindChecker
 data FunResolver
 data Inferencer (t :: * -> *)
 data PatternMatcher
-type FrontEnd = PatternMatcher
+data ClassEliminator
+type FrontEnd = ClassEliminator
 data LambdaLifter
 type BackEnd = LambdaLifter
 
@@ -26,6 +27,7 @@ type family StageId st where
   StageId KindChecker     = 300
   StageId (Inferencer t)  = 400
   StageId PatternMatcher  = 500
+  StageId ClassEliminator = 600
   StageId LambdaLifter    = 700
 
 type family StageType st where
@@ -35,6 +37,7 @@ type family StageType st where
   StageType KindChecker     = NoType
   StageType (Inferencer t)  = t
   StageType PatternMatcher  = Type
+  StageType ClassEliminator = Type
   StageType LambdaLifter    = Type
 
 type IsStage st = TraversableWithIndex Pos (StageType st)
@@ -42,11 +45,13 @@ type IsStage st = TraversableWithIndex Pos (StageType st)
 type HasLambda st = StageId st <=? 650
 type HasNested st = StageId st <=? 450
 type HasTypes  st = 400 <=? StageId st
+type HasClasses st = StageId st <=? 550
 
-type SameTopNodes st1 st2 =
+type SameDecls st1 st2 =
   ( Untyped   st1 ~ Untyped   st2
   , HasLambda st1 ~ HasLambda st2
   )
+
 type SameNodes st1 st2 =
   ( HasLambda st1 ~ HasLambda st2
   , HasNested st1 ~ HasNested st2

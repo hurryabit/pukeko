@@ -11,6 +11,7 @@ module Pukeko.AST.ConDecl
   , tcon2name
   , tcon2dcons
   , dcon2name
+  , dcon2flds
   , typeOfDConDecl
   ) where
 
@@ -51,7 +52,7 @@ typeOfDConDecl (MkTConDecl _ tname prms _) (MkDConDecl _ tcon dname _ flds)
     go xs flds =
       case sameNat (Proxy @n1) (Proxy @n2) of
         Just Refl ->
-          let res = mkTApp (TCon tcon) [ TVar (mkBound i x) | (i, x) <- itoList xs ]
+          let res = mkTApp (TCon tcon) (mkTVars xs)
           in  mkTUni (fmap (MkQVar mempty) xs) (flds *~> res)
         Nothing -> bug "type and data constructor have different arity" (tname, dname)
 

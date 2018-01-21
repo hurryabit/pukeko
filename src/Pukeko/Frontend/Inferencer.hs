@@ -7,7 +7,6 @@ where
 
 import Pukeko.Prelude
 
-import           Control.Lens
 import           Control.Monad.ST
 import           Control.Monad.ST.Class
 import qualified Data.List.NonEmpty as NE
@@ -52,9 +51,6 @@ freshUVar = do
   l <- getTLevel
   UVar <$> liftST (newSTRef (UFree v l))
 
-lookupFunc :: Id.EVar -> TI v s (UType s tv)
-lookupFunc x = fmap absurd . open . _sign2type <$> findInfo info2signs x
-
 generalize :: forall s tv ev. UType s tv -> IT s ev (UType s tv, Set Id.TVar)
 generalize = go
   where
@@ -98,16 +94,17 @@ splitCstr t0 clss = do
         ULink{} -> bug "ULink after unUTApp"
     UTVar v -> pure (MkSplitCstrs (Map.singleton v (Set.singleton clss)) mempty)
     UTCon tcon -> do
-      qual_mb <- lookupInfo info2insts (clss, tcon)
-      case qual_mb of
+      inst_mb <- lookupInfo info2insts (clss, tcon)
+      case inst_mb of
         Nothing -> throwNoInst
-        Just qual
+        Just (SomeInstDecl MkInstDecl{_inst2qvars = qvs})
           | length qual /= length tps ->
               bugWith "mitmatching number of type arguments for instance" (clss, tcon)
           | otherwise -> do
               let cstrs = Seq.fromList
                     [ (tp, c) | (tp, MkQVar q _) <- zip tps qual, c <- toList q ]
               splitCstrs cstrs
+          where qual = toList qvs
     UTApp{} -> bug "UTApp after unUTApp"
     UTUni{} -> bug "UTUni during constraint splitting"
     UTArr{} -> throwNoInst
@@ -166,6 +163,17 @@ inferLet (MkDefn l0 r0) = do
   let t3 = mkUTUni qvs t2
   pure (MkDefn (l0 & bind2type .~ t3) r1, t3, ds1)
 
+-- FIXME: The whole group needs to be generalized together. Since we don't do
+-- this, the following triggers a bug:
+--
+-- val f : Int
+-- let f =
+--   let rec g1 x y = g2 x y
+--   and     g2 x y = g1 y x
+--   in
+--   g1 0 0
+--
+-- BUG! unknown type variable in instantiation (_4)
 inferRec ::
   (BaseTVar tv, HasEnv ev) =>
   Vector n (Defn In tv (EFinScope n ev)) ->
@@ -197,8 +205,8 @@ infer ::
   Expr In tv ev -> IT s ev (Expr (Aux s) tv ev, UType s tv, Cstrs s tv)
 infer = \case
     EVar w x -> lookupEVar x >>= instantiate (EVar w x)
-    EVal w z -> lookupFunc z >>= instantiate (EVal w z)
-    ECon w c -> typeOfDCon c >>= instantiate (ECon w c) . fmap absurd . open
+    EVal w z -> typeOfFunc z >>= instantiate (EVal w z) . open
+    ECon w c -> typeOfDCon c >>= instantiate (ECon w c) . open
     ENum w n -> pure (ENum w n, open typeInt, mempty)
     EApp w fun0 args0 -> do
       let neUnzip3 :: NonEmpty (a, b, c) -> (NonEmpty a, NonEmpty b, NonEmpty c)
@@ -272,11 +280,11 @@ inferDecl = \case
     yield (DInst (MkInstDecl w clss tcon qvs ds1))
   DDefn d0 -> do
     reset
-    t_decl <- lookupFunc (d0^.defn2bind.bind2evar)
+    t_decl <- open <$> typeOfFunc (d0^.defn2bind.bind2evar)
     d1 <- inferTypedDefn d0 t_decl
     yield (DDefn d1)
   DPrim (MkPrimDecl (MkBind w z NoType) s) -> do
-    t <- lookupFunc z
+    t <- open <$> typeOfFunc z
     yield (DPrim (MkPrimDecl (MkBind w z t) s))
   where
     yield = pure . Just

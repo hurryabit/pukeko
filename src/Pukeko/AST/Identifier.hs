@@ -17,6 +17,7 @@ module Pukeko.AST.Identifier
   , dcon
   , Clss
   , clss
+  , annot
   )
 where
 
@@ -86,44 +87,37 @@ instance Pretty TVar where
 instance Show TVar where
   show = prettyShow
 
-data TCon = TCon String
+data XCon tag = XCon String
   deriving (Eq, Ord)
+
+xcon :: String -> XCon tag
+xcon name@(first:_)
+  | isUpper first = XCon name
+xcon name = bugWith "invalid constructor/clss name" name
+
+annot :: XCon tag -> String -> XCon tag
+annot (XCon name) x = XCon (name ++ "$" ++ x)
+
+instance Pretty (XCon tag) where
+  pPrint (XCon name) = text name
+
+instance Show (XCon tag) where
+  show = prettyShow
+
+data TConTag
+type TCon = XCon TConTag
 
 tcon :: String -> TCon
-tcon name@(first:_)
-  | isUpper first = TCon name
-tcon name = bugWith "invalid type constructor name" name
+tcon = xcon
 
-instance Pretty TCon where
-  pPrint (TCon name) = text name
-
-instance Show TCon where
-  show = prettyShow
-
-data DCon = DCon String
-  deriving (Eq, Ord)
+data DConTag
+type DCon = XCon DConTag
 
 dcon :: String -> DCon
-dcon name@(first:_)
-  | isUpper first = DCon name
-dcon name = bugWith "invalid data constructor name" name
+dcon = xcon
 
-instance Pretty DCon where
-  pPrint (DCon name) = text name
-
-instance Show DCon where
-  show = prettyShow
-
-data Clss = Clss String
-  deriving (Eq, Ord)
+data ClssTag
+type Clss = XCon ClssTag
 
 clss :: String -> Clss
-clss name@(first:_)
-  | isUpper first = Clss name
-clss name = bugWith "invalid type class name" name
-
-instance Pretty Clss where
-  pPrint (Clss name) = text name
-
-instance Show Clss where
-  show = prettyShow
+clss = xcon

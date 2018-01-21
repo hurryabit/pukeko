@@ -9,7 +9,10 @@ module Pukeko.AST.Type
   , NoType (..)
   , Type (..)
   , QVar (..)
+  , mkTVars
+  , mkTVarsQ
   , mkTUni
+  , withTUni
   , pattern TFun
   , (~>)
   , (*~>)
@@ -73,11 +76,24 @@ data QVar = MkQVar
 -- instance Ord QVar where
 --   compare = compare `on` _qvar2tvar
 
+mkTVars :: Vector n Id.TVar -> Vector n (Type (TFinScope n tv))
+mkTVars = imap (\i b -> TVar (mkBound i b))
+
+-- TODO: Use class 'BaseTVar' to avoid this duplication.
+mkTVarsQ :: Vector n QVar -> Vector n (Type (TFinScope n tv))
+mkTVarsQ = mkTVars . fmap _qvar2tvar
+
 mkTUni :: forall n tv. KnownNat n => Vector n QVar -> Type (TFinScope n tv) -> Type tv
 mkTUni xs t =
   case sameNat (Proxy @n) (Proxy @0) of
     Nothing   -> TUni xs t
     Just Refl -> fmap (strengthenWith absurd0) t
+
+withTUni ::
+  Type tv -> (forall m. (KnownNat m) => Vector m QVar -> Type (TFinScope m tv) -> a) -> a
+withTUni t0 k = case t0 of
+  TUni qvs t1 -> k qvs t1
+  _           -> k Vec.empty (fmap weaken t0)
 
 (~>) :: Type tv -> Type tv -> Type tv
 (~>) = TFun
@@ -204,9 +220,9 @@ deriving instance Show tv => Show (Type tv)
 newtype Boxed tv = Box{unBox :: tv}
   deriving (Eq, Ord)
 
-instance Ord tv => HasEnv (Boxed tv) where
+instance (BaseTVar tv, Ord tv) => HasEnv (Boxed tv) where
   type EnvOf (Boxed tv) = Map (Boxed tv)
-  lookupEnv v = (Map.! v)
+  lookupEnv v@(Box v0) = Map.findWithDefault (bugWith "lookupEnv" (baseTVar v0)) v
 
 renameType :: (BaseTVar tv, Ord tv) => Type tv -> Type tv
 renameType t0 =

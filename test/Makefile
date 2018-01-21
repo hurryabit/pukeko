@@ -27,7 +27,7 @@ SOURCES     = monad_io.pu \
               aliasinline.pu \
 							sort_gen.pu \
 							rmq_gen.pu
-LAMBDAS     = $(SOURCES:.pu=.ll)
+LAMBDAS     = $(SOURCES:.pu=.pl)
 TYPES       = $(SOURCES:.pu=.ti)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o

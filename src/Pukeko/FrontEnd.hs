@@ -9,6 +9,7 @@ import Pukeko.Prelude
 
 import qualified Pukeko.AST.SystemF             as SystemF
 import qualified Pukeko.AST.Stage               as Stage
+import qualified Pukeko.FrontEnd.ClassEliminator as ClassEliminator
 import qualified Pukeko.FrontEnd.Renamer        as Renamer
 import qualified Pukeko.FrontEnd.KindChecker    as KindChecker
 import qualified Pukeko.FrontEnd.Parser         as Parser
@@ -18,10 +19,10 @@ import qualified Pukeko.FrontEnd.TypeChecker    as TypeChecker
 import qualified Pukeko.FrontEnd.TypeResolver   as TypeResolver
 import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
 
-type Module = SystemF.Module Stage.PatternMatcher
+type Module = SystemF.Module Stage.ClassEliminator
 
-run :: MonadError String m => Parser.Package -> m Module
-run =
+run :: MonadError String m => Bool -> Parser.Package -> m Module
+run unsafe =
   Renamer.renameModule
   >=> TypeResolver.resolveModule
   >=> FunResolver.resolveModule
@@ -30,3 +31,5 @@ run =
   >=> TypeChecker.checkModule
   >=> PatternMatcher.compileModule
   >=> TypeChecker.checkModule
+  >=> pure . ClassEliminator.elimModule
+  >=> if unsafe then pure else TypeChecker.checkModule

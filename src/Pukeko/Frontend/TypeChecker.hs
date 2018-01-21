@@ -38,8 +38,8 @@ runTC tc m0 = runExcept (runInfoT (runGammaT tc) m0)
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   EVar _ x -> lookupEVar x
-  EVal _ z -> fmap absurd . _sign2type <$> findInfo info2signs z
-  ECon _ c -> fmap absurd <$> typeOfDCon c
+  EVal _ z -> typeOfFunc z
+  ECon _ c -> typeOfDCon c
   ENum _ _ -> pure typeInt
   EApp _ e0 es -> do
     t0 <- typeOf e0
@@ -90,10 +90,11 @@ satisfiesCstr t0 clss = do
   let throwNoInst = throwDoc ("no instance for" <+> pretty clss <+> parens (pretty t1))
   case t1 of
     TCon tcon -> do
-      qvs_mb <- lookupInfo info2insts (clss, tcon)
-      case qvs_mb of
+      inst_mb <- lookupInfo info2insts (clss, tcon)
+      case inst_mb of
         Nothing -> throwNoInst
-        Just qvs -> do
+        Just (SomeInstDecl MkInstDecl{_inst2qvars = qvsV}) -> do
+          let qvs = toList qvsV
           unless (length tps == length qvs) $
             -- NOTE: This should be caught by the kind checker.
             bugWith "mitmatching number of type arguments for instance" (clss, tcon)
@@ -178,6 +179,7 @@ checkDecl = \case
   DClss{} -> pure ()
   DInst (MkInstDecl _ _ tcon qvs ds) -> do
     let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
+    -- FIXME: Ensure that the type in @b@ is correct as well.
     withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
       (_, MkSignDecl _ _ t_mthd) <- findInfo info2mthds (b^.bind2evar)
       let t_decl = renameType (t_mthd >>= scope absurd (const t_inst))

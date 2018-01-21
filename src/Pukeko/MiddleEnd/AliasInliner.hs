@@ -58,7 +58,8 @@ join' uf i j = do
   A.writeArray (links uf) i l
 
 join :: Ord a => UnionFind s a -> a -> a -> ST s ()
-join uf x y = join' uf (indices uf Map.! x) (indices uf Map.! y)
+join uf x y = join' uf (indices uf ! x) (indices uf ! y)
+  where (!) = flip (Map.findWithDefault (bug "join"))
 
 unionFind :: Ord a => [(a, a)] -> Map a a
 unionFind xys = runST $ do

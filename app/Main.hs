@@ -17,7 +17,7 @@ compile :: Bool -> Bool -> Bool -> String -> IO ()
 compile write_pl stop_tc unsafe file = do
   ok_or_error <- runExceptT $ do
     package <- Parser.parsePackage file
-    module_sf <- FrontEnd.run package
+    module_sf <- FrontEnd.run unsafe package
     if stop_tc
       then do
         liftIO $ writeFile (file -<.> "ti")

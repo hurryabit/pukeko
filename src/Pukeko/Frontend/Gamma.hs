@@ -27,6 +27,9 @@ type GammaT = XGammaT (Const (Set Id.Clss)) Type
 runGammaT :: XGammaT tf ef Void Void m a -> m a
 runGammaT m = runReaderT (unGammaT m) (GammaEnv voidEnv voidEnv)
 
+mapGammaT :: (m a -> n b) -> XGammaT tf ef tv ev m a -> XGammaT tf ef tv ev n b
+mapGammaT f = GammaT . mapReaderT f . unGammaT
+
 withinEScope ::
   forall i m tf ef tv ev a. (HasEnvLevel i, HasEnv tv, HasEnv ev, Functor tf) =>
   EnvLevelOf i (ef tv) -> XGammaT tf ef tv (EScope i ev) m a -> XGammaT tf ef tv ev m a

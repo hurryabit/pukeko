@@ -21,7 +21,7 @@ runSnippet :: Parser.Package -> String -> HIO ()
 runSnippet prelude code = do
   let result = do
         module_ <- Parser.parseInput "<input>" code
-        FrontEnd.run (module_ `Parser.extend` prelude)
+        FrontEnd.run False (module_ `Parser.extend` prelude)
   case result of
     Right _ ->
       out "-- SUCCESS\n"

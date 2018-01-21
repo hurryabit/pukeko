@@ -21,7 +21,7 @@ import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 
-type In  = St.PatternMatcher
+type In  = St.ClassEliminator
 type Out = St.LambdaLifter
 
 type IsTVar tv = (Ord tv, BaseTVar tv)
@@ -63,7 +63,8 @@ llExpr = \case
       let allBinds0 :: Vector (n0 + n1) (Bind Type tv)
           allBinds0 = newBinds Vec.++ oldBinds
       let tvCapturedL :: [tv]
-          tvCapturedL = Set.toList (setOf (traverse . bind2type . traverse) allBinds0)
+          tvCapturedL = Set.toList
+            (setOf (traverse . bind2type . traverse) allBinds0 <> setOf traverse t_rhs)
       Vec.withList tvCapturedL $ \(tvCapturedV :: Vector m tv) -> do
         tyBinds :: Vector m QVar <-
           traverse (\v -> MkQVar <$> lookupQual v <*> pure (baseTVar v)) tvCapturedV
@@ -71,14 +72,17 @@ llExpr = \case
             tvMap =
               ifoldMap (\j v -> Map.singleton v (mkBound j (baseTVar v))) tvCapturedV
         let tvRename :: tv -> TFinScope m Void
-            tvRename = (tvMap Map.!)
+            tvRename v = Map.findWithDefault (bugWith "tvRename" (baseTVar v)) v tvMap
         let evMap :: Map ev (EFinScope (n0 + n1) Void)
             evMap =
               ifoldMap
               (\i x -> Map.singleton x (mkBound (Fin.weaken i) (baseEVar x)))
               evCapturedV
         let evRename :: EFinScope n1 ev -> EFinScope (n0 + n1) Void
-            evRename = scope' (evMap Map.!) (mkBound . Fin.shift)
+            evRename = scope'
+                       (\x -> Map.findWithDefault
+                              (bugWith "evRename" (baseEVar x)) x evMap)
+                       (mkBound . Fin.shift)
         let allBinds1 :: Vector (n0 + n1) (Bind Type (TFinScope m Void))
             allBinds1 = fmap (fmap tvRename) allBinds0
         let rhs2 :: Expr Out (TFinScope m Void) (EFinScope (n0 + n1) Void)
@@ -113,8 +117,6 @@ llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType ds -> yield (DType ds)
   -- FIXME: Erase type classes when converting to dictionary passing style.
-  DClss _ -> pure ()
-  DInst _ -> pure ()
   DDefn (MkDefn (MkBind w lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" lhs)
     rhs <- llExpr rhs

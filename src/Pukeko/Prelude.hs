@@ -31,7 +31,7 @@ import Prelude               as X
 import Control.Applicative   as X
 import Control.Lens          as X
        ( Iso, Lens, Lens', Traversal, Traversal', Prism, Prism'
-       , (^.), (%~)
+       , (^.), (.~), (%~)
        , over, view, views
        , iso, prism
        , iall, ifoldMap, imap, itoList, itraverse

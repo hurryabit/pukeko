@@ -18,7 +18,7 @@ shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
         module_ <- Parser.parseInput "<input>" code
-        FrontEnd.run (module_ `Parser.extend` prelude)
+        FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> expectationFailure "should fail, but succeeded"
@@ -30,7 +30,7 @@ shouldSucceed :: Parser.Package -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
         module_ <- Parser.parseInput "<input>" code
-        FrontEnd.run (module_ `Parser.extend` prelude)
+        FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> return ()

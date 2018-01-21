@@ -13,10 +13,10 @@ import           Data.Finite        (absurd0)
 import qualified Data.Vector.Sized  as Vec
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage   (HasLambda, StageType)
+import           Pukeko.AST.Stage   (HasLambda, HasClasses, StageType)
 import           Pukeko.AST.Type
 
-type ERStage st = (HasLambda st ~ 'False)
+type ERStage st = (HasLambda st ~ 'False, HasClasses st ~ 'False)
 
 reduceModule :: ERStage st => Module st -> Module st
 reduceModule = over (module2decls . traverse) erDecl
