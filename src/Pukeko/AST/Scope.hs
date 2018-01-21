@@ -23,6 +23,7 @@ module Pukeko.AST.Scope
   , dist
   , (>>>=)
   , finRenamer
+  , voidEnv
   , extendEnv
   , HasEnvLevel (..)
   , HasEnv (..)
@@ -118,6 +119,9 @@ lookupMap i = Map.findWithDefault (bugWith "lookup failed" (pretty i)) i
 
 data Pair f g a = Pair (f a) (g a)
   deriving (Functor)
+
+voidEnv :: EnvOf Void a
+voidEnv = Const ()
 
 extendEnv ::
   forall i v a b.

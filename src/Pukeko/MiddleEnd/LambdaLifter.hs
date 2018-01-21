@@ -59,14 +59,14 @@ llExpr = \case
         evCapturedL = Set.toList (setOf (traverse . _Free) rhs1)
     Vec.withList evCapturedL $ \(evCapturedV :: Vector n0 ev) -> do
       newBinds :: Vector n0 (Bind Type tv) <-
-        for evCapturedV $ \x -> MkBind w (baseEVar x) <$> lookupType x
+        for evCapturedV $ \x -> MkBind w (baseEVar x) <$> lookupEVar x
       let allBinds0 :: Vector (n0 + n1) (Bind Type tv)
           allBinds0 = newBinds Vec.++ oldBinds
       let tvCapturedL :: [tv]
           tvCapturedL = Set.toList (setOf (traverse . bind2type . traverse) allBinds0)
       Vec.withList tvCapturedL $ \(tvCapturedV :: Vector m tv) -> do
         tyBinds :: Vector m QVar <-
-          traverse (\v -> MkQVar <$> lookupKind v <*> pure (baseTVar v)) tvCapturedV
+          traverse (\v -> MkQVar <$> lookupQual v <*> pure (baseTVar v)) tvCapturedV
         let tvMap :: Map tv (TFinScope m Void)
             tvMap =
               ifoldMap (\j v -> Map.singleton v (mkBound j (baseTVar v))) tvCapturedV
@@ -107,7 +107,7 @@ llCase (MkCase w dcon ts0 bs e) = do
         Nothing    -> bug "wrong number of binds in pattern"
         Just flds1 -> do
           let t_flds = fmap (>>= scope absurd (ts1 Vec.!)) flds1
-          MkCase w dcon ts0 bs <$> withTypes t_flds (llExpr e)
+          MkCase w dcon ts0 bs <$> withinEScope t_flds (llExpr e)
 
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case

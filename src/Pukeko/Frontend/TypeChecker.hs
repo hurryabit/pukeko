@@ -37,7 +37,7 @@ runTC tc m0 = runExcept (runInfoT (runGammaT tc) m0)
 
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
-  EVar _ x -> lookupType x
+  EVar _ x -> lookupEVar x
   EVal _ z -> fmap absurd . _sign2type <$> findInfo info2signs z
   ECon _ c -> fmap absurd <$> typeOfDCon c
   ENum _ _ -> pure typeInt
@@ -54,7 +54,7 @@ typeOf = \case
         _ -> throwErrorAt (ek^.expr2pos) "unexpected value argument"
   ELam _ bs e0 t0 -> do
     let ts = fmap _bind2type bs
-    withTypes ts (check e0 t0)
+    withinEScope ts (check e0 t0)
     pure (ts *~> t0)
   ELet _ ds e0 -> do
     traverse_ checkDefn ds
@@ -100,7 +100,7 @@ satisfiesCstr t0 clss = do
           zipWithM_ satisfiesCstrs tps qvs
     TVar v
       | null tps -> do
-          qual <- lookupKind v
+          qual <- lookupQual v
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
@@ -125,7 +125,7 @@ typeOfAltn ::
   Type tv -> Altn st tv ev -> TC tv ev (Type tv)
 typeOfAltn t (MkAltn _ p e) = do
   env <- patnEnvLevel p t
-  withTypes env (typeOf e)
+  withinEScope env (typeOf e)
 
 typeOfCase ::
   (St.Typed st, IsTVar tv, IsEVar ev) =>

@@ -10,48 +10,67 @@ import           Pukeko.AST.Type
 import           Pukeko.FrontEnd.Info (MonadInfo)
 import qualified Pukeko.AST.Identifier as Id
 
-data GammaEnv tv ev = GammaEnv
-  { _tenv :: EnvOf ev (Type tv)
-  , _kenv :: EnvOf tv (Set Id.Clss)
+data GammaEnv tf ef tv ev = GammaEnv
+  { _tenv :: EnvOf ev (ef tv)
+  , _kenv :: EnvOf tv (tf ev)
   }
 makeLenses ''GammaEnv
 
-newtype GammaT tv ev m a = GammaT{unGammaT :: ReaderT (GammaEnv tv ev) m a}
+newtype XGammaT tf ef tv ev m a =
+  GammaT{unGammaT :: ReaderT (GammaEnv tf ef tv ev) m a}
   deriving ( Functor, Applicative, Monad, MonadTrans
            , MonadError e, MonadSupply s, MonadWriter w
            )
 
-deriving instance (MonadInfo m) => MonadInfo (GammaT tv ev m)
+type GammaT = XGammaT (Const (Set Id.Clss)) Type
 
-runGammaT :: GammaT Void Void m a -> m a
-runGammaT m = runReaderT (unGammaT m) (GammaEnv (Const ()) (Const ()))
+runGammaT :: XGammaT tf ef Void Void m a -> m a
+runGammaT m = runReaderT (unGammaT m) (GammaEnv voidEnv voidEnv)
 
-withTypes ::
-  forall i m tv ev a. (HasEnvLevel i, HasEnv ev) =>
-  EnvLevelOf i (Type tv) -> GammaT tv (EScope i ev) m a -> GammaT tv ev m a
-withTypes ts = GammaT . withReaderT (tenv %~ extendEnv @i @ev ts) . unGammaT
+withinEScope ::
+  forall i m tf ef tv ev a. (HasEnvLevel i, HasEnv tv, HasEnv ev, Functor tf) =>
+  EnvLevelOf i (ef tv) -> XGammaT tf ef tv (EScope i ev) m a -> XGammaT tf ef tv ev m a
+withinEScope ts = withXGammaT (extendEnv @i @ev ts) (fmap (fmap weaken))
 
 withBinds ::
-  (HasEnvLevel i, HasEnv ev) =>
-  EnvLevelOf i (Bind Type tv) -> GammaT tv (EScope i ev) m a -> GammaT tv ev m a
-withBinds = withTypes . fmap _bind2type
-
-withKinds ::
-  forall i m tv ev a.
   (HasEnvLevel i, HasEnv tv, HasEnv ev) =>
-  EnvLevelOf i (Set Id.Clss) -> GammaT (TScope i tv) ev m a -> GammaT tv ev m a
-withKinds qs = GammaT . withReaderT upd . unGammaT
-  where
-    upd (GammaEnv t_env k_env) =
-      GammaEnv (fmap (fmap weaken) t_env) (extendEnv @i @tv qs k_env)
+  EnvLevelOf i (Bind Type tv) -> GammaT tv (EScope i ev) m a -> GammaT tv ev m a
+withBinds = withinEScope . fmap _bind2type
+
+withinTScope ::
+  forall i m tf ef tv ev a.
+  (HasEnvLevel i, HasEnv tv, HasEnv ev, Functor ef) =>
+  EnvLevelOf i (tf ev) -> XGammaT tf ef (TScope i tv) ev m a -> XGammaT tf ef tv ev m a
+withinTScope qs = withXGammaT (fmap (fmap weaken)) (extendEnv @i @tv qs)
 
 withQVars ::
   (HasEnvLevel i, HasEnv tv, HasEnv ev) =>
   EnvLevelOf i QVar -> GammaT (TScope i tv) ev m a -> GammaT tv ev m a
-withQVars = withKinds . fmap _qvar2cstr
+withQVars = withinTScope . fmap (Const . _qvar2cstr)
 
-lookupType :: (HasEnv ev, Monad m) => ev -> GammaT tv ev m (Type tv)
-lookupType = GammaT . views tenv . lookupEnv
+withinXScope ::
+  forall i j tf ef tv ev m a.
+  (HasEnvLevel i, HasEnvLevel j, HasEnv tv, HasEnv ev, Functor tf, Functor ef) =>
+  EnvLevelOf i (tf (EScope j ev)) -> EnvLevelOf j (ef (TScope i tv)) ->
+  XGammaT tf ef (TScope i tv) (EScope j ev) m a -> XGammaT tf ef tv ev m a
+withinXScope qs ts = withXGammaT
+  (extendEnv @j @ev ts . fmap (fmap weaken))
+  (extendEnv @i @tv qs . fmap (fmap weaken))
 
-lookupKind :: (HasEnv tv, Monad m) => tv -> GammaT tv ev m (Set Id.Clss)
-lookupKind = GammaT . views kenv . lookupEnv
+lookupEVar :: (HasEnv ev, Monad m) => ev -> XGammaT tf ef tv ev m (ef tv)
+lookupEVar = GammaT . views tenv . lookupEnv
+
+lookupTVar :: (HasEnv tv, Monad m) => tv -> XGammaT tf ef tv ev m (tf ev)
+lookupTVar = GammaT . views kenv . lookupEnv
+
+lookupQual :: (HasEnv tv, Monad m) => tv -> GammaT tv ev m (Set Id.Clss)
+lookupQual = fmap getConst . lookupTVar
+
+withXGammaT ::
+  (EnvOf ev1 (ef1 tv1) -> EnvOf ev2 (ef2 tv2)) ->
+  (EnvOf tv1 (tf1 ev1) -> EnvOf tv2 (tf2 ev2)) ->
+  XGammaT tf2 ef2 tv2 ev2 m a -> XGammaT tf1 ef1 tv1 ev1 m a
+withXGammaT f g = GammaT . withReaderT upd . unGammaT
+  where upd = (\(GammaEnv ev_env tv_env) -> GammaEnv (f ev_env) (g tv_env))
+
+deriving instance (MonadInfo m) => MonadInfo (XGammaT tf ef tv ev m)
