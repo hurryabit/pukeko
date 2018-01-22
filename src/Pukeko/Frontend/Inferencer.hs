@@ -163,17 +163,6 @@ inferLet (MkDefn l0 r0) = do
   let t3 = mkUTUni qvs t2
   pure (MkDefn (l0 & bind2type .~ t3) r1, t3, ds1)
 
--- FIXME: The whole group needs to be generalized together. Since we don't do
--- this, the following triggers a bug:
---
--- val f : Int
--- let f =
---   let rec g1 x y = g2 x y
---   and     g2 x y = g1 y x
---   in
---   g1 0 0
---
--- BUG! unknown type variable in instantiation (_4)
 inferRec ::
   (BaseTVar tv, HasEnv ev) =>
   Vector n (Defn In tv (EFinScope n ev)) ->
@@ -198,7 +187,7 @@ inferRec defns0 = do
         scope' (EVar w . Free) (\i b -> mkETyApp w (EVar w (mkBound i b)) vs3)
   let rs2 = fmap (// addETyApp) rs1
   let defns1 = Vec.zipWith3 (\t3 -> MkDefn . (bind2type .~ t3)) ts3 ls0 rs2
-  pure (defns1, ts2, cstrs_def)
+  pure (defns1, ts3, cstrs_def)
 
 infer ::
   (BaseTVar tv, HasEnv ev) =>
