@@ -1,0 +1,24 @@
+-- Fundamental functions
+abort : a
+external abort = "abort"
+
+-- Fundamental types
+type Unit =
+  | Unit
+
+type Bool =
+  | False
+  | True
+
+type Pair a b =
+  | Pair a b
+
+-- Fundamental classes
+class Eq a : { (==) : a -> a -> Bool }
+
+(!=) : (Eq a) => a -> a -> Bool
+(!=) x y = if x == y then False else True
+
+-- Fundamental functions
+id : a -> a
+id x = x

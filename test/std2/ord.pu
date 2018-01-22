@@ -1,0 +1,9 @@
+import std2/basic
+
+-- Orderings
+class Ord a :
+{ (<)  : a -> a -> Bool
+, (<=) : a -> a -> Bool
+, (>=) : a -> a -> Bool
+, (>)  : a -> a -> Bool
+}

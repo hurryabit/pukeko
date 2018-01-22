@@ -5,6 +5,7 @@ doc/
 test/*
 !test/
 !test/std/
+!test/std2/
 !test/Makefile
 !test/*.asm
 !test/*.bench

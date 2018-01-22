@@ -1,13 +1,13 @@
-import std/prelude
-import std/tree
+import std2/io
+import std2/bag
 
 tsort : List Int -> List Int
-tsort xs = in_order (foldl (fun t x -> insert_tree x t) Leaf xs)
+tsort xs = to_list (foldl (fun s x -> bag_insert x s) bag_empty xs)
 
 main : IO Unit
 main =
   input
   >>= fun n ->
-  sequence_io (replicate n input)
+  sequence (replicate n input)
   >>= fun xs ->
-  iter_io print (tsort xs)
+  traverse_ print (tsort xs)

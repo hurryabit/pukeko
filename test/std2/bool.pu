@@ -1,0 +1,15 @@
+import std2/basic
+
+-- Boolean operations
+not : Bool -> Bool
+not x = if x then False else True
+
+(&&) : Bool -> Bool -> Bool
+(&&) x y = if x then y else False
+
+(||) : Bool -> Bool -> Bool
+(||) x y = if x then True else y
+
+instance Eq Bool =
+{ (==) x y = if x then y else if y then False else True
+}

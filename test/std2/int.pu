@@ -1,0 +1,67 @@
+import std2/basic
+import std2/ord
+import std2/monoid
+import std2/num
+-- Integers
+
+type Int
+
+-- Equality
+eq_int : Int -> Int -> Bool
+external eq_int = "eq"
+
+instance Eq Int =
+{ (==) = eq_int
+}
+
+-- Ordering
+lt_int : Int -> Int -> Bool
+external lt_int = "lt"
+
+le_int : Int -> Int -> Bool
+external le_int = "le"
+
+ge_int : Int -> Int -> Bool
+external ge_int = "ge"
+
+gt_int : Int -> Int -> Bool
+external gt_int = "gt"
+
+instance Ord Int =
+{ (<)  = lt_int
+, (<=) = le_int
+, (>=) = ge_int
+, (>)  = gt_int
+}
+
+
+-- Algebra
+neg_int : Int -> Int
+external neg_int = "neg"
+
+add_int : Int -> Int -> Int
+external add_int = "add"
+
+sub_int : Int -> Int -> Int
+external sub_int = "sub"
+
+mul_int : Int -> Int -> Int
+external mul_int = "mul"
+
+instance Ring Int =
+{ neg = neg_int
+, (+) = add_int
+, (-) = sub_int
+, (*) = mul_int
+}
+
+(/) : Int -> Int -> Int
+external (/) = "div"
+
+(%) : Int -> Int -> Int
+external (%) = "mod"
+
+instance Monoid Int =
+{ empty = 0
+, append = (+)
+}

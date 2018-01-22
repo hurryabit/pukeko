@@ -1,0 +1,22 @@
+import std2/functor
+import std2/foldable
+
+-- Binary trees
+type BinTree a =
+  | Leaf
+  | Branch (BinTree a) a (BinTree a)
+
+instance Functor BinTree =
+{ map f t = match t with
+  | Leaf -> Leaf
+  | Branch l x r -> Branch (map f l) (f x) (map f r)
+}
+
+instance Foldable BinTree =
+{ foldr f y0 t = match t with
+  | Leaf -> y0
+  | Branch l x r -> foldr f (f x (foldr f y0 r)) l
+, foldl f y0 t = match t with
+  | Leaf -> y0
+  | Branch l x r -> foldl f (f (foldl f y0 l) x) r
+}
