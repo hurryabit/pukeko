@@ -21,15 +21,14 @@ import qualified Pukeko.MiddleEnd.Prettifier   as Prettifier
 type Module = Lambda.Module
 
 run
-  :: forall m. MonadError String m
-  => Bool
+  :: Bool
   -> SystemF.Module Stage.FrontEnd
-  -> m (SystemF.Module Stage.BackEnd, Module)
+  -> Either Doc (SystemF.Module Stage.BackEnd, Module)
 run unsafe module_sf = do
   let typeChecked ::
         Stage.Typed st2 =>
         (SystemF.Module st1 -> SystemF.Module st2) ->
-        (SystemF.Module st1 -> m (SystemF.Module st2))
+        (SystemF.Module st1 -> Either Doc (SystemF.Module st2))
       typeChecked f m
         | unsafe    = pure (f m)
         | otherwise = TypeChecker.checkModule (f m)

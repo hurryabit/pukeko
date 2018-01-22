@@ -17,7 +17,7 @@ import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Info
 
-type TU s ev = GammaT s ev (InfoT (ExceptT String (ST s)))
+type TU s ev = GammaT s ev (InfoT (ExceptT Doc (ST s)))
 
 -- TODO: link compression
 unwind :: UType s tv -> TU s ev (UType s tv)
@@ -40,7 +40,7 @@ readUnwound uref = do
 occursCheck :: STRef s (UVar s tv) -> UType s tv -> TU s ev ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
-    | uref1 == uref2 -> throwError "occurs check"
+    | uref1 == uref2 -> throwHere "occurs check"
     | otherwise      -> do
         uvar2 <- liftST $ readSTRef uref2
         case uvar2 of
@@ -56,8 +56,8 @@ occursCheck uref1 t2 = case t2 of
   UTUni{} -> bug "universal quantification in occurs check"
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
-unify :: Pos -> UType s tv -> UType s tv -> TU s ev ()
-unify pos t1 t2 = do
+unify :: UType s tv -> UType s tv -> TU s ev ()
+unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2
   case (t1, t2) of
@@ -66,17 +66,16 @@ unify pos t1 t2 = do
       (v1, _) <- readUnwound uref1
       occursCheck uref1 t2 `catchError` \_ -> do
         p2 <- liftST $ prettyUType prettyNormal 0 t2
-        throwDocAt pos $ quotes (pretty v1) <+> "occurs in" <+> p2
+        throwHere (quotes (pretty v1) <+> "occurs in" <+> p2)
       liftST $ writeSTRef uref1 (ULink t2)
-    (_, UVar _) -> unify pos t2 t1
+    (_, UVar _) -> unify t2 t1
     (UTVar x1, UTVar x2)
       | x1 == x2 -> pure ()
     (UTArr, UTArr) -> pure ()
     (UTCon tcon1, UTCon tcon2)
       | tcon1 == tcon2 -> pure ()
-    (UTApp tf1 tp1, UTApp tf2 tp2) ->
-      unify pos tf1 tf2 *> unify pos tp1 tp2
+    (UTApp tf1 tp1, UTApp tf2 tp2) -> unify tf1 tf2 *> unify tp1 tp2
     _ -> do
       p1 <- liftST $ prettyUType prettyNormal 0 t1
       p2 <- liftST $ prettyUType prettyNormal 0 t2
-      throwDocAt pos $ "mismatching types" <+> p1 <+> "and" <+> p2
+      throwHere ("mismatching types" <+> p1 <+> "and" <+> p2)

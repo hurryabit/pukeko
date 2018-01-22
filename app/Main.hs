@@ -13,18 +13,21 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
 import qualified Pukeko.BackEnd         as BackEnd
 
+unlift :: (Monad m) => Either e a -> ExceptT e m a
+unlift = ExceptT . pure
+
 compile :: Bool -> Bool -> Bool -> String -> IO ()
 compile write_pl stop_tc unsafe file = do
   ok_or_error <- runExceptT $ do
     package <- Parser.parsePackage file
-    module_sf <- FrontEnd.run unsafe package
+    module_sf <- unlift (FrontEnd.run unsafe package)
     if stop_tc
       then do
         liftIO $ writeFile (file -<.> "ti")
           (render (pPrintPrec prettyNormal 0 module_sf) ++ "\n")
       else do
-        (module_pl, module_lm) <- MiddleEnd.run unsafe module_sf
-        nasm <- BackEnd.run module_lm
+        (module_pl, module_lm) <- unlift (MiddleEnd.run unsafe module_sf)
+        nasm <- unlift (BackEnd.run module_lm)
         liftIO $ do
           when write_pl $ do
             writeFile (file -<.> "pl") $
@@ -32,7 +35,7 @@ compile write_pl stop_tc unsafe file = do
           writeFile (file -<.> "asm") nasm
   case ok_or_error of
     Left error -> do
-      putStrLn $ "Error: " ++ error
+      putStrLn $ "Error: " ++ render error
       exitWith (ExitFailure 1)
     Right () -> exitWith ExitSuccess
 

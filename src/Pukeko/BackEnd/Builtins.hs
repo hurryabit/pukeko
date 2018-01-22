@@ -11,7 +11,6 @@ import Pukeko.Prelude
 
 import qualified Data.Map as Map
 
-import Pukeko.Pretty
 import Pukeko.BackEnd.GCode
 
 externalName :: Name -> Name
@@ -20,9 +19,9 @@ externalName (MkName name) = MkName ("gm$" ++ name)
 constructorName :: Int -> Int -> Name
 constructorName tag arity = MkName ("gm$cons_" ++ show tag ++ "_" ++ show arity)
 
-findGlobal :: MonadError String m => Name -> m Global
+findGlobal :: Name -> Either Doc Global
 findGlobal name = case Map.lookup (externalName name) globalTable of
-  Nothing -> throwDoc $ "unknown external" <+> quotes (pretty name)
+  Nothing -> throwError ("unknown external:" <+> pretty name)
   Just global -> return global
 
 mkBuiltinGen :: Name -> Int -> [Inst] -> Global

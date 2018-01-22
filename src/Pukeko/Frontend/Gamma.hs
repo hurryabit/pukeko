@@ -19,7 +19,7 @@ makeLenses ''GammaEnv
 newtype XGammaT tf ef tv ev m a =
   GammaT{unGammaT :: ReaderT (GammaEnv tf ef tv ev) m a}
   deriving ( Functor, Applicative, Monad, MonadTrans
-           , MonadError e, MonadSupply s, MonadWriter w
+           , MonadError e, MonadSupply s, MonadWriter w, MonadHere
            )
 
 type GammaT = XGammaT (Const (Set Id.Clss)) Type

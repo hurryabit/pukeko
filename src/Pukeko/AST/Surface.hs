@@ -17,7 +17,6 @@ module Pukeko.AST.Surface
   , TypeScheme (..)
   , Defn (..)
   , Expr (..)
-  , Bind (..)
   , Altn (..)
   , Patn (..)
 
@@ -49,56 +48,50 @@ data Package = MkPackage
 data Module = MkModule
   { _mod2file    :: FilePath
   , _mod2imports :: [FilePath]
-  , _mod2decls   :: [Decl]
+  , _mod2decls   :: [Loc Decl]
   }
 
 data Decl
-  = DType (NonEmpty TConDecl)
+  = DType (NonEmpty (Loc TConDecl))
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
-  | DLet  (NonEmpty (Defn Id.EVar))
-  | DRec  (NonEmpty (Defn Id.EVar))
+  | DLet  (NonEmpty (Loc (Defn Id.EVar)))
+  | DRec  (NonEmpty (Loc (Defn Id.EVar)))
   | DPrim PrimDecl
 
 data TConDecl = MkTConDecl
-  { _tcon2pos   :: Pos
-  , _tcon2name  :: Id.TCon
+  { _tcon2name  :: Id.TCon
   , _tcon2prms  :: [Id.TVar]
-  , _tcon2dcons :: [DConDecl]
+  , _tcon2dcons :: [Loc DConDecl]
   }
 
 data DConDecl = MkDConDecl
-  { _dcon2pos  :: Pos
-  , _dcon2name :: Id.DCon
+  { _dcon2name :: Id.DCon
   , _dcon2flds :: [Type]
   }
 
 data SignDecl = MkSignDecl
-  { _sign2pos  :: Pos
-  , _sign2func :: Id.EVar
+  { _sign2func :: Id.EVar
   , _sign2type :: TypeScheme
   }
 
 data ClssDecl = MkClssDecl
-  { _clss2pos   :: Pos
-  , _clss2name  :: Id.Clss
+  { _clss2name  :: Id.Clss
   , _clss2prm   :: Id.TVar
   , _clss2mthds :: [SignDecl]
   }
 
 data InstDecl = MkInstDecl
-  { _inst2pos   :: Pos
-  , _inst2clss  :: Id.Clss
+  { _inst2clss  :: Id.Clss
   , _inst2tcon  :: Id.TCon
   , _inst2tvars :: [Id.TVar]
   , _inst2cstr  :: TypeCstr
-  , _inst2defns :: [Defn Id.EVar]
+  , _inst2defns :: [Loc (Defn Id.EVar)]
   }
 
 data PrimDecl = MkPrimDecl
-  { _prim2pos  :: Pos
-  , _prim2func :: Id.EVar
+  { _prim2func :: Id.EVar
   , _prim2prim :: String
   }
 
@@ -112,50 +105,49 @@ data TypeCstr = MkTypeCstr [(Id.Clss, Id.TVar)]
 
 data TypeScheme = MkTypeScheme TypeCstr Type
 
-data Defn v = MkDefn Bind (Expr v)
+data Defn v = MkDefn Id.EVar (Expr v)
 
 data Expr v
-  = EVar Pos v
-  | ECon Pos DCon
-  | ENum Pos Int
-  | EApp Pos (Expr v) (NonEmpty (Expr v))
-  | EMat Pos (Expr v) [Altn v]
-  | ELam Pos (NonEmpty Bind) (Expr v)
-  | ELet Pos (NonEmpty (Defn v)) (Expr v)
-  | ERec Pos (NonEmpty (Defn v)) (Expr v)
+  = ELoc (Loc (Expr v))
+  | EVar v
+  | ECon DCon
+  | ENum Int
+  | EApp (Expr v) (NonEmpty (Expr v))
+  | EMat (Expr v) [Altn v]
+  | ELam (NonEmpty Id.EVar) (Expr v)
+  | ELet (NonEmpty (Loc (Defn v))) (Expr v)
+  | ERec (NonEmpty (Loc (Defn v))) (Expr v)
 
-data Bind = MkBind Pos Id.EVar
-
-data Altn v = MkAltn Pos Patn (Expr v)
+data Altn v = MkAltn Patn (Expr v)
 
 data Patn
-  = PWld Pos
-  | PVar Pos Id.EVar
-  | PCon Pos Id.DCon [Patn]
+  = PWld
+  | PVar Id.EVar
+  | PCon Id.DCon [Patn]
 
 extend :: Module -> Package -> Package
 extend mdl (MkPackage _ mdls) = MkPackage (_mod2file mdl) (mdls ++ [mdl])
 
-mkApp :: Pos -> Expr v -> [Expr v] -> Expr v
-mkApp pos fun = \case
+mkApp :: Expr v -> [Expr v] -> Expr v
+mkApp fun = \case
   []       -> fun
-  arg:args -> EApp pos fun (arg :| args)
+  arg:args -> EApp fun (arg :| args)
 
-mkAppOp :: String -> Pos -> Expr Id.EVar -> Expr Id.EVar -> Expr Id.EVar
-mkAppOp sym pos arg1 arg2 =
-  let fun = EVar pos (Id.op sym)
-  in  EApp pos fun (arg1 :| [arg2])
+mkAppOp :: String -> Expr Id.EVar -> Expr Id.EVar -> Expr Id.EVar
+mkAppOp sym arg1 arg2 =
+  let fun = EVar (Id.op sym)
+  in  EApp fun (arg1 :| [arg2])
 
-mkIf :: Pos -> Expr v -> Pos -> Expr v -> Pos -> Expr v -> Expr v
-mkIf wt t wu u wv v =
-  EMat wt t [ MkAltn wu (PCon wu (Id.dcon "True") []) u
-            , MkAltn wv (PCon wv (Id.dcon "False") []) v
-            ]
+mkIf :: Expr v -> Expr v -> Expr v -> Expr v
+mkIf t u v =
+  EMat t [ MkAltn (PCon (Id.dcon "True") []) u
+         , MkAltn (PCon (Id.dcon "False") []) v
+         ]
 
-mkLam :: Pos -> [Bind] -> Expr v -> Expr v
-mkLam w = \case
+mkLam :: [Id.EVar] -> Expr v -> Expr v
+mkLam = \case
   []     -> id
-  (b:bs) -> ELam w (b :| bs)
+  (b:bs) -> ELam (b :| bs)
 
 mkTApp :: Type -> [Type] -> Type
 mkTApp = foldl TApp
@@ -186,4 +178,3 @@ deriving instance Show v => Show (Defn v)
 deriving instance Show v => Show (Expr v)
 deriving instance Show v => Show (Altn v)
 deriving instance Show Patn
-deriving instance Show Bind

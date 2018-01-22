@@ -24,17 +24,17 @@ import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
-parseInput :: MonadError String m => SourceName -> String -> m Module
+parseInput :: (MonadError Doc m) => SourceName -> String -> m Module
 parseInput source =
-  either (throwError . show) pure . parse (module_ source <* eof) source
+  either (throwError . shown) pure . parse (module_ source <* eof) source
 
-parseModule :: (MonadError String m, MonadIO m) => FilePath -> m Module
+parseModule :: FilePath -> ExceptT Doc IO Module
 parseModule file = do
   liftIO (putStr (file ++ " "))
   code <- liftIO (readFile file)
   parseInput file code
 
-parsePackage :: (MonadError String m, MonadIO m) => FilePath -> m Package
+parsePackage :: FilePath -> ExceptT Doc IO Package
 parsePackage file = build parseModule file <* liftIO (putStrLn "")
 
 type Parser = Parsec String ()
@@ -76,8 +76,8 @@ many1NE p = (:|) <$> p <*> many p
 sepBy1NE :: Parser a -> Parser sep -> Parser (NonEmpty a)
 sepBy1NE p sep = (:|) <$> p <*> many (sep *> p)
 
-getPos :: Parser Pos
-getPos = mkPos <$> getPosition
+loc :: Parser a -> Parser (Loc a)
+loc p = Loc <$> (mkPos <$> getPosition) <*> p
 
 nat :: Parser Int
 nat = fromInteger <$> natural
@@ -127,12 +127,12 @@ module_ :: SourceName -> Parser Module
 module_ source = do
   imps <- many import_
   whiteSpace
-  decls <- many $ choice
-    [ DType <$> (reserved "type"     *> sepBy1NE tconDecl (reserved "and"))
+  decls <- many $ loc $ choice
+    [ DType <$> (reserved "type"     *> sepBy1NE (loc tconDecl) (reserved "and"))
     , DSign <$> (reserved "val"      *> signDecl)
     , DClss <$> (reserved "class"    *> clssDecl)
     , DInst <$> (reserved "instance" *> instDecl)
-    , let_ (const DLet) (const DRec)
+    , let_ DLet DRec
     , DPrim <$> (reserved "external" *> primDecl)
     ]
   pure (MkModule source imps decls)
@@ -147,113 +147,90 @@ import_ = do
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
 patn, apatn :: Parser Patn
-patn  = PCon <$> getPos <*> dcon <*> many apatn <|>
+patn  = PCon <$> dcon <*> many apatn <|>
         apatn
-apatn = PWld <$> getPos <*  symbol "_"       <|>
-        PVar <$> getPos <*> evar             <|>
-        PCon <$> getPos <*> dcon <*> pure [] <|>
+apatn = symbol "_" *> pure PWld   <|>
+        PVar <$> evar             <|>
+        PCon <$> dcon <*> pure [] <|>
         parens patn
 
 defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
-defnValLhs = MkDefn <$> bind
+defnValLhs = MkDefn <$> evar
 
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
-  (.) <$> (MkDefn <$> bind)
-      <*> (ELam <$> getPos <*> many1NE bind)
+  (.) <$> (MkDefn <$> evar)
+      <*> (ELam <$> many1NE evar)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
-defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> expr) <?> "definition"
+defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> lexpr) <?> "definition"
 
 altn :: Parser (Altn Id.EVar)
-altn =
-  MkAltn <$> getPos
-         <*> (bar *> patn)
-         <*> (arrow *> expr)
+altn = MkAltn <$> (bar *> patn) <*> (arrow *> expr)
 
 let_ ::
-  (Pos -> NonEmpty (Defn Id.EVar) -> a) ->
-  (Pos -> NonEmpty (Defn Id.EVar) -> a) ->
+  (NonEmpty (Loc (Defn Id.EVar)) -> a) ->
+  (NonEmpty (Loc (Defn Id.EVar)) -> a) ->
   Parser a
 let_ mkLet mkRec =
-  f <$> getPos
-    <*> (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
-    <*> sepBy1NE defn (reserved "and")
-  where
-    f w mk = mk w
+  (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
+  <*> sepBy1NE (loc defn) (reserved "and")
 
-expr, aexpr :: Parser (Expr Id.EVar)
+expr, aexpr, lexpr :: Parser (Expr Id.EVar)
 expr =
   (buildExpressionParser operatorTable . choice)
-  [ mkApp <$> getPos <*> aexpr <*> many aexpr
-  , mkIf  <$> getPos
-          <*> (reserved "if"   *> expr)
-          <*> getPos
+  [ mkApp <$> aexpr <*> many aexpr
+  , mkIf  <$> (reserved "if"   *> expr)
           <*> (reserved "then" *> expr)
-          <*> getPos
           <*> (reserved "else" *> expr)
   , EMat
-    <$> getPos
-    <*> (reserved "match" *> expr)
+    <$> (reserved "match" *> expr)
     <*> (reserved "with"  *> (toList <$> many1 altn))
   , ELam
-    <$> getPos
-    <*> (reserved "fun" *> many1NE bind)
+    <$> (reserved "fun" *> many1NE evar)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]
   <?> "expression"
 aexpr = choice
-  [ EVar <$> getPos <*> evar
-  , ECon <$> getPos <*> dcon
-  , ENum <$> getPos <*> nat
+  [ EVar <$> evar
+  , ECon <$> dcon
+  , ENum <$> nat
   , parens expr
   ]
-
-bind :: Parser Bind
-bind = MkBind <$> getPos <*> evar
+lexpr = ELoc <$> loc expr
 
 operatorTable = map (map f) (reverse Op.table)
   where
-    f MkSpec { _sym, _assoc } = Infix (mkAppOp _sym <$> (getPos <* reservedOp _sym)) _assoc
+    f MkSpec { _sym, _assoc } = Infix (reservedOp _sym *> pure (mkAppOp _sym)) _assoc
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
-  <$> getPos
-  <*> tcon
+  <$> tcon
   <*> many tvar
-  <*> option [] (equals *> (toList <$> many1 dconDecl))
+  <*> option [] (equals *> (toList <$> many1 (loc dconDecl)))
 
 dconDecl :: Parser DConDecl
-dconDecl = MkDConDecl <$> getPos <*> (reservedOp "|" *> dcon) <*> many atype
+dconDecl = MkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype
 
 signDecl :: Parser SignDecl
-signDecl = MkSignDecl
-  <$> getPos
-  <*> evar
-  <*> (colon *> typeScheme)
+signDecl = MkSignDecl <$> evar <*> (colon *> typeScheme)
 
 clssDecl :: Parser ClssDecl
-clssDecl = MkClssDecl
-  <$> getPos
-  <*> clss
-  <*> tvar
-  <*> (colon *> record signDecl)
+clssDecl = MkClssDecl <$> clss <*> tvar <*> (colon *> record signDecl)
 
 instDecl :: Parser InstDecl
 instDecl = do
-  w       <- getPos
   c       <- clss
   (t, vs) <- (,) <$> tcon <*> pure [] <|> parens ((,) <$> tcon <*> many tvar)
   q       <- equals *> typeCstr
-  ds      <- record defn
-  pure (MkInstDecl w c t vs q ds)
+  ds      <- record (loc defn)
+  pure (MkInstDecl c t vs q ds)
 
 primDecl :: Parser PrimDecl
 primDecl = MkPrimDecl
-  <$> getPos
-  <*> evar
+  <$> evar
   <*> (equals *> Token.stringLiteral pukeko)
 
 record :: Parser a -> Parser [a]

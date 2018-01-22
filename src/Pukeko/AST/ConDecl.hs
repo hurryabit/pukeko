@@ -7,7 +7,6 @@ module Pukeko.AST.ConDecl
   , Pair1 (..)
   , TConDecl (..)
   , DConDecl (..)
-  , tcon2pos
   , tcon2name
   , tcon2dcons
   , dcon2name
@@ -27,22 +26,20 @@ data Some1 f = forall n. KnownNat n => Some1 (f n)
 data Pair1 f g a = Pair1 (f a) (g a)
 
 data TConDecl n = KnownNat n => MkTConDecl
-  { _tcon2pos   :: Pos
-  , _tcon2name  :: Id.TCon
+  { _tcon2name  :: Id.TCon
   , _tcon2prms  :: Vector n Id.TVar
-  , _tcon2dcons :: [DConDecl n]
+  , _tcon2dcons :: [Loc (DConDecl n)]
   }
 
 data DConDecl n = MkDConDecl
-  { _dcon2pos  :: Pos
-  , _dcon2tcon :: Id.TCon
+  { _dcon2tcon :: Id.TCon
   , _dcon2name :: Id.DCon
   , _dcon2tag  :: Int
   , _dcon2flds :: [Type (TFinScope n Void)]
   }
 
 typeOfDConDecl :: TConDecl n -> DConDecl n -> Type Void
-typeOfDConDecl (MkTConDecl _ tname prms _) (MkDConDecl _ tcon dname _ flds)
+typeOfDConDecl (MkTConDecl tname prms _) (MkDConDecl tcon dname _ flds)
   | tname /= tcon = bugWith "type and data constructor do not match" (tname, dname)
   | otherwise     = go prms flds
   where
@@ -57,7 +54,7 @@ typeOfDConDecl (MkTConDecl _ tname prms _) (MkDConDecl _ tcon dname _ flds)
         Nothing -> bug "type and data constructor have different arity" (tname, dname)
 
 instance Pretty (TConDecl n) where
-  pPrintPrec lvl _ (MkTConDecl _ tname prms dcons)
+  pPrintPrec lvl _ (MkTConDecl tname prms dcons)
     | null dcons =
         pPrintPrec lvl 0 tname <+> hsepMap (pPrintPrec lvl 0) prms
     | otherwise  =
@@ -65,7 +62,7 @@ instance Pretty (TConDecl n) where
         nest 2 (vcat (map (pPrintPrec lvl 0) dcons))
 
 instance Pretty (DConDecl n) where
-  pPrintPrec lvl _ (MkDConDecl _ _ dname _ flds) =
+  pPrintPrec lvl _ (MkDConDecl _ dname _ flds) =
     "|" <+> pPrintPrec lvl 0 dname <+> hsepMap (pPrintPrec lvl 3) flds
 
 instance Pretty (Some1 TConDecl) where

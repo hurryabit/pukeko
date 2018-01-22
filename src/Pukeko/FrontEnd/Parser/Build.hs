@@ -5,21 +5,22 @@ module Pukeko.FrontEnd.Parser.Build
 import Pukeko.Prelude
 
 import           Control.Lens
+import           Control.Monad.Error.Class (MonadError (..))
 import qualified Data.DList as DL
 
 import           Pukeko.AST.Surface
 
 type BuildT = RWST (Set FilePath) (DList Module) (Set FilePath)
 
-build :: MonadError String m => (FilePath -> m Module) -> FilePath -> m Package
+build :: MonadError Doc m => (FilePath -> m Module) -> FilePath -> m Package
 build parse file = do
   (_, mdls) <- execRWST (run parse file) mempty mempty
   pure (MkPackage file (toList mdls))
 
-run :: MonadError String m => (FilePath -> m Module) -> FilePath -> BuildT m ()
+run :: MonadError Doc m => (FilePath -> m Module) -> FilePath -> BuildT m ()
 run parse file = do
   cyc <- view (contains file)
-  when cyc $ throwDoc ("detected import cycle at file" <+> text file)
+  when cyc $ throwError ("detected import cycle at file" <+> text file)
   done <- use (contains file)
   unless done $ do
     mdl <- lift (parse file)

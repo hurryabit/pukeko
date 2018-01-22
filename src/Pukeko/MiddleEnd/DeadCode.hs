@@ -15,12 +15,12 @@ import qualified Pukeko.AST.Identifier as Id
 
 cleanModule :: Module st -> Module st
 cleanModule (MkModule tops0) =
-  let edges t = fmap (\lhs -> (t, lhs, deps t)) (firstOf decl2func t)
+  let edges t = fmap (\lhs -> (t, lhs, deps t)) (firstOf (traverse . decl2func) t)
       (g, out, in_) = G.graphFromEdges $ mapMaybe edges tops0
       reach = Set.fromList
               $ map (view _2 . out) $ maybe [] (G.reachable g) (in_ Id.main)
       keep = (`Set.member` reach)
-      tops1 = filter (maybe True keep . firstOf decl2func) tops0
+      tops1 = filter (maybe True keep . firstOf (traverse . decl2func)) tops0
   in  MkModule tops1
   where
-    deps = Set.toList . setOf decl2eval
+    deps = Set.toList . setOf (traverse . unhere decl2eval)

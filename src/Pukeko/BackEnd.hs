@@ -12,7 +12,7 @@ import qualified Pukeko.BackEnd.PeepHole as PeepHole
 
 type NASM = String
 
-run :: MonadError String m => Lambda.Module -> m NASM
+run :: Lambda.Module -> Either Doc NASM
 run =
   Compiler.compile
   >=> pure . PeepHole.optimize

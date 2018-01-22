@@ -21,17 +21,12 @@ data Context = MkContext
   }
 makeLenses ''Context
 
-newtype CC a = CC { unCC :: RWST Context [Inst] Int (Except String) a }
-  deriving ( Functor, Applicative, Monad
-           , MonadError String
-           , MonadReader Context
-           , MonadWriter [Inst]
-           )
+type CC = RWST Context [Inst] Int (Except Doc)
 
 freshLabel :: CC Name
-freshLabel = CC $ state $ \n -> (MkName ('.':show n), n+1)
+freshLabel = state $ \n -> (MkName ('.':show n), n+1)
 
-compile :: MonadError String m => Module -> m Program
+compile :: Module -> Either Doc Program
 compile module_ = do
   let MkInfo{_constructors} = info module_
   let constructors =
@@ -40,7 +35,7 @@ compile module_ = do
   let _globals = constructors ++ globals
   return MkProgram{ _globals, _main = MkName "main" }
 
-compileTopDefn :: MonadError String m => TopLevel -> m Global
+compileTopDefn :: TopLevel -> Either Doc Global
 compileTopDefn top = case top of
   Def{_name, _binds, _body} -> do
     let n = length _binds
@@ -48,7 +43,7 @@ compileTopDefn top = case top of
           { _offsets = Map.fromList $ zipMaybe _binds [n, n-1 ..]
           , _depth   = n
           }
-    ((), code) <- runExcept (evalRWST (unCC $ ccExpr Redex _body) context 0)
+    ((), code) <- runExcept (evalRWST (ccExpr Redex _body) context 0)
     let _arity = n
         _code  = GLOBSTART _name _arity : code
     return $ MkGlobal { _name, _arity, _code }

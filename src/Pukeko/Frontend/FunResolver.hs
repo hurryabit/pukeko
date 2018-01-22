@@ -14,8 +14,8 @@ import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.Identifier as Id
 
-type In  = St.TypeResolver
-type Out = St.FunResolver
+type In  = St.Renamer
+type Out = St.Renamer
 
 data FRState = MkFRState
   { _declared :: Map Id.EVar Pos
@@ -23,37 +23,41 @@ data FRState = MkFRState
   }
 makeLenses ''FRState
 
-newtype FR a = FR{unFR :: StateT FRState (Except String) a}
+newtype FR a = FR{unFR :: StateT FRState (HereT (Except Doc)) a}
   deriving ( Functor, Applicative, Monad
            , MonadState FRState
-           , MonadError String
+           , MonadError Doc
+           , MonadHere
            )
 
-runFR :: MonadError String m => FR a -> m (a, FRState)
-runFR fr = runExcept (runStateT (unFR fr) st0)
+runFR :: FR a -> Either Doc a
+runFR fr = runExcept (runHereT (evalStateT (unFR fr) st0))
   where
     st0 = MkFRState mempty mempty
 
-resolveModule :: MonadError String m => Module In -> m (Module Out)
-resolveModule (MkModule tops0) = do
-  (tops1, MkFRState decld defnd) <- runFR (traverse frDecl tops0)
+resolveModule :: Module In -> Either Doc (Module Out)
+resolveModule (MkModule tops0) = runFR $ do
+  tops1 <- traverseHeres frDecl tops0
+  MkFRState decld defnd <- get
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   case Map.minViewWithKey undefnd of
-    Just ((fun, w), _) -> throwAt w "declared but undefined function" fun
+    Just ((fun, pos), _) ->
+      here pos (throwHere ("declared but undefined function:" <+> pretty fun))
     Nothing -> pure (MkModule tops1)
 
 declareFun :: SignDecl tv -> FR ()
-declareFun (MkSignDecl w fun _) = do
+declareFun (MkSignDecl fun _) = do
   dup <- uses declared (has (ix fun))
-  when dup (throwAt w "duplicate declaration of function" fun)
-  declared . at fun ?= w
+  when dup (throwHere ("duplicate declaration of function:" <+> pretty fun))
+  pos <- where_
+  declared . at fun ?= pos
 
-defineFun :: Pos -> Id.EVar -> FR ()
-defineFun w fun = do
+defineFun :: Id.EVar -> FR ()
+defineFun fun = do
   ex <- uses declared (has (ix fun))
-  unless ex (throwAt w "undeclared function" fun)
+  unless ex (throwHere ("undeclared function:" <+> pretty fun))
   dup <- use (defined . contains fun)
-  when dup (throwAt w "duplicate definition of function" fun)
+  when dup (throwHere ("duplicate definition of function:" <+> pretty fun))
   defined . contains fun .= True
 
 frDecl :: Decl In -> FR (Decl Out)
@@ -65,16 +69,14 @@ frDecl = \case
   -- FIXME: Check that classes are declared only once and before their first
   -- instantiation. Check that no class/type constructor pair is instantiated
   -- twice.
-  DClss (MkClssDecl w c v ms) -> do
-    for_ ms $ \m -> declareFun m *> defineFun (m^.sign2pos) (m^.sign2func)
-    pure (DClss (MkClssDecl w c v ms))
-  DInst (MkInstDecl w c t qvs ds) -> do
-    pure (DInst (MkInstDecl w c t qvs (map retagDefn ds)))
+  DClss (MkClssDecl c v ms) -> do
+    for_ ms $ \m -> declareFun m *> defineFun (m^.sign2func)
+    pure (DClss (MkClssDecl c v ms))
+  DInst (MkInstDecl c t qvs ds) -> do
+    pure (DInst (MkInstDecl c t qvs ds))
   DDefn d -> do
-    let b = d^.defn2bind
-    defineFun (b^.bind2pos) (b^.bind2evar)
-    pure (DDefn (retagDefn d))
+    defineFun (d^.defn2bind.bind2evar)
+    pure (DDefn d)
   DPrim p -> do
-    let b = p^.prim2bind
-    defineFun (b^.bind2pos) (b^.bind2evar)
+    defineFun (p^.prim2bind.bind2evar)
     pure (DPrim p)

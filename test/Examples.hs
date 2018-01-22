@@ -9,16 +9,16 @@ import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
 
-render :: [Int] -> String
-render = unlines . map show
+format :: [Int] -> String
+format = unlines . map show
 
 runProg :: FilePath -> [Int] -> IO (ExitCode, String)
 runProg prog input = do
-  (exitCode, stdout, _) <- readProcessWithExitCode ("./" ++ prog) [] (render input)
+  (exitCode, stdout, _) <- readProcessWithExitCode ("./" ++ prog) [] (format input)
   return (exitCode, stdout)
 
 testBasic name input output =
-  specify name $ runProg name input `shouldReturn` (ExitSuccess, render output)
+  specify name $ runProg name input `shouldReturn` (ExitSuccess, format output)
 
 prop_prog_correct :: Gen [Int] -> ([Int] -> [Int]) -> FilePath -> Property
 prop_prog_correct gen spec prog = monadicIO $ do
@@ -26,7 +26,7 @@ prop_prog_correct gen spec prog = monadicIO $ do
   (exitCode, stdout) <- run $ runProg prog xs
   assert (exitCode == ExitSuccess)
   let ys = spec xs
-  assert (stdout == render ys)
+  assert (stdout == format ys)
 
 prop_sort_correct :: FilePath -> Property
 prop_sort_correct =
@@ -100,7 +100,7 @@ prop_rmq_correct prog = monadicIO $ do
   (exitCode, stdout) <- run $ runProg prog input
   assert (exitCode == ExitSuccess)
   let output = map (\(lo, hi) -> minimum $ take (hi-lo+1) $ drop lo xs) qs
-  assert (stdout == render output)
+  assert (stdout == format output)
 
 compile :: IO ()
 compile = do

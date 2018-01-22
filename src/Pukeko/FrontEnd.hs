@@ -21,7 +21,7 @@ import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
 
 type Module = SystemF.Module Stage.ClassEliminator
 
-run :: MonadError String m => Bool -> Parser.Package -> m Module
+run :: Bool -> Parser.Package -> Either Doc Module
 run unsafe =
   Renamer.renameModule
   >=> TypeResolver.resolveModule

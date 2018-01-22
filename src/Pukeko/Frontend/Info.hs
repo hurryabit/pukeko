@@ -56,6 +56,7 @@ newtype InfoT m a = InfoT{unInfoT :: ReaderT ModuleInfo m a}
            , MonadState s
            , MonadSupply s
            , MonadWriter w
+           , MonadHere
            )
 
 data SomeInstDecl = forall st. SomeInstDecl (InstDecl st)
@@ -95,22 +96,22 @@ itemInfo l k v = set l (Map.singleton k v) mempty
 tconDeclInfo :: Some1 TConDecl -> ModuleInfo
 tconDeclInfo (Some1 tcon) =
   let dis =
-        flip foldMap (tcon^.tcon2dcons) $ \dcon ->
+        flip foldMap (tcon^.tcon2dcons) $ \(Loc _ dcon) ->
           itemInfo info2dcons (dcon^.dcon2name) (Some1 (Pair1 tcon dcon))
   in  itemInfo info2tcons (tcon^.tcon2name) (Some1 tcon) <> dis
 
 collectInfo :: forall st. (IsType (StageType st)) => Module st -> ModuleInfo
-collectInfo (MkModule tops) = foldFor tops $ \case
-  DType tcons -> foldMap tconDeclInfo tcons
+collectInfo (MkModule decls) = foldFor decls $ \decl -> case unloc decl of
+  DType tcons -> foldMap (tconDeclInfo . unloc) tcons
   DSign s -> sign s
-  DClss clss@(MkClssDecl _ c v ms) ->
-    let mthds_info = foldFor ms $ \mthd@(MkSignDecl w z t0) ->
+  DClss clss@(MkClssDecl c v ms) ->
+    let mthds_info = foldFor ms $ \mthd@(MkSignDecl z t0) ->
           let t1 = mkTUni (Vec.singleton (MkQVar (Set.singleton c) v)) t0
-          in  sign (MkSignDecl w z t1) <> itemInfo info2mthds z (clss, mthd)
+          in  sign (MkSignDecl z t1) <> itemInfo info2mthds z (clss, mthd)
     in  itemInfo info2clsss c clss <> mthds_info
-  DInst inst@(MkInstDecl _ c t _ _) -> itemInfo info2insts (c, t) (SomeInstDecl inst)
+  DInst inst@(MkInstDecl c t _ _) -> itemInfo info2insts (c, t) (SomeInstDecl inst)
   DDefn (MkDefn b _) -> signBind b
-  DSupC (MkSupCDecl w z xs t _ _) -> sign (MkSignDecl w z (mkTUni xs t))
+  DSupC (MkSupCDecl z xs t _ _) -> sign (MkSignDecl z (mkTUni xs t))
   DPrim (MkPrimDecl b _) -> signBind b
   where
     foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
@@ -119,7 +120,7 @@ collectInfo (MkModule tops) = foldFor tops $ \case
     sign :: SignDecl Void -> ModuleInfo
     sign s = itemInfo info2signs (s^.sign2func) s
     signBind :: IsType ty => Bind ty Void -> ModuleInfo
-    signBind (MkBind w z t) = maybe mempty (sign . MkSignDecl w z) (isType t)
+    signBind (MkBind z t) = maybe mempty (sign . MkSignDecl z) (isType t)
 
 instance Monad m => MonadInfo (InfoT m) where
   askInfo = InfoT ask
@@ -128,6 +129,9 @@ instance MonadInfo m => MonadInfo (ReaderT r m) where
   askInfo = lift askInfo
 
 instance MonadInfo m => MonadInfo (SupplyT s m) where
+  askInfo = lift askInfo
+
+instance MonadInfo m => MonadInfo (HereT m) where
   askInfo = lift askInfo
 
 instance MonadReader r m => MonadReader r (InfoT m) where

@@ -199,21 +199,6 @@ deriving instance Functor     NoType
 deriving instance Foldable    NoType
 deriving instance Traversable NoType
 
-instance FunctorWithIndex     Pos Type where
-instance FoldableWithIndex    Pos Type where
-instance TraversableWithIndex Pos Type where
-  itraverse f = \case
-    TVar x -> TVar <$> f noPos x
-    TArr   -> pure TArr
-    TCon c -> pure (TCon c)
-    TApp tf tp -> TApp <$> itraverse f tf <*> itraverse f tp
-    TUni vs tq -> TUni vs <$> itraverse (traverse . f) tq
-
-instance FunctorWithIndex     Pos NoType where
-instance FoldableWithIndex    Pos NoType where
-instance TraversableWithIndex Pos NoType where
-  itraverse _ NoType = pure NoType
-
 deriving instance Show QVar
 deriving instance Show tv => Show (Type tv)
 

@@ -28,15 +28,16 @@ data GammaEnv s ev = GammaEnv
   }
 makeLenses ''GammaEnv
 
-type GammaT s ev m = ReaderT (GammaEnv s ev) (SupplyT Id.TVar m)
+type GammaT s ev m = HereT (ReaderT (GammaEnv s ev) (SupplyT Id.TVar m))
 
 runGammaT :: Monad m => GammaT s Void m a -> [Id.TVar] -> m a
-runGammaT m vs = evalSupplyT (runReaderT m (GammaEnv (Const ()) 0 mempty)) vs
+runGammaT m vs =
+  evalSupplyT (runReaderT (runHereT m) (GammaEnv (Const ()) 0 mempty)) vs
 
 withinEScope ::
   forall i m s tv ev a. (HasEnvLevel i, HasEnv ev) =>
   EnvLevelOf i (UType s tv) -> GammaT s (EScope i ev) m a -> GammaT s ev m a
-withinEScope ts = withReaderT (tenv %~ extendEnv @i @ev (fmap coerce ts))
+withinEScope ts = mapHereT (withReaderT (tenv %~ extendEnv @i @ev (fmap coerce ts)))
 
 withinTScope :: (Monad m) => GammaT s ev m a -> GammaT s ev m a
 withinTScope = local (level +~ 1)

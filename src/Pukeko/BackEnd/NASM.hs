@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 
 import Pukeko.BackEnd.GCode
 
-assemble :: MonadError String m => Program -> m String
+assemble :: Program -> Either Doc String
 assemble MkProgram { _globals, _main } = do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
@@ -22,11 +22,11 @@ assemble MkProgram { _globals, _main } = do
   globals <- mapM (assembleGlobal arities) _globals
   return $ intercalate "\n" (prolog:globals)
 
-assembleGlobal :: MonadError String m => Map Name Int -> Global -> m String
+assembleGlobal :: Map Name Int -> Global -> Either Doc String
 assembleGlobal arities MkGlobal{ _code } =
   unlines <$> mapM (assembleInst arities) _code
 
-assembleInst :: MonadError String m => Map Name Int -> Inst -> m String
+assembleInst :: Map Name Int -> Inst -> Either Doc String
 assembleInst arities inst = do
   let code macro params = do
         let param_str
@@ -37,7 +37,7 @@ assembleInst arities inst = do
         let s = show label
         if "." `isPrefixOf` s
           then return ()
-          else throw "invalid jump label" label
+          else throwError ("invalid jump label:" <+> pretty label)
   case inst of
     EVAL   -> code "eval"   []
     UNWIND -> code "unwind" []
@@ -58,7 +58,7 @@ assembleInst arities inst = do
     PUSHINT num -> code "pushint" [show num]
     PUSHGLOBAL name -> do
       case Map.lookup name arities of
-        Nothing -> throw "unknown global" name
+        Nothing -> throwError ("unknown global:" <+> pretty name)
         Just arity -> code "pushglobal" [show name, show arity]
     GLOBSTART name arity ->
       code "globstart" [show name, show arity]

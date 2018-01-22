@@ -7,7 +7,6 @@ module Pukeko.MiddleEnd.EtaReducer
 
 import Pukeko.Prelude
 
-import           Control.Bilens     (firstOf)
 import           Data.Bitraversable
 import           Data.Finite        (absurd0)
 import qualified Data.Vector.Sized  as Vec
@@ -19,12 +18,12 @@ import           Pukeko.AST.Type
 type ERStage st = (HasLambda st ~ 'False, HasClasses st ~ 'False)
 
 reduceModule :: ERStage st => Module st -> Module st
-reduceModule = over (module2decls . traverse) erDecl
+reduceModule = over (module2decls . traverse . traverse) erDecl
 
 _EVar :: Expr st tv ev -> Maybe ev
 _EVar = \case
-  EVar _ x -> Just x
-  _        -> Nothing
+  EVar x -> Just x
+  _      -> Nothing
 
 _TVar :: Type tv -> Maybe tv
 _TVar = \case
@@ -36,26 +35,26 @@ erDecl top = case top of
   DType{} -> top
   DSign{} -> top
   DPrim{} -> top
-  DSupC (MkSupCDecl w z
+  DSupC (MkSupCDecl z
     (vs0 :: Vector m0 QVar)
     (t0 :: Type (TFinScope m0 Void))
     (bs0 :: Vector n0 (Bind (StageType st) (TFinScope m0 Void)))
     (e0 :: Expr st (TFinScope m0 Void) (EFinScope n0 Void))) ->
     case e0 of
-      EApp _ (traverse strengthen -> Just e1) (traverse _EVar -> Just xs1)
+      EApp (traverse strengthen -> Just e1) (traverse _EVar -> Just xs1)
         | Just xs2 <- Vec.matchNonEmpty bs0 xs1
         , iall (\i x -> i == scope absurd id x) xs2 ->
-          erDecl (DSupC (MkSupCDecl w z vs0 t0 Vec.empty (fmap weaken e1)))
-      ETyApp _
+          erDecl (DSupC (MkSupCDecl z vs0 t0 Vec.empty (fmap weaken e1)))
+      ETyApp
         (bitraverse strengthen strengthen -> Just e1)
         (traverse _TVar -> Just vs1)
         | null bs0
         , Just vs2 <- Vec.matchNonEmpty vs0 vs1
         , iall (\i v -> i == scope absurd id v) vs2 ->
-          DSupC (MkSupCDecl w z
+          DSupC (MkSupCDecl z
             Vec.empty (fmap weaken (mkTUni vs0 t0))
             Vec.empty (bimap weaken weaken e1))
-      ETyAbs _
+      ETyAbs
         (_ :: Vector m1 QVar)
         (e1 :: Expr st (TFinScope m1 (TFinScope m0 Void)) (EFinScope n0 Void))
         | Just Refl <- sameNat (Proxy @m0) (Proxy @0)
@@ -67,7 +66,8 @@ erDecl top = case top of
                 e2, e3 :: Expr st (TFinScope m2 Void) (EFinScope n0 Void)
                 e2 = first (fmap (strengthenWith absurd0)) e1
                 e3 = over
-                     (firstOf bitraverse . _Bound)
+                     (flip bitraverse pure . _Bound)
                      (\(i, _) -> (i, (vs2 Vec.! i)^.qvar2tvar)) e2
-            in  erDecl (DSupC (MkSupCDecl w z vs2 t2 bs2 e3))
+            in  erDecl (DSupC (MkSupCDecl z vs2 t2 bs2 e3))
+      ELoc e1 -> erDecl (DSupC (MkSupCDecl z vs0 t0 bs0 (unloc e1)))
       _ -> top

@@ -22,8 +22,8 @@ import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
-type In  = St.FunResolver
-type Out = St.KindChecker
+type In  = St.Renamer
+type Out = St.Renamer
 
 data Open s
 
@@ -40,10 +40,12 @@ type KCEnv n s = Vector n (Kind (Open s))
 
 type KCState s = Map Id.TCon (Kind (Open s))
 
-type KC n s = (RWST (KCEnv n s) () (KCState s) (SupplyT Id.TVar (ExceptT String (ST s))))
+type KC n s =
+  (RWST (KCEnv n s) () (KCState s) (HereT (SupplyT Id.TVar (ExceptT Doc (ST s)))))
 
-runKC :: MonadError String m => (forall n s. KC n s a) -> m a
-runKC kc = runST (runExceptT (evalSupplyT (fst <$> evalRWST kc env0 mempty) sup0))
+runKC :: (forall n s. KC n s a) -> Either Doc a
+runKC kc =
+  runST (runExceptT (evalSupplyT (runHereT(fst <$> evalRWST kc env0 mempty)) sup0))
   where
     sup0 = Id.freshTVars
     env0 = Vec.empty
@@ -73,20 +75,21 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: NonEmpty (Some1 TConDecl) -> KC n s ()
+kcTypDef :: NonEmpty (Loc (Some1 TConDecl)) -> KC n s ()
 kcTypDef tcons = do
-  kinds <- for tcons $ \(Some1 MkTConDecl{_tcon2name = tname}) -> do
+  kinds <- for tcons $ \(Loc _ (Some1 MkTConDecl{_tcon2name = tname})) -> do
     kind <- freshUVar
     at tname ?= kind
     pure kind
   for_ (NE.zip tcons kinds) $
-    \(Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}, tconKind) -> do
-      paramKinds <- traverse (const freshUVar) prms
-      unify tconKind (foldr Arrow Star paramKinds)
-      localize paramKinds $ do
-        -- TODO: Rewrite this in terms of @forOf_@.
-        for_ dcons $ \MkDConDecl{_dcon2pos = w, _dcon2flds = flds} -> do
-          here w (traverse_ (kcType Star) flds)
+    \(Loc pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}), tconKind) -> do
+      here pos $ do
+        paramKinds <- traverse (const freshUVar) prms
+        unify tconKind (foldr Arrow Star paramKinds)
+        localize paramKinds $ do
+          -- TODO: Rewrite this in terms of @forOf_@.
+          forHeres_ dcons $ \MkDConDecl{_dcon2flds = flds} -> do
+            traverse_ (kcType Star) flds
   traverse_ close kinds
 
 kcVal :: Type Void -> KC n s ()
@@ -100,23 +103,25 @@ kcVal = \case
 
 
 kcDecl :: Decl In -> KC n s (Decl Out)
-kcDecl = \case
+kcDecl decl = case decl of
   DType tcons -> do
     (kcTypDef tcons)
     pure (DType tcons)
-  DSign (MkSignDecl w z t) -> do
-    here w (kcVal t)
-    pure (DSign (MkSignDecl w z t))
+  DSign (MkSignDecl z t) -> do
+    kcVal t
+    pure (DSign (MkSignDecl z t))
   -- FIXME: Check kinds in type class declarations and instance definitions.
-  DClss c -> pure (DClss c)
-  DInst i -> DInst <$> inst2defn (pure . retagDefn) i
-  DDefn d -> pure (DDefn (retagDefn d))
-  DPrim p -> pure (DPrim p)
+  DClss{} -> passOn
+  DInst{} -> passOn
+  DDefn{} -> passOn
+  DPrim{} -> passOn
+  where
+    passOn = pure decl
 
 kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2decls (traverse (\top -> reset *> kcDecl top))
+kcModule = module2decls (traverse (\top -> reset *> traverseHere kcDecl top))
 
-checkModule :: MonadError String m => Module In -> m (Module Out)
+checkModule :: Module In -> Either Doc (Module Out)
 checkModule module_ = runKC (kcModule module_)
 
 
@@ -144,7 +149,7 @@ occursCheck uref1 = \case
   Star        -> pure ()
   Arrow kf kp -> occursCheck uref1 kf *> occursCheck uref1 kp
   UVar uref2
-    | uref1 == uref2 -> throwError "occurs check"
+    | uref1 == uref2 -> throwHere "occurs check"
     | otherwise -> do
         uvar2 <- liftST (readSTRef uref2)
         case uvar2 of
@@ -169,7 +174,7 @@ unify k1 k2 = do
     (_, _) -> do
       d1 <- liftST (prettyKind False k1)
       d2 <- liftST (prettyKind False k2)
-      throwDoc $ "cannot unify kinds" <+> d1 <+> "and" <+> d2
+      throwHere ("cannot unify kinds" <+> d1 <+> "and" <+> d2)
 
 close :: Kind (Open s) -> KC n s ()
 close k = do

@@ -22,7 +22,7 @@ shouldFail prelude expect code = do
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> expectationFailure "should fail, but succeeded"
-    Left actual -> case stripPrefix "\"<input>\" " actual of
+    Left actual -> case stripPrefix "\"<input>\" " (render actual) of
       Nothing -> expectationFailure "error does not start with \"<input>\""
       Just actual -> actual `shouldBe` expect
 
@@ -35,7 +35,7 @@ shouldSucceed prelude code = do
   case result of
     Right _ -> return ()
     Left error ->
-      expectationFailure $ "should succeed, but failed: " ++ error
+      expectationFailure $ "should succeed, but failed: " ++ render error
 
 type Parser a = Parsec [String] Parser.Package a
 
@@ -85,8 +85,8 @@ section = describe <$> pragma "SECTION" <*> manySpec subsection
 spec :: Parser Spec
 spec = skipEmpty *> manySpec section <* eof
 
-runEIO :: ExceptT String IO a -> IO a
-runEIO m = runExceptT m >>= either fail pure
+runEIO :: ExceptT Doc IO a -> IO a
+runEIO m = runExceptT m >>= either (fail . render) pure
 
 main :: IO ()
 main = do

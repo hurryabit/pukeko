@@ -14,16 +14,17 @@ import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Identifier as Id
 
 inlineModule :: Module st -> Module st
-inlineModule (MkModule tops0) =
-  let ls = mapMaybe topLink tops0
+inlineModule (MkModule decls0) =
+  let ls = mapMaybe (declLink . unloc) decls0
       uf = unionFind ls
-      tops1 = over (traverse . decl2eval) (\x -> Map.findWithDefault x x uf) tops0
-  in  MkModule tops1
+      decls1 =
+        overHere (traverseHeres . decl2eval) (\x -> Map.findWithDefault x x uf) decls0
+  in  MkModule decls1
 
-topLink :: Decl st -> Maybe (Id.EVar, Id.EVar)
-topLink = \case
-  DDefn (MkDefn b (EVal _ x)) -> Just (b^.bind2evar, x)
-  DSupC (MkSupCDecl _ z vs _ xs (EVal _ x))
+declLink :: Decl st -> Maybe (Id.EVar, Id.EVar)
+declLink = \case
+  DDefn (MkDefn b (EVal x)) -> Just (b^.bind2evar, x)
+  DSupC (MkSupCDecl z vs _ xs (EVal x))
     | null vs && null xs -> Just (z, x)
   _ -> Nothing
 

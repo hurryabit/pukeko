@@ -25,8 +25,8 @@ runSnippet prelude code = do
   case result of
     Right _ ->
       out "-- SUCCESS\n"
-    Left actual -> case stripPrefix "\"<input>\" " actual of
-      Nothing -> out "-- FAILURE error does not start with \"<input>\"\n"
+    Left actual -> case stripPrefix "\"<input>\" " (render actual) of
+      Nothing -> out ("-- FAILURE FIXME " ++ render actual ++ "\n")
       Just actual -> out ("-- FAILURE " ++ actual ++ "\n")
   out code
 
@@ -82,8 +82,8 @@ spec = do
   manySpec section
   eof
 
-runEIO :: ExceptT String IO a -> IO a
-runEIO m = runExceptT m >>= either fail pure
+runEIO :: ExceptT Doc IO a -> IO a
+runEIO m = runExceptT m >>= either (fail . render) pure
 
 testFile, outFile :: FilePath
 testFile = "frontend.pu"

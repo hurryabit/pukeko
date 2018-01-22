@@ -3,50 +3,50 @@
 -- SUBSECTION type cons
 
 -- TEST unknown in type definition
--- FAILURE (line 2, column 3): unknown type cons 'Bad'
+-- FAILURE (line 2, column 3): unknown type constructor: Bad
 type Typ =
   | Con Bad
 
 -- TEST unknown in function declaration
--- FAILURE (line 1, column 5): unknown type cons 'Typ'
+-- FAILURE (line 1, column 1): unknown type constructor: Typ
 val bad : Typ
 
 -- TEST duplicate in one type definition
--- FAILURE (line 2, column 6): duplicate type cons 'Typ'
+-- FAILURE (line 2, column 6): duplicate type constructor: Typ
 type Typ
  and Typ
 
 -- TEST duplicate in two type definitions
--- FAILURE (line 1, column 6): duplicate type cons 'Int'
+-- FAILURE (line 1, column 6): duplicate type constructor: Int
 type Int
 
--- SUBSECTION term cons
+-- SUBSECTION data constructor
 
 -- TEST unknown in expression
--- FAILURE (line 1, column 11): unknown term cons 'Con'
+-- FAILURE (line 1, column 11): unknown data constructor: Con
 let bad = Con
 
 -- TEST unknown in pattern
--- FAILURE (line 3, column 5): unknown term cons 'Con'
+-- FAILURE (line 2, column 3): unknown data constructor: Con
 let f x =
   match x with
   | Con -> 1
 
 -- TEST duplicate in one type
--- FAILURE (line 3, column 3): duplicate term cons 'Con'
+-- FAILURE (line 3, column 3): duplicate data constructor: Con
 type Typ =
   | Con
   | Con
 
 -- TEST duplicate in mutually recursive types
--- FAILURE (line 4, column 3): duplicate term cons 'Con'
+-- FAILURE (line 4, column 3): duplicate data constructor: Con
 type Typ1 =
   | Con
 and Typ2 =
   | Con
 
 -- TEST duplicate in two types
--- FAILURE (line 2, column 3): duplicate term cons 'Nil'
+-- FAILURE (line 2, column 3): duplicate data constructor: Nil
 type Typ =
   | Nil
 
@@ -88,7 +88,7 @@ type Typ a =
   | Con (Int a)
 
 -- TEST unbound type variable
--- FAILURE (line 1, column 6): unknown type variable 'b'
+-- FAILURE (line 2, column 3): unknown type variable: b
 type Typ a =
   | Con b
 
@@ -125,12 +125,12 @@ type Typ3 f a =
 -- SUBSECTION function declaration
 
 -- TEST underapplication
--- FAILURE (line 1, column 5): cannot unify kinds * -> * and *
+-- FAILURE (line 1, column 1): cannot unify kinds * -> * and *
 val bad : List
 let bad = abort
 
 -- TEST overapplication
--- FAILURE (line 1, column 5): cannot unify kinds * and * -> *
+-- FAILURE (line 1, column 1): cannot unify kinds * and * -> *
 val bad : Unit Int
 let bad = abort
 
@@ -140,32 +140,32 @@ let bad = abort
 -- SUBSECTION too many declarations
 
 -- TEST duplicate declaration
--- FAILURE (line 2, column 5): duplicate declaration of function 'f'
+-- FAILURE (line 2, column 1): duplicate declaration of function: f
 val f : a -> a
 val f : a -> a
 
 -- TEST redeclaration
--- FAILURE (line 1, column 5): duplicate declaration of function 'not'
+-- FAILURE (line 1, column 1): duplicate declaration of function: not
 val not : Bool -> Bool
 
 -- TEST missing definition
--- FAILURE (line 1, column 5): declared but undefined function 'f'
+-- FAILURE (line 1, column 1): declared but undefined function: f
 val f : a -> a
 
 -- SUBSECTION duplicate definition
 
 -- TEST two definitions
--- FAILURE (line 1, column 5): duplicate definition of function 'not'
+-- FAILURE (line 1, column 5): duplicate definition of function: not
 let not x = x
 
 -- TEST parallel definition
--- FAILURE (line 3, column 5): duplicate definition of function 'f'
+-- FAILURE (line 3, column 5): duplicate definition of function: f
 val f : a -> a
 let f x = x
 and f x = x
 
 -- TEST mutually recursive definition
--- FAILURE (line 3, column 5): duplicate definition of function 'f'
+-- FAILURE (line 3, column 5): duplicate definition of function: f
 val f : a -> a
 let rec f x = x
 and f x = x
@@ -173,48 +173,48 @@ and f x = x
 -- SUBSECTION definition of undeclared function
 
 -- TEST normal definition
--- FAILURE (line 1, column 5): undeclared function 'f'
+-- FAILURE (line 1, column 5): undeclared function: f
 let f x = x
 
 -- TEST recursive definition
--- FAILURE (line 1, column 9): undeclared function 'f'
+-- FAILURE (line 1, column 9): undeclared function: f
 let rec f x = f x
 
 -- TEST parallel definition
--- FAILURE (line 3, column 5): undeclared function 'g'
+-- FAILURE (line 3, column 5): undeclared function: g
 val f : a -> a
 let f x = x
 and g x = x
 
 -- TEST mutually recursive definition
--- FAILURE (line 3, column 5): undeclared function 'g'
+-- FAILURE (line 3, column 5): undeclared function: g
 val f : a -> a
 let rec f x = x
 and g x = x
 
 -- TEST post declaration
--- FAILURE (line 1, column 5): undeclared function 'f'
+-- FAILURE (line 1, column 5): undeclared function: f
 let f x = x
 val f : a -> a
 
 -- TEST external
--- FAILURE (line 1, column 10): undeclared function 'f'
+-- FAILURE (line 1, column 1): undeclared function: f
 external f = "f"
 
 -- SUBSECTION call of undeclared function
 
 -- TEST one definition
--- FAILURE (line 2, column 11): unknown variable 'g'
+-- FAILURE (line 2, column 11): unknown variable: g
 val f : x -> x
 let f a = g a
 
 -- TEST recursive definition
--- FAILURE (line 2, column 15): unknown variable 'g'
+-- FAILURE (line 2, column 15): unknown variable: g
 val f : x -> x
 let rec f a = g a
 
 -- TEST post declaration
--- FAILURE (line 2, column 11): unknown variable 'g'
+-- FAILURE (line 2, column 11): unknown variable: g
 val f : a -> a
 let f x = g x
 val g : a -> a
@@ -222,25 +222,25 @@ val g : a -> a
 -- SUBSECTION call of undefined function
 
 -- TEST call of other
--- FAILURE (line 3, column 11): unknown variable 'g'
+-- FAILURE (line 3, column 11): unknown variable: g
 val f : a -> a
 val g : a -> a
 let f x = g x
 
 -- TEST call of self
--- FAILURE (line 2, column 11): unknown variable 'f'
+-- FAILURE (line 2, column 11): unknown variable: f
 val f : a -> a
 let f x = f x
 
 -- TEST backward call in parallel
--- FAILURE (line 4, column 11): unknown variable 'f'
+-- FAILURE (line 4, column 11): unknown variable: f
 val f : a -> a
 val g : a -> a
 let f x = x
 and g x = f x
 
 -- TEST forward call in parallel
--- FAILURE (line 3, column 11): unknown variable 'g'
+-- FAILURE (line 3, column 11): unknown variable: g
 val f : a -> a
 val g : a -> a
 let f x = g x
@@ -248,7 +248,7 @@ and g x = x
 
 -- SECTION type checker
 
--- SUBSECTION term cons
+-- SUBSECTION data constructor
 
 -- TEST underapplication in expression
 -- FAILURE (line 2, column 5): mismatching types Option and (->) _1
@@ -261,14 +261,14 @@ val f : a -> Option a
 let f x = Some x x
 
 -- TEST underapplication in pattern
--- FAILURE (line 4, column 5): term cons 'Cons' expects 2 arguments
+-- FAILURE (line 3, column 3): data constructor 'Cons' expects 2 arguments
 val f : List a -> a
 let f x =
   match x with
   | Cons y -> y
 
 -- TEST overapplication in pattern
--- FAILURE (line 4, column 5): term cons 'Some' expects 1 arguments
+-- FAILURE (line 3, column 3): data constructor 'Some' expects 1 arguments
 val f : Option a -> a
 let f x =
   match x with
@@ -276,12 +276,12 @@ let f x =
 
 -- SUBSECTION unification
 
--- TEST type cons vs type cons
+-- TEST type constructor vs type cons
 -- FAILURE (line 2, column 5): mismatching types Unit and Int
 val bad : Unit
 let bad = 1
 
--- TEST type cons vs arrow
+-- TEST type constructor vs arrow
 -- FAILURE (line 2, column 5): mismatching types Option and (->) _1
 val bad : Option a
 let bad = fun y -> y
@@ -327,12 +327,12 @@ val f : (a -> b) -> (a -> c)
 let f x = x
 
 -- TEST occurs check
--- FAILURE (line 2, column 23): '_3' occurs in List _3
+-- FAILURE (line 2, column 11): '_3' occurs in List _3
 val bad : List a
 let bad = let rec x = Cons x Nil in x
 
 -- TEST no overgeneralization
--- FAILURE (line 5, column 5): mismatching types Int and Bool
+-- FAILURE (line 4, column 5): mismatching types Int and Bool
 val f : Int
 let f =
   let g x =
@@ -362,7 +362,7 @@ external f = "f"
 val y : A
 let y = f x x
 
--- TEST term cons instantiation
+-- TEST data constructor instantiation
 -- SUCCESS
 type A a =
   | X
@@ -434,14 +434,14 @@ let f x =
   | y -> y
 
 -- TEST non-exhaustive top level
--- FAILURE (line 3, column 3): unmatched constructor 'Second'
+-- FAILURE (line 3, column 3): unmatched constructor: Second
 val f : Choice a b -> a
 let f xy =
   match xy with
   | First x -> x
 
 -- TEST non-exhaustive nested
--- FAILURE (line 3, column 3): unmatched constructor 'Second'
+-- FAILURE (line 3, column 3): unmatched constructor: Second
 val f : Pair (Choice a b) c -> a
 let f xyz =
   match xyz with
