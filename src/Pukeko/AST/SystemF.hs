@@ -47,8 +47,6 @@ module Pukeko.AST.SystemF
   , expr2eval
   , patn2evar
 
-
-  , Pos
   , module Pukeko.AST.Scope
   )
   where

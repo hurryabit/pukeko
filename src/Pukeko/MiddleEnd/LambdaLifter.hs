@@ -28,7 +28,7 @@ type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, Reader Pos, Supply Id.EVar, Writer [Lctd (Decl Out)]]
+    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer [Lctd (Decl Out)]]
 
 execLL :: Module In -> LL Void Void () -> [Lctd (Decl Out)]
 execLL m0 =

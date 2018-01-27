@@ -56,9 +56,10 @@ library:
   - filepath
   - freer-simple ==1.0.0.1
   - lens
+  - megaparsec
   - monad-st
   - natural-transformation
-  - parsec
+  - parser-combinators
   - pretty
   - profunctors
   - tagged

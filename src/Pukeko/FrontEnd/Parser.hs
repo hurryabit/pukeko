@@ -10,13 +10,16 @@ module Pukeko.FrontEnd.Parser
   )
   where
 
-import Pukeko.Prelude hiding ((<|>), many, lctd)
+import Pukeko.Prelude hiding (lctd)
 
-import           System.FilePath as Sys
-import           Text.Parsec
-import           Text.Parsec.Expr
-import           Text.Parsec.Language
-import qualified Text.Parsec.Token as Token
+import qualified Control.Applicative.Combinators.NonEmpty as NE
+import qualified Data.List.NonEmpty         as NE
+import qualified Data.Set                   as Set
+import           System.FilePath            as Sys
+import           Text.Megaparsec
+import           Text.Megaparsec.Char       hiding (space)
+import qualified Text.Megaparsec.Char.Lexer as L
+import           Text.Megaparsec.Expr
 
 import           Pukeko.AST.Operator   (Spec (..))
 import           Pukeko.AST.Surface
@@ -24,9 +27,9 @@ import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
-parseInput :: (Member (Error Doc) effs) => SourceName -> String -> Eff effs Module
-parseInput source =
-  either (throwError . shown) pure . parse (module_ source <* eof) source
+parseInput :: (Member (Error Doc) effs) => FilePath -> String -> Eff effs Module
+parseInput file =
+  either (throwError . text . parseErrorPretty) pure . parse (module_ file <* eof) file
 
 parseModule ::
   (Member (Error Doc) effs, LastMember IO effs) => FilePath -> Eff effs Module
@@ -39,11 +42,29 @@ parsePackage ::
   (Member (Error Doc) effs, LastMember IO effs) => FilePath -> Eff effs Package
 parsePackage file = build parseModule file <* sendM (putStrLn "")
 
-type Parser = Parsec String ()
+type Parser = Parsec Void String
 
-pukekoDef :: LanguageDef st
-pukekoDef = haskellStyle
-  { Token.reservedNames =
+space :: Parser ()
+space = L.space space1 (L.skipLineComment "--") empty
+
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme space
+
+symbol :: String -> Parser String
+symbol = L.symbol space
+
+comma :: Parser ()
+comma = void (symbol ",")
+
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
+
+braces :: Parser a -> Parser a
+braces = between (symbol "{") (symbol "}")
+
+-- TODO: Ideally we want a trie rather than a tree.
+reservedIdents :: Set String
+reservedIdents = Set.fromList
       [ "fun"
       , "val", "let", "rec", "and", "in"
       , "if", "then", "else"
@@ -52,65 +73,80 @@ pukekoDef = haskellStyle
       , "external"
       , "import"
       ]
-  , Token.opStart  = oneOf Op.letters
-  , Token.opLetter = oneOf Op.letters
-  , Token.reservedOpNames = ["->", "=>", "=", ":", ".", "|"]
-  }
 
-pukeko@Token.TokenParser
-  { Token.reserved
-  , Token.reservedOp
-  , Token.operator
-  , Token.natural
-  , Token.identifier
-  , Token.parens
-  , Token.braces
-  , Token.colon
-  , Token.comma
-  , Token.symbol
-  , Token.whiteSpace
-  } =
-  Token.makeTokenParser pukekoDef
+lIdentStart :: Parser Char
+lIdentStart = lowerChar
 
-many1NE :: Parser a -> Parser (NonEmpty a)
-many1NE p = (:|) <$> p <*> many p
+uIdentStart :: Parser Char
+uIdentStart = upperChar
 
-sepBy1NE :: Parser a -> Parser sep -> Parser (NonEmpty a)
-sepBy1NE p sep = (:|) <$> p <*> many (sep *> p)
+identLetter :: Parser Char
+identLetter = alphaNumChar <|> satisfy (\c -> c == '_' || c == '\'')
+
+reservedOperators :: Set String
+reservedOperators = Set.fromList ["->", "=>", "=", ":", "|"]
+
+opLetter :: Parser Char
+opLetter = oneOf (Set.fromList "+-*/%=<>|&!.:;")
+
+reserved :: String -> Parser ()
+reserved kw = void (lexeme (string kw <* notFollowedBy identLetter))
+
+reservedOp :: String -> Parser ()
+reservedOp op = void (lexeme (string op <* notFollowedBy opLetter))
+
+lIdent :: Parser String
+lIdent = lexeme $ try $ do
+  x <- (:) <$> lIdentStart <*> many identLetter
+  when (x `Set.member` reservedIdents) $
+    unexpected (Label (NE.fromList ("reserved " ++ x)))
+  pure x
+
+uIdent :: Parser String
+uIdent = lexeme $ (:) <$> uIdentStart <*> many identLetter
+
+operator :: Parser String
+operator = lexeme $ try $ do
+  op <- some opLetter
+  when (op `Set.member` reservedOperators) $
+    unexpected (Label (NE.fromList ("reserved op " ++ op)))
+  pure op
+
+decimal :: Parser Int
+decimal = lexeme L.decimal
 
 lctd :: Parser a -> Parser (Lctd a)
-lctd p = Lctd <$> (mkPos <$> getPosition) <*> p
+lctd p = Lctd <$> getPosition <*> p
 
-nat :: Parser Int
-nat = fromInteger <$> natural
-
-equals, arrow, darrow, bar :: Parser ()
+equals, arrow, darrow, colon, bar :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
 darrow  = reservedOp "=>"
+colon   = reservedOp ":"
 bar     = reservedOp "|"
 
 evar :: Parser Id.EVar
-evar = Id.evar <$> (lookAhead lower *> identifier)
+evar = Id.evar <$> lIdent
   <|> Id.op <$> try (parens operator)
+  <?> "expression variable"
 
 tvar :: Parser Id.TVar
-tvar = Id.tvar <$> (lookAhead lower *> identifier)
+tvar = Id.tvar <$> lIdent <?> "type variable"
 
 tcon :: Parser Id.TCon
-tcon = Id.tcon <$> (lookAhead upper *> Token.identifier pukeko)
+tcon = Id.tcon <$> uIdent <?> "type constructor"
 
 dcon :: Parser Id.DCon
-dcon = Id.dcon <$> (lookAhead upper *> Token.identifier pukeko)
+dcon = Id.dcon <$> uIdent <?> "data constructor"
 
 clss :: Parser Id.Clss
-clss = Id.clss <$> (lookAhead upper *> Token.identifier pukeko)
+clss = Id.clss <$> uIdent <?> "class name"
 
 type_, atype :: Parser Type
 type_ =
-  buildExpressionParser
-    [ [ Infix (arrow *> pure mkTFun) AssocRight ] ]
+  makeExprParser
     (mkTApp <$> atype <*> many atype)
+    [ [ InfixR (arrow *> pure mkTFun) ] ]
   <?> "type"
 atype = choice
   [ TVar <$> tvar
@@ -125,25 +161,24 @@ typeCstr = MkTypeCstr
 typeScheme :: Parser TypeScheme
 typeScheme = MkTypeScheme <$> typeCstr <*> type_
 
-module_ :: SourceName -> Parser Module
-module_ source = do
-  imps <- many import_
-  whiteSpace
+module_ :: FilePath -> Parser Module
+module_ file = do
+  imps <- lexeme (many import_)
   decls <- many $ lctd $ choice
-    [ DType <$> (reserved "type"     *> sepBy1NE (lctd tconDecl) (reserved "and"))
+    [ DType <$> (reserved "type"     *> NE.sepBy1 (lctd tconDecl) (reserved "and"))
     , DSign <$> (reserved "val"      *> signDecl)
     , DClss <$> (reserved "class"    *> clssDecl)
     , DInst <$> (reserved "instance" *> instDecl)
     , let_ DLet DRec
     , DPrim <$> (reserved "external" *> primDecl)
     ]
-  pure (MkModule source imps decls)
+  pure (MkModule file imps decls)
 
 import_ :: Parser FilePath
 import_ = do
   reserved "import"
-  comps <- sepBy1 (many1 (lower <|> digit <|> char '_')) (char '/')
-  void endOfLine
+  comps <- sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/')
+  void eol
   pure (Sys.joinPath comps Sys.<.> "pu")
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
@@ -162,7 +197,7 @@ defnValLhs = MkDefn <$> evar
 defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
 defnFunLhs =
   (.) <$> (MkDefn <$> evar)
-      <*> (ELam <$> many1NE evar)
+      <*> (ELam <$> NE.some evar)
 
 -- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
@@ -177,20 +212,20 @@ let_ ::
   Parser a
 let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
-  <*> sepBy1NE (lctd defn) (reserved "and")
+  <*> NE.sepBy1 (lctd defn) (reserved "and")
 
 expr, aexpr, lexpr :: Parser (Expr Id.EVar)
 expr =
-  (buildExpressionParser operatorTable . choice)
+  (flip makeExprParser operatorTable . choice)
   [ mkApp <$> aexpr <*> many aexpr
   , mkIf  <$> (reserved "if"   *> expr)
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
   , EMat
     <$> (reserved "match" *> expr)
-    <*> (reserved "with"  *> (toList <$> many1 altn))
+    <*> (reserved "with"  *> some altn)
   , ELam
-    <$> (reserved "fun" *> many1NE evar)
+    <$> (reserved "fun" *> NE.some evar)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]
@@ -198,23 +233,27 @@ expr =
 aexpr = choice
   [ EVar <$> evar
   , ECon <$> dcon
-  , ENum <$> nat
+  , ENum <$> decimal
   , parens expr
   ]
 lexpr = ELoc <$> lctd expr
 
 operatorTable = map (map f) (reverse Op.table)
   where
-    f MkSpec { _sym, _assoc } = Infix (reservedOp _sym *> pure (mkAppOp _sym)) _assoc
+    f MkSpec{_sym, _assoc} = g _assoc (try (reservedOp _sym *> pure (mkAppOp _sym)))
+    g = \case
+      Op.AssocLeft  -> InfixL
+      Op.AssocRight -> InfixR
+      Op.AssocNone  -> InfixN
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
   <$> tcon
   <*> many tvar
-  <*> option [] (equals *> (toList <$> many1 (lctd dconDecl)))
+  <*> option [] (equals *> some (lctd dconDecl))
 
 dconDecl :: Parser DConDecl
-dconDecl = MkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype
+dconDecl = MkDConDecl <$> (bar *> dcon) <*> many atype
 
 signDecl :: Parser SignDecl
 signDecl = MkSignDecl <$> evar <*> (colon *> typeScheme)
@@ -233,7 +272,7 @@ instDecl = do
 primDecl :: Parser PrimDecl
 primDecl = MkPrimDecl
   <$> evar
-  <*> (equals *> Token.stringLiteral pukeko)
+  <*> (equals *> char '\"' *> some lowerChar <* symbol "\"")
 
 record :: Parser a -> Parser [a]
 record p = braces (sepBy p comma)

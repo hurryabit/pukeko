@@ -289,7 +289,8 @@ inferModule' =
 
 type TQEnv tv = Map Id.TVar tv
 
-type TQ tv s = Eff [Reader (TQEnv tv), Reader Pos, Supply Id.TVar, Error Doc, ST s]
+type TQ tv s =
+  Eff [Reader (TQEnv tv), Reader SourcePos, Supply Id.TVar, Error Doc, ST s]
 
 runTQ :: TQ Void s a -> Eff [Error Doc, ST s] a
 runTQ = evalSupply sup0 . runReader noPos . runReader env0

@@ -18,12 +18,12 @@ type In  = St.Renamer
 type Out = St.Renamer
 
 data FRState = MkFRState
-  { _declared :: Map Id.EVar Pos
+  { _declared :: Map Id.EVar SourcePos
   , _defined  :: Set Id.EVar
   }
 makeLenses ''FRState
 
-type FR = Eff [State FRState, Reader Pos, Error Doc]
+type FR = Eff [State FRState, Reader SourcePos, Error Doc]
 
 runFR :: FR a -> Either Doc a
 runFR = run . runError . runReader noPos . evalState st0

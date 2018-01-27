@@ -27,7 +27,7 @@ renameModule (Ps.MkPackage _ modules) = runRn $ do
 type RnEnv ev = Map Id.EVar ev
 type RnState = Set Id.EVar
 
-type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader Pos, Error Doc]
+type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader SourcePos, Error Doc]
 
 runRn :: Rn Void a -> Either Doc a
 runRn = run . runError . runReader noPos . evalState st0 . runReader env0

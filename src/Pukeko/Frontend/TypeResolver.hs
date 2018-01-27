@@ -22,7 +22,7 @@ data TRState = MkTRState
   }
 makeLenses ''TRState
 
-type TR = Eff [Reader Pos, State TRState, Error Doc]
+type TR = Eff [Reader SourcePos, State TRState, Error Doc]
 
 evalTR :: TR a -> Either Doc a
 evalTR =

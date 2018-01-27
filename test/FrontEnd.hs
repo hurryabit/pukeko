@@ -1,7 +1,7 @@
 {-# LANGUAGE ImplicitParams #-}
 module FrontEnd where
 
-import Pukeko.Prelude hiding ((<|>), many)
+import Pukeko.Prelude hiding ((<|>), many, SourcePos)
 
 import Data.Char (isSpace)
 import Data.List
@@ -17,19 +17,17 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
-        module_ <- run . runError $ Parser.parseInput "<input>" code
+        module_ <- run . runError $ Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> expectationFailure "should fail, but succeeded"
-    Left actual -> case stripPrefix "\"<input>\" " (render actual) of
-      Nothing -> expectationFailure "error does not start with \"<input>\""
-      Just actual -> actual `shouldBe` expect
+    Left actual -> render actual `shouldBe` expect
 
 shouldSucceed :: Parser.Package -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
-        module_ <- run . runError $ Parser.parseInput "<input>" code
+        module_ <- run . runError $ Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of

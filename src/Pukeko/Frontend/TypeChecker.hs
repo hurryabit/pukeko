@@ -26,7 +26,7 @@ type IsEVar ev = (HasEnv ev)
 
 type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
-type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader Pos, Error Doc]
+type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Doc]
 
 runTC :: (IsType (St.StageType st)) => Module st -> TC Void Void a -> Either Doc a
 runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma

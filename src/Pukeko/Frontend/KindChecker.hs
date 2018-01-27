@@ -42,7 +42,9 @@ type KCState s = Map Id.TCon (Kind (Open s))
 
 type KC n s =
   Eff
-  [Reader (KCEnv n s), State (KCState s), Reader Pos, Supply Id.TVar, Error Doc, ST s]
+  [ Reader (KCEnv n s), State (KCState s)
+  , Reader SourcePos, Supply Id.TVar, Error Doc, ST s
+  ]
 
 runKC :: (forall n s. KC n s a) -> Either Doc a
 runKC kc =

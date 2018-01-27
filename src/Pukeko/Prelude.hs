@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Prelude
   ( module X
@@ -13,8 +14,7 @@ module Pukeko.Prelude
 
   , local'
 
-  , Pos
-  , mkPos
+  , SourcePos
   , noPos
 
   , Where (..)
@@ -84,7 +84,7 @@ import qualified Text.PrettyPrint.HughesPJClass as PP
 import           Text.PrettyPrint.HughesPJClass ( Doc, Pretty (..)
                                                 , colon, prettyShow, text, render
                                                 )
-import           Text.Parsec                    (SourcePos)
+import           Text.Megaparsec.Pos            (SourcePos, initialPos, sourcePosPretty)
 
 infixr 6 <+>
 
@@ -98,27 +98,22 @@ pretty = pPrint
 shown :: (Show a) => a -> Doc
 shown = text . show
 
-newtype Pos = Pos (Maybe SourcePos)
-
-mkPos :: SourcePos -> Pos
-mkPos = Pos . Just
-
-noPos :: Pos
-noPos = Pos Nothing
+noPos :: SourcePos
+noPos = initialPos ""
 
 class Where f where
-  where_ :: f Pos
-  here :: Pos -> f a -> f a
+  where_ :: f SourcePos
+  here :: SourcePos -> f a -> f a
 
-instance (Member (Reader Pos) effs) => Where (Eff effs) where
+instance (Member (Reader SourcePos) effs) => Where (Eff effs) where
   where_ = ask
   here pos = local (const pos)
 
-instance (Applicative f) => Where (Compose ((->) Pos) f) where
+instance (Applicative f) => Where (Compose ((->) SourcePos) f) where
   where_ = Compose pure
   here pos (Compose f) = Compose (const (f pos))
 
-throwHere :: (Members [Reader Pos, Error Doc] effs) => Doc -> Eff effs a
+throwHere :: (Members [Reader SourcePos, Error Doc] effs) => Doc -> Eff effs a
 throwHere msg = do
   pos <- where_
   throwError (pretty pos <> colon <+> msg)
@@ -136,7 +131,7 @@ type WhereTraversal' s a = WhereTraversal s s a a
 unWhere :: WhereTraversal s t a b -> Traversal s t a b
 unWhere t f s = getCompose (t (Compose . const . f) s) noPos
 
-data Lctd a = Lctd{pos :: Pos, unlctd :: a}
+data Lctd a = Lctd{pos :: SourcePos, unlctd :: a}
   deriving (Show, Foldable, Functor, Traversable)
 
 lctd :: WhereLens (Lctd a) (Lctd b) a b
@@ -154,11 +149,8 @@ bugWith msg x = bug (msg ++ " (" ++ show x ++ ")")
 local' :: (r1 -> r2) -> Eff (Reader r2 : effs) a -> Eff (Reader r1 : effs) a
 local' f = reinterpret (\Ask -> asks f)
 
-instance Pretty Pos where
-  pPrintPrec _ _ (Pos p) = maybe "no position" (text . show) p
-
-instance Show Pos where
-  show = prettyShow
+instance Pretty SourcePos where
+  pPrintPrec _ _ = text . sourcePosPretty
 
 instance Pretty a => Pretty (Lctd a) where
   pPrintPrec lvl prec = pPrintPrec lvl prec . unlctd

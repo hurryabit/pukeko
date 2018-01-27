@@ -23,7 +23,8 @@ type Out = ClassEliminator
 
 type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
 
-type CE tv ev = EffXGamma (Map Id.Clss) Type tv ev [Reader ModuleInfo, Reader Pos]
+type CE tv ev =
+  EffXGamma (Map Id.Clss) Type tv ev [Reader ModuleInfo, Reader SourcePos]
 
 runCE :: Module In -> CE Void Void a -> a
 runCE m0 = run . runReader noPos . runInfo m0 . runGamma

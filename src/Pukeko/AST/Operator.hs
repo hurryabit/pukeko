@@ -10,9 +10,9 @@ where
 
 import Pukeko.Prelude
 
-import Text.Parsec.Expr (Assoc (..))
-
 import qualified Data.Map as Map
+
+data Assoc = AssocLeft | AssocRight | AssocNone
 
 data Spec = MkSpec{ _sym :: String, _prec :: Rational, _assoc :: Assoc }
 

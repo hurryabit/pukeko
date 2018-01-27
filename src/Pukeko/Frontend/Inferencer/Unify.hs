@@ -18,7 +18,7 @@ import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Info
 
 type TU s ev =
-  EffGamma s ev [Reader ModuleInfo, Reader Pos, Supply Id.TVar, Error Doc, ST s]
+  EffGamma s ev [Reader ModuleInfo, Reader SourcePos, Supply Id.TVar, Error Doc, ST s]
 
 -- TODO: link compression
 unwind :: UType s tv -> TU s ev (UType s tv)

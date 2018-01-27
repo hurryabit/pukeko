@@ -21,14 +21,12 @@ out s = do
 runSnippet :: Parser.Package -> String -> HIO ()
 runSnippet prelude code = do
   let result = do
-        module_ <- run . runError $ Parser.parseInput "<input>" code
+        module_ <- run . runError $ Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   case result of
     Right _ ->
       out "-- SUCCESS\n"
-    Left actual -> case stripPrefix "\"<input>\" " (render actual) of
-      Nothing -> out ("-- FAILURE FIXME " ++ render actual ++ "\n")
-      Just actual -> out ("-- FAILURE " ++ actual ++ "\n")
+    Left actual -> out ("-- FAILURE " ++ render actual ++ "\n")
   out code
 
 type HIO = Eff [Reader Handle, IO]

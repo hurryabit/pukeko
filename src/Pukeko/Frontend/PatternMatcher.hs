@@ -24,7 +24,7 @@ import qualified Pukeko.AST.Identifier as Id
 type In  = St.Inferencer Type
 type Out = St.PatternMatcher
 
-type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader Pos, Error Doc]
+type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader SourcePos, Error Doc]
 
 evalPM :: Module In -> PM a -> Either Doc a
 evalPM m0 = run . runError . runReader noPos . evalState [] . runInfo m0
