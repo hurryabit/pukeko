@@ -1,7 +1,7 @@
 import std/prelude
 
-val insert : Int -> List Int -> List Int
-let rec insert y xs =
+insert : Int -> List Int -> List Int
+insert y xs =
   match xs with
   | Nil -> Cons y Nil
   | Cons x xs' ->
@@ -10,14 +10,14 @@ let rec insert y xs =
     else
       Cons x (insert y xs')
 
-val isort : List Int -> List Int
-let rec isort xs =
+isort : List Int -> List Int
+isort xs =
   match xs with
   | Nil -> Nil
   | Cons x xs -> insert x (isort xs)
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   sequence_io (replicate n input)

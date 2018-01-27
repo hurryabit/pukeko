@@ -3,11 +3,11 @@ type Bool =
   | False
   | True
 
-val not : Bool -> Bool
-let not x = if x then False else True
+not : Bool -> Bool
+not x = if x then False else True
 
-val (&&) : Bool -> Bool -> Bool
-let (&&) x y = if x then y else False
+(&&) : Bool -> Bool -> Bool
+(&&) x y = if x then y else False
 
-val (||) : Bool -> Bool -> Bool
-let (||) x y = if x then True else y
+(||) : Bool -> Bool -> Bool
+(||) x y = if x then True else y

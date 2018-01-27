@@ -1,10 +1,10 @@
 import std/prelude
 
-val gen : (a -> a) -> a -> List a
-let rec gen f x = Cons x (gen f (f x))
+gen : (a -> a) -> a -> List a
+gen f x = Cons x (gen f (f x))
 
-val split_at : Int -> List a -> Pair (List a) (List a)
-let rec split_at n xs =
+split_at : Int -> List a -> Pair (List a) (List a)
+split_at n xs =
   if n <= 0 then
     Pair Nil xs
   else
@@ -14,11 +14,11 @@ let rec split_at n xs =
       match split_at (n-1) xs with
       | Pair ys zs -> Pair (Cons x ys) zs
 
-val random : List Int
-let random = gen (fun x -> (91*x) % 1000000007) 1
+random : List Int
+random = gen (fun x -> (91*x) % 1000000007) 1
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   let n = 400000 in
   print n;
   let m = 100000 in

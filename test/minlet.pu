@@ -1,7 +1,7 @@
 import std/io
 
-val id : a -> a
-let id x = let y = x in y
+id : a -> a
+id x = let y = x in y
 
-val main : IO Unit
-let main = print (id 0)
+main : IO Unit
+main = print (id 0)

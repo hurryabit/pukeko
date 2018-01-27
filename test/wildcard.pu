@@ -1,17 +1,17 @@
 import std/prelude
 
-val fst : Pair a b -> a
-let fst p =
+fst : Pair a b -> a
+fst p =
   match p with
   | Pair x _ -> x
 
-val snd : Pair a b -> b
-let snd p =
+snd : Pair a b -> b
+snd p =
   match p with
   | Pair _ y -> y
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun x ->
   input

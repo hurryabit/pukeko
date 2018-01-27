@@ -1,11 +1,11 @@
 import std/prelude
 import std/tree
 
-val tsort : List Int -> List Int
-let tsort xs = in_order (foldl (fun t x -> insert_tree x t) Leaf xs)
+tsort : List Int -> List Int
+tsort xs = in_order (foldl (fun t x -> insert_tree x t) Leaf xs)
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   sequence_io (replicate n input)

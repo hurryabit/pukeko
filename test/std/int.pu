@@ -3,38 +3,38 @@ import std/bool
 -- Integers
 type Int
 
-val neg : Int -> Int
+neg : Int -> Int
 external neg = "neg"
 
-val (+) : Int -> Int -> Int
+(+) : Int -> Int -> Int
 external (+) = "add"
 
-val (-) : Int -> Int -> Int
+(-) : Int -> Int -> Int
 external (-) = "sub"
 
-val ( * ) : Int -> Int -> Int
-external ( * ) = "mul"
+(*) : Int -> Int -> Int
+external (*) = "mul"
 
-val (/) : Int -> Int -> Int
+(/) : Int -> Int -> Int
 external (/) = "div"
 
-val (%) : Int -> Int -> Int
+(%) : Int -> Int -> Int
 external (%) = "mod"
 
-val (==) : Int -> Int -> Bool
+(==) : Int -> Int -> Bool
 external (==) = "eq"
 
-val (!=) : Int -> Int -> Bool
+(!=) : Int -> Int -> Bool
 external (!=) = "ne"
 
-val (<) : Int -> Int -> Bool
+(<) : Int -> Int -> Bool
 external (<) = "lt"
 
-val (<=) : Int -> Int -> Bool
+(<=) : Int -> Int -> Bool
 external (<=) = "le"
 
-val (>=) : Int -> Int -> Bool
+(>=) : Int -> Int -> Bool
 external (>=) = "ge"
 
-val (>) : Int -> Int -> Bool
+(>) : Int -> Int -> Bool
 external (>) = "gt"

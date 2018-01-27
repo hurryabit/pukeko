@@ -9,7 +9,7 @@ type Typ =
 
 -- TEST unknown in function declaration
 -- FAILURE 1:1: unknown type constructor: Typ
-val bad : Typ
+bad : Typ
 
 -- TEST duplicate in one type definition
 -- FAILURE 2:6: duplicate type constructor: Typ
@@ -23,12 +23,12 @@ type Int
 -- SUBSECTION data constructor
 
 -- TEST unknown in expression
--- FAILURE 1:11: unknown data constructor: Con
-let bad = Con
+-- FAILURE 1:7: unknown data constructor: Con
+bad = Con
 
 -- TEST unknown in pattern
 -- FAILURE 2:3: unknown data constructor: Con
-let f x =
+f x =
   match x with
   | Con -> 1
 
@@ -126,13 +126,13 @@ type Typ3 f a =
 
 -- TEST underapplication
 -- FAILURE 1:1: cannot unify kinds * -> * and *
-val bad : List
-let bad = abort
+bad : List
+bad = abort
 
 -- TEST overapplication
 -- FAILURE 1:1: cannot unify kinds * and * -> *
-val bad : Unit Int
-let bad = abort
+bad : Unit Int
+bad = abort
 
 
 -- SECTION declaration/definition checker
@@ -141,61 +141,39 @@ let bad = abort
 
 -- TEST duplicate declaration
 -- FAILURE 2:1: duplicate declaration of function: f
-val f : a -> a
-val f : a -> a
+f : a -> a
+f : a -> a
 
 -- TEST redeclaration
 -- FAILURE 1:1: duplicate declaration of function: not
-val not : Bool -> Bool
+not : Bool -> Bool
 
 -- TEST missing definition
 -- FAILURE 1:1: declared but undefined function: f
-val f : a -> a
+f : a -> a
 
 -- SUBSECTION duplicate definition
 
--- TEST two definitions
--- FAILURE 1:5: duplicate definition of function: not
-let not x = x
+-- TEST two definitions far away
+-- FAILURE 1:1: duplicate definition of function: not
+not x = x
 
--- TEST parallel definition
--- FAILURE 3:5: duplicate definition of function: f
-val f : a -> a
-let f x = x
-and f x = x
-
--- TEST mutually recursive definition
--- FAILURE 3:5: duplicate definition of function: f
-val f : a -> a
-let rec f x = x
-and f x = x
+-- TEST two definitions next to each other
+-- FAILURE 3:1: duplicate definition of function: f
+f : a -> a
+f x = x
+f x = x
 
 -- SUBSECTION definition of undeclared function
 
--- TEST normal definition
--- FAILURE 1:5: undeclared function: f
-let f x = x
-
--- TEST recursive definition
--- FAILURE 1:9: undeclared function: f
-let rec f x = f x
-
--- TEST parallel definition
--- FAILURE 3:5: undeclared function: g
-val f : a -> a
-let f x = x
-and g x = x
-
--- TEST mutually recursive definition
--- FAILURE 3:5: undeclared function: g
-val f : a -> a
-let rec f x = x
-and g x = x
+-- TEST definition
+-- FAILURE 1:1: undeclared function: f
+f x = x
 
 -- TEST post declaration
--- FAILURE 1:5: undeclared function: f
-let f x = x
-val f : a -> a
+-- FAILURE 1:1: undeclared function: f
+f x = x
+f : a -> a
 
 -- TEST external
 -- FAILURE 1:1: undeclared function: f
@@ -204,137 +182,118 @@ external f = "f"
 -- SUBSECTION call of undeclared function
 
 -- TEST one definition
--- FAILURE 2:11: unknown variable: g
-val f : x -> x
-let f a = g a
+-- FAILURE 2:7: unknown variable: g
+f : x -> x
+f a = g a
 
 -- TEST recursive definition
--- FAILURE 2:15: unknown variable: g
-val f : x -> x
-let rec f a = g a
+-- FAILURE 2:7: unknown variable: g
+f : x -> x
+f a = g a
 
 -- TEST post declaration
--- FAILURE 2:11: unknown variable: g
-val f : a -> a
-let f x = g x
-val g : a -> a
+-- FAILURE 2:7: unknown variable: g
+f : a -> a
+f x = g x
+g : a -> a
 
 -- SUBSECTION call of undefined function
 
 -- TEST call of other
--- FAILURE 3:11: unknown variable: g
-val f : a -> a
-val g : a -> a
-let f x = g x
-
--- TEST call of self
--- FAILURE 2:11: unknown variable: f
-val f : a -> a
-let f x = f x
-
--- TEST backward call in parallel
--- FAILURE 4:11: unknown variable: f
-val f : a -> a
-val g : a -> a
-let f x = x
-and g x = f x
-
--- TEST forward call in parallel
--- FAILURE 3:11: unknown variable: g
-val f : a -> a
-val g : a -> a
-let f x = g x
-and g x = x
+-- FAILURE 2:1: declared but undefined function: g
+f : a -> a
+g : a -> a
+f x = g x
 
 -- SECTION type checker
 
 -- SUBSECTION data constructor
 
 -- TEST underapplication in expression
--- FAILURE 2:5: mismatching types Option and (->) _1
-val bad : Option a
-let bad = Some
+-- FAILURE 2:1: mismatching types Option and (->) _1
+bad : Option a
+bad = Some
 
 -- TEST overapplication in expression
--- FAILURE 2:11: mismatching types Option and (->) _1
-val f : a -> Option a
-let f x = Some x x
+-- FAILURE 2:7: mismatching types Option and (->) _1
+f : a -> Option a
+f x = Some x x
 
 -- TEST underapplication in pattern
 -- FAILURE 3:3: data constructor 'Cons' expects 2 arguments
-val f : List a -> a
-let f x =
+f : List a -> a
+f x =
   match x with
   | Cons y -> y
 
 -- TEST overapplication in pattern
 -- FAILURE 3:3: data constructor 'Some' expects 1 arguments
-val f : Option a -> a
-let f x =
+f : Option a -> a
+f x =
   match x with
   | Some y _ -> y
 
 -- SUBSECTION unification
 
 -- TEST type constructor vs type cons
--- FAILURE 2:5: mismatching types Unit and Int
-val bad : Unit
-let bad = 1
+-- FAILURE 2:1: mismatching types Unit and Int
+bad : Unit
+bad = 1
 
 -- TEST type constructor vs arrow
--- FAILURE 2:5: mismatching types Option and (->) _1
-val bad : Option a
-let bad = fun y -> y
+-- FAILURE 2:1: mismatching types Option and (->) _1
+bad : Option a
+bad = fun y -> y
 
 -- TEST arrow vs type cons
--- FAILURE 2:5: mismatching types a -> b and Unit
-val f : a -> b
-let f = Unit
+-- FAILURE 2:1: mismatching types a -> b and Unit
+f : a -> b
+f = Unit
 
 -- TEST qvar vs qvar
--- FAILURE 2:5: mismatching types b and a
-val f : a -> b
-let f x = x
+-- FAILURE 2:1: mismatching types b and a
+f : a -> b
+f x = x
 
 -- TEST qvar vs type cons
--- FAILURE 2:5: mismatching types a and Int
-val bad : a
-let bad = 1
+-- FAILURE 2:1: mismatching types a and Int
+bad : a
+bad = 1
 
 -- TEST qvar vs arrow
--- FAILURE 2:5: mismatching types a and _1 -> _1
-val bad : a
-let bad = fun y -> y
+-- FAILURE 2:1: mismatching types a and _1 -> _1
+bad : a
+bad = fun y -> y
 
 -- TEST in type cons, 1
--- FAILURE 2:5: mismatching types b and a
-val f : Option a -> Option b
-let f x = x
+-- FAILURE 2:1: mismatching types b and a
+f : Option a -> Option b
+f x = x
 
 -- TEST in type cons, 2
--- FAILURE 2:5: mismatching types c and b
-val f : Pair a b -> Pair a c
-let f x = x
+-- FAILURE 2:1: mismatching types c and b
+f : Pair a b -> Pair a c
+f x = x
 
 -- TEST in lhs of arrow
--- FAILURE 2:5: mismatching types b and a
-val f : (a -> c) -> (b -> c)
-let f x = x
+-- FAILURE 2:1: mismatching types b and a
+f : (a -> c) -> (b -> c)
+f x = x
 
 -- TEST in rhs of arrow
--- FAILURE 2:5: mismatching types c and b
-val f : (a -> b) -> (a -> c)
-let f x = x
+-- FAILURE 2:1: mismatching types c and b
+f : (a -> b) -> (a -> c)
+f x = x
 
 -- TEST occurs check
--- FAILURE 2:11: '_3' occurs in List _3
-val bad : List a
-let bad = let rec x = Cons x Nil in x
+-- FAILURE 2:7: '_3' occurs in List _3
+bad : List a
+bad = let rec x = Cons x Nil in x
 
 -- TEST no overgeneralization
 -- FAILURE 4:5: mismatching types Int and Bool
-val f : Int
-let f =
+f : Int
+f =
   let g x =
     let h y = x in
     if h True then 0 else h False
@@ -345,22 +304,22 @@ let f =
 -- SUBSECTION misc
 
 -- TEST function application unifies
--- FAILURE 4:5: mismatching types b and a
-val f : a -> a
+-- FAILURE 4:1: mismatching types b and a
+f : a -> a
 external f = "f"
-val g : a -> b
-let g x = f x
+g : a -> b
+g x = f x
 
 -- TEST var instantiation
 -- SUCCESS
 type A
 type B
-val x : a
+x : a
 external x = "x"
-val f : A -> B -> A
+f : A -> B -> A
 external f = "f"
-val y : A
-let y = f x x
+y : A
+y = f x x
 
 -- TEST data constructor instantiation
 -- SUCCESS
@@ -368,19 +327,19 @@ type A a =
   | X
 type B
 type C
-val x : a
+x : a
 external x = "x"
-val f : A B -> A C -> A B
+f : A B -> A C -> A B
 external f = "f"
-val y : A B
-let y = f X X
+y : A B
+y = f X X
 
 -- SUBSECTION pattern matching
 
 -- TEST ill-typed overlap
--- FAILURE 2:5: mismatching types b and a
-val f : Pair a b -> a
-let f xy =
+-- FAILURE 2:1: mismatching types b and a
+f : Pair a b -> a
+f xy =
   match xy with
   | Pair x _ -> x
   | Pair _ y -> y
@@ -389,16 +348,16 @@ let f xy =
 
 -- TEST annotation and inferred agree
 -- SUCCESS
-val myfold1 : (b -> a -> b) -> b -> List a -> b
-let rec myfold1 f y0 xs =
+myfold1 : (b -> a -> b) -> b -> List a -> b
+myfold1 f y0 xs =
   match xs with
   | Nil -> y0
   | Cons x xs -> myfold1 f (f y0 x) xs
 
 -- TEST annotation and inferred disagree
 -- SUCCESS
-val myfold2 : (a -> b -> a) -> a -> List b -> a
-let rec myfold2 f y0 xs =
+myfold2 : (a -> b -> a) -> a -> List b -> a
+myfold2 f y0 xs =
   match xs with
   | Nil -> y0
   | Cons x xs -> myfold2 f (f y0 x) xs
@@ -410,8 +369,8 @@ let rec myfold2 f y0 xs =
 
 -- TEST nested list pattern
 -- SUCCESS
-val last : a -> List a -> a
-let rec last x0 xs =
+last : a -> List a -> a
+last x0 xs =
   match xs with
   | Nil                -> x0
   | Cons x Nil         -> x
@@ -419,8 +378,8 @@ let rec last x0 xs =
 
 -- TEST allowed let abuse
 -- SUCCESS
-val f : a -> a
-let f x =
+f : a -> a
+f x =
   match x with
   | y -> y
 
@@ -428,37 +387,37 @@ let f x =
 
 -- TEST forbidden let abuse
 -- FAILURE 3:3: pattern match too simple, use a let binding instead
-val f : a -> Option a
-let f x =
+f : a -> Option a
+f x =
   match Some x with
   | y -> y
 
 -- TEST non-exhaustive top level
 -- FAILURE 3:3: unmatched constructor: Second
-val f : Choice a b -> a
-let f xy =
+f : Choice a b -> a
+f xy =
   match xy with
   | First x -> x
 
 -- TEST non-exhaustive nested
 -- FAILURE 3:3: unmatched constructor: Second
-val f : Pair (Choice a b) c -> a
-let f xyz =
+f : Pair (Choice a b) c -> a
+f xyz =
   match xyz with
   | Pair (First x) z -> x
 
 -- TEST overlapping top level
 -- FAILURE 3:3: overlapping patterns
-val f : Pair a a -> a
-let f xy =
+f : Pair a a -> a
+f xy =
   match xy with
   | Pair x _ -> x
   | Pair _ y -> y
 
 -- TEST overlapping nested
 -- FAILURE 3:3: overlapping patterns
-val f : Pair (Option a) a -> a
-let f xy =
+f : Pair (Option a) a -> a
+f xy =
   match xy with
   | Pair None     y -> y
   | Pair (Some x) _ -> x
@@ -466,16 +425,16 @@ let f xy =
 
 -- TEST constructor rule top level
 -- FAILURE 3:3: cannot apply constructor rule
-val f : a -> Option a -> a
-let f x0 x_opt =
+f : a -> Option a -> a
+f x0 x_opt =
   match x_opt with
   | Some x -> x
   | _      -> x0
 
 -- TEST constructor rule nested
 -- FAILURE 3:3: cannot apply constructor rule
-val f : a -> List (Option a) -> a
-let rec f x0 ys =
+f : a -> List (Option a) -> a
+f x0 ys =
   match ys with
   | Nil              -> x0
   | Cons (Some x) _  -> x

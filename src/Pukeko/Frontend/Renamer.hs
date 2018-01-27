@@ -22,7 +22,7 @@ type Out = St.Renamer
 renameModule :: Ps.Package -> Either Doc (Module Out)
 renameModule (Ps.MkPackage _ modules) = runRn $ do
   let ldecls = concatMap Ps._mod2decls modules
-  MkModule <$> concat <$> traverse rnDecl ldecls
+  MkModule <$> (traverse . lctd) rnDecl ldecls
 
 type RnEnv ev = Map Id.EVar ev
 type RnState = Set Id.EVar
@@ -44,31 +44,24 @@ localize bs = local' upd
 localizeDefns :: Vector n (Lctd (Ps.Defn _)) -> Rn (EFinScope n ev) a -> Rn ev a
 localizeDefns = localize . ifoldMap (\i (Lctd _ (Ps.MkDefn x _)) -> Map.singleton x i)
 
-rnDecl :: Lctd Ps.Decl -> Rn Void [Lctd (Decl Out)]
-rnDecl (Lctd pos decl) = here pos $ case decl of
-  Ps.DType ts -> (:[]) . Lctd pos . DType <$> (traverse . lctd) rnTConDecl ts
-  Ps.DSign s -> (:[]) . Lctd pos . DSign <$> rnSignDecl mempty s
+rnDecl :: Ps.Decl -> Rn Void (Decl Out)
+rnDecl = \case
+  Ps.DType ts -> DType <$> (traverse . lctd) rnTConDecl ts
+  Ps.DSign s -> DSign <$> rnSignDecl mempty s
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
     let env = Map.singleton v (mkBound Fin.zero v)
     ms1 <- traverse (rnSignDecl env) ms0
     modify (<> setOf (traverse . sign2func) ms1)
-    pure [Lctd pos (DClss (MkClssDecl c v ms1))]
+    pure (DClss (MkClssDecl c v ms1))
   Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
     Vec.withList vs0 $ \vs1 -> do
       qvs <- rnTypeCstr vs1 qs
       ds1 <- (traverse . lctd) rnDefn ds0
-      pure [Lctd pos (DInst (MkInstDecl c t qvs ds1))]
-  Ps.DLet ds0 -> do
-    ds1 <- (traverse . lctd) rnDefn ds0
-    modify (<> setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0)
-    pure ((fmap . fmap) DDefn (toList ds1))
-  Ps.DRec ds0 -> do
-    modify  (<> setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0)
-    ds1 <- (traverse . lctd) rnDefn ds0
-    pure ((fmap . fmap) DDefn (toList ds1))
+      pure (DInst (MkInstDecl c t qvs ds1))
+  Ps.DDefn d -> DDefn <$> rnDefn d
   Ps.DPrim (Ps.MkPrimDecl z s) -> do
     modify (<> Set.singleton z)
-    pure [Lctd pos (DPrim (MkPrimDecl (MkBind z NoType) s))]
+    pure (DPrim (MkPrimDecl (MkBind z NoType) s))
 
 rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 TConDecl)
 rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = Vec.withList prms0 $ \prms1 -> do
@@ -82,7 +75,9 @@ rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) =
     env = finRenamer vs
 
 rnSignDecl :: Map Id.TVar tv -> Ps.SignDecl -> Rn ev (SignDecl tv)
-rnSignDecl env (Ps.MkSignDecl z t) = MkSignDecl z <$> rnTypeScheme env t
+rnSignDecl env (Ps.MkSignDecl z t) = do
+  modify (Set.insert z)
+  MkSignDecl z <$> rnTypeScheme env t
 
 rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)
 rnType env = go

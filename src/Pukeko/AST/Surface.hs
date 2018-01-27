@@ -56,8 +56,7 @@ data Decl
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
-  | DLet  (NonEmpty (Lctd (Defn Id.EVar)))
-  | DRec  (NonEmpty (Lctd (Defn Id.EVar)))
+  | DDefn (Defn Id.EVar)
   | DPrim PrimDecl
 
 data TConDecl = MkTConDecl

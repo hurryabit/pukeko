@@ -5,23 +5,23 @@ import std/list
 -- IO
 type IO a
 
-val return : a -> IO a
+return : a -> IO a
 external return = "return"
 
-val print : Int -> IO Unit
+print : Int -> IO Unit
 external print = "print"
 
-val input : IO Int
+input : IO Int
 external input = "input"
 
-val (>>=) : IO a -> (a -> IO b) -> IO b
+(>>=) : IO a -> (a -> IO b) -> IO b
 external (>>=) = "bind"
 
-val (;) : IO Unit -> IO a -> IO a
-let (;) m1 m2 = m1 >>= fun x -> m2
+(;) : IO Unit -> IO a -> IO a
+(;) m1 m2 = m1 >>= fun x -> m2
 
-val sequence_io : List (IO a) -> IO (List a)
-let rec sequence_io ms =
+sequence_io : List (IO a) -> IO (List a)
+sequence_io ms =
   match ms with
   | Nil -> return Nil
   | Cons m ms ->
@@ -31,8 +31,8 @@ let rec sequence_io ms =
     >>= fun xs ->
     return (Cons x xs)
 
-val iter_io : (a -> IO Unit) -> List a -> IO Unit
-let iter_io f = foldr (fun x m -> f x; m) (return Unit)
+iter_io : (a -> IO Unit) -> List a -> IO Unit
+iter_io f = foldr (fun x m -> f x; m) (return Unit)
 
-val print_list : List Int -> IO Unit
-let print_list = iter_io print
+print_list : List Int -> IO Unit
+print_list = iter_io print

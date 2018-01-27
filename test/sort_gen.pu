@@ -1,10 +1,10 @@
 import std/prelude
 
-val gen : (a -> a) -> a -> List a
-let rec gen f x = Cons x (gen f (f x))
+gen : (a -> a) -> a -> List a
+gen f x = Cons x (gen f (f x))
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   print n;

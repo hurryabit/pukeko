@@ -1,23 +1,23 @@
 import std/prelude
 
-val id : a -> a
-let id x = x
+id : a -> a
+id x = x
 
 -- Fixpoint of a functor
 type Fix f =
   | Fix (f (Fix f))
 
-val cata : ((Fix f -> a) -> f (Fix f) -> f a) -> (f a -> a) -> Fix f -> a
-let rec cata fmap f x =
+cata : ((Fix f -> a) -> f (Fix f) -> f a) -> (f a -> a) -> Fix f -> a
+cata fmap f x =
   match x with
   | Fix y -> f (fmap (cata fmap f) y)
 
-val ana : ((a -> Fix f) -> f a -> f (Fix f)) -> (a -> f a) -> a -> Fix f
-let rec ana fmap f x = Fix (fmap (ana fmap f) (f x))
+ana : ((a -> Fix f) -> f a -> f (Fix f)) -> (a -> f a) -> a -> Fix f
+ana fmap f x = Fix (fmap (ana fmap f) (f x))
 
-val mapFix : ((a -> b) -> (Fix (f a) -> Fix (f b)) -> f a (Fix (f a)) -> f b (Fix (f b)))
+mapFix : ((a -> b) -> (Fix (f a) -> Fix (f b)) -> f a (Fix (f a)) -> f b (Fix (f b)))
        -> (a -> b) -> Fix (f a) -> Fix (f b)
-let rec mapFix bimap f x =
+mapFix bimap f x =
   match x with
   | Fix y -> Fix (bimap f (mapFix bimap f) y)
 
@@ -27,30 +27,30 @@ type ListF a b =
   | NilF
   | ConsF a b
 
-val bimapListF : (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2
-let bimapListF f g x =
+bimapListF : (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2
+bimapListF f g x =
   match x with
   | NilF      -> NilF
   | ConsF y z -> ConsF (f y) (g z)
 
-val mapFixList : (a -> b) -> Fix (ListF a) -> Fix (ListF b)
-let mapFixList = mapFix bimapListF
+mapFixList : (a -> b) -> Fix (ListF a) -> Fix (ListF b)
+mapFixList = mapFix bimapListF
 
-val toList : Fix (ListF a) -> List a
-let toList = cata (bimapListF id) (fun x ->
+toList : Fix (ListF a) -> List a
+toList = cata (bimapListF id) (fun x ->
   match x with
   | NilF       -> Nil
   | ConsF y ys -> Cons y ys)
 
-val fromList : List a -> Fix (ListF a)
-let fromList = ana (bimapListF id) (fun x ->
+fromList : List a -> Fix (ListF a)
+fromList = ana (bimapListF id) (fun x ->
   match x with
   | Nil       -> NilF
   | Cons y ys -> ConsF y ys)
 
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   sequence_io (replicate n input)

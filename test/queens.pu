@@ -1,7 +1,7 @@
 import std/prelude
 
-val diff : List Int -> List Int -> List Int
-let rec diff xs ys =
+diff : List Int -> List Int -> List Int
+diff xs ys =
   match xs with
   | Nil -> Nil
   | Cons x xs' ->
@@ -15,13 +15,13 @@ let rec diff xs ys =
       else
         diff xs ys'
 
-val ints : List Int
-let ints =
+ints : List Int
+ints =
   let rec go k = Cons k (go (k+1)) in
   go 1
 
-val solve_aux : List (List Int) -> List (List Int)
-let rec solve_aux kss =
+solve_aux : List (List Int) -> List (List Int)
+solve_aux kss =
   match kss with
   | Nil -> Cons Nil Nil
   | Cons ks kss ->
@@ -33,11 +33,11 @@ let rec solve_aux kss =
             ints)))
       ks
 
-val solve : Int -> List (List Int)
-let solve n = solve_aux (replicate n (take n ints))
+solve : Int -> List (List Int)
+solve n = solve_aux (replicate n (take n ints))
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   print (length (solve n))

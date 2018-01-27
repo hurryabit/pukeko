@@ -47,6 +47,12 @@ type Parser = Parsec Void String
 space :: Parser ()
 space = L.space space1 (L.skipLineComment "--") empty
 
+indented :: Parser a -> Parser a
+indented p = L.indentGuard space GT pos1 *> p
+
+nonIndented :: Parser a -> Parser a
+nonIndented = L.nonIndented space
+
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme space
 
@@ -66,7 +72,7 @@ braces = between (symbol "{") (symbol "}")
 reservedIdents :: Set String
 reservedIdents = Set.fromList
       [ "fun"
-      , "val", "let", "rec", "and", "in"
+      , "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
       , "type", "class", "instance"
@@ -149,9 +155,9 @@ type_ =
     [ [ InfixR (arrow *> pure mkTFun) ] ]
   <?> "type"
 atype = choice
-  [ TVar <$> tvar
+  [ TVar <$> try (indented tvar)
   , TCon <$> tcon
-  , parens type_
+  , indented (parens type_)
   ]
 
 typeCstr :: Parser TypeCstr
@@ -160,26 +166,6 @@ typeCstr = MkTypeCstr
 
 typeScheme :: Parser TypeScheme
 typeScheme = MkTypeScheme <$> typeCstr <*> type_
-
-module_ :: FilePath -> Parser Module
-module_ file = do
-  imps <- lexeme (many import_)
-  decls <- many $ lctd $ choice
-    [ DType <$> (reserved "type"     *> NE.sepBy1 (lctd tconDecl) (reserved "and"))
-    , DSign <$> (reserved "val"      *> signDecl)
-    , DClss <$> (reserved "class"    *> clssDecl)
-    , DInst <$> (reserved "instance" *> instDecl)
-    , let_ DLet DRec
-    , DPrim <$> (reserved "external" *> primDecl)
-    ]
-  pure (MkModule file imps decls)
-
-import_ :: Parser FilePath
-import_ = do
-  reserved "import"
-  comps <- sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/')
-  void eol
-  pure (Sys.joinPath comps Sys.<.> "pu")
 
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
@@ -231,10 +217,10 @@ expr =
   ]
   <?> "expression"
 aexpr = choice
-  [ EVar <$> evar
+  [ EVar <$> try (indented evar)
   , ECon <$> dcon
   , ENum <$> decimal
-  , parens expr
+  , indented (parens expr)
   ]
 lexpr = ELoc <$> lctd expr
 
@@ -249,14 +235,14 @@ operatorTable = map (map f) (reverse Op.table)
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
   <$> tcon
-  <*> many tvar
+  <*> many (indented tvar)
   <*> option [] (equals *> some (lctd dconDecl))
 
 dconDecl :: Parser DConDecl
 dconDecl = MkDConDecl <$> (bar *> dcon) <*> many atype
 
 signDecl :: Parser SignDecl
-signDecl = MkSignDecl <$> evar <*> (colon *> typeScheme)
+signDecl = MkSignDecl <$> try (evar <* colon) <*> typeScheme
 
 clssDecl :: Parser ClssDecl
 clssDecl = MkClssDecl <$> clss <*> tvar <*> (colon *> record signDecl)
@@ -273,6 +259,26 @@ primDecl :: Parser PrimDecl
 primDecl = MkPrimDecl
   <$> evar
   <*> (equals *> char '\"' *> some lowerChar <* symbol "\"")
+
+import_ :: Parser FilePath
+import_ = do
+  reserved "import"
+  comps <- sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/')
+  void eol
+  pure (Sys.joinPath comps Sys.<.> "pu")
+
+module_ :: FilePath -> Parser Module
+module_ file = do
+  imps <- lexeme (many import_)
+  decls <- many $ lctd $ choice
+    [ DType <$> (reserved "type"     *> NE.sepBy1 (lctd tconDecl) (reserved "and"))
+    , DClss <$> (reserved "class"    *> clssDecl)
+    , DInst <$> (reserved "instance" *> instDecl)
+    , nonIndented (DSign <$> signDecl)
+    , nonIndented (DDefn <$> defn)
+    , DPrim <$> (reserved "external" *> primDecl)
+    ]
+  pure (MkModule file imps decls)
 
 record :: Parser a -> Parser [a]
 record p = braces (sepBy p comma)

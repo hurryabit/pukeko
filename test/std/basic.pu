@@ -1,5 +1,5 @@
 -- Fundamental functions
-val abort : a
+abort : a
 external abort = "abort"
 
 -- Fundamental types

@@ -1,19 +1,19 @@
 import std/prelude
 
-val p : Int
-let p = 100000007
+p : Int
+p = 100000007
 
-val mul_p : Int -> Int -> Int
-let mul_p x y = (x*y) % p
+mul_p : Int -> Int -> Int
+mul_p x y = (x*y) % p
 
-val add_p : Int -> Int -> Int
-let add_p x y = (x+y) % p
+add_p : Int -> Int -> Int
+add_p x y = (x+y) % p
 
-val sum_p : List Int -> Int
-let sum_p = foldl add_p 0
+sum_p : List Int -> Int
+sum_p = foldl add_p 0
 
-val scanl : (b -> a -> b) -> b -> List a -> List b
-let scanl f =
+scanl : (b -> a -> b) -> b -> List a -> List b
+scanl f =
   let rec scanl_f y0 xs =
     match xs with
     | Nil -> Nil
@@ -23,14 +23,14 @@ let scanl f =
   in
   scanl_f
 
-val sols : List Int
-let rec sols =
+sols : List Int
+sols =
   Cons 1
     (map (fun xs -> sum_p (zip_with mul_p sols xs))
       (scanl (fun xs x -> Cons x xs) Nil sols))
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   print (nth sols n)

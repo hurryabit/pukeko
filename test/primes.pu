@@ -1,12 +1,12 @@
 import std/prelude
 
-val repeat : List a -> List a
-let repeat xs =
+repeat : List a -> List a
+repeat xs =
   let rec ys = append xs ys in
   ys
 
-val psums : List Int -> List Int
-let psums =
+psums : List Int -> List Int
+psums =
   let rec psums0 n xs =
     match xs with
     | Nil -> Nil
@@ -16,8 +16,8 @@ let psums =
   in
   psums0 0
 
-val filter : (a -> Bool) -> List a -> List a
-let filter p =
+filter : (a -> Bool) -> List a -> List a
+filter p =
   let rec filter_p xs =
     match xs with
     | Nil -> Nil
@@ -27,17 +27,17 @@ let filter p =
   in
   filter_p
 
-val sieve : List Int -> List Int
-let rec sieve ks =
+sieve : List Int -> List Int
+sieve ks =
   match ks with
   | Nil -> abort
   | Cons p ks -> Cons p (sieve (filter (fun k -> k % p != 0) ks))
 
-val primes : List Int
-let primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
+primes : List Int
+primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   print (nth primes n)

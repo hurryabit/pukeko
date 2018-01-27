@@ -1,16 +1,16 @@
 import std/io
 
-val h : c -> c
-let h z = (fun u -> u) z
+h : c -> c
+h z = (fun u -> u) z
 
-val g : b -> b
-let g y = (fun z -> h z) y
+g : b -> b
+g y = (fun z -> h z) y
 
-val f1 : a -> a
-let f1 = h
+f1 : a -> a
+f1 = h
 
-val f2 : a -> a
-let f2 x = g x
+f2 : a -> a
+f2 x = g x
 
-val main : IO Unit
-let main = return (f1 (f2 Unit))
+main : IO Unit
+main = return (f1 (f2 Unit))

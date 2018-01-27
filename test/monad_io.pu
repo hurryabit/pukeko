@@ -1,16 +1,16 @@
 import std/io
 
-val when : Bool -> IO Unit -> IO Unit
-let when p m = if p then m else return Unit
+when : Bool -> IO Unit -> IO Unit
+when p m = if p then m else return Unit
 
-val count_down : Int -> IO Unit
-let rec count_down k = when (k >= 0) (print k; count_down (k-1))
+count_down : Int -> IO Unit
+count_down k = when (k >= 0) (print k; count_down (k-1))
 
-val repeat_m : Int -> IO Unit -> IO Unit
-let rec repeat_m k m = when (k > 0) (m; repeat_m (k-1) m)
+repeat_m : Int -> IO Unit -> IO Unit
+repeat_m k m = when (k > 0) (m; repeat_m (k-1) m)
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun k ->
   input

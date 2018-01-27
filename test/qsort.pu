@@ -1,15 +1,15 @@
 import std/prelude
 
-val qsort : List Int -> List Int
-let rec qsort xs =
+qsort : List Int -> List Int
+qsort xs =
   match xs with
   | Nil -> Nil
   | Cons x xs ->
     match partition (fun y -> y < x) xs with
     | Pair ys zs -> append (qsort ys) (Cons x (qsort zs))
 
-val main : IO Unit
-let main =
+main : IO Unit
+main =
   input
   >>= fun n ->
   sequence_io (replicate n input)
