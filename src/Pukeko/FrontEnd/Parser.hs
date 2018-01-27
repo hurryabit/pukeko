@@ -24,18 +24,20 @@ import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
-parseInput :: (MonadError Doc m) => SourceName -> String -> m Module
+parseInput :: (Member (Error Doc) effs) => SourceName -> String -> Eff effs Module
 parseInput source =
   either (throwError . shown) pure . parse (module_ source <* eof) source
 
-parseModule :: FilePath -> ExceptT Doc IO Module
+parseModule ::
+  (Member (Error Doc) effs, LastMember IO effs) => FilePath -> Eff effs Module
 parseModule file = do
-  liftIO (putStr (file ++ " "))
-  code <- liftIO (readFile file)
+  sendM (putStr (file ++ " "))
+  code <- sendM (readFile file)
   parseInput file code
 
-parsePackage :: FilePath -> ExceptT Doc IO Package
-parsePackage file = build parseModule file <* liftIO (putStrLn "")
+parsePackage ::
+  (Member (Error Doc) effs, LastMember IO effs) => FilePath -> Eff effs Package
+parsePackage file = build parseModule file <* sendM (putStrLn "")
 
 type Parser = Parsec String ()
 

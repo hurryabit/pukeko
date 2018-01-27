@@ -4,7 +4,6 @@ module Pukeko.MiddleEnd.Prettifier
 
 import Pukeko.Prelude
 
--- import           Control.Lens
 import qualified Data.Map      as Map
 import qualified Data.Set      as Set
 

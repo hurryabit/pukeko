@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeApplications #-}
 module Pukeko.AST.ConDecl
   ( Some1 (..)
   , Pair1 (..)

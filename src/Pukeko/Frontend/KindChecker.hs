@@ -7,11 +7,11 @@ module Pukeko.FrontEnd.KindChecker
 
 import Pukeko.Prelude
 
-import           Control.Lens
+import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
-import           Control.Monad.ST.Class
 import           Data.Forget      (Forget (..))
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map           as Map
 import           Data.STRef
 import qualified Data.Vector.Sized as Vec
 
@@ -41,11 +41,14 @@ type KCEnv n s = Vector n (Kind (Open s))
 type KCState s = Map Id.TCon (Kind (Open s))
 
 type KC n s =
-  (RWST (KCEnv n s) () (KCState s) (HereT (SupplyT Id.TVar (ExceptT Doc (ST s)))))
+  Eff
+  [Reader (KCEnv n s), State (KCState s), Reader Pos, Supply Id.TVar, Error Doc, ST s]
 
 runKC :: (forall n s. KC n s a) -> Either Doc a
 runKC kc =
-  runST (runExceptT (evalSupplyT (runHereT(fst <$> evalRWST kc env0 mempty)) sup0))
+  runST
+  $ runM . runError . evalSupply sup0 . runReader noPos . evalState mempty . runReader env0
+  $ kc
   where
     sup0 = Id.freshTVars
     env0 = Vec.empty
@@ -53,10 +56,10 @@ runKC kc =
 freshUVar :: KC n s (Kind (Open s))
 freshUVar = do
   v <- fresh
-  UVar <$> liftST (newSTRef (Free (Forget v)))
+  UVar <$> sendM (newSTRef (Free (Forget v)))
 
 localize :: Vector n (Kind (Open s)) -> KC n s a -> KC m s a
-localize env = withRWST (\_ -> (,) env)
+localize env = local' (const env)
 
 kcType :: Kind (Open s) -> Type (TFinScope n Void) -> KC n s ()
 kcType k = \case
@@ -65,7 +68,7 @@ kcType k = \case
     unify kv k
   TArr -> unify (Arrow Star (Arrow Star Star)) k
   TCon tcon -> do
-    kcon_opt <- use (at tcon)
+    kcon_opt <- gets (tcon `Map.lookup`)
     case kcon_opt of
       Nothing -> bugWith "unknown type constructor" tcon
       Just kcon -> unify kcon k
@@ -79,7 +82,7 @@ kcTypDef :: NonEmpty (Loc (Some1 TConDecl)) -> KC n s ()
 kcTypDef tcons = do
   kinds <- for tcons $ \(Loc _ (Some1 MkTConDecl{_tcon2name = tname})) -> do
     kind <- freshUVar
-    at tname ?= kind
+    modify (Map.insert tname kind)
     pure kind
   for_ (NE.zip tcons kinds) $
     \(Loc pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}), tconKind) -> do
@@ -119,7 +122,7 @@ kcDecl decl = case decl of
     passOn = pure decl
 
 kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2decls (traverse (\top -> reset *> traverseHere kcDecl top))
+kcModule = module2decls (traverse (\top -> reset @Id.TVar *> traverseHere kcDecl top))
 
 checkModule :: Module In -> Either Doc (Module Out)
 checkModule module_ = runKC (kcModule module_)
@@ -128,18 +131,18 @@ checkModule module_ = runKC (kcModule module_)
 unwind :: Kind (Open s) -> KC n s (Kind (Open s))
 unwind = \case
   k0@(UVar uref) -> do
-    uvar <- liftST (readSTRef uref)
+    uvar <- sendM (readSTRef uref)
     case uvar of
       Free _  -> pure k0
       Link k1 -> do
         k2 <- unwind k1
-        liftST (writeSTRef uref (Link k2))
+        sendM (writeSTRef uref (Link k2))
         pure k2
   k -> pure k
 
 assertFree :: STRef s (UVar s) -> KC a s ()
 assertFree uref = do
-  uvar <- liftST (readSTRef uref)
+  uvar <- sendM (readSTRef uref)
   case uvar of
     Free _ -> pure ()
     Link _ -> bug "unwinding produced link"
@@ -151,7 +154,7 @@ occursCheck uref1 = \case
   UVar uref2
     | uref1 == uref2 -> throwHere "occurs check"
     | otherwise -> do
-        uvar2 <- liftST (readSTRef uref2)
+        uvar2 <- sendM (readSTRef uref2)
         case uvar2 of
           Link k2 -> occursCheck uref1 k2
           Free _  -> pure ()
@@ -168,12 +171,12 @@ unify k1 k2 = do
     (UVar uref1, _) -> do
       assertFree uref1
       occursCheck uref1 k2
-      liftST (writeSTRef uref1 (Link k2))
+      sendM (writeSTRef uref1 (Link k2))
     (_, UVar _) -> unify k2 k1
     -- TODO: Improve error message.
     (_, _) -> do
-      d1 <- liftST (prettyKind False k1)
-      d2 <- liftST (prettyKind False k2)
+      d1 <- sendM (prettyKind False k1)
+      d2 <- sendM (prettyKind False k2)
       throwHere ("cannot unify kinds" <+> d1 <+> "and" <+> d2)
 
 close :: Kind (Open s) -> KC n s ()
@@ -184,7 +187,7 @@ close k = do
     Arrow kf kp -> close kf *> close kp
     UVar uref -> do
       assertFree uref
-      liftST (writeSTRef uref (Link Star))
+      sendM (writeSTRef uref (Link Star))
 
 prettyKind :: Bool -> Kind (Open s) -> ST s Doc
 prettyKind prec = \case

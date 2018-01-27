@@ -1,5 +1,4 @@
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeOperators #-}
 module Data.Finite
   ( Finite
   , zero

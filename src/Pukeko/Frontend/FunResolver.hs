@@ -7,8 +7,8 @@ module Pukeko.FrontEnd.FunResolver
 
 import Pukeko.Prelude
 
-import           Control.Lens
 import qualified Data.Map      as Map
+import qualified Data.Set      as Set
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
@@ -23,15 +23,10 @@ data FRState = MkFRState
   }
 makeLenses ''FRState
 
-newtype FR a = FR{unFR :: StateT FRState (HereT (Except Doc)) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadState FRState
-           , MonadError Doc
-           , MonadHere
-           )
+type FR = Eff [State FRState, Reader Pos, Error Doc]
 
 runFR :: FR a -> Either Doc a
-runFR fr = runExcept (runHereT (evalStateT (unFR fr) st0))
+runFR = run . runError . runReader noPos . evalState st0
   where
     st0 = MkFRState mempty mempty
 
@@ -47,18 +42,18 @@ resolveModule (MkModule tops0) = runFR $ do
 
 declareFun :: SignDecl tv -> FR ()
 declareFun (MkSignDecl fun _) = do
-  dup <- uses declared (has (ix fun))
+  dup <- uses declared (Map.member fun)
   when dup (throwHere ("duplicate declaration of function:" <+> pretty fun))
   pos <- where_
-  declared . at fun ?= pos
+  modifying declared (Map.insert fun pos)
 
 defineFun :: Id.EVar -> FR ()
 defineFun fun = do
-  ex <- uses declared (has (ix fun))
+  ex <- uses declared (Map.member fun)
   unless ex (throwHere ("undeclared function:" <+> pretty fun))
-  dup <- use (defined . contains fun)
+  dup <- uses defined (Set.member fun)
   when dup (throwHere ("duplicate definition of function:" <+> pretty fun))
-  defined . contains fun .= True
+  modifying defined (Set.insert fun)
 
 frDecl :: Decl In -> FR (Decl Out)
 frDecl = \case

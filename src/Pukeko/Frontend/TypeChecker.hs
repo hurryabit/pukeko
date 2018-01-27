@@ -1,5 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeApplications #-}
 module Pukeko.FrontEnd.TypeChecker
   ( checkModule
   ) where
@@ -28,10 +26,10 @@ type IsEVar ev = (HasEnv ev)
 
 type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
-type TC tv ev a = GammaT tv ev (InfoT (HereT (Except Doc))) a
+type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader Pos, Error Doc]
 
 runTC :: (IsType (St.StageType st)) => Module st -> TC Void Void a -> Either Doc a
-runTC m0 tc = runExcept (runHereT (runInfoT (runGammaT tc) m0))
+runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
 
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case

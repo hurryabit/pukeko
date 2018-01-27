@@ -11,7 +11,7 @@ import qualified Data.Map as Map
 import Pukeko.BackEnd.GCode
 
 assemble :: Program -> Either Doc String
-assemble MkProgram { _globals, _main } = do
+assemble MkProgram { _globals, _main } = run . runError $ do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
       cafs = [ _name | MkGlobal{ _name, _arity = 0 } <- _globals ]
@@ -22,11 +22,11 @@ assemble MkProgram { _globals, _main } = do
   globals <- mapM (assembleGlobal arities) _globals
   return $ intercalate "\n" (prolog:globals)
 
-assembleGlobal :: Map Name Int -> Global -> Either Doc String
+assembleGlobal :: (Member (Error Doc) effs) => Map Name Int -> Global -> Eff effs String
 assembleGlobal arities MkGlobal{ _code } =
   unlines <$> mapM (assembleInst arities) _code
 
-assembleInst :: Map Name Int -> Inst -> Either Doc String
+assembleInst :: (Member (Error Doc) effs) => Map Name Int -> Inst -> Eff effs String
 assembleInst arities inst = do
   let code macro params = do
         let param_str
@@ -86,4 +86,4 @@ assembleInst arities inst = do
     PRINT -> code "print" []
     INPUT -> code "input" []
     ABORT -> code "abort" []
-    EXIT -> throwError "forbidden instruction 'EXIT'"
+    EXIT -> throwError (text "forbidden instruction 'EXIT'")

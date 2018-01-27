@@ -5,7 +5,6 @@ module Pukeko.FrontEnd.Renamer
 
 import Pukeko.Prelude
 
-import           Control.Lens
 import qualified Data.Finite       as Fin
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
@@ -28,20 +27,16 @@ renameModule (Ps.MkPackage _ modules) = runRn $ do
 type RnEnv ev = Map Id.EVar ev
 type RnState = Set Id.EVar
 
-newtype Rn ev a =
-  Rn{unRn :: ReaderT (RnEnv ev) (StateT RnState (HereT (Except Doc))) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadReader (RnEnv ev)
-           , MonadState  RnState
-           , MonadError Doc
-           , MonadHere
-           )
+type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader Pos, Error Doc]
 
 runRn :: Rn Void a -> Either Doc a
-runRn ix = runExcept (runHereT (evalStateT (runReaderT (unRn ix) Map.empty) Set.empty))
+runRn = run . runError . runReader noPos . evalState st0 . runReader env0
+  where
+    st0 = mempty
+    env0 = mempty
 
 localize :: Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
-localize bs = Rn . withReaderT upd . unRn
+localize bs = local' upd
   where
     upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
@@ -56,7 +51,7 @@ rnDecl (Loc pos decl) = here pos $ case decl of
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
     let env = Map.singleton v (mkBound Fin.zero v)
     ms1 <- traverse (rnSignDecl env) ms0
-    id <>= setOf (traverse . sign2func) ms1
+    modify (<> setOf (traverse . sign2func) ms1)
     pure [Loc pos (DClss (MkClssDecl c v ms1))]
   Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
     Vec.withList vs0 $ \vs1 -> do
@@ -65,14 +60,14 @@ rnDecl (Loc pos decl) = here pos $ case decl of
       pure [Loc pos (DInst (MkInstDecl c t qvs ds1))]
   Ps.DLet ds0 -> do
     ds1 <- traverseHeres rnDefn ds0
-    id <>= setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0
+    modify (<> setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0)
     pure (fmapHeres DDefn (toList ds1))
   Ps.DRec ds0 -> do
-    id <>= setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0
+    modify  (<> setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0)
     ds1 <- traverseHeres rnDefn ds0
     pure (fmapHeres DDefn (toList ds1))
   Ps.DPrim (Ps.MkPrimDecl z s) -> do
-    id <>= Set.singleton z
+    modify (<> Set.singleton z)
     pure [Loc pos (DPrim (MkPrimDecl (MkBind z NoType) s))]
 
 rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 TConDecl)
@@ -121,11 +116,11 @@ rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
 rnExpr = \case
   Ps.ELoc l -> ELoc <$> traverseHere rnExpr l
   Ps.EVar x -> do
-    y_mb <- view (at x)
+    y_mb <- asks (x `Map.lookup`)
     case y_mb of
       Just y -> pure (EVar y)
       Nothing -> do
-        global <- use (contains x)
+        global <- gets (x `Set.member`)
         if global then pure (EVal x) else throwHere ("unknown variable:" <+> pretty x)
   Ps.ECon c -> pure (ECon c)
   Ps.ENum n -> pure (ENum n)

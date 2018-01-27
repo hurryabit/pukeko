@@ -1,5 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeOperators #-}
 module Pukeko.MiddleEnd.LambdaLifter
   ( Out
   , liftModule
@@ -8,6 +6,7 @@ where
 
 import Pukeko.Prelude
 
+import           Control.Monad.Freer.Supply
 import qualified Data.Finite       as Fin
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
@@ -27,11 +26,13 @@ type Out = St.LambdaLifter
 type IsTVar tv = (Ord tv, BaseTVar tv)
 type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
-type LL tv ev a =
-  GammaT tv ev (InfoT (HereT (SupplyT Id.EVar (Writer [Loc (Decl Out)])))) a
+type LL tv ev =
+  EffGamma tv ev
+    [Reader ModuleInfo, Reader Pos, Supply Id.EVar, Writer [Loc (Decl Out)]]
 
 execLL :: Module In -> LL Void Void () -> [Loc (Decl Out)]
-execLL m0 ll = execWriter (evalSupplyT (runHereT (runInfoT (runGammaT ll) m0)) [])
+execLL m0 =
+  snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
 
 yield :: Decl Out -> LL tv ev ()
 yield decl = do

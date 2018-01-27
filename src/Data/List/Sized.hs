@@ -1,6 +1,5 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeOperators #-}
 module Data.List.Sized
   ( Nat (..)
   , One

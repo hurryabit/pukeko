@@ -4,26 +4,28 @@ module Pukeko.FrontEnd.Parser.Build
 
 import Pukeko.Prelude
 
-import           Control.Lens
-import           Control.Monad.Error.Class (MonadError (..))
 import qualified Data.DList as DL
+import qualified Data.Set   as Set
 
 import           Pukeko.AST.Surface
 
-type BuildT = RWST (Set FilePath) (DList Module) (Set FilePath)
-
-build :: MonadError Doc m => (FilePath -> m Module) -> FilePath -> m Package
+build ::
+  (Member (Error Doc) effs) =>
+  (FilePath -> Eff effs Module) -> FilePath -> Eff effs Package
 build parse file = do
-  (_, mdls) <- execRWST (run parse file) mempty mempty
+  (_, mdls) <-
+    evalState @(Set FilePath) mempty
+    $ runWriter @(DList Module)
+    $ runReader @(Set FilePath) mempty
+    $ go (raise . raise . raise . parse) file
   pure (MkPackage file (toList mdls))
-
-run :: MonadError Doc m => (FilePath -> m Module) -> FilePath -> BuildT m ()
-run parse file = do
-  cyc <- view (contains file)
-  when cyc $ throwError ("detected import cycle at file" <+> text file)
-  done <- use (contains file)
-  unless done $ do
-    mdl <- lift (parse file)
-    contains file .= True
-    local (contains file .~ True) $ for_ (_mod2imports mdl) (run parse)
-    tell (DL.singleton mdl)
+  where
+    go parse file = do
+      cyc <- asks (file `Set.member`)
+      when cyc $ throwError ("detected import cycle at file" <+> text file)
+      done <- gets (file `Set.member`)
+      unless done $ do
+        mdl <- parse file
+        modify (file `Set.insert`)
+        local (file `Set.insert`) $ for_ (_mod2imports mdl) (go parse)
+        tell (DL.singleton mdl)

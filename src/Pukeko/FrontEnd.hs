@@ -5,7 +5,7 @@ module Pukeko.FrontEnd
   )
   where
 
-import Pukeko.Prelude
+import Pukeko.Prelude hiding (run)
 
 import qualified Pukeko.AST.SystemF             as SystemF
 import qualified Pukeko.AST.Stage               as Stage

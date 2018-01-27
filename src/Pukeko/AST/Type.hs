@@ -1,8 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.Type
   ( IsType (..)
@@ -32,7 +30,8 @@ module Pukeko.AST.Type
 
 import Pukeko.Prelude
 
-import           Control.Lens
+import           Control.Lens ()
+import           Control.Monad.Freer.Supply
 import           Data.Finite       (absurd0)
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
@@ -115,7 +114,7 @@ typeInt :: Type tv
 typeInt  = TCon (Id.tcon "Int")
 
 vars :: Ord tv => Type tv -> Set tv
-vars = setOf traversed
+vars = setOf traverse
 
 -- * Deep traversals
 type2tcon :: Traversal' (Type tv) Id.TCon
@@ -218,11 +217,11 @@ renameType t0 =
       -- env0 :: Map tv tv
       env0 = Map.fromSet id vs
       sup0 = Set.toList nvs ++ Id.freshTVars
-  in fmap unBox (runIdentity (evalSupplyT (runReaderT (go t1) env0) sup0))
+  in fmap unBox (run (evalSupply sup0 (runReader env0 (go t1))))
   where
     go ::
       forall tv. (HasEnv tv) =>
-      Type tv -> ReaderT (EnvOf tv tv) (SupplyT Id.TVar Identity) (Type tv)
+      Type tv -> Eff [Reader (EnvOf tv tv), Supply Id.TVar] (Type tv)
     go = \case
       TVar v -> TVar <$> asks (lookupEnv v)
       TArr -> pure TArr
@@ -231,5 +230,5 @@ renameType t0 =
       TUni (qvs0 :: Vector n QVar) tq -> do
         qvs1 <- traverse (qvar2tvar (const fresh)) qvs0
         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
-        withReaderT (\env0 -> extendEnv @(Finite n) @tv env1 (fmap weaken env0)) $
+        local' (\env0 -> extendEnv @(Finite n) @tv env1 (fmap weaken env0)) $
           TUni qvs1 <$> go tq

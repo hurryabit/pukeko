@@ -4,7 +4,8 @@ module Pukeko.FrontEnd.TypeResolver
 
 import Pukeko.Prelude
 
-import           Control.Lens
+import           Control.Lens (traverseOf)
+import qualified Data.Map     as Map
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
@@ -21,40 +22,35 @@ data TRState = MkTRState
   }
 makeLenses ''TRState
 
-newtype TR a = TR {unTR :: StateT TRState (HereT (Except Doc)) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadError Doc
-           , MonadState TRState
-           , MonadHere
-           )
+type TR = Eff [Reader Pos, State TRState, Error Doc]
 
 evalTR :: TR a -> Either Doc a
-evalTR tr =
-  let st = MkTRState mempty mempty
-  in  runExcept (runHereT (evalStateT (unTR tr) st))
+evalTR =
+  let st0 = MkTRState mempty mempty
+  in  run . runError . evalState st0 . runReader noPos
 
 -- TODO: Use proper terminology in error messages.
 trType :: Type tv -> TR (Type tv)
 trType = type2tcon $ \tcon -> do
-  ex <- uses st2tcons (has (ix tcon))
+  ex <- uses st2tcons (Map.member tcon)
   unless ex (throwHere ("unknown type constructor:" <+> pretty tcon))
   pure tcon
 
 insertTCon :: TConDecl n -> TR ()
 insertTCon tcon@MkTConDecl{_tcon2name = tname} = do
-  old <- use (st2tcons . at tname)
+  old <- uses st2tcons (Map.lookup tname)
   when (isJust old) $ throwHere ("duplicate type constructor:" <+> pretty tname)
-  st2tcons . at tname ?= Some1 tcon
+  modifying st2tcons (Map.insert tname (Some1 tcon))
 
 insertDCon :: KnownNat n => TConDecl n -> DConDecl n -> TR ()
 insertDCon tcon dcon@MkDConDecl{_dcon2name = dname} = do
-  old <- use (st2dcons . at dname)
+  old <- uses st2dcons (Map.lookup dname)
   when (isJust old) $ throwHere ("duplicate data constructor:" <+> pretty dname)
-  st2dcons . at dname ?= Some1 (Pair1 tcon dcon)
+  modifying st2dcons (Map.insert dname (Some1 (Pair1 tcon dcon)))
 
 findDCon :: Id.DCon -> TR Id.DCon
 findDCon dcon = do
-  ex <- uses st2dcons (has (ix dcon))
+  ex <- uses st2dcons (Map.member dcon)
   unless ex (throwHere ("unknown data constructor:" <+> pretty dcon))
   pure dcon
 

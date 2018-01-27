@@ -41,6 +41,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - monad-st-0.2.4.1
+- ../freer-simple
 
 # Override default flag values for local packages and extra-deps
 flags: {}

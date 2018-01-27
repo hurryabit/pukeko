@@ -6,7 +6,7 @@ where
 
 import Pukeko.Prelude
 
-import           Control.Lens
+import qualified Data.Map as Map
 
 import           Pukeko.AST.NoLambda
 import           Pukeko.AST.Scope
@@ -25,14 +25,10 @@ eraseModule m0@(In.MkModule decls) =
 
 type CCState = Map Id.EVar Name
 
-newtype CC a = CC{unCC :: InfoT (State CCState) a}
-  deriving ( Functor, Applicative, Monad
-           , MonadInfo
-           , MonadState CCState
-           )
+type CC = Eff [Reader ModuleInfo, State CCState]
 
 runCC :: In.Module In -> CC a -> a
-runCC decls cc = evalState (runInfoT (unCC cc) decls) mempty
+runCC decls = run . evalState mempty . runInfo decls
 
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
@@ -47,7 +43,7 @@ ccDecl = \case
     Just <$> Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
   In.DPrim (In.MkPrimDecl b s) -> do
     let n = MkName s
-    at (In._bind2evar b) ?= n
+    modify (Map.insert (In._bind2evar b) n)
     pure (Just (Asm n))
 
 ccDefn :: (BaseEVar ev) => Loc (In.Defn In tv ev) -> CC Defn
@@ -58,7 +54,7 @@ ccExpr = \case
   In.ELoc l -> ccExpr (unloc l)
   In.EVar x -> pure (Local (name (baseEVar x)))
   In.EVal z -> do
-    external <- use (at z)
+    external <- gets (Map.lookup z)
     case external of
       Nothing -> pure (Global (name z))
       Just s  -> pure (External s)

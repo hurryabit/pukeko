@@ -9,7 +9,6 @@ where
 
 import Pukeko.Prelude
 
--- import           Control.Lens
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Sized  as LS
 import qualified Data.Map         as Map
@@ -25,13 +24,13 @@ import qualified Pukeko.AST.Identifier as Id
 type In  = St.Inferencer Type
 type Out = St.PatternMatcher
 
-type PM = InfoT (StateT [Id.EVar] (HereT (Except Doc)))
+type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader Pos, Error Doc]
 
-evalPM :: PM a -> Module In -> Either Doc a
-evalPM pm m0 = runExcept (runHereT (evalStateT (runInfoT pm m0) []))
+evalPM :: Module In -> PM a -> Either Doc a
+evalPM m0 = run . runError . runReader noPos . evalState [] . runInfo m0
 
 freshEVar :: PM Id.EVar
-freshEVar = state (\(x:xs) -> (x, xs))
+freshEVar = get >>= \(x:xs) -> put xs >> return x
 
 pmExpr :: Expr In tv ev -> PM (Expr Out tv ev)
 pmExpr = \case
@@ -64,7 +63,7 @@ pmDecl = \case
   DPrim p -> pure (DPrim p)
 
 compileModule :: Module In -> Either Doc (Module Out)
-compileModule m0 = evalPM (module2decls (traverseHeres pmDecl) m0) m0
+compileModule m0 = evalPM m0 (module2decls (traverseHeres pmDecl) m0)
 
 pmMatch ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>

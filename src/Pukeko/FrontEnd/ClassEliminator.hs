@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
 module Pukeko.FrontEnd.ClassEliminator
   ( elimModule
   ) where
@@ -24,10 +23,10 @@ type Out = ClassEliminator
 
 type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
 
-type CE tv ev = XGammaT (Map Id.Clss) Type tv ev (InfoT (HereT Identity))
+type CE tv ev = EffXGamma (Map Id.Clss) Type tv ev [Reader ModuleInfo, Reader Pos]
 
 runCE :: Module In -> CE Void Void a -> a
-runCE m0 ce = runIdentity (runHereT (runInfoT (runGammaT ce) m0))
+runCE m0 = run . runReader noPos . runInfo m0 . runGamma
 
 elimModule :: Module In -> Module Out
 elimModule m0@(MkModule decls) = runCE m0 $
@@ -59,7 +58,7 @@ elimDecl decl = case decl of
     let (z_dict, t_dict) = instDictInfo inst
     clssDecl@(MkClssDecl _ _ mthdsL) <- findInfo info2clsss clss
     pos <- where_
-    mapGammaT (localInfo (tconDeclInfo (dictTConDecl (Loc pos clssDecl)))) $ do
+    local (<> tconDeclInfo (dictTConDecl (Loc pos clssDecl))) $ do
       Vec.withList mthdsL $ \mthdsV -> do
         defns1 <- for mthdsV $ \(MkSignDecl mthd _) -> do
           case find (\defn -> unloc defn^.defn2func == mthd) defns0 of
@@ -68,7 +67,7 @@ elimDecl decl = case decl of
         let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
         let e_body =
               mkEApp e_dcon
-                (imap (\i -> EVar . mkBound i . view defn2func . unloc) defns1)
+                (imap (\i -> EVar . mkBound i . (^.defn2func) . unloc) defns1)
         let e_let :: Expr In _ _
             e_let = ELet defns1 e_body
         let e_rhs :: Expr In _ _
@@ -197,7 +196,7 @@ unclssDecl = \case
   DType tcons ->
     let tcon2type = tcon2dcons . traverse . traverse . dcon2flds . traverse
     in  DType (fmapHeres (\(Some1 tcon) -> Some1 (over tcon2type unclssType tcon)) tcons)
-  DDefn defn -> runIdentity (runHereT (DDefn <$> defn2type (pure . unclssType) defn))
+  DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
   DPrim prim -> DPrim (over (prim2bind . bind2type) unclssType prim)
 
 -- TODO: Make this less hacky.

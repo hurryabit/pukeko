@@ -1,5 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeOperators #-}
 module Pukeko.AST.Stage where
 
 import Pukeko.Prelude

@@ -1,6 +1,4 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 module Data.Vector.Sized
   ( -- * Types
     Vector

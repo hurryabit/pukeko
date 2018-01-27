@@ -11,6 +11,7 @@ github: hurryabit/pukeko
 dependencies:
 - base
 default-extensions:
+- ConstraintKinds
 - DataKinds
 - DeriveFunctor
 - DeriveFoldable
@@ -29,7 +30,9 @@ default-extensions:
 - ScopedTypeVariables
 - StandaloneDeriving
 - TemplateHaskell
+- TypeApplications
 - TypeFamilies
+- TypeOperators
 ghc-options:
 - -Wall
 - -Werror
@@ -51,14 +54,14 @@ library:
   - containers
   - dlist
   - filepath
+  - freer-simple ==1.0.0.1
   - lens
   - monad-st
-  - mtl
+  - natural-transformation
   - parsec
   - pretty
   - profunctors
   - tagged
-  - transformers
   - vector
 
 executables:
@@ -105,11 +108,12 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - directory
-    - tasty
-    - tasty-golden
     - HUnit
     - parsec
     - pukeko
+    - tasty
+    - tasty-golden
+    - transformers
 
   examples:
     main: Examples

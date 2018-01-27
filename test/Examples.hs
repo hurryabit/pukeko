@@ -1,6 +1,6 @@
 module Examples where
 
-import Pukeko.Prelude
+import Pukeko.Prelude hiding (run)
 
 import System.Directory (setCurrentDirectory)
 import System.Exit (ExitCode (..))

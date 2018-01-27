@@ -9,7 +9,7 @@ import GHC.Stack
 import System.Directory (setCurrentDirectory)
 import Test.Hspec
 import Test.Hspec.Core.Spec
-import Text.Parsec
+import Text.Parsec hiding (Error)
 
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
@@ -17,7 +17,7 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do
   let result = do
-        module_ <- Parser.parseInput "<input>" code
+        module_ <- run . runError $ Parser.parseInput "<input>" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
@@ -29,7 +29,7 @@ shouldFail prelude expect code = do
 shouldSucceed :: Parser.Package -> String -> Expectation
 shouldSucceed prelude code = do
   let result = do
-        module_ <- Parser.parseInput "<input>" code
+        module_ <- run . runError $ Parser.parseInput "<input>" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
@@ -85,14 +85,12 @@ section = describe <$> pragma "SECTION" <*> manySpec subsection
 spec :: Parser Spec
 spec = skipEmpty *> manySpec section <* eof
 
-runEIO :: ExceptT Doc IO a -> IO a
-runEIO m = runExceptT m >>= either (fail . render) pure
-
 main :: IO ()
 main = do
   setCurrentDirectory "test"
   let prelFile = "std/prelude.pu"
       testFile = "frontend.pu"
   cont <- lines <$> readFile testFile
-  prelude <- runEIO (Parser.parsePackage prelFile)
+  prelude <- runM $ interpretM (\(Error msg) -> fail (render msg))
+    (Parser.parsePackage prelFile)
   either (fail . show) hspec $ runParser spec prelude testFile cont

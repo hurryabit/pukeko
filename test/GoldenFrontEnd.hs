@@ -2,12 +2,13 @@ module GoldenFrontEnd where
 
 import Pukeko.Prelude hiding ((<|>), many)
 
+import Control.Monad.Trans.Class (lift)
 import Data.List
 import System.Directory (setCurrentDirectory)
 import System.IO
 import Test.Tasty
 import Test.Tasty.Golden
-import Text.Parsec
+import Text.Parsec hiding (Error)
 
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
@@ -15,12 +16,12 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 out :: String -> HIO ()
 out s = do
   h <- ask
-  liftIO (hPutStr h s)
+  sendM (hPutStr h s)
 
 runSnippet :: Parser.Package -> String -> HIO ()
 runSnippet prelude code = do
   let result = do
-        module_ <- Parser.parseInput "<input>" code
+        module_ <- run . runError $ Parser.parseInput "<input>" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   case result of
     Right _ ->
@@ -30,7 +31,7 @@ runSnippet prelude code = do
       Just actual -> out ("-- FAILURE " ++ actual ++ "\n")
   out code
 
-type HIO = ReaderT Handle IO
+type HIO = Eff [Reader Handle, IO]
 
 type Parser = ParsecT [String] Parser.Package HIO
 
@@ -82,9 +83,6 @@ spec = do
   manySpec section
   eof
 
-runEIO :: ExceptT Doc IO a -> IO a
-runEIO m = runExceptT m >>= either (fail . render) pure
-
 testFile, outFile :: FilePath
 testFile = "frontend.pu"
 outFile = "frontend.out"
@@ -94,9 +92,11 @@ frontEndTest = do
   setCurrentDirectory "test"
   let prelFile = "std/prelude.pu"
   cont <- lines <$> readFile testFile
-  prelude <- runEIO (Parser.parsePackage prelFile)
+  prelude <- runM $
+    interpretM (\(Error msg) -> fail (render msg)) (Parser.parsePackage prelFile)
   h <- openFile outFile WriteMode
-  runReaderT (runParserT spec prelude testFile cont) h >>= either (fail . show) pure
+  runM (runReader h (runParserT spec prelude testFile cont))
+    >>= either (fail . show) pure
   hClose h
 
 main :: IO ()

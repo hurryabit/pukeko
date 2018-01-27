@@ -1,9 +1,6 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.SystemF
   ( Module (..)
@@ -243,7 +240,7 @@ pdist (Free t)    = fmap Free t
 
 -- * Lenses and traversals
 inst2defn ::
-  (MonadHere f) =>
+  (ApHere f) =>
   (forall n. Defn st1 (TFinScope n Void) Void -> f (Defn st2 (TFinScope n Void) Void)) ->
   InstDecl st1 -> f (InstDecl st2)
 inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> traverseHeres f ds
@@ -261,7 +258,7 @@ decl2func f top = case top of
   DPrim p -> DPrim <$> prim2bind (bind2evar f) p
 
 decl2expr ::
-  (MonadHere f) =>
+  (ApHere f) =>
   (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> Decl st -> f (Decl st)
 decl2expr f top = case top of
   DType{} -> pure top
@@ -305,13 +302,13 @@ expr2dcon f = \case
   ETyApp e t   -> ETyApp <$> expr2dcon f e <*> pure t
 
 defn2type ::
-  forall m st1 st2 tv ev. (MonadHere m, SameNodes st1 st2) =>
+  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
   (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
   Defn st1 tv ev -> m (Defn st2 tv ev)
 defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
 
 expr2type ::
-  forall m st1 st2 tv ev. (MonadHere m, SameNodes st1 st2) =>
+  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
   (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
   Expr st1 tv ev -> m (Expr st2 tv ev)
 expr2type f = \case
@@ -330,14 +327,14 @@ expr2type f = \case
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse f ts
 
 case2type ::
-  forall m st1 st2 tv ev. (MonadHere m, SameNodes st1 st2) =>
+  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
   (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
   Case st1 tv ev -> m (Case st2 tv ev)
 case2type f (MkCase dcon targs bnds e0) =
   MkCase dcon <$> traverse f targs <*> pure bnds <*> expr2type f e0
 
 altn2type ::
-  forall m st1 st2 tv ev. (MonadHere m, SameNodes st1 st2) =>
+  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
   (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
   Altn st1 tv ev -> m (Altn st2 tv ev)
 altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0

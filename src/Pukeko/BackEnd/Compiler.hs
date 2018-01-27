@@ -6,7 +6,8 @@ module Pukeko.BackEnd.Compiler
 
 import Pukeko.Prelude
 
-import           Control.Lens hiding (Context)
+import           Control.Lens ((+~))
+import           Control.Monad.Freer.Fresh
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -21,10 +22,13 @@ data Context = MkContext
   }
 makeLenses ''Context
 
-type CC = RWST Context [Inst] Int (Except Doc)
+type CC = Eff [Reader Context, Writer [Inst], Fresh, Error Doc]
 
 freshLabel :: CC Name
-freshLabel = state $ \n -> (MkName ('.':show n), n+1)
+freshLabel = MkName . ('.' :) . show <$> fresh
+
+output :: [Inst] -> CC ()
+output = tell
 
 compile :: Module -> Either Doc Program
 compile module_ = do
@@ -43,7 +47,8 @@ compileTopDefn top = case top of
           { _offsets = Map.fromList $ zipMaybe _binds [n, n-1 ..]
           , _depth   = n
           }
-    ((), code) <- runExcept (evalRWST (ccExpr Redex _body) context 0)
+    ((), code) <- run . runError . evalFresh 0 . runWriter . runReader context $
+      ccExpr Redex _body
     let _arity = n
         _code  = GLOBSTART _name _arity : code
     return $ MkGlobal { _name, _arity, _code }
@@ -66,7 +71,7 @@ whenRedex mode cc =
 continueRedex :: Inst -> CC ()
 continueRedex inst = do
   d <- view depth
-  tell [UPDATE (d+1), POP d, inst]
+  output [UPDATE (d+1), POP d, inst]
 
 ccExpr :: Mode -> Expr -> CC ()
 ccExpr mode expr =
@@ -75,16 +80,16 @@ ccExpr mode expr =
       MkContext { _offsets, _depth } <- ask
       case Map.lookup _name _offsets of
         Nothing     -> bugWith "unknown local variable" _name
-        Just offset -> tell [PUSH (_depth - offset)]
+        Just offset -> output [PUSH (_depth - offset)]
       case mode of
         Stack -> return ()
-        Eval  -> tell [EVAL]
+        Eval  -> output [EVAL]
         Redex -> continueRedex UNWIND
     Global{_name} -> do
-      tell [PUSHGLOBAL _name]
+      output [PUSHGLOBAL _name]
       case mode of
         Stack -> return ()
-        Eval  -> tell [EVAL]
+        Eval  -> output [EVAL]
         Redex -> continueRedex UNWIND
     External{_name} ->
       ccExpr mode $ Global{_name = Builtins.externalName _name}
@@ -92,7 +97,7 @@ ccExpr mode expr =
       let _name = Builtins.constructorName _tag _arity
       ccExpr mode $ Global{_name}
     Num{ _int } -> do
-      tell [PUSHINT _int]
+      output [PUSHINT _int]
       whenRedex mode $ continueRedex RETURN
     Ap{ _fun, _args } -> do
       let n = length _args
@@ -101,17 +106,17 @@ ccExpr mode expr =
       let ccDefault = do
             ccArgs Stack
             ccExprAt Stack n _fun
-            tell [MKAP n]
+            output [MKAP n]
             case mode of
               Stack -> return ()
-              Eval  -> tell [EVAL]
+              Eval  -> output [EVAL]
               Redex -> continueRedex UNWIND
       case _fun of
         Pack{_tag, _arity}
           | n > _arity -> bugWith "overapplied constructor" _fun
           | n == _arity && _arity > 0 -> do
               ccArgs Stack
-              tell [CONS _tag _arity]
+              output [CONS _tag _arity]
               case mode of
                 Stack -> return ()
                 Eval  -> return ()
@@ -124,7 +129,7 @@ ccExpr mode expr =
               | n == arity -> do
                   let eval continue = do
                         ccArgs Eval
-                        tell [inst]
+                        output [inst]
                         continue
                   case mode of
                     Stack -> ccDefault
@@ -137,15 +142,15 @@ ccExpr mode expr =
           (idents, rhss) = unzipDefns _defns
       zipWithM_ (\rhs k -> local (depth +~ k) $ ccExpr Stack rhs) rhss [0 ..]
       localDecls (map Just idents) $ ccExpr mode _body
-      whenStackOrEval mode $ tell [SLIDE n]
+      whenStackOrEval mode $ output [SLIDE n]
     Let{ _isrec = True, _defns, _body } -> do
       let n = length _defns
           (idents, rhss) = unzipDefns _defns
-      tell [ALLOC n]
+      output [ALLOC n]
       localDecls (map Just idents) $ do
-        zipWithM_ (\rhs k -> ccExpr Stack rhs >> tell [UPDATE (n-k)]) rhss [0 ..]
+        zipWithM_ (\rhs k -> ccExpr Stack rhs >> output [UPDATE (n-k)]) rhss [0 ..]
         ccExpr mode _body
-      whenStackOrEval mode $ tell [SLIDE n]
+      whenStackOrEval mode $ output [SLIDE n]
     Match{ _expr, _altns } -> do
       ccExpr Eval _expr
       case _altns of
@@ -153,19 +158,19 @@ ccExpr mode expr =
         _ -> do
           ls <- mapM (\_ -> freshLabel) _altns
           done <- freshLabel
-          tell [JUMPCASE ls]
+          output [JUMPCASE ls]
           forM_ (zip ls _altns) $ \(l, altn) -> do
-            tell [LABEL l]
+            output [LABEL l]
             ccAltn mode altn
-            tell [JUMP done]
-          tell [LABEL done]
+            output [JUMP done]
+          output [LABEL done]
 
 ccAltn :: Mode -> Altn -> CC ()
 ccAltn mode MkAltn{_binds, _rhs} = do
   let arity = length _binds
-  tell [UNCONS arity]
+  output [UNCONS arity]
   localDecls (reverse _binds) (ccExpr mode _rhs)
-  whenStackOrEval mode $ tell [SLIDE arity]
+  whenStackOrEval mode $ output [SLIDE arity]
 
 localDecls :: [Maybe Name] -> CC a -> CC a
 localDecls binds cc = do

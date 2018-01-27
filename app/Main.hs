@@ -1,3 +1,4 @@
+{-# LANGUAGE IncoherentInstances #-}
 module Main where
 
 import Pukeko.Prelude
@@ -13,22 +14,22 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
 import qualified Pukeko.BackEnd         as BackEnd
 
-unlift :: (Monad m) => Either e a -> ExceptT e m a
-unlift = ExceptT . pure
+unlift :: (Monad m) => Either e a -> Eff [Error e, m] a
+unlift = either throwError pure
 
 compile :: Bool -> Bool -> Bool -> String -> IO ()
 compile write_pl stop_tc unsafe file = do
-  ok_or_error <- runExceptT $ do
+  ok_or_error <- runM . runError $ do
     package <- Parser.parsePackage file
     module_sf <- unlift (FrontEnd.run unsafe package)
     if stop_tc
       then do
-        liftIO $ writeFile (file -<.> "ti")
+        sendM $ writeFile (file -<.> "ti")
           (render (pPrintPrec prettyNormal 0 module_sf) ++ "\n")
       else do
         (module_pl, module_lm) <- unlift (MiddleEnd.run unsafe module_sf)
         nasm <- unlift (BackEnd.run module_lm)
-        liftIO $ do
+        sendM $ do
           when write_pl $ do
             writeFile (file -<.> "pl") $
               render (pPrintPrec prettyNormal 0 module_pl) ++ "\n"

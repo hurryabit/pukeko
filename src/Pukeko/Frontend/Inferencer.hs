@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 module Pukeko.FrontEnd.Inferencer
   ( Out
   , inferModule
@@ -7,8 +6,8 @@ where
 
 import Pukeko.Prelude
 
+import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
-import           Control.Monad.ST.Class
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map         as Map
 import qualified Data.Sequence    as Seq
@@ -42,14 +41,16 @@ data SplitCstrs s tv = MkSplitCstrs
 type TI ev s = TU s ev
 type IT s ev = TU s ev
 
-runTI :: TI Void s a -> Module In -> ExceptT Doc (ST s) a
-runTI tc module_ = runInfoT (runGammaT tc Id.freshTVars) module_
+runTI :: Module In -> TI Void s a -> Eff [Error Doc, ST s] a
+runTI m0 = evalSupply sup0 . runReader noPos . runInfo m0 . runGamma
+  where
+    sup0 = Id.freshTVars
 
 freshUVar :: TI v s (UType s tv)
 freshUVar = do
   v <- fresh
   l <- getTLevel
-  UVar <$> liftST (newSTRef (UFree v l))
+  UVar <$> sendM (newSTRef (UFree v l))
 
 generalize :: forall s tv ev. UType s tv -> IT s ev (UType s tv, Set Id.TVar)
 generalize = go
@@ -57,13 +58,13 @@ generalize = go
     go :: UType s tv -> IT s ev (UType s tv, Set Id.TVar)
     go t0 = case t0 of
       UVar uref -> do
-        uvar <- liftST (readSTRef uref)
+        uvar <- sendM (readSTRef uref)
         cur_level <- getTLevel
         case uvar of
           UFree v l
             | l > cur_level -> do
                 let t1 = UTVar v
-                liftST (writeSTRef uref (ULink t1))
+                sendM (writeSTRef uref (ULink t1))
                 pure (t1, Set.singleton v)
             | otherwise     -> pureDefault
           ULink t1 -> go t1
@@ -80,10 +81,10 @@ generalize = go
 
 splitCstr :: UType s tv -> Id.Clss -> TI ev s (SplitCstrs s tv)
 splitCstr t0 clss = do
-  (t1, tps) <- liftST (unUTApp t0)
+  (t1, tps) <- sendM (unUTApp t0)
   case t1 of
     UVar uref -> do
-      uvar <- liftST (readSTRef uref)
+      uvar <- sendM (readSTRef uref)
       cur_level <- getTLevel
       case uvar of
         UFree v l
@@ -110,7 +111,7 @@ splitCstr t0 clss = do
     UTArr{} -> throwNoInst
   where
     throwNoInst = do
-      p0 <- liftST (prettyUType prettyNormal 1 t0)
+      p0 <- sendM (prettyUType prettyNormal 1 t0)
       throwHere ("no instance for" <+> pretty clss <+> p0)
 
 
@@ -127,7 +128,7 @@ instantiate e0 t0 = do
     fmap unzip . for qvs $ \(MkQVar q v) -> do
       t <- freshUVar
       pure ((v, t), Seq.fromList (map ((,) t) (toList q)))
-  t2 <- liftST (subst (Map.fromList (concat env)) t1)
+  t2 <- sendM (subst (Map.fromList (concat env)) t1)
   let e1 = foldl (\e -> mkETyApp e . map snd) e0 env
   pure (e1, t2, foldMap fold cstrs)
 
@@ -272,7 +273,7 @@ inferDecl = \case
       withQVars qvs (inferTypedDefn d0 (open t_decl1))
     yield (DInst (MkInstDecl clss tcon qvs ds1))
   DDefn d0 -> do
-    reset
+    reset @Id.TVar
     t_decl <- open <$> typeOfFunc (d0^.defn2bind.bind2evar)
     d1 <- inferTypedDefn d0 t_decl
     yield (DDefn d1)
@@ -288,12 +289,13 @@ inferModule' =
 
 type TQEnv tv = Map Id.TVar tv
 
-type TQ tv s = ReaderT (TQEnv tv) (HereT (SupplyT Id.TVar (ExceptT Doc (ST s))))
+type TQ tv s = Eff [Reader (TQEnv tv), Reader Pos, Supply Id.TVar, Error Doc, ST s]
 
-runTQ :: TQ Void s a -> ExceptT Doc (ST s) a
-runTQ tq = evalSupplyT (runHereT (runReaderT tq mempty)) tvars
+runTQ :: TQ Void s a -> Eff [Error Doc, ST s] a
+runTQ = evalSupply sup0 . runReader noPos . runReader env0
   where
-    tvars = map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars
+    env0 = mempty
+    sup0 = map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars
 
 localizeTQ ::
   Vector n QVar ->
@@ -307,7 +309,7 @@ localizeTQ xs m = do
           (\i (x, y) -> Map.singleton (x^.qvar2tvar) (mkBound i (y^.qvar2tvar)))
           (Vec.zip xs ys)
   let upd env0 = env1 <> fmap Free env0
-  withReaderT upd (m ys)
+  local' upd (m ys)
 
 qualType :: UType s tv' -> TQ tv s (Type tv)
 qualType = \case
@@ -321,7 +323,7 @@ qualType = \case
   UTApp t1 t2 -> TApp <$> qualType t1 <*> qualType t2
   UTUni{} -> bug "quantification during quantification"
   UVar uref -> do
-    uvar <- liftST (readSTRef uref)
+    uvar <- sendM (readSTRef uref)
     case uvar of
       UFree x _ -> bugWith "free unification variable during quantification" x
       ULink t -> qualType t
@@ -379,11 +381,12 @@ qualDecl = \case
     pure (DPrim (MkPrimDecl (MkBind x t1) s))
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
-qualModule = (module2decls . traverse) (\decl -> reset *> traverseHere qualDecl decl)
+qualModule =
+  module2decls (traverse (\decl -> reset @Id.TVar *> traverseHere qualDecl decl))
 
 inferModule :: Module In -> Either Doc (Module Out)
-inferModule m0 = runST $ runExceptT $ do
-  m1 <- runTI (inferModule' m0) m0
+inferModule m0 = runST $ runM . runError $ do
+  m1 <- runTI m0 (inferModule' m0)
   runTQ (qualModule m1)
 
 instance Monoid (SplitCstrs s tv) where

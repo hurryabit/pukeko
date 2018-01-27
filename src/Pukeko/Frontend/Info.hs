@@ -1,8 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Pukeko.FrontEnd.Info
-  ( MonadInfo (..)
+  ( ModuleInfo
   , SomeInstDecl (..)
   , info2tcons
   , info2dcons
@@ -10,23 +9,16 @@ module Pukeko.FrontEnd.Info
   , info2clsss
   , info2mthds
   , info2insts
-  , InfoT
-  , runInfoT
-   ,localInfo
-  , mapInfoT
+  , runInfo
   , lookupInfo
   , findInfo
   , typeOfDCon
   , typeOfFunc
   , tconDeclInfo
-  , liftCatch
   ) where
 
 import Pukeko.Prelude
 
-import           Control.Lens
-import qualified Control.Monad.Trans.Reader  as Reader
-import           Control.Monad.Signatures    (Catch)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 import qualified Data.Vector.Sized           as Vec
@@ -47,48 +39,36 @@ data ModuleInfo = MkModuleInfo
   , _info2insts :: Map (Id.Clss, Id.TCon) SomeInstDecl
   }
 
-class Monad m => MonadInfo m where
-  askInfo :: m ModuleInfo
-
-newtype InfoT m a = InfoT{unInfoT :: ReaderT ModuleInfo m a}
-  deriving ( Functor, Applicative, Monad, MonadTrans
-           , MonadError e
-           , MonadState s
-           , MonadSupply s
-           , MonadWriter w
-           , MonadHere
-           )
-
 data SomeInstDecl = forall st. SomeInstDecl (InstDecl st)
 
 makeLenses ''ModuleInfo
 makePrisms ''ModuleInfo
 
-runInfoT :: (IsType (StageType st)) => InfoT m a -> Module st -> m a
-runInfoT act = runReaderT (unInfoT act) . collectInfo
+runInfo ::
+  (IsType (StageType st)) =>
+  Module st -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
+runInfo = runReader . collectInfo
 
-mapInfoT :: (m a -> n b) -> InfoT m a -> InfoT n b
-mapInfoT f = InfoT . mapReaderT f . unInfoT
+lookupInfo ::
+  (Member (Reader ModuleInfo) effs, Ord k) =>
+  Lens' ModuleInfo (Map k v) -> k -> Eff effs (Maybe v)
+lookupInfo l k = Map.lookup k <$> view l
 
-localInfo :: Monad m => ModuleInfo -> InfoT m a -> InfoT m a
-localInfo mi = InfoT . local (<> mi) . unInfoT
+findInfo ::
+  (HasCallStack, Member (Reader ModuleInfo) effs, Ord k, Show k) =>
+  Lens' ModuleInfo (Map k v) -> k -> Eff effs v
+findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k <$> view l
 
-lookupInfo :: (MonadInfo m, Ord k) => Lens' ModuleInfo (Map k v) -> k -> m (Maybe v)
-lookupInfo l k = Map.lookup k . view l <$> askInfo
-
-findInfo :: (HasCallStack, MonadInfo m, Ord k, Show k) => Lens' ModuleInfo (Map k v) -> k -> m v
-findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k . view l <$> askInfo
-
-typeOfDCon :: (HasCallStack, MonadInfo m) => Id.DCon -> m (Type tv)
+typeOfDCon ::
+  (HasCallStack, Member (Reader ModuleInfo) effs) => Id.DCon -> Eff effs (Type tv)
 typeOfDCon dcon = do
   Some1 (Pair1 tconDecl dconDecl) <- findInfo info2dcons dcon
   pure (fmap absurd (typeOfDConDecl tconDecl dconDecl))
 
-typeOfFunc :: (HasCallStack, MonadInfo m) => Id.EVar -> m (Type tv)
+typeOfFunc ::
+  (HasCallStack, Member (Reader ModuleInfo) effs) =>
+  Id.EVar -> Eff effs (Type tv)
 typeOfFunc func = fmap absurd . _sign2type <$> findInfo info2signs func
-
-liftCatch :: Catch e m a -> Catch e (InfoT m) a
-liftCatch f m h = InfoT $ Reader.liftCatch f (unInfoT m) (unInfoT . h)
 
 itemInfo :: (Ord k) => Lens' ModuleInfo (Map k v) -> k -> v -> ModuleInfo
 itemInfo l k v = set l (Map.singleton k v) mempty
@@ -121,23 +101,6 @@ collectInfo (MkModule decls) = foldFor decls $ \decl -> case unloc decl of
     sign s = itemInfo info2signs (s^.sign2func) s
     signBind :: IsType ty => Bind ty Void -> ModuleInfo
     signBind (MkBind z t) = maybe mempty (sign . MkSignDecl z) (isType t)
-
-instance Monad m => MonadInfo (InfoT m) where
-  askInfo = InfoT ask
-
-instance MonadInfo m => MonadInfo (ReaderT r m) where
-  askInfo = lift askInfo
-
-instance MonadInfo m => MonadInfo (SupplyT s m) where
-  askInfo = lift askInfo
-
-instance MonadInfo m => MonadInfo (HereT m) where
-  askInfo = lift askInfo
-
-instance MonadReader r m => MonadReader r (InfoT m) where
-  ask = lift ask
-  local = mapInfoT . local
-  reader = lift . reader
 
 instance Monoid ModuleInfo where
   mempty = MkModuleInfo mempty mempty mempty mempty mempty mempty
