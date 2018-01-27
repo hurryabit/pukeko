@@ -22,9 +22,9 @@ data TRState = MkTRState
   }
 makeLenses ''TRState
 
-type TR = Eff [Reader SourcePos, State TRState, Error Doc]
+type TR = Eff [Reader SourcePos, State TRState, Error Failure]
 
-evalTR :: TR a -> Either Doc a
+evalTR :: TR a -> Either Failure a
 evalTR =
   let st0 = MkTRState mempty mempty
   in  run . runError . evalState st0 . runReader noPos
@@ -74,5 +74,5 @@ trDecl top = case top of
   DDefn d -> DDefn <$> trDefn d
   DPrim p -> pure (DPrim p)
 
-resolveModule :: Module In -> Either Doc (Module Out)
+resolveModule :: Module In -> Either Failure (Module Out)
 resolveModule = evalTR . module2decls (traverse (lctd trDecl))

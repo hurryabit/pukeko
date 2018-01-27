@@ -19,7 +19,7 @@ import           Pukeko.AST.Type
 
 type Out = St.Renamer
 
-renameModule :: Ps.Package -> Either Doc (Module Out)
+renameModule :: Ps.Package -> Either Failure (Module Out)
 renameModule (Ps.MkPackage _ modules) = runRn $ do
   let ldecls = concatMap Ps._mod2decls modules
   MkModule <$> (traverse . lctd) rnDecl ldecls
@@ -27,9 +27,9 @@ renameModule (Ps.MkPackage _ modules) = runRn $ do
 type RnEnv ev = Map Id.EVar ev
 type RnState = Set Id.EVar
 
-type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader SourcePos, Error Doc]
+type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader SourcePos, Error Failure]
 
-runRn :: Rn Void a -> Either Doc a
+runRn :: Rn Void a -> Either Failure a
 runRn = run . runError . runReader noPos . evalState st0 . runReader env0
   where
     st0 = mempty

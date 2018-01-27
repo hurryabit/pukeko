@@ -18,7 +18,7 @@ import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Info
 
 type TU s ev =
-  EffGamma s ev [Reader ModuleInfo, Reader SourcePos, Supply Id.TVar, Error Doc, ST s]
+  EffGamma s ev [Reader ModuleInfo, Reader SourcePos, Supply Id.TVar, Error Failure, ST s]
 
 -- TODO: link compression
 unwind :: UType s tv -> TU s ev (UType s tv)
@@ -65,7 +65,7 @@ unify t1 t2 = do
     (UVar uref1, UVar uref2) | uref1 == uref2 -> return ()
     (UVar uref1, _) -> do
       (v1, _) <- readUnwound uref1
-      occursCheck uref1 t2 `catchError` \(_ :: Doc) -> do
+      occursCheck uref1 t2 `catchError` \(_ :: Failure) -> do
         p2 <- sendM $ prettyUType prettyNormal 0 t2
         throwHere (quotes (pretty v1) <+> "occurs in" <+> p2)
       sendM $ writeSTRef uref1 (ULink t2)

@@ -17,7 +17,7 @@ import qualified Pukeko.AST.Stage      as St
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 
-checkModule :: (St.Typed st) => Module st -> Either Doc (Module st)
+checkModule :: (St.Typed st) => Module st -> Either Failure (Module st)
 checkModule m0@(MkModule decls) = runTC m0 $ do
   for_ decls (lctd_ checkDecl)
   pure m0
@@ -26,9 +26,9 @@ type IsEVar ev = (HasEnv ev)
 
 type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
-type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Doc]
+type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
-runTC :: (IsType (St.StageType st)) => Module st -> TC Void Void a -> Either Doc a
+runTC :: (IsType (St.StageType st)) => Module st -> TC Void Void a -> Either Failure a
 runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
 
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
@@ -179,5 +179,5 @@ checkDecl = \case
       t1 <- withQVars qvs (withBinds bs (typeOf e0))
       let t2 = fmap _bind2type bs *~> t1
       match (mkTUni qvs t0) (mkTUni qvs t2)
-    `catchError` \e -> throwError ("while type checking" <+> pretty z <+> colon $$ e)
+    `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> colon $$ e)
   DPrim _ -> pure ()

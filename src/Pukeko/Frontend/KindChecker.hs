@@ -43,10 +43,10 @@ type KCState s = Map Id.TCon (Kind (Open s))
 type KC n s =
   Eff
   [ Reader (KCEnv n s), State (KCState s)
-  , Reader SourcePos, Supply Id.TVar, Error Doc, ST s
+  , Reader SourcePos, Supply Id.TVar, Error Failure, ST s
   ]
 
-runKC :: (forall n s. KC n s a) -> Either Doc a
+runKC :: (forall n s. KC n s a) -> Either Failure a
 runKC kc =
   runST
   $ runM . runError . evalSupply sup0 . runReader noPos . evalState mempty . runReader env0
@@ -126,7 +126,7 @@ kcDecl decl = case decl of
 kcModule ::Module In -> KC n s (Module Out)
 kcModule = module2decls (traverse (\top -> reset @Id.TVar *> lctd kcDecl top))
 
-checkModule :: Module In -> Either Doc (Module Out)
+checkModule :: Module In -> Either Failure (Module Out)
 checkModule module_ = runKC (kcModule module_)
 
 

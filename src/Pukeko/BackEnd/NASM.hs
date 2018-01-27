@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 
 import Pukeko.BackEnd.GCode
 
-assemble :: Program -> Either Doc String
+assemble :: Program -> Either Failure String
 assemble MkProgram { _globals, _main } = run . runError $ do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
@@ -22,11 +22,12 @@ assemble MkProgram { _globals, _main } = run . runError $ do
   globals <- mapM (assembleGlobal arities) _globals
   return $ intercalate "\n" (prolog:globals)
 
-assembleGlobal :: (Member (Error Doc) effs) => Map Name Int -> Global -> Eff effs String
+assembleGlobal ::
+  (Member (Error Failure) effs) => Map Name Int -> Global -> Eff effs String
 assembleGlobal arities MkGlobal{ _code } =
   unlines <$> mapM (assembleInst arities) _code
 
-assembleInst :: (Member (Error Doc) effs) => Map Name Int -> Inst -> Eff effs String
+assembleInst :: (Member (Error Failure) effs) => Map Name Int -> Inst -> Eff effs String
 assembleInst arities inst = do
   let code macro params = do
         let param_str
@@ -37,7 +38,7 @@ assembleInst arities inst = do
         let s = show label
         if "." `isPrefixOf` s
           then return ()
-          else throwError ("invalid jump label:" <+> pretty label)
+          else throwFailure ("invalid jump label:" <+> pretty label)
   case inst of
     EVAL   -> code "eval"   []
     UNWIND -> code "unwind" []
@@ -58,7 +59,7 @@ assembleInst arities inst = do
     PUSHINT num -> code "pushint" [show num]
     PUSHGLOBAL name -> do
       case Map.lookup name arities of
-        Nothing -> throwError ("unknown global:" <+> pretty name)
+        Nothing -> throwFailure ("unknown global:" <+> pretty name)
         Just arity -> code "pushglobal" [show name, show arity]
     GLOBSTART name arity ->
       code "globstart" [show name, show arity]
@@ -86,4 +87,4 @@ assembleInst arities inst = do
     PRINT -> code "print" []
     INPUT -> code "input" []
     ABORT -> code "abort" []
-    EXIT -> throwError (text "forbidden instruction 'EXIT'")
+    EXIT -> throwFailure "forbidden instruction 'EXIT'"

@@ -27,19 +27,20 @@ import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
-parseInput :: (Member (Error Doc) effs) => FilePath -> String -> Eff effs Module
+parseInput :: (Member (Error Failure) effs) => FilePath -> String -> Eff effs Module
 parseInput file =
-  either (throwError . text . parseErrorPretty) pure . parse (module_ file <* eof) file
+  either (throwFailure . pretty . parseErrorPretty) pure .
+  parse (module_ file <* eof) file
 
 parseModule ::
-  (Member (Error Doc) effs, LastMember IO effs) => FilePath -> Eff effs Module
+  (Member (Error Failure) effs, LastMember IO effs) => FilePath -> Eff effs Module
 parseModule file = do
   sendM (putStr (file ++ " "))
   code <- sendM (readFile file)
   parseInput file code
 
 parsePackage ::
-  (Member (Error Doc) effs, LastMember IO effs) => FilePath -> Eff effs Package
+  (Member (Error Failure) effs, LastMember IO effs) => FilePath -> Eff effs Package
 parsePackage file = build parseModule file <* sendM (putStrLn "")
 
 type Parser = Parsec Void String

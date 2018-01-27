@@ -23,12 +23,12 @@ type Module = Lambda.Module
 run
   :: Bool
   -> SystemF.Module Stage.FrontEnd
-  -> Either Doc (SystemF.Module Stage.BackEnd, Module)
+  -> Either Failure (SystemF.Module Stage.BackEnd, Module)
 run unsafe module_sf = do
   let typeChecked ::
         Stage.Typed st2 =>
         (SystemF.Module st1 -> SystemF.Module st2) ->
-        (SystemF.Module st1 -> Either Doc (SystemF.Module st2))
+        (SystemF.Module st1 -> Either Failure (SystemF.Module st2))
       typeChecked f m
         | unsafe    = pure (f m)
         | otherwise = TypeChecker.checkModule (f m)

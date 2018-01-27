@@ -22,12 +22,15 @@ external ext = mempty{_externals = Set.singleton ext}
 constructor :: Int -> Int -> Info
 constructor tag arity = mempty{_constructors = Set.singleton (tag, arity)}
 
-instance Monoid Info where
-  mempty = MkInfo{_externals = Set.empty, _constructors = Set.empty}
-  x `mappend` y = MkInfo
-    { _externals    = _externals x    `Set.union` _externals y
-    , _constructors = _constructors x `Set.union` _constructors y
+instance Semigroup Info where
+  x <> y = MkInfo
+    { _externals    = _externals x    <> _externals y
+    , _constructors = _constructors x <> _constructors y
     }
+
+instance Monoid Info where
+  mempty = MkInfo{_externals = mempty, _constructors = mempty}
+  mappend = (<>)
 
 infoExpr :: Expr -> Info
 infoExpr expr = case expr of

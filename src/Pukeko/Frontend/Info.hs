@@ -102,13 +102,10 @@ collectInfo (MkModule decls) = foldFor decls $ \decl -> case unlctd decl of
     signBind :: IsType ty => Bind ty Void -> ModuleInfo
     signBind (MkBind z t) = maybe mempty (sign . MkSignDecl z) (isType t)
 
+instance Semigroup ModuleInfo where
+  MkModuleInfo a1 b1 c1 d1 e1 f1 <> MkModuleInfo a2 b2 c2 d2 e2 f2 =
+    MkModuleInfo (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2) (f1 <> f2)
+
 instance Monoid ModuleInfo where
   mempty = MkModuleInfo mempty mempty mempty mempty mempty mempty
-  MkModuleInfo a1 b1 c1 d1 e1 f1 `mappend` MkModuleInfo a2 b2 c2 d2 e2 f2 =
-    MkModuleInfo
-      (a1 `mappend` a2)
-      (b1 `mappend` b2)
-      (c1 `mappend` c2)
-      (d1 `mappend` d2)
-      (e1 `mappend` e2)
-      (f1 `mappend` f2)
+  mappend = (<>)

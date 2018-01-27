@@ -19,7 +19,7 @@ externalName (MkName name) = MkName ("gm$" ++ name)
 constructorName :: Int -> Int -> Name
 constructorName tag arity = MkName ("gm$cons_" ++ show tag ++ "_" ++ show arity)
 
-findGlobal :: Name -> Either Doc Global
+findGlobal :: Name -> Either Failure Global
 findGlobal name = case Map.lookup (externalName name) globalTable of
   Nothing -> Left ("unknown external:" <+> pretty name)
   Just global -> return global

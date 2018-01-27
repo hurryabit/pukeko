@@ -10,7 +10,7 @@ import qualified Data.Set   as Set
 import           Pukeko.AST.Surface
 
 build ::
-  (Member (Error Doc) effs) =>
+  (Member (Error Failure) effs) =>
   (FilePath -> Eff effs Module) -> FilePath -> Eff effs Package
 build parse file = do
   (_, mdls) <-
@@ -22,7 +22,7 @@ build parse file = do
   where
     go parse file = do
       cyc <- asks (file `Set.member`)
-      when cyc $ throwError ("detected import cycle at file" <+> text file)
+      when cyc $ throwFailure ("detected import cycle at file" <+> pretty file)
       done <- gets (file `Set.member`)
       unless done $ do
         mdl <- parse file

@@ -22,7 +22,7 @@ data Context = MkContext
   }
 makeLenses ''Context
 
-type CC = Eff [Reader Context, Writer [Inst], Fresh, Error Doc]
+type CC = Eff [Reader Context, Writer [Inst], Fresh, Error Failure]
 
 freshLabel :: CC Name
 freshLabel = MkName . ('.' :) . show <$> fresh
@@ -30,7 +30,7 @@ freshLabel = MkName . ('.' :) . show <$> fresh
 output :: [Inst] -> CC ()
 output = tell
 
-compile :: Module -> Either Doc Program
+compile :: Module -> Either Failure Program
 compile module_ = do
   let MkInfo{_constructors} = info module_
   let constructors =
@@ -39,7 +39,7 @@ compile module_ = do
   let _globals = constructors ++ globals
   return MkProgram{ _globals, _main = MkName "main" }
 
-compileTopDefn :: TopLevel -> Either Doc Global
+compileTopDefn :: TopLevel -> Either Failure Global
 compileTopDefn top = case top of
   Def{_name, _binds, _body} -> do
     let n = length _binds

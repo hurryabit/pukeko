@@ -91,7 +91,8 @@ frontEndTest = do
   let prelFile = "std/prelude.pu"
   cont <- lines <$> readFile testFile
   prelude <- runM $
-    interpretM (\(Error msg) -> fail (render msg)) (Parser.parsePackage prelFile)
+    interpretM (\(Error (msg :: Failure)) -> fail (show msg))
+      (Parser.parsePackage prelFile)
   h <- openFile outFile WriteMode
   runM (runReader h (runParserT spec prelude testFile cont))
     >>= either (fail . show) pure

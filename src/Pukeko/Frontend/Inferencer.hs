@@ -41,7 +41,7 @@ data SplitCstrs s tv = MkSplitCstrs
 type TI ev s = TU s ev
 type IT s ev = TU s ev
 
-runTI :: Module In -> TI Void s a -> Eff [Error Doc, ST s] a
+runTI :: Module In -> TI Void s a -> Eff [Error Failure, ST s] a
 runTI m0 = evalSupply sup0 . runReader noPos . runInfo m0 . runGamma
   where
     sup0 = Id.freshTVars
@@ -290,9 +290,9 @@ inferModule' =
 type TQEnv tv = Map Id.TVar tv
 
 type TQ tv s =
-  Eff [Reader (TQEnv tv), Reader SourcePos, Supply Id.TVar, Error Doc, ST s]
+  Eff [Reader (TQEnv tv), Reader SourcePos, Supply Id.TVar, Error Failure, ST s]
 
-runTQ :: TQ Void s a -> Eff [Error Doc, ST s] a
+runTQ :: TQ Void s a -> Eff [Error Failure, ST s] a
 runTQ = evalSupply sup0 . runReader noPos . runReader env0
   where
     env0 = mempty
@@ -385,7 +385,7 @@ qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule =
   module2decls (traverse (\decl -> reset @Id.TVar *> lctd qualDecl decl))
 
-inferModule :: Module In -> Either Doc (Module Out)
+inferModule :: Module In -> Either Failure (Module Out)
 inferModule m0 = runST $ runM . runError $ do
   m1 <- runTI m0 (inferModule' m0)
   runTQ (qualModule m1)

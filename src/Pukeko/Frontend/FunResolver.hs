@@ -23,14 +23,14 @@ data FRState = MkFRState
   }
 makeLenses ''FRState
 
-type FR = Eff [State FRState, Reader SourcePos, Error Doc]
+type FR = Eff [State FRState, Reader SourcePos, Error Failure]
 
-runFR :: FR a -> Either Doc a
+runFR :: FR a -> Either Failure a
 runFR = run . runError . runReader noPos . evalState st0
   where
     st0 = MkFRState mempty mempty
 
-resolveModule :: Module In -> Either Doc (Module Out)
+resolveModule :: Module In -> Either Failure (Module Out)
 resolveModule (MkModule tops0) = runFR $ do
   tops1 <- (traverse . lctd) frDecl tops0
   MkFRState decld defnd <- get
