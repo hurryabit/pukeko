@@ -28,22 +28,22 @@ type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, Reader Pos, Supply Id.EVar, Writer [Loc (Decl Out)]]
+    [Reader ModuleInfo, Reader Pos, Supply Id.EVar, Writer [Lctd (Decl Out)]]
 
-execLL :: Module In -> LL Void Void () -> [Loc (Decl Out)]
+execLL :: Module In -> LL Void Void () -> [Lctd (Decl Out)]
 execLL m0 =
   snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
 
 yield :: Decl Out -> LL tv ev ()
 yield decl = do
   pos <- where_
-  tell [Loc pos decl]
+  tell [Lctd pos decl]
 
 llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
   Expr In tv ev -> LL tv ev (Expr Out tv ev)
 llExpr = \case
-  ELoc l -> ELoc <$> traverseHere llExpr l
+  ELoc l -> ELoc <$> lctd llExpr l
   EVar x -> pure (EVar x)
   EVal z -> pure (EVal z)
   ECon c -> pure (ECon c)
@@ -52,11 +52,11 @@ llExpr = \case
   ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
   ELet ds e0 ->
     ELet
-    <$> (traverseHeres . defn2exprSt) llExpr ds
-    <*> withBinds (fmap (_defn2bind . unloc) ds) (llExpr e0)
+    <$> (traverse . lctd . defn2exprSt) llExpr ds
+    <*> withBinds (fmap (_defn2bind . unlctd) ds) (llExpr e0)
   ERec ds e0 ->
-    withBinds (fmap (_defn2bind . unloc) ds) $
-      ERec <$> (traverseHeres . defn2exprSt) llExpr ds <*> llExpr e0
+    withBinds (fmap (_defn2bind . unlctd) ds) $
+      ERec <$> (traverse . lctd . defn2exprSt) llExpr ds <*> llExpr e0
   ELam (oldBinds :: Vector n1 (Bind Type tv)) rhs0 (t_rhs :: Type tv) -> do
     rhs1 :: Expr Out tv (EFinScope n1 ev) <- withBinds oldBinds (llExpr rhs0)
     let evCapturedL :: [ev]
@@ -128,5 +128,5 @@ llDecl = \case
 
 liftModule :: Module In -> Module Out
 liftModule m0@(MkModule tops0) =
-  let tops1 = execLL m0 (traverse_ (foldHere llDecl) tops0)
+  let tops1 = execLL m0 (traverse_ (lctd_ llDecl) tops0)
   in  MkModule tops1

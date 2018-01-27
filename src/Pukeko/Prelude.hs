@@ -17,23 +17,17 @@ module Pukeko.Prelude
   , mkPos
   , noPos
 
+  , Where (..)
   , throwHere
+  , WhereLens
+  , WhereLens'
+  , WhereTraversal
+  , WhereTraversal'
+  , unWhere
 
-  , Loc (..)
-  , ApHere (..)
-  , foldHere
-  , traverseHere
-  , forHere
-  , fmapHeres
-  , traverseHeres
-  , forHeres
-  , traverseHeres_
-  , forHeres_
-
-  , HereTraversal
-  , HereTraversal'
-  , overHere
-  , unhere
+  , Lctd (..)
+  , lctd
+  , lctd_
 
   , bug
   , bugWith
@@ -112,15 +106,15 @@ mkPos = Pos . Just
 noPos :: Pos
 noPos = Pos Nothing
 
-class (Applicative f) => ApHere f where
+class Where f where
   where_ :: f Pos
   here :: Pos -> f a -> f a
 
-instance (Member (Reader Pos) effs) => ApHere (Eff effs) where
+instance (Member (Reader Pos) effs) => Where (Eff effs) where
   where_ = ask
   here pos = local (const pos)
 
-instance (Applicative f) => ApHere (Compose ((->) Pos) f) where
+instance (Applicative f) => Where (Compose ((->) Pos) f) where
   where_ = Compose pure
   here pos (Compose f) = Compose (const (f pos))
 
@@ -129,42 +123,27 @@ throwHere msg = do
   pos <- where_
   throwError (pretty pos <> colon <+> msg)
 
-data Loc a = Loc{pos :: Pos, unloc :: a}
+type WhereLens s t a b =
+  forall f. (Functor f, Where f) => (a -> f b) -> s -> f t
+
+type WhereLens' s a = WhereLens s s a a
+
+type WhereTraversal s t a b =
+  forall f. (Applicative f, Where f) => (a -> f b) -> s -> f t
+
+type WhereTraversal' s a = WhereTraversal s s a a
+
+unWhere :: WhereTraversal s t a b -> Traversal s t a b
+unWhere t f s = getCompose (t (Compose . const . f) s) noPos
+
+data Lctd a = Lctd{pos :: Pos, unlctd :: a}
   deriving (Show, Foldable, Functor, Traversable)
 
-foldHere :: (ApHere f) => (a -> f b) -> Loc a -> f b
-foldHere f (Loc pos thing) = here pos (f thing)
+lctd :: WhereLens (Lctd a) (Lctd b) a b
+lctd f (Lctd pos thng) = Lctd pos <$> here pos (f thng)
 
-traverseHere :: (ApHere f) => (a -> f b) -> Loc a -> f (Loc b)
-traverseHere f (Loc pos thing) = here pos (Loc pos <$> f thing)
-
-fmapHeres :: (Functor f) => (a -> b) -> f (Loc a) -> f (Loc b)
-fmapHeres = fmap . fmap
-
-traverseHeres :: (ApHere f, Traversable t) => (a -> f b) -> t (Loc a) -> f (t (Loc b))
-traverseHeres = traverse . traverseHere
-
-traverseHeres_ :: (ApHere f, Foldable t) => (a -> f ()) -> t (Loc a) -> f ()
-traverseHeres_ = traverse_ . foldHere
-
-forHere :: (ApHere f) => Loc a -> (a -> f b) -> f (Loc b)
-forHere = flip traverseHere
-
-forHeres :: (ApHere f, Traversable t) => t (Loc a) -> (a -> f b) -> f (t (Loc b))
-forHeres = flip traverseHeres
-
-forHeres_ :: (ApHere f, Foldable t) => t (Loc a) -> (a -> f ()) -> f ()
-forHeres_ = flip traverseHeres_
-
-type HereTraversal s t a b = forall f. (ApHere f) => (a -> f b) -> s -> f t
-
-type HereTraversal' s a = HereTraversal s s a a
-
-overHere :: HereTraversal s t a b -> (a -> b) -> (s -> t)
-overHere t f = run . runReader noPos . t (pure . f)
-
-unhere :: HereTraversal s t a b -> Traversal s t a b
-unhere t f s = getCompose (t (Compose . const . f) s) noPos
+lctd_ :: (Where f) => (a -> f b) -> Lctd a -> f b
+lctd_ f (Lctd pos thng) = here pos (f thng)
 
 bug :: HasCallStack => String -> a
 bug msg = error ("BUG! " ++ msg)
@@ -181,5 +160,5 @@ instance Pretty Pos where
 instance Show Pos where
   show = prettyShow
 
-instance Pretty a => Pretty (Loc a) where
-  pPrintPrec lvl prec = pPrintPrec lvl prec . unloc
+instance Pretty a => Pretty (Lctd a) where
+  pPrintPrec lvl prec = pPrintPrec lvl prec . unlctd

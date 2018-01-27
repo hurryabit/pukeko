@@ -32,7 +32,7 @@ runFR = run . runError . runReader noPos . evalState st0
 
 resolveModule :: Module In -> Either Doc (Module Out)
 resolveModule (MkModule tops0) = runFR $ do
-  tops1 <- traverseHeres frDecl tops0
+  tops1 <- (traverse . lctd) frDecl tops0
   MkFRState decld defnd <- get
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   case Map.minViewWithKey undefnd of

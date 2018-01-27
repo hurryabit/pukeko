@@ -48,22 +48,22 @@ data Package = MkPackage
 data Module = MkModule
   { _mod2file    :: FilePath
   , _mod2imports :: [FilePath]
-  , _mod2decls   :: [Loc Decl]
+  , _mod2decls   :: [Lctd Decl]
   }
 
 data Decl
-  = DType (NonEmpty (Loc TConDecl))
+  = DType (NonEmpty (Lctd TConDecl))
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
-  | DLet  (NonEmpty (Loc (Defn Id.EVar)))
-  | DRec  (NonEmpty (Loc (Defn Id.EVar)))
+  | DLet  (NonEmpty (Lctd (Defn Id.EVar)))
+  | DRec  (NonEmpty (Lctd (Defn Id.EVar)))
   | DPrim PrimDecl
 
 data TConDecl = MkTConDecl
   { _tcon2name  :: Id.TCon
   , _tcon2prms  :: [Id.TVar]
-  , _tcon2dcons :: [Loc DConDecl]
+  , _tcon2dcons :: [Lctd DConDecl]
   }
 
 data DConDecl = MkDConDecl
@@ -87,7 +87,7 @@ data InstDecl = MkInstDecl
   , _inst2tcon  :: Id.TCon
   , _inst2tvars :: [Id.TVar]
   , _inst2cstr  :: TypeCstr
-  , _inst2defns :: [Loc (Defn Id.EVar)]
+  , _inst2defns :: [Lctd (Defn Id.EVar)]
   }
 
 data PrimDecl = MkPrimDecl
@@ -108,15 +108,15 @@ data TypeScheme = MkTypeScheme TypeCstr Type
 data Defn v = MkDefn Id.EVar (Expr v)
 
 data Expr v
-  = ELoc (Loc (Expr v))
+  = ELoc (Lctd (Expr v))
   | EVar v
   | ECon DCon
   | ENum Int
   | EApp (Expr v) (NonEmpty (Expr v))
   | EMat (Expr v) [Altn v]
   | ELam (NonEmpty Id.EVar) (Expr v)
-  | ELet (NonEmpty (Loc (Defn v))) (Expr v)
-  | ERec (NonEmpty (Loc (Defn v))) (Expr v)
+  | ELet (NonEmpty (Lctd (Defn v))) (Expr v)
+  | ERec (NonEmpty (Lctd (Defn v))) (Expr v)
 
 data Altn v = MkAltn Patn (Expr v)
 

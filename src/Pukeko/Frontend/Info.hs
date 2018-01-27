@@ -76,13 +76,13 @@ itemInfo l k v = set l (Map.singleton k v) mempty
 tconDeclInfo :: Some1 TConDecl -> ModuleInfo
 tconDeclInfo (Some1 tcon) =
   let dis =
-        flip foldMap (tcon^.tcon2dcons) $ \(Loc _ dcon) ->
+        flip foldMap (tcon^.tcon2dcons) $ \(Lctd _ dcon) ->
           itemInfo info2dcons (dcon^.dcon2name) (Some1 (Pair1 tcon dcon))
   in  itemInfo info2tcons (tcon^.tcon2name) (Some1 tcon) <> dis
 
 collectInfo :: forall st. (IsType (StageType st)) => Module st -> ModuleInfo
-collectInfo (MkModule decls) = foldFor decls $ \decl -> case unloc decl of
-  DType tcons -> foldMap (tconDeclInfo . unloc) tcons
+collectInfo (MkModule decls) = foldFor decls $ \decl -> case unlctd decl of
+  DType tcons -> foldMap (tconDeclInfo . unlctd) tcons
   DSign s -> sign s
   DClss clss@(MkClssDecl c v ms) ->
     let mthds_info = foldFor ms $ \mthd@(MkSignDecl z t0) ->

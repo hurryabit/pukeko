@@ -41,39 +41,39 @@ localize bs = local' upd
     upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
 -- TODO: Make @\(Ps.MkDefn x _) -> x@ a function and use it.
-localizeDefns :: Vector n (Loc (Ps.Defn _)) -> Rn (EFinScope n ev) a -> Rn ev a
-localizeDefns = localize . ifoldMap (\i (Loc _ (Ps.MkDefn x _)) -> Map.singleton x i)
+localizeDefns :: Vector n (Lctd (Ps.Defn _)) -> Rn (EFinScope n ev) a -> Rn ev a
+localizeDefns = localize . ifoldMap (\i (Lctd _ (Ps.MkDefn x _)) -> Map.singleton x i)
 
-rnDecl :: Loc Ps.Decl -> Rn Void [Loc (Decl Out)]
-rnDecl (Loc pos decl) = here pos $ case decl of
-  Ps.DType ts -> (:[]) . Loc pos . DType <$> traverseHeres rnTConDecl ts
-  Ps.DSign s -> (:[]) . Loc pos . DSign <$> rnSignDecl mempty s
+rnDecl :: Lctd Ps.Decl -> Rn Void [Lctd (Decl Out)]
+rnDecl (Lctd pos decl) = here pos $ case decl of
+  Ps.DType ts -> (:[]) . Lctd pos . DType <$> (traverse . lctd) rnTConDecl ts
+  Ps.DSign s -> (:[]) . Lctd pos . DSign <$> rnSignDecl mempty s
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
     let env = Map.singleton v (mkBound Fin.zero v)
     ms1 <- traverse (rnSignDecl env) ms0
     modify (<> setOf (traverse . sign2func) ms1)
-    pure [Loc pos (DClss (MkClssDecl c v ms1))]
+    pure [Lctd pos (DClss (MkClssDecl c v ms1))]
   Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
     Vec.withList vs0 $ \vs1 -> do
       qvs <- rnTypeCstr vs1 qs
-      ds1 <- traverseHeres rnDefn ds0
-      pure [Loc pos (DInst (MkInstDecl c t qvs ds1))]
+      ds1 <- (traverse . lctd) rnDefn ds0
+      pure [Lctd pos (DInst (MkInstDecl c t qvs ds1))]
   Ps.DLet ds0 -> do
-    ds1 <- traverseHeres rnDefn ds0
+    ds1 <- (traverse . lctd) rnDefn ds0
     modify (<> setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0)
-    pure (fmapHeres DDefn (toList ds1))
+    pure ((fmap . fmap) DDefn (toList ds1))
   Ps.DRec ds0 -> do
     modify  (<> setOf (traverse . traverse . to (\(Ps.MkDefn x _) -> x)) ds0)
-    ds1 <- traverseHeres rnDefn ds0
-    pure (fmapHeres DDefn (toList ds1))
+    ds1 <- (traverse . lctd) rnDefn ds0
+    pure ((fmap . fmap) DDefn (toList ds1))
   Ps.DPrim (Ps.MkPrimDecl z s) -> do
     modify (<> Set.singleton z)
-    pure [Loc pos (DPrim (MkPrimDecl (MkBind z NoType) s))]
+    pure [Lctd pos (DPrim (MkPrimDecl (MkBind z NoType) s))]
 
 rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 TConDecl)
 rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = Vec.withList prms0 $ \prms1 -> do
   Some1 <$> MkTConDecl tcon prms1
-    <$> zipWithM (\tag -> traverseHere (rnDConDecl tcon prms1 tag)) [0..] dcons
+    <$> zipWithM (\tag -> lctd (rnDConDecl tcon prms1 tag)) [0..] dcons
 
 rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (DConDecl n)
 rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) =
@@ -114,7 +114,7 @@ rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
 rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
 rnExpr = \case
-  Ps.ELoc l -> ELoc <$> traverseHere rnExpr l
+  Ps.ELoc l -> ELoc <$> lctd rnExpr l
   Ps.EVar x -> do
     y_mb <- asks (x `Map.lookup`)
     case y_mb of
@@ -133,9 +133,9 @@ rnExpr = \case
     let bs2 = ifoldMap (\i (MkBind x NoType) -> Map.singleton x i) bs1
     ELam bs1 <$> localize bs2 (rnExpr e0) <*> pure NoType
   Ps.ELet ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
-    ELet <$> traverseHeres rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
+    ELet <$> (traverse . lctd) rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
   Ps.ERec ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
-    localizeDefns ds1 $ ERec <$> traverseHeres rnDefn ds1 <*> rnExpr e0
+    localizeDefns ds1 $ ERec <$> (traverse . lctd) rnDefn ds1 <*> rnExpr e0
 
 rnBind :: Id.EVar -> Bind NoType tv
 rnBind x = MkBind x NoType

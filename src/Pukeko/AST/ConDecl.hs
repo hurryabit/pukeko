@@ -27,7 +27,7 @@ data Pair1 f g a = Pair1 (f a) (g a)
 data TConDecl n = KnownNat n => MkTConDecl
   { _tcon2name  :: Id.TCon
   , _tcon2prms  :: Vector n Id.TVar
-  , _tcon2dcons :: [Loc (DConDecl n)]
+  , _tcon2dcons :: [Lctd (DConDecl n)]
   }
 
 data DConDecl n = MkDConDecl

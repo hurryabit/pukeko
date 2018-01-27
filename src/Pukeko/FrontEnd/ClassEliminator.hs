@@ -31,13 +31,13 @@ runCE m0 = run . runReader noPos . runInfo m0 . runGamma
 elimModule :: Module In -> Module Out
 elimModule m0@(MkModule decls) = runCE m0 $
   MkModule . fmap (fmap unclssDecl) . concatMap sequence
-  <$> traverseHeres elimDecl decls
+  <$> (traverse . lctd) elimDecl decls
 
 elimDecl :: Decl In -> CE Void Void [Decl Out]
 elimDecl decl = case decl of
   DClss clssDecl@(MkClssDecl clss prm mthdsL) -> Vec.withList mthdsL $ \mthdsV -> do
     pos <- where_
-    let tcon = dictTConDecl (Loc pos clssDecl)
+    let tcon = dictTConDecl (Lctd pos clssDecl)
     let qprm = Vec.singleton (MkQVar mempty prm)
         prmType = TVar (mkBound Fin.zero prm)
         dictPrm = Id.evar "dict"
@@ -52,22 +52,22 @@ elimDecl decl = case decl of
           let e_lam = ELam (Vec.singleton b_lam) e_cas t0
           let e_tyabs = ETyAbs qprm e_lam
           pure (DDefn (MkDefn (MkBind z t1) e_tyabs))
-    pure (DType (Loc pos tcon :| []) : sels)
+    pure (DType (Lctd pos tcon :| []) : sels)
   DInst inst@(MkInstDecl clss tcon qvs defns0) -> do
     let t_inst = mkTApp (TCon tcon) (mkTVarsQ qvs)
     let (z_dict, t_dict) = instDictInfo inst
     clssDecl@(MkClssDecl _ _ mthdsL) <- findInfo info2clsss clss
     pos <- where_
-    local (<> tconDeclInfo (dictTConDecl (Loc pos clssDecl))) $ do
+    local (<> tconDeclInfo (dictTConDecl (Lctd pos clssDecl))) $ do
       Vec.withList mthdsL $ \mthdsV -> do
         defns1 <- for mthdsV $ \(MkSignDecl mthd _) -> do
-          case find (\defn -> unloc defn^.defn2func == mthd) defns0 of
+          case find (\defn -> unlctd defn^.defn2func == mthd) defns0 of
             Nothing -> bugWith "missing method" (clss, tcon, mthd)
             Just defn -> pure defn
         let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
         let e_body =
               mkEApp e_dcon
-                (imap (\i -> EVar . mkBound i . (^.defn2func) . unloc) defns1)
+                (imap (\i -> EVar . mkBound i . (^.defn2func) . unlctd) defns1)
         let e_let :: Expr In _ _
             e_let = ELet defns1 e_body
         let e_rhs :: Expr In _ _
@@ -110,7 +110,7 @@ elimDefn = defn2exprSt (fmap fst . elimExpr)
 elimExpr ::
   (IsTVar tv, HasEnv ev) => Expr In tv ev -> CE tv ev (Expr Out tv ev, Type tv)
 elimExpr = \case
-  ELoc (Loc pos e0) -> here pos $ first (ELoc . Loc pos) <$> elimExpr e0
+  ELoc (Lctd pos e0) -> here pos $ first (ELoc . Lctd pos) <$> elimExpr e0
 
   EVar x -> (,) <$> pure (EVar x) <*> lookupEVar x
   EVal z -> (,) <$> pure (EVal z) <*> typeOfFunc z
@@ -125,12 +125,12 @@ elimExpr = \case
     (e1, t1) <- withinEScope ts (elimExpr e0)
     pure (ELam bs e1 t0, ts *~> t1)
   ELet ds0 e0 -> do
-    ds1 <- traverseHeres elimDefn ds0
-    (e1, t1) <- withinEScope (fmap (_bind2type . _defn2bind . unloc) ds1) (elimExpr e0)
+    ds1 <- (traverse . lctd) elimDefn ds0
+    (e1, t1) <- withinEScope (fmap (_bind2type . _defn2bind . unlctd) ds1) (elimExpr e0)
     pure (ELet ds1 e1, t1)
   ERec ds0 e0 -> do
-    withinEScope (fmap (_bind2type . _defn2bind . unloc) ds0) $ do
-      ds1 <- traverseHeres elimDefn ds0
+    withinEScope (fmap (_bind2type . _defn2bind . unlctd) ds0) $ do
+      ds1 <- (traverse . lctd) elimDefn ds0
       (e1, t1) <- elimExpr e0
       pure (ERec ds1 e1, t1)
   ECas e0 (c0 :| cs0) -> do
@@ -195,7 +195,8 @@ unclssDecl :: Decl Out -> Decl Out
 unclssDecl = \case
   DType tcons ->
     let tcon2type = tcon2dcons . traverse . traverse . dcon2flds . traverse
-    in  DType (fmapHeres (\(Some1 tcon) -> Some1 (over tcon2type unclssType tcon)) tcons)
+    in  DType
+        ((fmap . fmap) (\(Some1 tcon) -> Some1 (over tcon2type unclssType tcon)) tcons)
   DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
   DPrim prim -> DPrim (over (prim2bind . bind2type) unclssType prim)
 
@@ -217,9 +218,9 @@ instDictInfo (MkInstDecl clss tcon qvs _) =
     let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TCon tcon) (mkTVarsQ qvs)))
     in  (dictEVar clss tcon, t_dict)
 
-dictTConDecl :: Loc ClssDecl -> Some1 TConDecl
-dictTConDecl (Loc pos (MkClssDecl clss prm mthds)) =
+dictTConDecl :: Lctd ClssDecl -> Some1 TConDecl
+dictTConDecl (Lctd pos (MkClssDecl clss prm mthds)) =
     let flds = map _sign2type mthds
         dcon = MkDConDecl (clssTCon clss) (clssDCon clss) 0 flds
-        tcon = MkTConDecl (clssTCon clss) (Vec.singleton prm) [Loc pos dcon]
+        tcon = MkTConDecl (clssTCon clss) (Vec.singleton prm) [Lctd pos dcon]
     in  Some1 tcon

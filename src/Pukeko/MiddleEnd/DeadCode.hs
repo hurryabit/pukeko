@@ -22,4 +22,4 @@ cleanModule (MkModule tops0) =
       tops1 = filter (maybe True keep . firstOf (traverse . decl2func)) tops0
   in  MkModule tops1
   where
-    deps = Set.toList . setOf (traverse . unhere decl2eval)
+    deps = Set.toList . setOf (traverse . unWhere decl2eval)

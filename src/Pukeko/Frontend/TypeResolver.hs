@@ -61,9 +61,9 @@ trDefn = traverseOf defn2dcon findDCon
 trDecl :: Decl In -> TR (Decl Out)
 trDecl top = case top of
   DType tconDecls -> do
-    forHeres_ tconDecls (\(Some1 tcon) -> insertTCon tcon)
-    forHeres_ tconDecls $ \(Some1 tcon@MkTConDecl{_tcon2dcons = dconDecls}) -> do
-      forHeres_ dconDecls $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
+    for_ tconDecls (lctd_ (\(Some1 tcon) -> insertTCon tcon))
+    for_ tconDecls $ lctd_ $ \(Some1 tcon@MkTConDecl{_tcon2dcons = dconDecls}) -> do
+      for_ dconDecls $ lctd_ $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
         for_ flds trType
         insertDCon tcon dcon
     pure (DType tconDecls)
@@ -75,4 +75,4 @@ trDecl top = case top of
   DPrim p -> pure (DPrim p)
 
 resolveModule :: Module In -> Either Doc (Module Out)
-resolveModule = evalTR . module2decls (traverseHeres trDecl)
+resolveModule = evalTR . module2decls (traverse (lctd trDecl))

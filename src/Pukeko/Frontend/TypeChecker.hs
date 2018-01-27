@@ -19,7 +19,7 @@ import           Pukeko.AST.Type
 
 checkModule :: (St.Typed st) => Module st -> Either Doc (Module st)
 checkModule m0@(MkModule decls) = runTC m0 $ do
-  for_ decls (foldHere checkDecl)
+  for_ decls (lctd_ checkDecl)
   pure m0
 
 type IsEVar ev = (HasEnv ev)
@@ -33,7 +33,7 @@ runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
 
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
-  ELoc l -> foldHere typeOf l
+  ELoc l -> lctd_ typeOf l
   EVar x -> lookupEVar x
   EVal z -> typeOfFunc z
   ECon c -> typeOfDCon c
@@ -51,11 +51,11 @@ typeOf = \case
     withinEScope ts (check e0 t0)
     pure (ts *~> t0)
   ELet ds e0 -> do
-    traverseHeres_ checkDefn ds
-    withBinds (fmap (_defn2bind . unloc) ds) (typeOf e0)
+    (traverse_ . lctd_) checkDefn ds
+    withBinds (fmap (_defn2bind . unlctd) ds) (typeOf e0)
   ERec ds e0 -> do
-    withBinds (fmap (_defn2bind . unloc) ds) $ do
-      traverseHeres_ checkDefn ds
+    withBinds (fmap (_defn2bind . unlctd) ds) $ do
+      (traverse_ . lctd_) checkDefn ds
       typeOf e0
   EMat e0 as -> typeOfBranching typeOfAltn e0 as
   ECas e0 cs -> typeOfBranching typeOfCase e0 cs
@@ -170,7 +170,7 @@ checkDecl = \case
   DInst (MkInstDecl _ tcon qvs ds) -> do
     let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
     -- FIXME: Ensure that the type in @b@ is correct as well.
-    withQVars qvs $ forHeres_ ds $ \(MkDefn b e) -> do
+    withQVars qvs $ for_ ds $ lctd_ $ \(MkDefn b e) -> do
       (_, MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar)
       let t_decl = renameType (t_mthd >>= scope absurd (const t_inst))
       check e t_decl

@@ -10,7 +10,7 @@ module Pukeko.FrontEnd.Parser
   )
   where
 
-import Pukeko.Prelude hiding ((<|>), many)
+import Pukeko.Prelude hiding ((<|>), many, lctd)
 
 import           System.FilePath as Sys
 import           Text.Parsec
@@ -78,8 +78,8 @@ many1NE p = (:|) <$> p <*> many p
 sepBy1NE :: Parser a -> Parser sep -> Parser (NonEmpty a)
 sepBy1NE p sep = (:|) <$> p <*> many (sep *> p)
 
-loc :: Parser a -> Parser (Loc a)
-loc p = Loc <$> (mkPos <$> getPosition) <*> p
+lctd :: Parser a -> Parser (Lctd a)
+lctd p = Lctd <$> (mkPos <$> getPosition) <*> p
 
 nat :: Parser Int
 nat = fromInteger <$> natural
@@ -129,8 +129,8 @@ module_ :: SourceName -> Parser Module
 module_ source = do
   imps <- many import_
   whiteSpace
-  decls <- many $ loc $ choice
-    [ DType <$> (reserved "type"     *> sepBy1NE (loc tconDecl) (reserved "and"))
+  decls <- many $ lctd $ choice
+    [ DType <$> (reserved "type"     *> sepBy1NE (lctd tconDecl) (reserved "and"))
     , DSign <$> (reserved "val"      *> signDecl)
     , DClss <$> (reserved "class"    *> clssDecl)
     , DInst <$> (reserved "instance" *> instDecl)
@@ -172,12 +172,12 @@ altn :: Parser (Altn Id.EVar)
 altn = MkAltn <$> (bar *> patn) <*> (arrow *> expr)
 
 let_ ::
-  (NonEmpty (Loc (Defn Id.EVar)) -> a) ->
-  (NonEmpty (Loc (Defn Id.EVar)) -> a) ->
+  (NonEmpty (Lctd (Defn Id.EVar)) -> a) ->
+  (NonEmpty (Lctd (Defn Id.EVar)) -> a) ->
   Parser a
 let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
-  <*> sepBy1NE (loc defn) (reserved "and")
+  <*> sepBy1NE (lctd defn) (reserved "and")
 
 expr, aexpr, lexpr :: Parser (Expr Id.EVar)
 expr =
@@ -201,7 +201,7 @@ aexpr = choice
   , ENum <$> nat
   , parens expr
   ]
-lexpr = ELoc <$> loc expr
+lexpr = ELoc <$> lctd expr
 
 operatorTable = map (map f) (reverse Op.table)
   where
@@ -211,7 +211,7 @@ tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
   <$> tcon
   <*> many tvar
-  <*> option [] (equals *> (toList <$> many1 (loc dconDecl)))
+  <*> option [] (equals *> (toList <$> many1 (lctd dconDecl)))
 
 dconDecl :: Parser DConDecl
 dconDecl = MkDConDecl <$> (reservedOp "|" *> dcon) <*> many atype
@@ -227,7 +227,7 @@ instDecl = do
   c       <- clss
   (t, vs) <- (,) <$> tcon <*> pure [] <|> parens ((,) <$> tcon <*> many tvar)
   q       <- equals *> typeCstr
-  ds      <- record (loc defn)
+  ds      <- record (lctd defn)
   pure (MkInstDecl c t vs q ds)
 
 primDecl :: Parser PrimDecl

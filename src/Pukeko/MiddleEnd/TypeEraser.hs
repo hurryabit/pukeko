@@ -21,7 +21,7 @@ type In = St.LambdaLifter
 
 eraseModule :: In.Module In -> Module
 eraseModule m0@(In.MkModule decls) =
-  runCC m0 $ catMaybes <$> traverse (ccDecl . unloc) decls
+  runCC m0 $ catMaybes <$> traverse (ccDecl . unlctd) decls
 
 type CCState = Map Id.EVar Name
 
@@ -46,12 +46,12 @@ ccDecl = \case
     modify (Map.insert (In._bind2evar b) n)
     pure (Just (Asm n))
 
-ccDefn :: (BaseEVar ev) => Loc (In.Defn In tv ev) -> CC Defn
-ccDefn (Loc _ (In.MkDefn b t)) = MkDefn (bindName b) <$> ccExpr t
+ccDefn :: (BaseEVar ev) => Lctd (In.Defn In tv ev) -> CC Defn
+ccDefn (Lctd _ (In.MkDefn b t)) = MkDefn (bindName b) <$> ccExpr t
 
 ccExpr :: (BaseEVar ev) => In.Expr In tv ev -> CC Expr
 ccExpr = \case
-  In.ELoc l -> ccExpr (unloc l)
+  In.ELoc l -> ccExpr (unlctd l)
   In.EVar x -> pure (Local (name (baseEVar x)))
   In.EVal z -> do
     external <- gets (Map.lookup z)

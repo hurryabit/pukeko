@@ -15,8 +15,8 @@ prettifyModule (MkModule tops0) =
   let xs = setOf (traverse . traverse . decl2func) tops0
       mp = cluster xs
       rename x = Map.findWithDefault x x mp
-      tops1 = overHere (traverseHeres . decl2func) rename tops0
-      tops2 = overHere (traverseHeres . decl2eval) rename tops1
+      tops1 = over (unWhere (traverse . lctd . decl2func)) rename tops0
+      tops2 = over (unWhere (traverse . lctd . decl2eval)) rename tops1
   in  MkModule tops2
 
 cluster :: Set Id.EVar -> Map Id.EVar Id.EVar

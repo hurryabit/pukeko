@@ -154,26 +154,26 @@ inferPatn patn t_expr = case patn of
 
 inferLet ::
   (BaseTVar tv, HasEnv ev) =>
-  Loc (Defn In tv ev) -> IT s ev (Loc (Defn (Aux s) tv ev), UType s tv, Cstrs s tv)
-inferLet (Loc pos (MkDefn l0 r0)) = do
+  Lctd (Defn In tv ev) -> IT s ev (Lctd (Defn (Aux s) tv ev), UType s tv, Cstrs s tv)
+inferLet (Lctd pos (MkDefn l0 r0)) = do
   (r1, t1, cstrs1) <- withinTScope (infer r0)
   (t2, vs2) <- generalize t1
   MkSplitCstrs rs1 ds1 <- splitCstrs cstrs1
   let rs2 = Map.unionWith (<>) rs1 (Map.fromSet (const mempty) vs2)
   let qvs = map (\(v, q) -> MkQVar q v) (Map.toList rs2)
   let t3 = mkUTUni qvs t2
-  pure (Loc pos (MkDefn (l0 & bind2type .~ t3) r1), t3, ds1)
+  pure (Lctd pos (MkDefn (l0 & bind2type .~ t3) r1), t3, ds1)
 
 inferRec ::
   (BaseTVar tv, HasEnv ev) =>
-  Vector n (Loc (Defn In tv (EFinScope n ev))) ->
-  IT s ev ( Vector n (Loc (Defn (Aux s) tv (EFinScope n ev)))
+  Vector n (Lctd (Defn In tv (EFinScope n ev))) ->
+  IT s ev ( Vector n (Lctd (Defn (Aux s) tv (EFinScope n ev)))
           , Vector n (UType s tv)
           , Cstrs s tv
           )
 inferRec defns0 = do
   let (poss, ls0, rs0) =
-        Vec.unzip3 (fmap (\(Loc pos (MkDefn l r)) -> (pos, l, r)) defns0)
+        Vec.unzip3 (fmap (\(Lctd pos (MkDefn l r)) -> (pos, l, r)) defns0)
   (rs1, ts1, cstrs1) <- withinTScope $ do
     us <- traverse (const freshUVar) ls0
     (rs1, ts1, cstrs1) <-
@@ -189,15 +189,15 @@ inferRec defns0 = do
   let addETyApp = scope' (EVar . Free) (\i b -> mkETyApp (EVar (mkBound i b)) vs3)
   let rs2 = fmap (// addETyApp) rs1
   let defns1 = Vec.zipWith3 (\t3 -> MkDefn . (bind2type .~ t3)) ts3 ls0 rs2
-  pure (Vec.zipWith Loc poss defns1, ts3, cstrs_def)
+  pure (Vec.zipWith Lctd poss defns1, ts3, cstrs_def)
 
 infer ::
   (BaseTVar tv, HasEnv ev) =>
   Expr In tv ev -> IT s ev (Expr (Aux s) tv ev, UType s tv, Cstrs s tv)
 infer = \case
-    ELoc (Loc pos e0) -> do
+    ELoc (Lctd pos e0) -> do
       (e1, t1, cstrs) <- here pos (infer e0)
-      pure (ELoc (Loc pos e1), t1, cstrs)
+      pure (ELoc (Lctd pos e1), t1, cstrs)
     EVar x -> lookupEVar x >>= instantiate (EVar x)
     EVal z -> typeOfFunc z >>= instantiate (EVal z) . open
     ECon c -> typeOfDCon c >>= instantiate (ECon c) . open
@@ -265,7 +265,7 @@ inferDecl = \case
   DSign{} -> pure Nothing
   DClss c -> yield (DClss c)
   DInst (MkInstDecl clss tcon (qvs :: Vector n _) ds0) -> do
-    ds1 <- forHeres ds0 $ \d0 -> do
+    ds1 <- for ds0 $ lctd $ \d0 -> do
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (d0^.defn2bind.bind2evar)
       let t_inst = mkTApp (TCon tcon) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
       let t_decl1 :: Type (TFinScope n Void)
@@ -285,7 +285,7 @@ inferDecl = \case
 
 inferModule' :: Module In -> TI Void s (Module (Aux s))
 inferModule' =
-  module2decls (fmap (mapMaybe sequence) . traverseHeres inferDecl)
+  module2decls (fmap (mapMaybe sequence) . (traverse . lctd) inferDecl)
 
 type TQEnv tv = Map Id.TVar tv
 
@@ -338,7 +338,7 @@ qualDefn (MkDefn (MkBind x ts) e0) = case ts of
 
 qualExpr :: Expr (Aux s) tv' ev -> TQ tv s (Expr Out tv ev)
 qualExpr = \case
-  ELoc l -> ELoc <$> traverseHere qualExpr l
+  ELoc l -> ELoc <$> lctd qualExpr l
   EVar x -> pure (EVar x)
   EVal z -> pure (EVal z)
   ECon c -> pure (ECon c)
@@ -348,8 +348,8 @@ qualExpr = \case
     bs1 <- for bs0 $ \(MkBind x ts) -> do
       MkBind x <$> qualType ts
     ELam bs1 <$> qualExpr e0 <*> qualType t
-  ELet ds e0 -> ELet <$> traverseHeres qualDefn ds <*> qualExpr e0
-  ERec ds e0 -> ERec <$> traverseHeres qualDefn ds <*> qualExpr e0
+  ELet ds e0 -> ELet <$> (traverse . lctd) qualDefn ds <*> qualExpr e0
+  ERec ds e0 -> ERec <$> (traverse . lctd) qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
   ETyAbs _ _ -> bug "type abstraction during quantification"
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
@@ -369,7 +369,7 @@ qualDecl = \case
   DClss c -> pure (DClss c)
   -- FIXME: Do type inference for type class instances.
   DInst (MkInstDecl c t qvs ds0) -> do
-    ds1 <- forHeres ds0 $ \d0 -> localizeTQ qvs (\_ -> qualDefn d0)
+    ds1 <- for ds0 $ lctd $ \d0 -> localizeTQ qvs (\_ -> qualDefn d0)
     pure (DInst (MkInstDecl c t qvs ds1))
   DDefn d -> DDefn <$> qualDefn d
   DPrim (MkPrimDecl (MkBind x ts) s) -> do
@@ -382,7 +382,7 @@ qualDecl = \case
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule =
-  module2decls (traverse (\decl -> reset @Id.TVar *> traverseHere qualDecl decl))
+  module2decls (traverse (\decl -> reset @Id.TVar *> lctd qualDecl decl))
 
 inferModule :: Module In -> Either Doc (Module Out)
 inferModule m0 = runST $ runM . runError $ do

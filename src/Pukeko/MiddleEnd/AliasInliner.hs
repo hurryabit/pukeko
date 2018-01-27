@@ -15,10 +15,11 @@ import qualified Pukeko.AST.Identifier as Id
 
 inlineModule :: Module st -> Module st
 inlineModule (MkModule decls0) =
-  let ls = mapMaybe (declLink . unloc) decls0
+  let ls = mapMaybe (declLink . unlctd) decls0
       uf = unionFind ls
-      decls1 =
-        overHere (traverseHeres . decl2eval) (\x -> Map.findWithDefault x x uf) decls0
+      decls1 = over
+        (unWhere (traverse . lctd . decl2eval))
+        (\x -> Map.findWithDefault x x uf) decls0
   in  MkModule decls1
 
 declLink :: Decl st -> Maybe (Id.EVar, Id.EVar)

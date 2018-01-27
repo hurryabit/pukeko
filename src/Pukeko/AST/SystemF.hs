@@ -68,11 +68,11 @@ import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
 
 data Module st = MkModule
-  { _module2decls :: [Loc (Decl st)]
+  { _module2decls :: [Lctd (Decl st)]
   }
 
 data Decl st
-  =                          DType (NonEmpty (Loc (Some1 TConDecl)))
+  =                          DType (NonEmpty (Lctd (Some1 TConDecl)))
   | Untyped    st ~ 'True => DSign (SignDecl Void)
   | HasClasses st ~ 'True => DClss ClssDecl
   | HasClasses st ~ 'True => DInst (InstDecl st)
@@ -97,7 +97,7 @@ data InstDecl st = forall m. (KnownNat m) => MkInstDecl
     -- FIXME: There's no way to define instances on (->).
   , _inst2tcon  :: Id.TCon
   , _inst2qvars :: Vector m QVar
-  , _inst2defns :: [Loc (Defn st (TFinScope m Void) Void)]
+  , _inst2defns :: [Lctd (Defn st (TFinScope m Void) Void)]
   }
 
 data SupCDecl st m n = MkSupCDecl
@@ -119,7 +119,7 @@ data Defn st tv ev = MkDefn
   }
 
 data Expr st tv ev
-  = ELoc (Loc (Expr st tv ev))
+  = ELoc (Lctd (Expr st tv ev))
   | EVar ev
   | EVal Id.EVar
   | ECon Id.DCon
@@ -128,9 +128,9 @@ data Expr st tv ev
   | forall n. HasLambda st ~ 'True =>
     ELam (Vector n (Bind (StageType st) tv)) (Expr st tv (EFinScope n ev)) (StageType st tv)
   | forall n.
-    ELet (Vector n (Loc (Defn st tv ev))) (Expr st tv (EFinScope n ev))
+    ELet (Vector n (Lctd (Defn st tv ev))) (Expr st tv (EFinScope n ev))
   | forall n.
-    ERec (Vector n (Loc (Defn st tv (EFinScope n ev)))) (Expr st tv (EFinScope n ev))
+    ERec (Vector n (Lctd (Defn st tv (EFinScope n ev)))) (Expr st tv (EFinScope n ev))
   | HasNested st ~ 'False =>
     ECas (Expr st tv ev) (NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
@@ -240,10 +240,11 @@ pdist (Free t)    = fmap Free t
 
 -- * Lenses and traversals
 inst2defn ::
-  (ApHere f) =>
-  (forall n. Defn st1 (TFinScope n Void) Void -> f (Defn st2 (TFinScope n Void) Void)) ->
+  (Applicative f, Where f) =>
+  (forall n.
+    Defn st1 (TFinScope n Void) Void -> f (Defn st2 (TFinScope n Void) Void)) ->
   InstDecl st1 -> f (InstDecl st2)
-inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> traverseHeres f ds
+inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> (traverse . lctd) f ds
 
 -- | Travere over the names of all the functions defined in either a 'DDefn', a
 -- 'DSupC' or a 'DPrim'.
@@ -258,7 +259,7 @@ decl2func f top = case top of
   DPrim p -> DPrim <$> prim2bind (bind2evar f) p
 
 decl2expr ::
-  (ApHere f) =>
+  (Applicative f, Where f) =>
   (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> Decl st -> f (Decl st)
 decl2expr f top = case top of
   DType{} -> pure top
@@ -269,7 +270,7 @@ decl2expr f top = case top of
   DSupC s -> DSupC <$> supc2expr f s
   DPrim p -> pure (DPrim p)
 
-decl2eval :: HereTraversal' (Decl st) Id.EVar
+decl2eval :: WhereTraversal' (Decl st) Id.EVar
 decl2eval f = decl2expr (expr2eval f)
 
 defn2func :: Lens' (Defn st tv ev) Id.EVar
@@ -282,12 +283,12 @@ defn2exprSt f (MkDefn b e) = MkDefn b <$> f e
 
 
 -- * Deep traversals
-defn2dcon :: HereTraversal' (Defn st tv ev) Id.DCon
+defn2dcon :: WhereTraversal' (Defn st tv ev) Id.DCon
 defn2dcon f (MkDefn b e) = MkDefn b <$> expr2dcon f e
 
-expr2dcon :: HereTraversal' (Expr st tv ev) Id.DCon
+expr2dcon :: WhereTraversal' (Expr st tv ev) Id.DCon
 expr2dcon f = \case
-  ELoc l       -> ELoc <$> traverseHere (expr2dcon f) l
+  ELoc l       -> ELoc <$> lctd (expr2dcon f) l
   EVar x       -> pure (EVar x)
   EVal z       -> pure (EVal z)
   ECon c       -> ECon <$> f c
@@ -295,22 +296,22 @@ expr2dcon f = \case
   EApp t  us   -> EApp <$> expr2dcon f t <*> (traverse . expr2dcon) f us
   ECas t  cs   -> ECas <$> expr2dcon f t <*> (traverse . case2dcon) f cs
   ELam bs e t  -> ELam bs <$> expr2dcon f e <*> pure t
-  ELet ds t    -> ELet <$> (traverseHeres . defn2dcon) f ds <*> expr2dcon f t
-  ERec ds t    -> ERec <$> (traverseHeres . defn2dcon) f ds <*> expr2dcon f t
+  ELet ds t    -> ELet <$> (traverse . lctd . defn2dcon) f ds <*> expr2dcon f t
+  ERec ds t    -> ERec <$> (traverse . lctd . defn2dcon) f ds <*> expr2dcon f t
   EMat t  as   -> EMat <$> expr2dcon f t <*> (traverse . altn2dcon) f as
   ETyAbs x e   -> ETyAbs x <$> expr2dcon f e
   ETyApp e t   -> ETyApp <$> expr2dcon f e <*> pure t
 
 defn2type ::
-  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
-  Defn st1 tv ev -> m (Defn st2 tv ev)
+  forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
+  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  Defn st1 tv ev -> f (Defn st2 tv ev)
 defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
 
 expr2type ::
-  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
-  Expr st1 tv ev -> m (Expr st2 tv ev)
+  forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
+  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  Expr st1 tv ev -> f (Expr st2 tv ev)
 expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
   EVar x       -> pure (EVar x)
@@ -320,23 +321,23 @@ expr2type f = \case
   EApp e0 es   -> EApp <$> expr2type f e0 <*> traverse (expr2type f) es
   ECas e0 cs   -> ECas <$> expr2type f e0 <*> traverse (case2type f ) cs
   ELam bs e t  -> ELam <$> traverse (bind2type f) bs <*> expr2type f e <*> f t
-  ELet ds e0   -> ELet <$> traverseHeres (defn2type f) ds <*> expr2type f e0
-  ERec ds e0   -> ERec <$> traverseHeres (defn2type f) ds <*> expr2type f e0
+  ELet ds e0   -> ELet <$> (traverse . lctd) (defn2type f) ds <*> expr2type f e0
+  ERec ds e0   -> ERec <$> (traverse . lctd) (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type f e0
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse f ts
 
 case2type ::
-  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
-  Case st1 tv ev -> m (Case st2 tv ev)
+  forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
+  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  Case st1 tv ev -> f (Case st2 tv ev)
 case2type f (MkCase dcon targs bnds e0) =
   MkCase dcon <$> traverse f targs <*> pure bnds <*> expr2type f e0
 
 altn2type ::
-  forall m st1 st2 tv ev. (ApHere m, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> m (StageType st2 tv)) ->
-  Altn st1 tv ev -> m (Altn st2 tv ev)
+  forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
+  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  Altn st1 tv ev -> f (Altn st2 tv ev)
 altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0
 
 patn2type ::
@@ -348,7 +349,7 @@ patn2type f = \case
   PCon dcon targs patns ->
     PCon dcon <$> traverse f targs <*> traverse (patn2type f) patns
 
-altn2dcon :: HereTraversal' (Altn st tv ev) Id.DCon
+altn2dcon :: WhereTraversal' (Altn st tv ev) Id.DCon
 altn2dcon f (MkAltn p t) = MkAltn <$> patn2dcon f p <*> expr2dcon f t
 
 patn2dcon :: Traversal (Patn ty tv) (Patn ty tv) Id.DCon Id.DCon
@@ -357,7 +358,7 @@ patn2dcon f = \case
   PVar x    -> pure (PVar x)
   PCon c ts ps -> PCon <$> f c <*> pure ts <*> (traverse . patn2dcon) f ps
 
-expr2eval :: HereTraversal' (Expr st tv ev) Id.EVar
+expr2eval :: WhereTraversal' (Expr st tv ev) Id.EVar
 expr2eval f = \case
   ELoc l      -> ELoc <$> traverse (expr2eval f) l
   EVar x      -> pure (EVar x)
@@ -366,8 +367,10 @@ expr2eval f = \case
   ENum n      -> pure (ENum n)
   EApp t  us  -> EApp <$> expr2eval f t <*> (traverse . expr2eval) f us
   ELam bs e t -> ELam bs <$> expr2eval f e <*> pure t
-  ELet ds t   -> ELet <$> (traverseHeres . defn2expr . expr2eval) f ds <*> expr2eval f t
-  ERec ds t   -> ERec <$> (traverseHeres . defn2expr . expr2eval) f ds <*> expr2eval f t
+  ELet ds t   ->
+    ELet <$> (traverse . lctd . defn2expr . expr2eval) f ds <*> expr2eval f t
+  ERec ds t   ->
+    ERec <$> (traverse . lctd . defn2expr . expr2eval) f ds <*> expr2eval f t
   EMat t  as  -> EMat <$> expr2eval f t <*> (traverse . altn2expr . expr2eval) f as
   ECas t  cs  -> ECas <$> expr2eval f t <*> traverse (case2expr (expr2eval f)) cs
   ETyAbs x e  -> ETyAbs x <$> expr2eval f e
@@ -527,7 +530,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) wh
 
 prettyDefns ::
   (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
-  Bool -> Vector n (Loc (Defn st tv ev)) -> Doc
+  Bool -> Vector n (Lctd (Defn st tv ev)) -> Doc
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
     d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)

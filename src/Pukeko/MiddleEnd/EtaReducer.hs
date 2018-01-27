@@ -67,5 +67,5 @@ erDecl top = case top of
                      (flip bitraverse pure . _Bound)
                      (\(i, _) -> (i, (vs2 Vec.! i)^.qvar2tvar)) e2
             in  erDecl (DSupC (MkSupCDecl z vs2 t2 bs2 e3))
-      ELoc e1 -> erDecl (DSupC (MkSupCDecl z vs0 t0 bs0 (unloc e1)))
+      ELoc e1 -> erDecl (DSupC (MkSupCDecl z vs0 t0 bs0 (unlctd e1)))
       _ -> top

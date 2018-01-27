@@ -78,20 +78,20 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: NonEmpty (Loc (Some1 TConDecl)) -> KC n s ()
+kcTypDef :: NonEmpty (Lctd (Some1 TConDecl)) -> KC n s ()
 kcTypDef tcons = do
-  kinds <- for tcons $ \(Loc _ (Some1 MkTConDecl{_tcon2name = tname})) -> do
+  kinds <- for tcons $ \(Lctd _ (Some1 MkTConDecl{_tcon2name = tname})) -> do
     kind <- freshUVar
     modify (Map.insert tname kind)
     pure kind
   for_ (NE.zip tcons kinds) $
-    \(Loc pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}), tconKind) -> do
+    \(Lctd pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}), tconKind) -> do
       here pos $ do
         paramKinds <- traverse (const freshUVar) prms
         unify tconKind (foldr Arrow Star paramKinds)
         localize paramKinds $ do
           -- TODO: Rewrite this in terms of @forOf_@.
-          forHeres_ dcons $ \MkDConDecl{_dcon2flds = flds} -> do
+          for_ dcons $ lctd_ $ \MkDConDecl{_dcon2flds = flds} -> do
             traverse_ (kcType Star) flds
   traverse_ close kinds
 
@@ -122,7 +122,7 @@ kcDecl decl = case decl of
     passOn = pure decl
 
 kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2decls (traverse (\top -> reset @Id.TVar *> traverseHere kcDecl top))
+kcModule = module2decls (traverse (\top -> reset @Id.TVar *> lctd kcDecl top))
 
 checkModule :: Module In -> Either Doc (Module Out)
 checkModule module_ = runKC (kcModule module_)
