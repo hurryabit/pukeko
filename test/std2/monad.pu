@@ -1,12 +1,10 @@
+-- The monad class and some useful functions for monads
 import std2/basic
 import std2/list
 
--- The monad class and some useful functions for monads
-
-class Monad m :
-{ pure : a -> m a
-, (>>=) : m a -> (a -> m b) -> m b
-}
+class Monad m where
+  pure : a -> m a
+  (>>=) : m a -> (a -> m b) -> m b
 
 (;) : (Monad m) => m Unit -> m a -> m a
 (;) m1 m2 = m1 >>= fun x -> m2

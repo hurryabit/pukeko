@@ -1,7 +1,7 @@
+-- The IO monad
 import std2/int
 import std2/monad
 
--- The IO monad
 type IO a
 
 pure_io : a -> IO a
@@ -10,10 +10,10 @@ external pure_io = "return"
 bind_io : IO a -> (a -> IO b) -> IO b
 external bind_io = "bind"
 
-instance Monad IO =
-{ pure = pure_io
-, (>>=) = bind_io
-}
+instance Monad IO where
+  pure = pure_io
+  (>>=) = bind_io
+
 
 print : Int -> IO Unit
 external print = "print"

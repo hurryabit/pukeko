@@ -1,47 +1,39 @@
+-- The List datatype
 import std2/basic
 import std2/bool
 import std2/foldable
 import std2/functor
 import std2/monoid
 
--- The List datatype
 type List a =
   | Nil
   | Cons a (List a)
 
-instance Eq (List a) = (Eq a) =>
-{ (==) xs ys = match xs with
-  | Nil ->
-    ( match ys with
-    | Nil -> True
-    | Cons _ _ -> False
-    )
-  | Cons x xs ->
-    ( match ys with
-    | Nil -> False
-    | Cons y ys -> x == y && xs == ys
-    )
-}
+instance (Eq a) => Eq (List a) where
+  (==) xs ys = match xs with
+    | Nil -> match ys with
+      | Nil -> True
+      | Cons _ _ -> False
+    | Cons x xs -> match ys with
+      | Nil -> False
+      | Cons y ys -> x == y && xs == ys
 
-instance Monoid (List a) =
-{ empty = Nil
-, append xs ys = foldr Cons ys xs
-}
+instance Monoid (List a) where
+  empty = Nil
+  append xs ys = foldr Cons ys xs
 
-instance Functor List =
-{ map f xs = match xs with
-  | Nil -> Nil
-  | Cons x xs -> Cons (f x) (map f xs)
-}
+instance Functor List where
+  map f xs = match xs with
+    | Nil -> Nil
+    | Cons x xs -> Cons (f x) (map f xs)
 
-instance Foldable List =
-{ foldr f y0 xs = match xs with
-  | Nil -> y0
-  | Cons x xs -> f x (foldr f y0 xs)
-, foldl f y0 xs = match xs with
-  | Nil -> y0
-  | Cons x xs -> foldl f (f y0 x) xs
-}
+instance Foldable List where
+  foldr f y0 xs = match xs with
+    | Nil -> y0
+    | Cons x xs -> f x (foldr f y0 xs)
+  foldl f y0 xs = match xs with
+    | Nil -> y0
+    | Cons x xs -> foldl f (f y0 x) xs
 
 to_list : (Foldable t) => t a -> List a
 to_list = foldr Cons Nil

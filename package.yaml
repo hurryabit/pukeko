@@ -58,6 +58,7 @@ library:
   - lens
   - megaparsec
   - monad-st
+  - mtl
   - natural-transformation
   - parser-combinators
   - pretty

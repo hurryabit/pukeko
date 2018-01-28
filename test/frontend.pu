@@ -14,7 +14,7 @@ bad : Typ
 -- TEST duplicate in one type definition
 -- FAILURE 2:6: duplicate type constructor: Typ
 type Typ
- and Typ
+and  Typ
 
 -- TEST duplicate in two type definitions
 -- FAILURE 1:6: duplicate type constructor: Int

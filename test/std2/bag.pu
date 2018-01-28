@@ -1,0 +1,28 @@
+-- Multi-sets represented by (unbalanced) binary trees
+import std2/bintree
+
+type Bag a =
+  | Bag (BinTree a)
+
+instance Foldable Bag where
+  foldr f y0 s =
+    match s with
+    | Bag t -> foldr f y0 t
+  foldl f y0 s =
+    match s with
+    | Bag t -> foldl f y0 t
+
+bag_empty : Bag a
+bag_empty = Bag Leaf
+
+bag_insert : (Ord a) => a -> Bag a -> Bag a
+bag_insert x s =
+  let rec insert x t =
+    match t with
+    | Leaf -> Branch Leaf x Leaf
+    | Branch l y r ->
+      if x < y then Branch (insert x l) y r
+      else Branch l y (insert x r)
+  in
+  match s with
+  | Bag t -> Bag (insert x t)

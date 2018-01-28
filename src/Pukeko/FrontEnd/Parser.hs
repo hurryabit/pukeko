@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
 -- | Implementation of the parser.
 module Pukeko.FrontEnd.Parser
   ( Module
@@ -7,16 +6,19 @@ module Pukeko.FrontEnd.Parser
   , parseModule
   , parsePackage
   , extend
+  , parseTest
   )
   where
 
 import Pukeko.Prelude hiding (lctd)
 
 import qualified Control.Applicative.Combinators.NonEmpty as NE
+import qualified Control.Monad.RWS          as RWS
 import qualified Data.List.NonEmpty         as NE
 import qualified Data.Set                   as Set
 import           System.FilePath            as Sys
-import           Text.Megaparsec
+import           Text.Megaparsec            hiding (parse, parseTest)
+import qualified Text.Megaparsec            as MP
 import           Text.Megaparsec.Char       hiding (space)
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Text.Megaparsec.Expr
@@ -29,7 +31,7 @@ import           Pukeko.FrontEnd.Parser.Build (build)
 
 parseInput :: (Member (Error Failure) effs) => FilePath -> String -> Eff effs Module
 parseInput file =
-  either (throwFailure . pretty . parseErrorPretty) pure .
+  either (throwFailure . text . parseErrorPretty) pure .
   parse (module_ file <* eof) file
 
 parseModule ::
@@ -43,31 +45,55 @@ parsePackage ::
   (Member (Error Failure) effs, LastMember IO effs) => FilePath -> Eff effs Package
 parsePackage file = build parseModule file <* sendM (putStrLn "")
 
-type Parser = Parsec Void String
+type Parser = RWS.RWST (Pos, Ordering) () SourcePos (Parsec Void String)
+
+parse :: Parser a -> FilePath -> String -> Either (ParseError Char Void) a
+parse p file = MP.parse (fst <$> RWS.evalRWST p (pos1, EQ) (initialPos file)) file
+
+parseTest :: (Show a) => Parser a -> String -> IO ()
+parseTest p = either (putStrLn . parseErrorPretty) print . parse p ""
 
 space :: Parser ()
-space = L.space space1 (L.skipLineComment "--") empty
+space = do
+  L.space space1 (L.skipLineComment "--") empty
+  refPos <- RWS.get
+  curPos <- getPosition
+  when (sourceLine refPos < sourceLine curPos) (RWS.put curPos)
 
-indented :: Parser a -> Parser a
-indented p = L.indentGuard space GT pos1 *> p
-
-nonIndented :: Parser a -> Parser a
-nonIndented = L.nonIndented space
+indentGuard :: Parser Pos
+indentGuard = do
+  (refCol, refOrd) <- RWS.ask
+  L.indentGuard (pure ()) refOrd refCol
 
 lexeme :: Parser a -> Parser a
-lexeme = L.lexeme space
+lexeme p = indentGuard *> L.lexeme space p
+
+block :: Pos -> Ordering -> Parser a -> Parser a
+block col ord = RWS.local (const (col, ord))
+
+indented :: Parser a -> (a -> Parser b) -> Parser b
+indented p f = do
+  _ <- indentGuard
+  refCol <- RWS.gets sourceColumn
+  x <- p
+  block refCol GT (f x)
+
+indented_ :: Parser () -> Parser a -> Parser a
+indented_ p0 p1 = indented p0 (const p1)
+
+aligned :: Parser a -> Parser a
+aligned p = do
+  refCol <- indentGuard
+  block refCol EQ p
 
 symbol :: String -> Parser String
-symbol = L.symbol space
+symbol = lexeme . string
 
 comma :: Parser ()
 comma = void (symbol ",")
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
-
-braces :: Parser a -> Parser a
-braces = between (symbol "{") (symbol "}")
 
 -- TODO: Ideally we want a trie rather than a tree.
 reservedIdents :: Set String
@@ -76,7 +102,7 @@ reservedIdents = Set.fromList
       , "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
-      , "type", "class", "instance"
+      , "type", "class", "where", "instance"
       , "external"
       , "import"
       ]
@@ -112,9 +138,9 @@ lIdent = lexeme $ try $ do
 uIdent :: Parser String
 uIdent = lexeme $ (:) <$> uIdentStart <*> many identLetter
 
-operator :: Parser String
-operator = lexeme $ try $ do
-  op <- some opLetter
+prefixOperator :: Parser String
+prefixOperator = lexeme $ try $ do
+  op <- between (char '(') (char ')') (some opLetter)
   when (op `Set.member` reservedOperators) $
     unexpected (Label (NE.fromList ("reserved op " ++ op)))
   pure op
@@ -134,7 +160,7 @@ bar     = reservedOp "|"
 
 evar :: Parser Id.EVar
 evar = Id.evar <$> lIdent
-  <|> Id.op <$> try (parens operator)
+  <|> Id.op <$> prefixOperator
   <?> "expression variable"
 
 tvar :: Parser Id.TVar
@@ -156,9 +182,9 @@ type_ =
     [ [ InfixR (arrow *> pure mkTFun) ] ]
   <?> "type"
 atype = choice
-  [ TVar <$> try (indented tvar)
+  [ TVar <$> tvar
   , TCon <$> tcon
-  , indented (parens type_)
+  , parens type_
   ]
 
 typeCstr :: Parser TypeCstr
@@ -178,20 +204,27 @@ apatn = symbol "_" *> pure PWld   <|>
         PCon <$> dcon <*> pure [] <|>
         parens patn
 
-defnValLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
-defnValLhs = MkDefn <$> evar
-
-defnFunLhs :: Parser (Expr Id.EVar -> Defn Id.EVar)
-defnFunLhs =
-  (.) <$> (MkDefn <$> evar)
-      <*> (ELam <$> NE.some evar)
-
--- TODO: Improve this code.
 defn :: Parser (Defn Id.EVar)
-defn = (try defnFunLhs <|> defnValLhs) <*> (equals *> lexpr) <?> "definition"
+defn = indented evar $ \z -> MkDefn z <$> (mkLam <$> many evar <*> (equals *> lexpr))
+
+exprMatch :: Parser (Expr Id.EVar)
+exprMatch = do
+  tokCol <- indentGuard
+  fstCol <- RWS.gets sourceColumn
+  reserved "match"
+  if tokCol == fstCol && fstCol > pos1
+    then
+      EMat
+      <$> block tokCol GT (expr <* reserved "with")
+      <*> block tokCol EQ (some altn)
+    else
+      block fstCol GT $
+      EMat
+      <$> (expr <* reserved "with")
+      <*> aligned (some altn)
 
 altn :: Parser (Altn Id.EVar)
-altn = MkAltn <$> (bar *> patn) <*> (arrow *> expr)
+altn = indented_ bar (MkAltn <$> patn <*> (arrow *> expr))
 
 let_ ::
   (NonEmpty (Lctd (Defn Id.EVar)) -> a) ->
@@ -202,58 +235,59 @@ let_ mkLet mkRec =
   <*> NE.sepBy1 (lctd defn) (reserved "and")
 
 expr, aexpr, lexpr :: Parser (Expr Id.EVar)
+lexpr = ELoc <$> lctd expr
+aexpr = choice
+  [ EVar <$> evar
+  , ECon <$> dcon
+  , ENum <$> decimal
+  , parens expr
+  ]
 expr =
   (flip makeExprParser operatorTable . choice)
   [ mkApp <$> aexpr <*> many aexpr
   , mkIf  <$> (reserved "if"   *> expr)
           <*> (reserved "then" *> expr)
           <*> (reserved "else" *> expr)
-  , EMat
-    <$> (reserved "match" *> expr)
-    <*> (reserved "with"  *> some altn)
+  , exprMatch
   , ELam
     <$> (reserved "fun" *> NE.some evar)
     <*> (arrow *> expr)
   , let_ ELet ERec <*> (reserved "in" *> expr)
   ]
   <?> "expression"
-aexpr = choice
-  [ EVar <$> try (indented evar)
-  , ECon <$> dcon
-  , ENum <$> decimal
-  , indented (parens expr)
-  ]
-lexpr = ELoc <$> lctd expr
-
-operatorTable = map (map f) (reverse Op.table)
   where
-    f MkSpec{_sym, _assoc} = g _assoc (try (reservedOp _sym *> pure (mkAppOp _sym)))
-    g = \case
-      Op.AssocLeft  -> InfixL
-      Op.AssocRight -> InfixR
-      Op.AssocNone  -> InfixN
+    operatorTable = map (map f) (reverse Op.table)
+      where
+        f MkSpec{_sym, _assoc} = g _assoc (try (reservedOp _sym *> pure (mkAppOp _sym)))
+        g = \case
+          Op.AssocLeft  -> InfixL
+          Op.AssocRight -> InfixR
+          Op.AssocNone  -> InfixN
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
   <$> tcon
-  <*> many (indented tvar)
-  <*> option [] (equals *> some (lctd dconDecl))
+  <*> many tvar
+  <*> option [] (equals *> aligned (some (lctd dconDecl)))
 
 dconDecl :: Parser DConDecl
-dconDecl = MkDConDecl <$> (bar *> dcon) <*> many atype
+dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
 
 signDecl :: Parser SignDecl
-signDecl = MkSignDecl <$> try (evar <* colon) <*> typeScheme
+signDecl = indented
+  (try (indented evar (\z -> colon *> pure z)))
+  (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
-clssDecl = MkClssDecl <$> clss <*> tvar <*> (colon *> record signDecl)
+clssDecl =
+  MkClssDecl <$> clss <*> tvar <*> (reserved "where" *> aligned (many signDecl))
 
 instDecl :: Parser InstDecl
 instDecl = do
+  q       <- typeCstr
   c       <- clss
   (t, vs) <- (,) <$> tcon <*> pure [] <|> parens ((,) <$> tcon <*> many tvar)
-  q       <- equals *> typeCstr
-  ds      <- record (lctd defn)
+  ds      <- reserved "where" *> aligned (many (lctd defn))
   pure (MkInstDecl c t vs q ds)
 
 primDecl :: Parser PrimDecl
@@ -262,24 +296,23 @@ primDecl = MkPrimDecl
   <*> (equals *> char '\"' *> some lowerChar <* symbol "\"")
 
 import_ :: Parser FilePath
-import_ = do
-  reserved "import"
-  comps <- sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/')
-  void eol
+import_ = indented_ (reserved "import") $ do
+  comps <- lexeme (sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/'))
   pure (Sys.joinPath comps Sys.<.> "pu")
 
 module_ :: FilePath -> Parser Module
 module_ file = do
-  imps <- lexeme (many import_)
+  space
+  imps <- many import_
   decls <- many $ lctd $ choice
-    [ DType <$> (reserved "type"     *> NE.sepBy1 (lctd tconDecl) (reserved "and"))
-    , DClss <$> (reserved "class"    *> clssDecl)
-    , DInst <$> (reserved "instance" *> instDecl)
-    , nonIndented (DSign <$> signDecl)
-    , nonIndented (DDefn <$> defn)
-    , DPrim <$> (reserved "external" *> primDecl)
+    [ DType <$> ( (:|)
+                  <$> indented_ (reserved "type") (lctd tconDecl)
+                  <*> many (indented_ (reserved "and") (lctd tconDecl))
+                )
+    , DClss <$> indented_ (reserved "class") clssDecl
+    , DInst <$> indented_ (reserved "instance") instDecl
+    , DPrim <$> indented_ (reserved "external") primDecl
+    , DSign <$> signDecl <?> "function declaration"
+    , DDefn <$> defn <?> "function definition"
     ]
   pure (MkModule file imps decls)
-
-record :: Parser a -> Parser [a]
-record p = braces (sepBy p comma)

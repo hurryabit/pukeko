@@ -1,6 +1,5 @@
 -- Monoids
 
-class Monoid m :
-{ empty : m
-, append : m -> m -> m
-}
+class Monoid m where
+  empty : m
+  append : m -> m -> m

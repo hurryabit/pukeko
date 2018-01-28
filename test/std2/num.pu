@@ -1,8 +1,7 @@
 -- Class for numbers/algebraic structures
 
-class Ring a :
-{ neg : a -> a
-, (+) : a -> a -> a
-, (-) : a -> a -> a
-, (*) : a -> a -> a
-}
+class Ring a where
+  neg : a -> a
+  (+) : a -> a -> a
+  (-) : a -> a -> a
+  (*) : a -> a -> a

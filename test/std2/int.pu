@@ -1,8 +1,8 @@
+-- Integers
 import std2/basic
 import std2/ord
 import std2/monoid
 import std2/num
--- Integers
 
 type Int
 
@@ -10,9 +10,9 @@ type Int
 eq_int : Int -> Int -> Bool
 external eq_int = "eq"
 
-instance Eq Int =
-{ (==) = eq_int
-}
+instance Eq Int where
+  (==) = eq_int
+
 
 -- Ordering
 lt_int : Int -> Int -> Bool
@@ -27,12 +27,11 @@ external ge_int = "ge"
 gt_int : Int -> Int -> Bool
 external gt_int = "gt"
 
-instance Ord Int =
-{ (<)  = lt_int
-, (<=) = le_int
-, (>=) = ge_int
-, (>)  = gt_int
-}
+instance Ord Int where
+  (<)  = lt_int
+  (<=) = le_int
+  (>=) = ge_int
+  (>)  = gt_int
 
 
 -- Algebra
@@ -48,12 +47,11 @@ external sub_int = "sub"
 mul_int : Int -> Int -> Int
 external mul_int = "mul"
 
-instance Ring Int =
-{ neg = neg_int
-, (+) = add_int
-, (-) = sub_int
-, (*) = mul_int
-}
+instance Ring Int where
+  neg = neg_int
+  (+) = add_int
+  (-) = sub_int
+  (*) = mul_int
 
 (/) : Int -> Int -> Int
 external (/) = "div"
@@ -61,7 +59,6 @@ external (/) = "div"
 (%) : Int -> Int -> Int
 external (%) = "mod"
 
-instance Monoid Int =
-{ empty = 0
-, append = (+)
-}
+instance Monoid Int where
+  empty = 0
+  append = (+)
