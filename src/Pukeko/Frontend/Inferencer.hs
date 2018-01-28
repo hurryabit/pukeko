@@ -111,7 +111,7 @@ splitCstr t0 clss = do
     UTArr{} -> throwNoInst
   where
     throwNoInst = do
-      p0 <- sendM (prettyUType prettyNormal 1 t0)
+      p0 <- sendM (prettyUType 1 t0)
       throwHere ("no instance for" <+> pretty clss <+> p0)
 
 
@@ -144,7 +144,7 @@ inferPatn patn t_expr = case patn of
       findInfo info2dcons dcon
     when (length ps0 /= length flds) $
       throwHere ("data constructor" <+> quotes (pretty dcon) <+>
-                 "expects" <+> int (length flds) <+> "arguments")
+                 "expects" <+> pretty (length flds) <+> "arguments")
     t_params <- traverse (const freshUVar) params
     let t_inst = appTCon tcon (toList t_params)
     unify t_expr t_inst

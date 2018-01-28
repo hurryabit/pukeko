@@ -72,8 +72,8 @@ data Global = MkGlobal
   }
 
 instance Pretty Program where
-  pPrint MkProgram { _globals, _main } =
-    vcat $ map (text . show) $
+  pretty MkProgram { _globals, _main } =
+    vcat $ map (pretty . show) $
     [ PUSHGLOBAL _main
     , EVAL
     , PRINT

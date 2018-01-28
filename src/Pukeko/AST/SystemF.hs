@@ -479,56 +479,56 @@ instance IsStage st => Bitraversable (Altn st) where
 
 -- * Pretty printing
 class PrettyType f where
-  pPrintPrecType :: (BaseTVar tv) => PrettyLevel -> Rational -> f tv -> Doc
+  prettyPrecType :: (BaseTVar tv) => Int -> f tv -> Doc ann
 
 instance PrettyType NoType where
-  pPrintPrecType _ _ NoType = mempty
+  prettyPrecType _ NoType = mempty
 
 instance PrettyType Type where
-  pPrintPrecType = pPrintPrec
+  prettyPrecType = prettyPrec
 
 type PrettyStage st = PrettyType (StageType st)
 
 instance (PrettyStage st) => Pretty (Module st) where
-  pPrintPrec lvl prec (MkModule decls) = vcat (map (pPrintPrec lvl prec) decls)
+  pretty (MkModule decls) = vcat (map pretty decls)
 
 instance (PrettyStage st) => Pretty (Decl st) where
-  pPrintPrec lvl _ = \case
+  pretty = \case
     DType (dcon0 :| dcons) ->
-      "type" <+> pPrintPrec lvl 0 dcon0 $$
-      vcat (map (\dcon -> "and " <+> pPrintPrec lvl 0 dcon) dcons)
+      "type" <+> pretty dcon0 $$
+      vcat (map (\dcon -> "and " <+> pretty dcon) dcons)
     DSign s -> "val" <+> pretty s
     DClss (MkClssDecl c v ms) ->
-      "class" <+> pretty c <+> pretty v <+> colon $$ prettyBlock lvl ms
+      "class" <+> pretty c <+> pretty v <+> ":" $$ prettyBlock ms
     DInst (MkInstDecl c t0 qvs ds) ->
-      "instance" <+> pretty c <+> pPrintPrec lvl 3 t1 <+> prettyTypeCstr qvs
-      $$ prettyBlock lvl ds
+      "instance" <+> pretty c <+> prettyPrec 3 t1 <+> prettyTypeCstr qvs
+      $$ prettyBlock ds
       where
         t1 :: Type (TFinScope _ Void)
         t1 = mkTApp (TCon t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
     DDefn d -> "let" <+> pretty d
     DSupC (MkSupCDecl z qvs t bs e) ->
       "let" <+>
-      hang (pretty z <+> colon <+> pPrintPrecType lvl 0 (mkTUni qvs t) <+> equals) 2
-        (prettyETyAbs lvl 0 qvs (prettyELam lvl 0 bs e))
+      hang (pretty z <+> ":" <+> prettyPrecType 0 (mkTUni qvs t) <+> "=") 2
+        (prettyETyAbs 0 qvs (prettyELam 0 bs e))
     DPrim (MkPrimDecl b s) ->
-      hsep ["external", pretty b, equals, text (show s)]
+      hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
 
-prettyBlock :: (Foldable t, Pretty a) => PrettyLevel -> t a -> Doc
-prettyBlock lvl xs = case map (pPrintPrec lvl 0) (toList xs) of
+prettyBlock :: (Foldable t, Pretty a) => t a -> Doc ann
+prettyBlock xs = case map pretty (toList xs) of
   []     -> "{}"
   d0:ds -> "{" <+> d0 $+$ vcat (map (\d -> "," <+> d) ds) $+$ "}"
 
 instance (BaseTVar tv) => Pretty (SignDecl tv) where
-  pPrintPrec lvl _ (MkSignDecl x t) = pretty x <+> colon <+> pPrintPrec lvl 0 t
+  pretty (MkSignDecl x t) = pretty x <+> ":" <+> prettyPrec 0 t
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
-  pPrintPrec lvl _ (MkDefn b t) =
-    hang (pPrintPrec lvl 0 b <+> equals) 2 (pPrintPrec lvl 0 t)
+  pretty (MkDefn b t) =
+    hang (prettyPrec 0 b <+> "=") 2 (prettyPrec 0 t)
 
 prettyDefns ::
   (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
-  Bool -> Vector n (Lctd (Defn st tv ev)) -> Doc
+  Bool -> Vector n (Lctd (Defn st tv ev)) -> Doc ann
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
     d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
@@ -537,15 +537,18 @@ prettyDefns isrec ds = case toList ds of
            | otherwise = "let"
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
-  pPrintPrec lvl prec = \case
-    ELoc l -> pPrintPrec lvl prec l
+  pretty = prettyPrec 0
+
+instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev) where
+  prettyPrec prec = \case
+    ELoc l -> prettyPrec prec l
     EVar x -> pretty (baseEVar x)
     EVal z -> pretty z
     ECon c -> pretty c
-    ENum n -> int n
+    ENum n -> pretty n
     EApp t us ->
-      maybeParens lvl (prec > Op.aprec)
-      $ pPrintPrec lvl Op.aprec t <+> hsepMap (pPrintPrec lvl (Op.aprec+1)) us
+      maybeParens (prec > Op.aprec)
+      $ prettyPrec Op.aprec t <+> hsepMap (prettyPrec (Op.aprec+1)) us
     -- This could be brought back in @EApp@ when @t@ is an operator.
     -- ApOp   { _op, _arg1, _arg2 } ->
     --   let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op
@@ -555,89 +558,94 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) wh
     --           AssocRight -> (_prec+1, _prec  )
     --           AssocNone  -> (_prec+1, _prec+1)
     --   in  maybeParens (prec > _prec) $
-    --         pPrintPrec lvl prec1 _arg1 <> text _sym <> pPrintPrec lvl prec2 _arg2
-    ELet ds t -> sep [prettyDefns False ds, "in"] $$ pPrintPrec lvl 0 t
-    ERec ds t -> sep [prettyDefns True  ds, "in"] $$ pPrintPrec lvl 0 t
-    ELam bs e t -> prettyELamT lvl prec bs e t
+    --         prettyPrec prec1 _arg1 <> text _sym <> prettyPrec prec2 _arg2
+    ELet ds t -> sep [prettyDefns False ds, "in"] $$ prettyPrec 0 t
+    ERec ds t -> sep [prettyDefns True  ds, "in"] $$ prettyPrec 0 t
+    ELam bs e t -> prettyELamT prec bs e t
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
-    --     [ "if"  <+> pPrintPrec lvl 0 _cond <+> "then"
-    --     , nest 2 (pPrintPrec lvl 0 _then)
+    --     [ "if"  <+> prettyPrec 0 _cond <+> "then"
+    --     , nest 2 (prettyPrec 0 _then)
     --     , "else"
-    --     , nest 2 (pPrintPrec lvl 0 _else)
+    --     , nest 2 (prettyPrec 0 _else)
     --     ]
     EMat t as ->
-      maybeParens lvl (prec > 0) $ vcat
-      $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList as)
+      maybeParens (prec > 0) $ vcat
+      $ ("match" <+> prettyPrec 0 t <+> "with") : map pretty (toList as)
     ECas t cs ->
-      maybeParens lvl (prec > 0) $ vcat
-      $ ("match" <+> pPrintPrec lvl 0 t <+> "with") : map (pPrintPrec lvl 0) (toList cs)
-    ETyAbs vs e -> prettyETyAbs lvl prec vs (pPrintPrec lvl 0 e)
+      maybeParens (prec > 0) $ vcat
+      $ ("match" <+> prettyPrec 0 t <+> "with") : map pretty (toList cs)
+    ETyAbs vs e -> prettyETyAbs prec vs (prettyPrec 0 e)
     ETyApp e0 ts ->
-      maybeParens lvl (prec > Op.aprec)
-      $ pPrintPrec lvl Op.aprec e0 <+> prettyAtType (pPrintPrecType lvl 3) ts
+      maybeParens (prec > Op.aprec)
+      $ prettyPrec Op.aprec e0 <+> prettyAtType (prettyPrecType 3) ts
 
 prettyELam ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  PrettyLevel -> Rational ->
-  Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> Doc
-prettyELam lvl prec bs e
-  | null bs   = pPrintPrec lvl prec e
+  Int -> Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> Doc ann
+prettyELam prec bs e
+  | null bs   = prettyPrec prec e
   | otherwise =
-      maybeParens lvl (prec > 0)
-      $ hang ("fun" <+> hsepMap (pPrintPrec lvl 1) bs <+> "->") 2 (pPrintPrec lvl 0 e)
+      maybeParens (prec > 0)
+      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> "->") 2 (prettyPrec 0 e)
 
 prettyELamT ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  PrettyLevel -> Rational ->
-  Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> StageType st tv -> Doc
-prettyELamT lvl prec bs e t
-  | null bs   = bug "empty lambda" -- pPrintPrec lvl prec e
+  Int ->
+  Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> StageType st tv -> Doc ann
+prettyELamT prec bs e t
+  | null bs   = bug "empty lambda" -- prettyPrec prec e
   | otherwise =
-      maybeParens lvl (prec > 0)
-      $ hang ("fun" <+> hsepMap (pPrintPrec lvl 1) bs <+> colon <+> pPrintPrecType lvl 3 t <+> "->") 2 (pPrintPrec lvl 0 e)
+      maybeParens (prec > 0)
+      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (prettyPrec 0 e)
 
-prettyETyAbs :: PrettyLevel -> Rational -> Vector m QVar -> Doc -> Doc
-prettyETyAbs lvl prec qvs d
-  | null qvs   = maybeParens lvl (prec > 0) d
+prettyETyAbs :: Int -> Vector m QVar -> Doc ann -> Doc ann
+prettyETyAbs prec qvs d
+  | null qvs   = maybeParens (prec > 0) d
   | otherwise =
-      maybeParens lvl (prec > 0)
+      maybeParens (prec > 0)
       $ hang ("fun" <+> prettyAtType prettyQVar qvs <+> "->") 2 d
 
-prettyAtType :: Foldable t => (a -> Doc) -> t a -> Doc
+prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
 instance (BaseTVar tv, PrettyType ty) => Pretty (Bind ty tv) where
-  pPrintPrec lvl prec (MkBind z t)
+  pretty = prettyPrec 0
+
+instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Bind ty tv) where
+  prettyPrec prec (MkBind z t)
     | isEmpty td = zd
-    | otherwise  = maybeParens lvl (prec > 0) (zd <+> colon <+> td)
+    | otherwise  = maybeParens (prec > 0) (zd <+> ":" <+> td)
     where
       zd = pretty z
-      td = pPrintPrecType lvl 0 t
+      td = prettyPrecType 0 t
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
-  pPrintPrec lvl _ (MkCase c ts bs e) =
+  pretty (MkCase c ts bs e) =
     hang
       ( "|"
         <+> pretty c
-        <+> prettyAtType (pPrintPrecType lvl 3) ts
+        <+> prettyAtType (prettyPrecType 3) ts
         <+> hsepMap pretty bs <+> "->"
       )
-      2 (pPrintPrec lvl 0 e)
+      2 (prettyPrec 0 e)
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
-  pPrintPrec lvl _ (MkAltn p t) =
-    hang ("|" <+> pPrintPrec lvl 0 p <+> "->") 2 (pPrintPrec lvl 0 t)
+  pretty (MkAltn p t) =
+    hang ("|" <+> prettyPrec 0 p <+> "->") 2 (prettyPrec 0 t)
 
 instance (BaseTVar tv, PrettyType ty) => Pretty (Patn ty tv) where
-  pPrintPrec lvl prec = \case
+  pretty = prettyPrec 0
+
+instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Patn ty tv) where
+  prettyPrec prec = \case
     PWld -> "_"
     PVar x    -> pretty x
     PCon c ts ps ->
-      maybeParens lvl (prec > 0 && (not (null ts) || not (null ps)))
+      maybeParens (prec > 0 && (not (null ts) || not (null ps)))
       $ pretty c
-        <+> prettyAtType (pPrintPrecType lvl 3) ts
-        <+> hsep (map (pPrintPrec lvl 1) ps)
+        <+> prettyAtType (prettyPrecType 3) ts
+        <+> hsep (map (prettyPrec 1) ps)
 
 deriving instance (StageType st ~ Type) => Show (Decl st)
 deriving instance (Show tv)             => Show (SignDecl tv)

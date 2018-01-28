@@ -117,7 +117,7 @@ subst env = go
       t@(UTCon _) -> pure t
       UTApp tf tp -> UTApp <$> go tf <*> go tp
       t0@(UTUni _qvs _t1) -> do
-        p0 <- prettyUType prettyNormal 0 t0
+        p0 <- prettyUType 0 t0
         bug ("quantification during instantiation: " ++ render p0)
         -- let vs = setOf (traverse . qvar2tvar) qvs
         -- subst (env `Map.difference` Map.fromSet (const ()) vs) t1
@@ -128,28 +128,28 @@ subst env = go
           ULink t1  -> go  t1
 
 -- * Pretty printing
-prettyUVar :: PrettyLevel -> Rational -> UVar s tv -> ST s Doc
-prettyUVar lvl prec = \case
+prettyUVar :: Int -> UVar s tv -> ST s (Doc ann)
+prettyUVar prec = \case
   UFree v _ -> pure (pretty v)
-  ULink t   -> prettyUType lvl prec t
+  ULink t   -> prettyUType prec t
 
-prettyUType :: PrettyLevel -> Rational -> UType s tv -> ST s Doc
-prettyUType lvl prec = \case
+prettyUType :: Int -> UType s tv -> ST s (Doc ann)
+prettyUType prec = \case
   UTVar v -> pure (pretty v)
   UTArr   -> pure "(->)"
   UTCon c -> pure (pretty c)
   UTFun tx ty -> do
-    px <- prettyUType lvl 2 tx
-    py <- prettyUType lvl 1 ty
-    pure $ maybeParens lvl (prec > 1) $ px <+> "->" <+> py
+    px <- prettyUType 2 tx
+    py <- prettyUType 1 ty
+    pure $ maybeParens (prec > 1) $ px <+> "->" <+> py
   UTApp tf tx -> do
-    pf <- prettyUType lvl 2 tf
-    px <- prettyUType lvl 3 tx
-    pure $ maybeParens lvl (prec > 2) $ pf <+> px
-  UTUni qvs tq -> prettyTUni lvl prec qvs <$> prettyUType lvl 0 tq
+    pf <- prettyUType 2 tf
+    px <- prettyUType 3 tx
+    pure $ maybeParens (prec > 2) $ pf <+> px
+  UTUni qvs tq -> prettyTUni prec qvs <$> prettyUType 0 tq
   UVar uref -> do
     uvar <- readSTRef uref
-    prettyUVar lvl prec uvar
+    prettyUVar prec uvar
 
 instance Functor (UType s) where
   fmap _ = coerce

@@ -53,31 +53,31 @@ zipMaybe :: [Maybe a] -> [b] -> [(a, b)]
 zipMaybe idents = catMaybes . zipWith (\ident x -> (,) <$> ident <*> pure x) idents
 
 instance Pretty Name where
-  pPrint (MkName name) = text name
+  pretty (MkName name) = pretty name
 
-instance Show Name where
-  show = prettyShow
+prettyBind :: Maybe Name -> Doc ann
+prettyBind = maybe "_" pretty
 
-pPrintBind :: Maybe Name -> Doc
-pPrintBind = maybe "_" pretty
-
-pPrintAltn :: Int -> Altn -> Doc
-pPrintAltn tag MkAltn{_binds, _rhs} = hang
-    (hsep ["|", braces (int tag), hsep (map pPrintBind _binds), "->"])
+prettyAltn :: Int -> Altn -> Doc ann
+prettyAltn tag MkAltn{_binds, _rhs} = hang
+    (hsep ["|", braces (pretty tag), hsep (map prettyBind _binds), "->"])
     2
-    (pPrint _rhs)
+    (pretty _rhs)
 
 instance Pretty Expr where
-  pPrintPrec lvl prec expr =
+  pretty = prettyPrec 0
+
+instance PrettyPrec Expr where
+  prettyPrec prec expr =
     case expr of
-      Local{_name} -> pPrintPrec lvl prec _name
-      Global{_name} -> "@" <> pPrintPrec lvl prec _name
-      External{_name} -> "$" <> pPrintPrec lvl prec _name
-      Pack{ _tag, _arity } -> "Pack" <> braces (int _tag <> comma <> int _arity)
-      Num{ _int } -> int _int
+      Local{_name} -> pretty _name
+      Global{_name} -> "@" <> pretty _name
+      External{_name} -> "$" <> pretty _name
+      Pack{ _tag, _arity } -> "Pack" <> braces (pretty _tag <> "," <> pretty _arity)
+      Num{ _int } -> pretty _int
       Ap{ _fun, _args } ->
-        maybeParens lvl (prec > 0) $ hsep $
-          pPrintPrec lvl 1 _fun : map (pPrintPrec lvl 1) _args
+        maybeParens (prec > 0) $ hsep $
+          prettyPrec 1 _fun : map (prettyPrec 1) _args
       Let{ _isrec, _defns, _body } ->
         case _defns of
           [] -> bug "empty let"
@@ -87,29 +87,31 @@ instance Pretty Expr where
             in  vcat
                 [ sep
                   [ vcat $
-                    (let_ <+> pPrintPrec lvl 0 defn0) :
-                    map (\defn -> "and" <+> pPrintPrec lvl 0 defn) defns
+                    (let_ <+> pretty defn0) :
+                    map (\defn -> "and" <+> pretty defn) defns
                   , "in"
                   ]
-                , pPrintPrec lvl 0 _body
+                , prettyPrec 0 _body
                 ]
       Match { _expr, _altns } ->
-        maybeParens lvl (prec > 0) $ vcat $
-        ("match" <+> pPrintPrec lvl 0 _expr <+> "with") :
-        zipWith pPrintAltn [0..] _altns
+        maybeParens (prec > 0) $ vcat $
+        ("match" <+> prettyPrec 0 _expr <+> "with") :
+        zipWith prettyAltn [0..] _altns
 
 instance Pretty Defn where
-  pPrintPrec lvl _ MkDefn{_lhs, _rhs} =
-    hang (pPrintPrec lvl 0 _lhs <+> equals) 2 (pPrintPrec lvl 0 _rhs)
+  pretty MkDefn{_lhs, _rhs} = hang (pretty _lhs <+> "=") 2 (pretty _rhs)
 
 instance Pretty TopLevel where
-  pPrintPrec lvl _ top = case top of
+  pretty top = case top of
     Def{_name, _binds, _body} -> hang
       (hsep [ "let"
-            , pPrintPrec lvl 0 _name
-            , hsep (map pPrintBind _binds)
-            , equals
+            , pretty _name
+            , hsep (map prettyBind _binds)
+            , "="
             ])
       2
-      (pPrintPrec lvl 0 _body)
-    Asm{_name} -> "asm" <+> pPrintPrec lvl 0 _name
+      (prettyPrec 0 _body)
+    Asm{_name} -> "asm" <+> pretty _name
+
+instance Show Name where
+  show (MkName x) = x

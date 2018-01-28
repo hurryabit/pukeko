@@ -191,13 +191,13 @@ close k = do
       assertFree uref
       sendM (writeSTRef uref (Link Star))
 
-prettyKind :: Bool -> Kind (Open s) -> ST s Doc
+prettyKind :: Bool -> Kind (Open s) -> ST s (Doc ann)
 prettyKind prec = \case
-  Star -> pure (text "*")
+  Star -> pure "*"
   Arrow kf kp -> do
     df <- prettyKind True  kf
     dp <- prettyKind False kp
-    pure $ maybeParens prettyNormal prec (df <+> "->" <+> dp)
+    pure $ maybeParens prec (df <+> "->" <+> dp)
   UVar uref -> do
     uvar <- readSTRef uref
     case uvar of

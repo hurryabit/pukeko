@@ -66,8 +66,8 @@ typeOf = \case
       TUni qvs t1 ->
         case Vec.matchNonEmpty qvs ts1 of
           Nothing -> throwHere
-            ("expected" <+> int (length qvs) <+> "type arguments, but found"
-             <+> int (length ts1) <+> "type arguments")
+            ("expected" <+> pretty (length qvs) <+> "type arguments, but found"
+             <+> pretty (length ts1) <+> "type arguments")
           Just ts2 -> do
             Vec.zipWithM_ satisfiesCstrs ts2 qvs
             pure (t1 >>= scope TVar (ts2 Vec.!))
@@ -140,8 +140,8 @@ patnEnvLevel p t0 = case p of
       ("expected pattern of type" <+> pretty t0
        <> ", but found pattern of type" <+> pretty t1)
     unless (length flds1 == length ps) $ throwHere
-      ("expected" <+> int (length flds1) <+> "pattern arguments of" <+> pretty dcon
-       <> ", but found" <+> int (length ps) <+> "pattern arguments")
+      ("expected" <+> pretty (length flds1) <+> "pattern arguments of" <+> pretty dcon
+       <> ", but found" <+> pretty (length ps) <+> "pattern arguments")
     Vec.withList ts1 $ \ts2 -> do
       let fldsProxy :: [Type (TFinScope n tv)] -> Proxy n
           fldsProxy _ = Proxy
@@ -179,5 +179,5 @@ checkDecl = \case
       t1 <- withQVars qvs (withBinds bs (typeOf e0))
       let t2 = fmap _bind2type bs *~> t1
       match (mkTUni qvs t0) (mkTUni qvs t2)
-    `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> colon $$ e)
+    `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)
   DPrim _ -> pure ()

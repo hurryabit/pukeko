@@ -7,8 +7,6 @@ import Options.Applicative
 import System.FilePath ((-<.>))
 import System.Exit
 
-import Pukeko.Pretty
-
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
@@ -25,14 +23,14 @@ compile write_pl stop_tc unsafe file = do
     if stop_tc
       then do
         sendM $ writeFile (file -<.> "ti")
-          (render (pPrintPrec prettyNormal 0 module_sf) ++ "\n")
+          (render (pretty module_sf) ++ "\n")
       else do
         (module_pl, module_lm) <- unlift (MiddleEnd.run unsafe module_sf)
         nasm <- unlift (BackEnd.run module_lm)
         sendM $ do
           when write_pl $ do
             writeFile (file -<.> "pl") $
-              render (pPrintPrec prettyNormal 0 module_pl) ++ "\n"
+              render (pretty module_pl) ++ "\n"
           writeFile (file -<.> "asm") nasm
   case ok_or_error of
     Left error -> do

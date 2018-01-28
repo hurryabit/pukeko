@@ -5,11 +5,10 @@ module Pukeko.Prelude
 
   , Doc
   , Pretty (..)
+  , PrettyPrec (..)
   , (<+>)
-  , pretty
-  , prettyShow
-  , shown
-  , text
+  -- , shown
+  -- , text
   , render
 
   , local'
@@ -83,28 +82,29 @@ import Data.Finite           as X (Finite)
 import Data.Vector.Sized     as X (Vector)
 
 import           Data.Functor.Compose           (Compose (..))
-import qualified Text.PrettyPrint.HughesPJClass as PP
-import           Text.PrettyPrint.HughesPJClass ( Doc, Pretty (..)
-                                                , colon, prettyShow, text, render
-                                                )
+import qualified Text.PrettyPrint.Annotated     as PP
+import           Text.PrettyPrint.Annotated     (Doc, render)
 import           Text.Megaparsec.Pos            (SourcePos, initialPos, sourcePosPretty)
 
-type Failure = Doc
+type Failure = Doc ()
 
 throwFailure :: (Member (Error Failure) effs) => Failure -> Eff effs a
 throwFailure = throwError
 
 infixr 6 <+>
 
-(<+>) :: Doc -> Doc -> Doc
+(<+>) :: Doc ann -> Doc ann -> Doc ann
 (<+>) = (PP.<+>)
 {-# INLINE (<+>) #-}
 
-pretty :: Pretty a => a -> Doc
-pretty = pPrint
+class Pretty a where
+  pretty :: a -> Doc ann
 
-shown :: (Show a) => a -> Doc
-shown = text . show
+class Pretty a => PrettyPrec a where
+  prettyPrec :: Int -> a -> Doc ann
+
+-- shown :: (Show a) => a -> Doc
+-- shown = text . show
 
 noPos :: SourcePos
 noPos = initialPos ""
@@ -124,7 +124,7 @@ instance (Applicative f) => Where (Compose ((->) SourcePos) f) where
 throwHere :: (Members [Reader SourcePos, Error Failure] effs) => Failure -> Eff effs a
 throwHere msg = do
   pos <- where_
-  throwFailure (pretty pos <> colon <+> msg)
+  throwFailure (pretty pos <> ":" <+> msg)
 
 type WhereLens s t a b =
   forall f. (Functor f, Where f) => (a -> f b) -> s -> f t
@@ -157,8 +157,20 @@ bugWith msg x = bug (msg ++ " (" ++ show x ++ ")")
 local' :: (r1 -> r2) -> Eff (Reader r2 : effs) a -> Eff (Reader r1 : effs) a
 local' f = reinterpret (\Ask -> asks f)
 
+instance Pretty String where
+  pretty = PP.text
+
+instance Pretty Int where
+  pretty = PP.int
+
+instance Pretty Void where
+  pretty = absurd
+
 instance Pretty SourcePos where
-  pPrintPrec _ _ = text . sourcePosPretty
+  pretty = pretty . sourcePosPretty
 
 instance Pretty a => Pretty (Lctd a) where
-  pPrintPrec lvl prec = pPrintPrec lvl prec . unlctd
+  pretty = pretty . unlctd
+
+instance PrettyPrec a => PrettyPrec (Lctd a) where
+  prettyPrec prec = prettyPrec prec . unlctd

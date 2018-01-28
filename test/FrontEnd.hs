@@ -89,6 +89,6 @@ main = do
   let prelFile = "std/prelude.pu"
       testFile = "frontend.pu"
   cont <- lines <$> readFile testFile
-  prelude <- runM $ interpretM (\(Error msg) -> fail (render msg))
+  prelude <- runM $ interpretM (\(Error (msg :: Failure)) -> fail (render msg))
     (Parser.parsePackage prelFile)
   either (fail . show) hspec $ runParser spec prelude testFile cont

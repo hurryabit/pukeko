@@ -31,7 +31,7 @@ import           Pukeko.FrontEnd.Parser.Build (build)
 
 parseInput :: (Member (Error Failure) effs) => FilePath -> String -> Eff effs Module
 parseInput file =
-  either (throwFailure . text . parseErrorPretty) pure .
+  either (throwFailure . pretty . parseErrorPretty) pure .
   parse (module_ file <* eof) file
 
 parseModule ::

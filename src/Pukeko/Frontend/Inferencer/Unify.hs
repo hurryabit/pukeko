@@ -66,7 +66,7 @@ unify t1 t2 = do
     (UVar uref1, _) -> do
       (v1, _) <- readUnwound uref1
       occursCheck uref1 t2 `catchError` \(_ :: Failure) -> do
-        p2 <- sendM $ prettyUType prettyNormal 0 t2
+        p2 <- sendM $ prettyUType 0 t2
         throwHere (quotes (pretty v1) <+> "occurs in" <+> p2)
       sendM $ writeSTRef uref1 (ULink t2)
     (_, UVar _) -> unify t2 t1
@@ -77,6 +77,6 @@ unify t1 t2 = do
       | tcon1 == tcon2 -> pure ()
     (UTApp tf1 tp1, UTApp tf2 tp2) -> unify tf1 tf2 *> unify tp1 tp2
     _ -> do
-      p1 <- sendM $ prettyUType prettyNormal 0 t1
-      p2 <- sendM $ prettyUType prettyNormal 0 t2
+      p1 <- sendM $ prettyUType 0 t1
+      p2 <- sendM $ prettyUType 0 t2
       throwHere ("mismatching types" <+> p1 <+> "and" <+> p2)

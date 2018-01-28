@@ -1,38 +1,38 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Pukeko.Pretty
-  ( (<+>)
-  , pretty
-  , prettyPrint
-  , hsep
+  ( hsep
   , hsepMap
   , maybeParens
-  , pattern High
-  , module Text.PrettyPrint.HughesPJClass
+
+  , (<+>)
+  , ($$)
+  , ($+$)
+  , braces
+  , doubleQuotes
+  , hang
+  , isEmpty
+  , nest
+  , parens
+  , punctuate
+  , quotes
+  , sep
+  , vcat
   )
   where
 
 import Pukeko.Prelude
 
-import           Text.PrettyPrint.HughesPJClass hiding ( (<>), (<+>)
-                                                       , empty, hsep, first, maybeParens
-                                                       )
-import qualified Text.PrettyPrint.HughesPJClass as PP
+import qualified Text.PrettyPrint.Annotated as PP
+import           Text.PrettyPrint.Annotated hiding ((<+>), hsep)
 
-hsep :: (Foldable t) => t Doc -> Doc
+hsep :: (Foldable t) => t (Doc ann) -> Doc ann
 hsep = PP.hsep . toList
 
-hsepMap :: (Foldable t) => (a -> Doc) -> t a -> Doc
+hsepMap :: (Foldable t) => (a -> Doc ann) -> t a -> Doc ann
 hsepMap f = PP.hsep . map f . toList
 
-pattern High :: PrettyLevel
-pattern High = PrettyLevel 100
-
-maybeParens :: PrettyLevel -> Bool -> Doc -> Doc
-maybeParens lvl cond = PP.maybeParens (cond || lvl >= High)
-
-prettyPrint :: Pretty a => a -> IO ()
-prettyPrint = print . pPrint
-
-instance Pretty Void where
-  pPrintPrec _ _ = absurd
+maybeParens :: Bool -> Doc ann -> Doc ann
+maybeParens = \case
+  False -> id
+  True  -> parens

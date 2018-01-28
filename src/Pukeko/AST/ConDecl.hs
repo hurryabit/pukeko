@@ -53,22 +53,22 @@ typeOfDConDecl (MkTConDecl tname prms _) (MkDConDecl tcon dname _ flds)
         Nothing -> bug "type and data constructor have different arity" (tname, dname)
 
 instance Pretty (TConDecl n) where
-  pPrintPrec lvl _ (MkTConDecl tname prms dcons)
+  pretty (MkTConDecl tname prms dcons)
     | null dcons =
-        pPrintPrec lvl 0 tname <+> hsepMap (pPrintPrec lvl 0) prms
+        pretty tname <+> hsepMap pretty prms
     | otherwise  =
-        pPrintPrec lvl 0 tname <+> hsepMap (pPrintPrec lvl 0) prms <+> equals $$
-        nest 2 (vcat (map (pPrintPrec lvl 0) dcons))
+        pretty tname <+> hsepMap pretty prms <+> "=" $$
+        nest 2 (vcat (map pretty dcons))
 
 instance Pretty (DConDecl n) where
-  pPrintPrec lvl _ (MkDConDecl _ dname _ flds) =
-    "|" <+> pPrintPrec lvl 0 dname <+> hsepMap (pPrintPrec lvl 3) flds
+  pretty (MkDConDecl _ dname _ flds) =
+    "|" <+> pretty dname <+> hsepMap (prettyPrec 3) flds
 
 instance Pretty (Some1 TConDecl) where
-  pPrintPrec lvl prec (Some1 tcon) = pPrintPrec lvl prec tcon
+  pretty (Some1 tcon) = pretty tcon
 
 instance Pretty (Some1 DConDecl) where
-  pPrintPrec lvl prec (Some1 dcon) = pPrintPrec lvl prec dcon
+  pretty (Some1 dcon) = pretty dcon
 
 instance Show (Some1 TConDecl) where
   show (Some1 tcon) = show tcon

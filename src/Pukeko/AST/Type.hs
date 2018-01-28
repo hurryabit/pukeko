@@ -161,29 +161,32 @@ instance Monad Type where
     TUni xs tq -> TUni xs (tq >>>= f)
 
 instance BaseTVar tv => Pretty (Type tv) where
-  pPrintPrec lvl prec = \case
+  pretty = prettyPrec 0
+
+instance BaseTVar tv => PrettyPrec (Type tv) where
+  prettyPrec prec = \case
     TVar x -> pretty (baseTVar x)
     TArr   -> "(->)"
     TCon c -> pretty c
     TFun tx ty ->
-      maybeParens lvl (prec > 1) (pPrintPrec lvl 2 tx <+> "->" <+> pPrintPrec lvl 1 ty)
+      maybeParens (prec > 1) (prettyPrec 2 tx <+> "->" <+> prettyPrec 1 ty)
     TApp tf tx ->
-      maybeParens lvl (prec > 2) (pPrintPrec lvl 2 tf <+> pPrintPrec lvl 3 tx)
-    TUni qvs tq -> prettyTUni lvl prec qvs (pPrintPrec lvl 0 tq)
+      maybeParens (prec > 2) (prettyPrec 2 tf <+> prettyPrec 3 tx)
+    TUni qvs tq -> prettyTUni prec qvs (prettyPrec 0 tq)
 
-prettyTypeCstr :: Foldable t => t QVar -> Doc
+prettyTypeCstr :: Foldable t => t QVar -> Doc ann
 prettyTypeCstr qvs
   | null qs   = mempty
   | otherwise = parens (hsep (punctuate "," qs)) <+> "=>"
   where
     qs = [ pretty c <+> pretty v | MkQVar q v <- toList qvs, c <- toList q ]
 
-prettyTUni :: Foldable t => PrettyLevel -> Rational -> t QVar -> Doc -> Doc
-prettyTUni lvl prec qvs tq =
-  maybeParens lvl (prec > 0)
+prettyTUni :: Foldable t => Int -> t QVar -> Doc ann -> Doc ann
+prettyTUni prec qvs tq =
+  maybeParens (prec > 0)
   ("∀" <> hsepMap (pretty . _qvar2tvar) qvs <> "." <+> prettyTypeCstr qvs <+> tq)
 
-prettyQVar :: QVar -> Doc
+prettyQVar :: QVar -> Doc ann
 prettyQVar (MkQVar q v)
   | null q    = pretty v
   | otherwise = parens (pretty v <+> "|" <+> hsepMap pretty q)

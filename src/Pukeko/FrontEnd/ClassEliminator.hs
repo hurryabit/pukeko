@@ -203,16 +203,16 @@ unclssDecl = \case
 
 -- TODO: Make this less hacky.
 clssTCon :: Id.Clss -> Id.TCon
-clssTCon clss = Id.tcon ("Dict$" ++ show clss)
+clssTCon clss = Id.tcon ("Dict$" ++ Id.name clss)
 
 clssDCon :: Id.Clss -> Id.DCon
-clssDCon clss = Id.dcon ("Dict$" ++ show clss)
+clssDCon clss = Id.dcon ("Dict$" ++ Id.name clss)
 
 mkTDict :: Id.Clss -> Type tv -> Type tv
 mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 
-dictEVar :: (Show tcon) => Id.Clss -> tcon -> Id.EVar
-dictEVar clss tcon = Id.evar ("dict$" ++ show clss ++ "$" ++ show tcon)
+dictEVar :: (Id.Named t) => Id.Clss -> t -> Id.EVar
+dictEVar clss tcon = Id.evar ("dict$" ++ Id.name clss ++ "$" ++ Id.name tcon)
 
 instDictInfo :: InstDecl st -> (Id.EVar, Type Void)
 instDictInfo (MkInstDecl clss tcon qvs _) =

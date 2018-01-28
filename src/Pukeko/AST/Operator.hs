@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 
 data Assoc = AssocLeft | AssocRight | AssocNone
 
-data Spec = MkSpec{ _sym :: String, _prec :: Rational, _assoc :: Assoc }
+data Spec = MkSpec{ _sym :: String, _prec :: Int, _assoc :: Assoc }
 
 mangleTable :: Map Char Char
 mangleTable = Map.fromList
@@ -50,8 +50,8 @@ table = fixPrecs
   , [right "*", none "/", none "%"]
   ]
 
-aprec :: Rational
-aprec = fromIntegral (length table + 1)
+aprec :: Int
+aprec = length table + 1
 
 fixPrecs :: [[Spec]] -> [[Spec]]
 fixPrecs = zipWith (\prec -> map (\spec -> spec { _prec = prec })) [1 ..]
