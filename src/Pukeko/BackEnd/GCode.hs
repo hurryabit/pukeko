@@ -47,9 +47,14 @@ data GInst lab
   | NEQ
   | GEQ
   | GTR
+  -- Character conversion
+  | CHR
+  | ORD
   -- I/O
   | PRINT
   | INPUT
+  | PUTC
+  | GETC
   -- Jumps
   | JUMP        lab
   | JUMPZERO    lab

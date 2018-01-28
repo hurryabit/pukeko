@@ -36,16 +36,24 @@ globalTable :: Map Name Global
 globalTable =
   Map.fromList $
   map (\global@MkGlobal{_name} -> (_name, global)) $
-  neg : map fst binops ++ [return_, print_, input, bind, abort]
+  map fst (unops ++ binops) ++ io ++ [abort]
 
 -- TODO: Produce more efficient code in Redex mode.
-neg :: Global
-neg = mkBuiltin "neg" 1
-  [ EVAL
-  , NEG
-  , UPDATE 1
-  , RETURN
+unops :: [(Global, Inst)]
+unops =
+  [ mk "neg" NEG
+  , mk "chr" CHR
+  , mk "ord" ORD
   ]
+  where
+    mk name inst =
+      let global = mkBuiltin name 1
+            [ EVAL
+            , inst
+            , UPDATE 1
+            , RETURN
+            ]
+      in  (global, inst)
 
 binops :: [(Global, Inst)]
 binops =
@@ -82,37 +90,53 @@ constructor tag arity = mkBuiltinGen (constructorName tag arity) arity
   , RETURN
   ]
 
-return_, print_, input, bind :: Global
-return_ = mkBuiltin "return" 2
-  [ CONS 0 2
-  , UPDATE 1
-  , RETURN
-  ]
-print_ = mkBuiltin "print" 2
-  [ EVAL
-  , PRINT
-  , CONS 0 0 -- unit
-  , CONS 0 2 -- pair
-  , UPDATE 1
-  , RETURN
-  ]
-input = mkBuiltin "input" 1
-  [ INPUT
-  , CONS 0 2 -- pair
-  , UPDATE 1
-  , RETURN
-  ]
-bind = mkBuiltin "bind" 3
-  [ PUSH 2
-  , PUSH 1
-  , MKAP 1
-  , EVAL
-  , UNCONS 2
-  , PUSH 3
-  , MKAP 2
-  , UPDATE 4
-  , POP 3
-  , UNWIND
+io :: [Global]
+io =
+  [ mkBuiltin "return" 2
+    [ CONS 0 2
+    , UPDATE 1
+    , RETURN
+    ]
+  , mkBuiltin "bind" 3
+    [ PUSH 2
+    , PUSH 1
+    , MKAP 1
+    , EVAL
+    , UNCONS 2
+    , PUSH 3
+    , MKAP 2
+    , UPDATE 4
+    , POP 3
+    , UNWIND
+    ]
+  , mkBuiltin "print" 2
+    [ EVAL
+    , PRINT
+    , CONS 0 0 -- unit
+    , CONS 0 2 -- pair
+    , UPDATE 1
+    , RETURN
+    ]
+  , mkBuiltin "input" 1
+    [ INPUT
+    , CONS 0 2 -- pair
+    , UPDATE 1
+    , RETURN
+    ]
+  , mkBuiltin "putc" 2
+    [ EVAL
+    , PUTC
+    , CONS 0 0 -- unit
+    , CONS 0 2 -- pair
+    , UPDATE 1
+    , RETURN
+    ]
+  , mkBuiltin "getc" 1
+    [ GETC
+    , CONS 0 2 -- pair
+    , UPDATE 1
+    , RETURN
+    ]
   ]
 
 abort :: Global
@@ -121,7 +145,7 @@ abort = mkBuiltin "abort" 0 [ABORT]
 inlineTable :: Map Name (Inst, Int)
 inlineTable =
   Map.fromList $
-  map (\(MkGlobal{_name, _arity}, inst) -> (_name, (inst, _arity))) binops
+  map (\(MkGlobal{_name, _arity}, inst) -> (_name, (inst, _arity))) (unops ++ binops)
 
 findInline :: Name -> Maybe (Inst, Int)
 findInline name = Map.lookup (externalName name) inlineTable

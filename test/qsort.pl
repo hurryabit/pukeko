@@ -62,6 +62,7 @@ dict$Ring$Int : Dict$Ring Int =
   and (*) : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg (+) (-) (*)
+type Char
 type Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
 foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =

@@ -1,4 +1,5 @@
 -- The IO monad
+import std2/char
 import std2/int
 import std2/monad
 
@@ -20,3 +21,15 @@ external print = "print"
 
 input : IO Int
 external input = "input"
+
+putChar : Char -> IO Unit
+external putChar = "putc"
+
+getCharRaw : IO Int
+external getCharRaw = "getc"
+
+getChar : IO (Option Char)
+getChar =
+  getCharRaw
+  >>= fun n ->
+  pure (if n < 0 then None else Some (chr n))

@@ -84,7 +84,11 @@ assembleInst arities inst = do
     NEQ -> code "neq" []
     GEQ -> code "geq" []
     GTR -> code "gtr" []
+    CHR -> code "chr" []
+    ORD -> code "ord" []
     PRINT -> code "print" []
     INPUT -> code "input" []
+    PUTC -> code "putc" []
+    GETC -> code "getc" []
     ABORT -> code "abort" []
     EXIT -> throwFailure "forbidden instruction 'EXIT'"

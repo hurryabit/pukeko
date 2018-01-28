@@ -15,50 +15,13 @@ type Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
 type Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
-(<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
-  fun @a ->
-    fun (dict : Dict$Ord a) ->
-      match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (<=)
 type Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 type Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
-(-) : ∀a. Dict$Ring a -> a -> a -> a =
-  fun @a ->
-    fun (dict : Dict$Ring a) ->
-      match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (-)
-(*) : ∀a. Dict$Ring a -> a -> a -> a =
-  fun @a ->
-    fun (dict : Dict$Ring a) ->
-      match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (*)
 type Int
-external lt_int : Int -> Int -> Bool = "lt"
-external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-dict$Ord$Int : Dict$Ord Int =
-  let (<) : Int -> Int -> Bool = lt_int
-  and (<=) : Int -> Int -> Bool = le_int
-  and (>=) : Int -> Int -> Bool = ge_int
-  and (>) : Int -> Int -> Bool = gt_int
-  in
-  Dict$Ord @Int (<) (<=) (>=) (>)
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
-external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
-dict$Ring$Int : Dict$Ring Int =
-  let neg : Int -> Int = neg_int
-  and (+) : Int -> Int -> Int = add_int
-  and (-) : Int -> Int -> Int = sub_int
-  and (*) : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg (+) (-) (*)
-external (%) : Int -> Int -> Int = "mod"
 type Char
+external chr : Int -> Char = "chr"
 type Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
 foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
@@ -97,16 +60,6 @@ dict$Foldable$List : Dict$Foldable List =
         fun @a @b -> dict$Foldable$List$ll2 @a @b
   in
   Dict$Foldable @List foldr foldl
-take : ∀a. Int -> List a -> List a =
-  fun @a ->
-    fun (n : Int) (xs : List a) ->
-      match (<=) @Int dict$Ord$Int n 0 with
-      | False ->
-        match xs with
-        | Nil @a -> Nil @a
-        | Cons @a x xs ->
-          Cons @a x (take @a ((-) @Int dict$Ring$Int n 1) xs)
-      | True -> Nil @a
 type Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
@@ -142,13 +95,9 @@ dict$Monad$IO : Dict$Monad IO =
         fun @a @b -> bind_io @a @b
   in
   Dict$Monad @IO pure (>>=)
-external print : Int -> IO Unit = "print"
-external input : IO Int = "input"
-gen : ∀a. (a -> a) -> a -> List a =
-  fun @a -> fun (f : a -> a) (x : a) -> Cons @a x (gen @a f (f x))
-main$ll1 : Int -> Int =
-  fun (x : Int) -> (%) ((*) @Int dict$Ring$Int 91 x) 1000000007
-main$ll2 : Int -> IO Unit =
-  fun (n : Int) ->
-    (;) @Unit @IO dict$Monad$IO (print n) (traverse_ @Int @IO @List dict$Monad$IO dict$Foldable$List print (take @Int n (gen @Int main$ll1 1)))
-main : IO Unit = (>>=) @IO dict$Monad$IO @Int @Unit input main$ll2
+external putChar : Char -> IO Unit = "putc"
+hello : List Int =
+  Cons @Int 72 (Cons @Int 101 (Cons @Int 108 (Cons @Int 108 (Cons @Int 111 (Cons @Int 32 (Cons @Int 87 (Cons @Int 111 (Cons @Int 114 (Cons @Int 108 (Cons @Int 100 (Cons @Int 33 (Cons @Int 10 (Nil @Int)))))))))))))
+main$ll1 : Int -> IO Unit = fun (x : Int) -> putChar (chr x)
+main : IO Unit =
+  traverse_ @Int @IO @List dict$Monad$IO dict$Foldable$List main$ll1 hello

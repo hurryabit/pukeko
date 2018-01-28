@@ -86,6 +86,7 @@ dict$Monoid$Int : Dict$Monoid Int =
   and append : Int -> Int -> Int = (+) @Int dict$Ring$Int
   in
   Dict$Monoid @Int empty append
+type Char
 type Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
 foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =

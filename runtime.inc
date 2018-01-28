@@ -2,7 +2,9 @@
 ;; G-Machine runtime
 global _main
 extern _exit
+extern _getchar
 extern _printf
+extern _putchar
 extern _scanf
 extern _gc_init
 extern _gc_collect
@@ -402,6 +404,7 @@ __install__main__:
   @@(8)
   g_claim 2
   pop rax
+  g_assert_int rax
   mov rcx, [rax+8]
   neg rcx
   push rhp
@@ -470,6 +473,23 @@ __install__main__:
 %define g_geq g_relop setge
 %define g_gtr g_relop setg
 
+
+;; Character conversion
+%macro g_chr 0
+  @@(8)
+  g_claim 2
+  pop rax
+  g_assert_int rax
+  mov rcx, [rax+8]
+  and rcx, 0xFF
+  push rhp
+  g_create_int rcx
+%endmacro
+
+%macro g_ord 0
+%endmacro
+
+
 ;; I/O
 %macro g_print 0
   @@(5)
@@ -501,6 +521,26 @@ __install__main__:
   mov  qword rax, TAG_ARITY_SIZE(TAG_INT, 0, 2)
   mov  qword [rhp], rax
   add  rhp, 16
+%endmacro
+
+%macro g_putc 0
+  @@(2)
+  pop  rax
+  g_assert_int rax
+  g_pre_call_c
+  mov  rdi, [rax+8]
+  call _putchar
+  g_post_call_c
+%endmacro
+
+%macro g_getc 0
+  g_claim 2
+  g_pre_call_c
+  call _getchar
+  g_post_call_c
+  movsx rax, eax                 ; getchar returns an int32 and we care about the sign
+  push rhp
+  g_create_int rax
 %endmacro
 
 ;; Jumps
