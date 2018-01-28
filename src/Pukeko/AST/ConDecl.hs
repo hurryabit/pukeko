@@ -58,7 +58,7 @@ instance Pretty (TConDecl n) where
         pretty tname <+> hsepMap pretty prms
     | otherwise  =
         pretty tname <+> hsepMap pretty prms <+> "=" $$
-        nest 2 (vcat (map pretty dcons))
+        nest 2 (vcatMap pretty dcons)
 
 instance Pretty (DConDecl n) where
   pretty (MkDConDecl _ dname _ flds) =

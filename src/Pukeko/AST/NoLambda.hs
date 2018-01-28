@@ -64,8 +64,7 @@ prettyAltn tag MkAltn{_binds, _rhs} = hang
     2
     (pretty _rhs)
 
-instance Pretty Expr where
-  pretty = prettyPrec 0
+instance Pretty Expr
 
 instance PrettyPrec Expr where
   prettyPrec prec expr =
@@ -91,11 +90,11 @@ instance PrettyPrec Expr where
                     map (\defn -> "and" <+> pretty defn) defns
                   , "in"
                   ]
-                , prettyPrec 0 _body
+                , pretty _body
                 ]
       Match { _expr, _altns } ->
         maybeParens (prec > 0) $ vcat $
-        ("match" <+> prettyPrec 0 _expr <+> "with") :
+        ("match" <+> pretty _expr <+> "with") :
         zipWith prettyAltn [0..] _altns
 
 instance Pretty Defn where
@@ -110,7 +109,7 @@ instance Pretty TopLevel where
             , "="
             ])
       2
-      (prettyPrec 0 _body)
+      (pretty _body)
     Asm{_name} -> "asm" <+> pretty _name
 
 instance Show Name where

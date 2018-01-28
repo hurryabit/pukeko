@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module Pukeko.FrontEnd
   ( Module
   , run

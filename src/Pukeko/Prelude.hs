@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Prelude
   ( module X
@@ -99,6 +99,8 @@ infixr 6 <+>
 
 class Pretty a where
   pretty :: a -> Doc ann
+  default pretty :: PrettyPrec a => a -> Doc ann
+  pretty = prettyPrec 0
 
 class Pretty a => PrettyPrec a where
   prettyPrec :: Int -> a -> Doc ann

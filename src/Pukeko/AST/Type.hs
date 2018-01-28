@@ -160,8 +160,7 @@ instance Monad Type where
     TApp tf tp -> TApp (tf >>= f) (tp >>= f)
     TUni xs tq -> TUni xs (tq >>>= f)
 
-instance BaseTVar tv => Pretty (Type tv) where
-  pretty = prettyPrec 0
+instance BaseTVar tv => Pretty (Type tv)
 
 instance BaseTVar tv => PrettyPrec (Type tv) where
   prettyPrec prec = \case
@@ -172,7 +171,7 @@ instance BaseTVar tv => PrettyPrec (Type tv) where
       maybeParens (prec > 1) (prettyPrec 2 tx <+> "->" <+> prettyPrec 1 ty)
     TApp tf tx ->
       maybeParens (prec > 2) (prettyPrec 2 tf <+> prettyPrec 3 tx)
-    TUni qvs tq -> prettyTUni prec qvs (prettyPrec 0 tq)
+    TUni qvs tq -> prettyTUni prec qvs (pretty tq)
 
 prettyTypeCstr :: Foldable t => t QVar -> Doc ann
 prettyTypeCstr qvs

@@ -490,54 +490,50 @@ instance PrettyType Type where
 type PrettyStage st = PrettyType (StageType st)
 
 instance (PrettyStage st) => Pretty (Module st) where
-  pretty (MkModule decls) = vcat (map pretty decls)
+  pretty (MkModule decls) = vcatMap pretty decls
 
 instance (PrettyStage st) => Pretty (Decl st) where
   pretty = \case
     DType (dcon0 :| dcons) ->
-      "type" <+> pretty dcon0 $$
-      vcat (map (\dcon -> "and " <+> pretty dcon) dcons)
-    DSign s -> "val" <+> pretty s
+      "type" <+> pretty dcon0
+      $$ vcatMap (\dcon -> "and " <+> pretty dcon) dcons
+    DSign s -> pretty s
     DClss (MkClssDecl c v ms) ->
-      "class" <+> pretty c <+> pretty v <+> ":" $$ prettyBlock ms
+      "class" <+> pretty c <+> pretty v <+> "where"
+      $$ nest 2 (vcatMap pretty ms)
     DInst (MkInstDecl c t0 qvs ds) ->
-      "instance" <+> pretty c <+> prettyPrec 3 t1 <+> prettyTypeCstr qvs
-      $$ prettyBlock ds
+      "instance" <+> prettyTypeCstr qvs <+> pretty c <+> prettyPrec 3 t1
+      $$ nest 2 (vcatMap pretty ds)
       where
         t1 :: Type (TFinScope _ Void)
         t1 = mkTApp (TCon t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
-    DDefn d -> "let" <+> pretty d
+    DDefn d -> pretty d
     DSupC (MkSupCDecl z qvs t bs e) ->
-      "let" <+>
       hang (pretty z <+> ":" <+> prettyPrecType 0 (mkTUni qvs t) <+> "=") 2
         (prettyETyAbs 0 qvs (prettyELam 0 bs e))
     DPrim (MkPrimDecl b s) ->
       hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
 
-prettyBlock :: (Foldable t, Pretty a) => t a -> Doc ann
-prettyBlock xs = case map pretty (toList xs) of
-  []     -> "{}"
-  d0:ds -> "{" <+> d0 $+$ vcat (map (\d -> "," <+> d) ds) $+$ "}"
-
 instance (BaseTVar tv) => Pretty (SignDecl tv) where
-  pretty (MkSignDecl x t) = pretty x <+> ":" <+> prettyPrec 0 t
+  pretty (MkSignDecl x t) = pretty x <+> ":" <+> pretty t
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) where
   pretty (MkDefn b t) =
-    hang (prettyPrec 0 b <+> "=") 2 (prettyPrec 0 t)
+    hang (pretty b <+> "=") 2 (prettyPrec 0 t)
 
 prettyDefns ::
   (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
   Bool -> Vector n (Lctd (Defn st tv ev)) -> Doc ann
 prettyDefns isrec ds = case toList ds of
     [] -> mempty
-    d0:ds -> vcat ((let_ <+> pretty d0) : map (\d -> "and" <+> pretty d) ds)
+    d0:ds ->
+      let_ <+> pretty d0
+      $$ vcatMap (\d -> "and" <+> pretty d) ds
     where
       let_ | isrec     = "let rec"
            | otherwise = "let"
 
-instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev) where
-  pretty = prettyPrec 0
+instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev)
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev) where
   prettyPrec prec = \case
@@ -559,23 +555,25 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
     --           AssocNone  -> (_prec+1, _prec+1)
     --   in  maybeParens (prec > _prec) $
     --         prettyPrec prec1 _arg1 <> text _sym <> prettyPrec prec2 _arg2
-    ELet ds t -> sep [prettyDefns False ds, "in"] $$ prettyPrec 0 t
-    ERec ds t -> sep [prettyDefns True  ds, "in"] $$ prettyPrec 0 t
+    ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
+    ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
     ELam bs e t -> prettyELamT prec bs e t
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
-    --     [ "if"  <+> prettyPrec 0 _cond <+> "then"
-    --     , nest 2 (prettyPrec 0 _then)
+    --     [ "if"  <+> pretty _cond <+> "then"
+    --     , nest 2 (pretty _then)
     --     , "else"
-    --     , nest 2 (prettyPrec 0 _else)
+    --     , nest 2 (pretty _else)
     --     ]
     EMat t as ->
-      maybeParens (prec > 0) $ vcat
-      $ ("match" <+> prettyPrec 0 t <+> "with") : map pretty (toList as)
+      maybeParens (prec > 0) $
+        "match" <+> pretty t <+> "with"
+        $$ vcatMap pretty as
     ECas t cs ->
-      maybeParens (prec > 0) $ vcat
-      $ ("match" <+> prettyPrec 0 t <+> "with") : map pretty (toList cs)
-    ETyAbs vs e -> prettyETyAbs prec vs (prettyPrec 0 e)
+      maybeParens (prec > 0) $
+        "match" <+> pretty t <+> "with"
+        $$ vcatMap pretty cs
+    ETyAbs vs e -> prettyETyAbs prec vs (pretty e)
     ETyApp e0 ts ->
       maybeParens (prec > Op.aprec)
       $ prettyPrec Op.aprec e0 <+> prettyAtType (prettyPrecType 3) ts
@@ -587,7 +585,7 @@ prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
       maybeParens (prec > 0)
-      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> "->") 2 (prettyPrec 0 e)
+      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> "->") 2 (pretty e)
 
 prettyELamT ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
@@ -597,7 +595,7 @@ prettyELamT prec bs e t
   | null bs   = bug "empty lambda" -- prettyPrec prec e
   | otherwise =
       maybeParens (prec > 0)
-      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (prettyPrec 0 e)
+      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (pretty e)
 
 prettyETyAbs :: Int -> Vector m QVar -> Doc ann -> Doc ann
 prettyETyAbs prec qvs d
@@ -609,8 +607,7 @@ prettyETyAbs prec qvs d
 prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
-instance (BaseTVar tv, PrettyType ty) => Pretty (Bind ty tv) where
-  pretty = prettyPrec 0
+instance (BaseTVar tv, PrettyType ty) => Pretty (Bind ty tv)
 
 instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Bind ty tv) where
   prettyPrec prec (MkBind z t)
@@ -628,14 +625,12 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) wh
         <+> prettyAtType (prettyPrecType 3) ts
         <+> hsepMap pretty bs <+> "->"
       )
-      2 (prettyPrec 0 e)
+      2 (pretty e)
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
-  pretty (MkAltn p t) =
-    hang ("|" <+> prettyPrec 0 p <+> "->") 2 (prettyPrec 0 t)
+  pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)
 
-instance (BaseTVar tv, PrettyType ty) => Pretty (Patn ty tv) where
-  pretty = prettyPrec 0
+instance (BaseTVar tv, PrettyType ty) => Pretty (Patn ty tv)
 
 instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Patn ty tv) where
   prettyPrec prec = \case
