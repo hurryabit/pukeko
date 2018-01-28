@@ -21,8 +21,8 @@
 typedef struct heap_cell {
   uint8_t tag;
   uint8_t arity;
-  uint8_t size;
-  uint8_t unused[5];
+  uint16_t unused;
+  uint32_t size;
   struct heap_cell* data[0];
 } heap_cell;
 

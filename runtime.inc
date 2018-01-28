@@ -25,6 +25,16 @@ default rel
 
 %define CAF_SIZE 3
 
+%define TAG_ARITY_SIZE(tag, arity, size) tag | (arity << 8) | (size << 32)
+
+;; HEADER LAYOUT (little endian):
+;;
+;; +--------+--------+--------+--------+--------+--------+--------+--------+
+;; |        |        |        |        |        |        |        |        |
+;; |  TAG   | ARITY  |  ----  |  ----  |  SIZE  |  SIZE  |  SIZE  |  SIZE  |
+;; |        |        |        |        |        |        |        |        |
+;; +--------+--------+--------+--------+--------+--------+--------+--------+
+
 ;; Stats stuff
 %define step_ctr r14
 %define claim_ctr r15
@@ -108,8 +118,6 @@ default rel
 %endmacro
 
 ;; Heap operations
-%define TAG_ARITY_SIZE(tag, arity, size) tag | (arity << 8) | (size << 16)
-
 %macro g_claim 1
   @@(4)
   inc  claim_ctr
@@ -121,28 +129,33 @@ default rel
   %%ok:
 %endmacro
 
-%macro g_create 1-*
+;; TODO: do 'push rhp' here
+%macro g_create 0-*             ; expects TAG_ARITY_SIZE(...) in rbx
   @@(3*%0+1)
-%assign idx 0
+  mov  qword [rhp], rbx
+%assign idx 1
 %rep %0
   mov  qword [rhp+8*idx], %1
 %assign idx idx+1
 %rotate 1
 %endrep
-  add  rhp, 8*%0
+  add  rhp, 8*(%0+1)
 %endmacro
 
-%macro g_create_int 1
-  g_create TAG_ARITY_SIZE(TAG_INT, 0, 2), %1
+%macro g_create_int 1           ; %1 must not be rbx
+  @@(1)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_INT, 0, 2)
+  g_create %1
 %endmacro
 
 ;; TODO: make this faster
 %macro g_alloc 1
-  @@(3*%1)
+  @@(4*%1)
   g_claim 3*%1
 %rep %1
   push rhp
-  g_create TAG_ARITY_SIZE(TAG_NIX, 0, 2), 0, 0
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_NIX, 0, 2)
+  g_create 0, 0
 %endrep
 %endmacro
 
@@ -264,11 +277,12 @@ __install__main__:
   %if %2 = 0
     g_pushcaf %1
   %else
-    @@(4)
+    @@(5)
     g_claim 2
     lea  rax, [%1]
     push rhp
-    g_create TAG_ARITY_SIZE(TAG_FUN, %2, 2), rax
+    mov  qword rbx, TAG_ARITY_SIZE(TAG_FUN, %2, 2)
+    g_create rax
   %endif
 %endmacro
 
@@ -276,13 +290,15 @@ __install__main__:
 %if %1 = 0
 %fatal "g_mkap 0 is invalid"
 %else
-  @@(10*%1+3)
+  @@(11*%1+4)
   g_claim 3*%1
-  mov  qword [rhp], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword rax, TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rhp], rax
   pop  qword [rhp+ 8]
   pop  qword [rhp+16]
 %rep %1 - 1
-  mov  qword [rhp+24], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword rax, TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rhp+24], rax
   mov  qword [rhp+32], rhp
   pop  qword [rhp+40]
   add  rhp, 24
@@ -296,25 +312,29 @@ __install__main__:
 %if %1 = 0 || %2 = 0
 %fatal "g_updap %1, %2 is invalid"
 %elif %1 = 1
-  @@(11)
+  @@(12)
   mov  rax, [rsp+8*(%2+1)]
-  mov  qword [rax], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rax   ], rbx
   pop  qword [rax+ 8]
   pop  qword [rax+16]
 %else
-  @@(10*%1+1)
+  @@(11*%1+3)
   g_claim 3*(%1-1)
-  mov  qword [rhp], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rhp   ], rbx
   pop  qword [rhp+ 8]
   pop  qword [rhp+16]
 %rep %1 - 2
-  mov  qword [rhp+24], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rhp+24], rbx
   mov  qword [rhp+32], rhp
   pop  qword [rhp+40]
   add  rhp, 24
 %endrep
   mov  rax, [rsp+8*%2]
-  mov  qword [rax   ], TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_APP, 0, 3)
+  mov  qword [rax   ], rbx
   mov  qword [rax+ 8], rhp
   pop  qword [rax+16]
   add  rhp, 24
@@ -322,14 +342,15 @@ __install__main__:
 %endmacro
 
 %macro g_cons 2                 ; %1 = tag, %2 = arity
-  @@(3+%2*3+4)
+  @@(4+3*%2+4)
 %if %2 = 0
 %assign size 2
 %else
 %assign size 1+%2
 %endif
   g_claim size
-  mov  qword [rhp], TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
+  mov  qword rax, TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
+  mov  qword [rhp], rax
 %assign idx 0
 %rep %2
 %assign idx idx+1
@@ -351,8 +372,10 @@ __install__main__:
 %else
 %assign size 1+%2
 %endif
+  @@(6+3*%2)
   mov  rax, [rsp+8*(%2+%3-1)]
-  mov  qword [rax], TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_CON + %1, %2, size)
+  mov  qword [rax], rbx
 %assign idx 0
 %rep %2
 %assign idx idx+1
@@ -422,7 +445,7 @@ __install__main__:
 
 ;; Comparison relations
 %macro g_relop 1                ; %1 is some setCC instruction
-  @@(19)
+  @@(20)
   g_claim 2
   pop  rax
   g_assert_int rax
@@ -433,7 +456,8 @@ __install__main__:
   mov  rax, 0
   cmp  rbx, rcx
   %1   al
-  add  rax, TAG_ARITY_SIZE(TAG_CON, 0, 2)
+  mov  qword rbx, TAG_ARITY_SIZE(TAG_CON, 0, 2)
+  add  rax, rbx
   push rhp
   mov  [rhp], rax
   add  rhp, 16
@@ -472,9 +496,10 @@ __install__main__:
   je   %%ok
   g_fail MSG_BAD_INPUT
 %%ok:
-  @@(6)
+  @@(7)
   push rhp
-  mov  qword [rhp], TAG_ARITY_SIZE(TAG_INT, 0, 2)
+  mov  qword rax, TAG_ARITY_SIZE(TAG_INT, 0, 2)
+  mov  qword [rhp], rax
   add  rhp, 16
 %endmacro
 
