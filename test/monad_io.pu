@@ -1,13 +1,10 @@
-import std/io
-
-when : Bool -> IO Unit -> IO Unit
-when p m = if p then m else return Unit
+import std2/io
 
 count_down : Int -> IO Unit
 count_down k = when (k >= 0) (print k; count_down (k-1))
 
-repeat_m : Int -> IO Unit -> IO Unit
-repeat_m k m = when (k > 0) (m; repeat_m (k-1) m)
+repeat : (Monad m) => Int -> m Unit -> m Unit
+repeat k m = when (k > 0) (m; repeat (k-1) m)
 
 main : IO Unit
 main =
@@ -15,4 +12,4 @@ main =
   >>= fun k ->
   input
   >>= fun n ->
-  repeat_m k (count_down n)
+  repeat k (count_down n)

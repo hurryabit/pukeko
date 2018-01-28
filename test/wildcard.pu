@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 fst : Pair a b -> a
 fst p =

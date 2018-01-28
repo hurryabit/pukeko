@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 qsort : List Int -> List Int
 qsort xs =
@@ -12,6 +12,6 @@ main : IO Unit
 main =
   input
   >>= fun n ->
-  sequence_io (replicate n input)
+  sequence (replicate n input)
   >>= fun xs ->
-  iter_io print (qsort xs)
+  traverse_ print (qsort xs)

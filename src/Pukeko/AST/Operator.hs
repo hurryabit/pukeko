@@ -20,7 +20,7 @@ mangleTable :: Map Char Char
 mangleTable = Map.fromList
   [ ('+', 'p'), ('-', 'm'), ('*', 't'), ('/', 'd'), ('%', 'r')
   , ('=', 'e'), ('<', 'l'), ('>', 'g'), ('!', 'n')
-  , ('&', 'a'), ('|', 'o'), (';', 's'), (':', 'c')
+  , ('&', 'a'), ('|', 'o'), (';', 's'), (':', 'c'), ('∘', 'u')
   ]
 
 mangle :: String -> Maybe String
@@ -48,6 +48,7 @@ table = fixPrecs
   , map none ["<" , "<=", "==", "!=", ">=", ">" ]
   , [right "+", none "-"]
   , [right "*", none "/", none "%"]
+  , [right "∘"]
   ]
 
 aprec :: Int

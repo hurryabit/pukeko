@@ -4,7 +4,7 @@ import Pukeko.Prelude hiding (run)
 
 import System.Directory (setCurrentDirectory)
 import System.Exit (ExitCode (..))
-import System.Process (callCommand, readProcessWithExitCode)
+import System.Process (readProcess, readProcessWithExitCode)
 import Test.Hspec
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
@@ -17,8 +17,12 @@ runProg prog input = do
   (exitCode, stdout, _) <- readProcessWithExitCode ("./" ++ prog) [] (format input)
   return (exitCode, stdout)
 
+build prog = void (readProcess "make" [prog] "")
+
+specifyProg name = beforeAll_ (build name) . specify name
+
 testBasic name input output =
-  specify name $ runProg name input `shouldReturn` (ExitSuccess, format output)
+  specifyProg name $ runProg name input `shouldReturn` (ExitSuccess, format output)
 
 prop_prog_correct :: Gen [Int] -> ([Int] -> [Int]) -> FilePath -> Property
 prop_prog_correct gen spec prog = monadicIO $ do
@@ -37,7 +41,7 @@ prop_sort_correct =
   in  prop_prog_correct gen (sort . tail)
 
 -- testSort :: String -> Test
-testSort name = specify name (prop_sort_correct name)
+testSort name = specifyProg name (prop_sort_correct name)
 
 prop_function_correct :: Int -> (Int -> Int) -> FilePath -> Property
 prop_function_correct bound spec =
@@ -48,7 +52,7 @@ prop_function_correct bound spec =
 
 -- testFunction :: String -> Int -> (Int -> Int) -> Test
 testFunction name bound spec =
-  specify name (prop_function_correct bound spec name)
+  specifyProg name (prop_function_correct bound spec name)
 
 spec_catalan :: Int -> Int
 spec_catalan n =
@@ -105,7 +109,6 @@ prop_rmq_correct prog = monadicIO $ do
 compile :: IO ()
 compile = do
   setCurrentDirectory "test"
-  callCommand "make -B all"
 
 main :: IO ()
 main = hspec $ beforeAll_ compile $ do
@@ -124,4 +127,4 @@ main = hspec $ beforeAll_ compile $ do
     testFunction "catalan"  100 spec_catalan
     testBasic    "queens"   [8] [92]
     testFunction "primes"   100 spec_primes
-    specify "rmq" (prop_rmq_correct "rmq")
+    specifyProg "rmq" (prop_rmq_correct "rmq")

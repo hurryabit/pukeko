@@ -1,3 +1,0 @@
-type Choice a b =
-  | First  a
-  | Second b

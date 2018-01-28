@@ -1,4 +1,4 @@
-import std/io
+import std2/io
 
 g : Int -> Int -> Int -> Int -> Int
 g a b c d = a

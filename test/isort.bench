@@ -1,10 +1,10 @@
 benchmarking ./isort < sort20.in > /dev/null
-time                 4.619 s    (4.293 s .. 4.832 s)
-                     0.999 R²   (0.998 R² .. 1.000 R²)
-mean                 4.714 s    (4.688 s .. 4.730 s)
-std dev              24.16 ms   (0.0 s .. 27.68 ms)
+time                 9.863 s    (9.743 s .. 10.07 s)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 9.869 s    (9.843 s .. 9.888 s)
+std dev              28.14 ms   (0.0 s .. 32.20 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
-Steps      :  21195520655
-Alloc bytes:   7962667096          (Checks:    298740021)
-GC runs    :           59
+Steps      :  46640191860
+Alloc bytes:  16708800184          (Checks:    596900017)
+GC runs    :          125

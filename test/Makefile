@@ -1,4 +1,5 @@
-COMP = stack exec pukeko -- -l
+COMPFILE = $(shell stack exec -- which pukeko)
+COMP = $(COMPFILE) -l
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
@@ -17,7 +18,6 @@ SOURCES     = monad_io.pu \
 							isort.pu \
 							tsort.pu \
 							queens.pu \
-							minlet.pu \
 							primes.pu \
 							catalan.pu \
 							wildcard.pu \
@@ -42,7 +42,7 @@ all: $(EXECUTABLES)
 
 asm: $(ASSEMBLES)
 
-%.asm: %.pu std/*.pu
+%.asm: %.pu std2/*.pu $(COMPFILE)
 	$(COMP) $<
 
 %.pp.asm: %.asm

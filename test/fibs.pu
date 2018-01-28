@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 prime : Int
 prime = 1000000*1000000+39
@@ -17,4 +17,4 @@ main : IO Unit
 main =
   input
   >>= fun n ->
-  print (nth fibs0 n)
+  print (nth_exn fibs0 n)

@@ -1,25 +1,44 @@
-import std/prelude
-
-id : a -> a
-id x = x
+import std2/prelude
 
 -- Fixpoint of a functor
-type Fix f =
-  | Fix (f (Fix f))
+type Fix f = | Fix (f (Fix f))
 
-cata : ((Fix f -> a) -> f (Fix f) -> f a) -> (f a -> a) -> Fix f -> a
-cata fmap f x =
-  match x with
-  | Fix y -> f (fmap (cata fmap f) y)
+unFix : Fix f -> f (Fix f)
+unFix x = match x with | Fix y -> y
 
-ana : ((a -> Fix f) -> f a -> f (Fix f)) -> (a -> f a) -> a -> Fix f
-ana fmap f x = Fix (fmap (ana fmap f) (f x))
+cata : (Functor f) => (f a -> a) -> Fix f -> a
+cata f = f ∘ map (cata f) ∘ unFix
 
-mapFix : ((a -> b) -> (Fix (f a) -> Fix (f b)) -> f a (Fix (f a)) -> f b (Fix (f b)))
-       -> (a -> b) -> Fix (f a) -> Fix (f b)
-mapFix bimap f x =
-  match x with
-  | Fix y -> Fix (bimap f (mapFix bimap f) y)
+ana : (Functor f) => (a -> f a) -> a -> Fix f
+ana f = Fix ∘ map (ana f) ∘ f
+
+hylo : (Functor f) => (f b -> b) -> (a -> f a) -> a -> b
+hylo f g = cata f ∘ ana g
+
+class Bifunctor p where
+  bimap : (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2
+
+type Fix2 p a = | Fix2 (p a (Fix2 p a))
+
+unFix2 : Fix2 p a -> p a (Fix2 p a)
+unFix2 x = match x with | Fix2 y -> y
+
+instance (Bifunctor p) => Functor (Fix2 p) where
+  map f = Fix2 ∘ bimap f (map f) ∘ unFix2
+
+poly : (Bifunctor p) => Fix (p a) -> Fix2 p a
+poly = Fix2 ∘ bimap id poly ∘ unFix
+
+mono : (Bifunctor p) => Fix2 p a -> Fix (p a)
+mono = Fix ∘ bimap id mono ∘ unFix2
+
+type FixPoly p a = | FixPoly (Fix (p a))
+
+unFixPoly : FixPoly p a -> Fix (p a)
+unFixPoly x = match x with | FixPoly y -> y
+
+instance (Bifunctor p) => Functor (FixPoly p) where
+  map f = FixPoly ∘ mono ∘ map f ∘ poly ∘ unFixPoly
 
 
 -- Bifunctor whose fixpoint is isomorphic to lists
@@ -27,23 +46,23 @@ type ListF a b =
   | NilF
   | ConsF a b
 
-bimapListF : (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2
-bimapListF f g x =
-  match x with
-  | NilF      -> NilF
-  | ConsF y z -> ConsF (f y) (g z)
+instance Functor (ListF a) where
+  map = bimap id
 
-mapFixList : (a -> b) -> Fix (ListF a) -> Fix (ListF b)
-mapFixList = mapFix bimapListF
+instance Bifunctor ListF where
+  bimap f g x =
+    match x with
+    | NilF      -> NilF
+    | ConsF y z -> ConsF (f y) (g z)
 
-toList : Fix (ListF a) -> List a
-toList = cata (bimapListF id) (fun x ->
+toList : Fix2 ListF a -> List a
+toList = cata (fun x ->
   match x with
   | NilF       -> Nil
-  | ConsF y ys -> Cons y ys)
+  | ConsF y ys -> Cons y ys) ∘ mono
 
-fromList : List a -> Fix (ListF a)
-fromList = ana (bimapListF id) (fun x ->
+fromList : List a -> Fix2 ListF a
+fromList = poly ∘ ana (fun x ->
   match x with
   | Nil       -> NilF
   | Cons y ys -> ConsF y ys)
@@ -53,6 +72,6 @@ main : IO Unit
 main =
   input
   >>= fun n ->
-  sequence_io (replicate n input)
+  sequence (replicate n input)
   >>= fun xs ->
-  iter_io print (toList (mapFixList (fun x -> 2*x) (fromList xs)))
+  traverse_ print (toList (map (fun x -> 2*x) (fromList xs)))

@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 insert : Int -> List Int -> List Int
 insert y xs =
@@ -20,6 +20,6 @@ main : IO Unit
 main =
   input
   >>= fun n ->
-  sequence_io (replicate n input)
+  sequence (replicate n input)
   >>= fun xs ->
-  iter_io print (isort xs)
+  traverse_ print (isort xs)

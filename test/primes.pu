@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 repeat : List a -> List a
 repeat xs =
@@ -40,4 +40,4 @@ main : IO Unit
 main =
   input
   >>= fun n ->
-  print (nth primes n)
+  print (nth_exn primes n)

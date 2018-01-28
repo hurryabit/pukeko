@@ -291,7 +291,7 @@ bad : List a
 bad = let rec x = Cons x Nil in x
 
 -- TEST no overgeneralization
--- FAILURE 4:5: mismatching types Int and Bool
+-- FAILURE 5:5: mismatching types Int and Bool
 f : Int
 f =
   let g x =
@@ -377,7 +377,7 @@ last x0 xs =
   | Cons _ (Cons x xs) -> last x xs
 
 -- TEST allowed let abuse
--- SUCCESS
+-- FAILURE 3:3: pattern match too simple, use a let binding instead
 f : a -> a
 f x =
   match x with

@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 gen : (a -> a) -> a -> List a
 gen f x = Cons x (gen f (f x))
@@ -25,11 +25,11 @@ main =
   print m;
   match split_at n random with
   | Pair xs random ->
-    iter_io print xs;
+    traverse_ print xs;
     match split_at m random with
     | Pair ys random ->
       let zs = take m random in
-      sequence_io (
+      sequence (
         zip_with
           (fun y z ->
              let y = y % n in
@@ -41,4 +41,4 @@ main =
           ys
           zs)
       >>= fun x ->
-      return Unit
+      pure Unit

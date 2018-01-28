@@ -22,3 +22,6 @@ sequence ms =
 
 traverse_ : (Monad m, Foldable t) => (a -> m Unit) -> t a -> m Unit
 traverse_ f = foldr (fun x m -> f x; m) (pure Unit)
+
+when : (Monad m) => Bool -> m Unit -> m Unit
+when p m = if p then m else pure Unit

@@ -120,7 +120,7 @@ reservedOperators :: Set String
 reservedOperators = Set.fromList ["->", "=>", "=", ":", "|"]
 
 opLetter :: Parser Char
-opLetter = oneOf (Set.fromList "+-*/%=<>|&!.:;")
+opLetter = oneOf (Set.fromList "+-*/%=<>|&!.:;∘")
 
 reserved :: String -> Parser ()
 reserved kw = void (lexeme (string kw <* notFollowedBy identLetter))
@@ -205,7 +205,7 @@ apatn = symbol "_" *> pure PWld   <|>
         parens patn
 
 defn :: Parser (Defn Id.EVar)
-defn = indented evar $ \z -> MkDefn z <$> (mkLam <$> many evar <*> (equals *> lexpr))
+defn = indented evar $ \z -> MkDefn z <$> (mkLam <$> many evar <*> (equals *> expr))
 
 exprMatch :: Parser (Expr Id.EVar)
 exprMatch = do
@@ -234,8 +234,7 @@ let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
   <*> NE.sepBy1 (lctd defn) (reserved "and")
 
-expr, aexpr, lexpr :: Parser (Expr Id.EVar)
-lexpr = ELoc <$> lctd expr
+expr, aexpr :: Parser (Expr Id.EVar)
 aexpr = choice
   [ EVar <$> evar
   , ECon <$> dcon
@@ -243,17 +242,19 @@ aexpr = choice
   , parens expr
   ]
 expr =
-  (flip makeExprParser operatorTable . choice)
-  [ mkApp <$> aexpr <*> many aexpr
-  , mkIf  <$> (reserved "if"   *> expr)
-          <*> (reserved "then" *> expr)
-          <*> (reserved "else" *> expr)
-  , exprMatch
-  , ELam
-    <$> (reserved "fun" *> NE.some evar)
-    <*> (arrow *> expr)
-  , let_ ELet ERec <*> (reserved "in" *> expr)
-  ]
+  ( fmap ELoc . lctd $
+    (flip makeExprParser operatorTable . choice)
+    [ mkApp <$> aexpr <*> many aexpr
+    , mkIf
+      <$> (reserved "if"   *> expr)
+      <*> (reserved "then" *> expr)
+      <*> (reserved "else" *> expr)
+    , exprMatch
+    , ELam
+      <$> (reserved "fun" *> NE.some evar)
+      <*> (arrow *> expr)
+    , let_ ELet ERec <*> (reserved "in" *> expr)
+    ])
   <?> "expression"
   where
     operatorTable = map (map f) (reverse Op.table)

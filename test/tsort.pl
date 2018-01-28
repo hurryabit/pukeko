@@ -5,6 +5,12 @@ type Bool =
        | True
 type Pair a b =
        | Pair a b
+type Option a =
+       | None
+       | Some a
+type Choice a b =
+       | First a
+       | Second b
 type Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
 type Dict$Ord a =

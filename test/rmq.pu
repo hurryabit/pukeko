@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 nats : List Int
 nats =
@@ -61,7 +61,7 @@ min : Int -> Int -> Int
 min x y = if x <= y then x else y
 
 replicate_io : Int -> IO a -> IO (List a)
-replicate_io n act = sequence_io (replicate n act)
+replicate_io n act = sequence (replicate n act)
 
 main : IO Unit
 main =
@@ -81,4 +81,4 @@ main =
       print res
   )
   >>= fun x ->
-  return Unit
+  pure Unit

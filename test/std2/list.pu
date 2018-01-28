@@ -38,6 +38,42 @@ instance Foldable List where
 to_list : (Foldable t) => t a -> List a
 to_list = foldr Cons Nil
 
+nth_exn : List a -> Int -> a
+nth_exn xs n =
+  match xs with
+  | Nil -> abort
+  | Cons x xs -> if n <= 0 then x else nth_exn xs (n-1)
+
+take : Int -> List a -> List a
+take n xs =
+  if n <= 0 then
+    Nil
+  else
+    match xs with
+    | Nil       -> Nil
+    | Cons x xs -> Cons x (take (n-1) xs)
+
 replicate : Int -> a -> List a
 replicate n x =
   if n <= 0 then Nil else Cons x (replicate (n-1) x)
+
+zip_with : (a -> b -> c) -> List a -> List b -> List c
+zip_with f xs ys =
+  match xs with
+  | Nil -> Nil
+  | Cons x xs ->
+    match ys with
+    | Nil -> Nil
+    | Cons y ys -> Cons (f x y) (zip_with f xs ys)
+
+partition : (a -> Bool) -> List a -> Pair (List a) (List a)
+partition p xs =
+  match xs with
+  | Nil -> Pair Nil Nil
+  | Cons x xs ->
+    match partition p xs with
+    | Pair ys zs ->
+      if p x then
+        Pair (Cons x ys) zs
+      else
+        Pair ys (Cons x zs)

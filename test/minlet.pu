@@ -1,7 +1,0 @@
-import std/io
-
-id : a -> a
-id x = let y = x in y
-
-main : IO Unit
-main = print (id 0)

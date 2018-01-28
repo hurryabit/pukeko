@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 gen : (a -> a) -> a -> List a
 gen f x = Cons x (gen f (f x))
@@ -8,4 +8,4 @@ main =
   input
   >>= fun n ->
   print n;
-  iter_io print (take n (gen (fun x -> (91*x) % 1000000007) 1))
+  traverse_ print (take n (gen (fun x -> (91*x) % 1000000007) 1))

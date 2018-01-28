@@ -86,7 +86,7 @@ spec = skipEmpty *> manySpec section <* eof
 main :: IO ()
 main = do
   setCurrentDirectory "test"
-  let prelFile = "std/prelude.pu"
+  let prelFile = "std2/prelude.pu"
       testFile = "frontend.pu"
   cont <- lines <$> readFile testFile
   prelude <- runM $ interpretM (\(Error (msg :: Failure)) -> fail (render msg))

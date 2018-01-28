@@ -1,4 +1,4 @@
-import std/prelude
+import std2/prelude
 
 p : Int
 p = 100000007
@@ -33,4 +33,4 @@ main : IO Unit
 main =
   input
   >>= fun n ->
-  print (nth sols n)
+  print (nth_exn sols n)

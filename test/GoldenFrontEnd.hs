@@ -88,7 +88,7 @@ outFile = "frontend.out"
 frontEndTest :: IO ()
 frontEndTest = do
   setCurrentDirectory "test"
-  let prelFile = "std/prelude.pu"
+  let prelFile = "std2/prelude.pu"
   cont <- lines <$> readFile testFile
   prelude <- runM $
     interpretM (\(Error (msg :: Failure)) -> fail (show msg))

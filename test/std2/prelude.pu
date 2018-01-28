@@ -1,0 +1,6 @@
+-- The pukeko prelude
+import std2/basic
+import std2/bool
+import std2/int
+import std2/io
+import std2/list

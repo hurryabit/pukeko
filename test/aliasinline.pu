@@ -1,4 +1,4 @@
-import std/io
+import std2/io
 
 h : c -> c
 h z = (fun u -> u) z
@@ -13,4 +13,4 @@ f2 : a -> a
 f2 x = g x
 
 main : IO Unit
-main = return (f1 (f2 Unit))
+main = pure (f1 (f2 Unit))

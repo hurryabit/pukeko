@@ -1,3 +1,0 @@
-type Option a =
-  | None
-  | Some a

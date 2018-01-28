@@ -13,6 +13,14 @@ type Bool =
 type Pair a b =
   | Pair a b
 
+type Option a =
+  | None
+  | Some a
+
+type Choice a b =
+  | First a
+  | Second b
+
 -- Fundamental classes
 class Eq a where (==) : a -> a -> Bool
 
@@ -22,3 +30,6 @@ class Eq a where (==) : a -> a -> Bool
 -- Fundamental functions
 id : a -> a
 id x = x
+
+(∘) : (b -> c) -> (a -> b) -> (a -> c)
+(∘) f g x = f (g x)
