@@ -1,41 +1,41 @@
-type Unit =
+data Unit =
        | Unit
-type Bool =
+data Bool =
        | False
        | True
-type Pair a b =
+data Pair a b =
        | Pair a b
-type Option a =
+data Option a =
        | None
        | Some a
-type Choice a b =
+data Choice a b =
        | First a
        | Second b
-type Dict$Eq a =
+data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
-type Dict$Ord a =
+data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
-type Dict$Monoid m =
+data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
-type Dict$Ring a =
+data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
-type Int
-type Char
-type Dict$Foldable t =
+data Int
+data Char
+data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
-type Dict$Functor f =
+data Dict$Functor f =
        | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
-type List a =
+data List a =
        | Nil
        | Cons a (List a)
-type Dict$Monad m =
+data Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure (>>=) -> pure
-type IO a
+data IO a
 external pure_io : ∀a. a -> IO a = "return"
 external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
 dict$Monad$IO : Dict$Monad IO =

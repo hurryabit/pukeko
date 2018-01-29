@@ -1,28 +1,28 @@
-type Unit =
+data Unit =
        | Unit
-type Bool =
+data Bool =
        | False
        | True
-type Pair a b =
+data Pair a b =
        | Pair a b
-type Option a =
+data Option a =
        | None
        | Some a
-type Choice a b =
+data Choice a b =
        | First a
        | Second b
-type Dict$Eq a =
+data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
-type Dict$Ord a =
+data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 (<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a (<) (<=) (>=) (>) -> (<=)
-type Dict$Monoid m =
+data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
-type Dict$Ring a =
+data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 (-) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
@@ -34,7 +34,7 @@ type Dict$Ring a =
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a neg (+) (-) (*) -> (*)
-type Int
+data Int
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
@@ -58,8 +58,8 @@ dict$Ring$Int : Dict$Ring Int =
   in
   Dict$Ring @Int neg (+) (-) (*)
 external (%) : Int -> Int -> Int = "mod"
-type Char
-type Dict$Foldable t =
+data Char
+data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
 foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
@@ -71,9 +71,9 @@ foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t foldr foldl -> foldl
-type Dict$Functor f =
+data Dict$Functor f =
        | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
-type List a =
+data List a =
        | Nil
        | Cons a (List a)
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
@@ -107,7 +107,7 @@ take : ∀a. Int -> List a -> List a =
         | Cons @a x xs ->
           Cons @a x (take @a ((-) @Int dict$Ring$Int n 1) xs)
       | True -> Nil @a
-type Dict$Monad m =
+data Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
@@ -133,7 +133,7 @@ traverse_ : ∀a m t. Dict$Monad m -> Dict$Foldable t -> (a -> m Unit) -> t a ->
   fun @a @m @t ->
     fun (dict$Monad$m : Dict$Monad m) (dict$Foldable$t : Dict$Foldable t) (f : a -> m Unit) ->
       foldr @t dict$Foldable$t @a @(m Unit) (traverse_$ll1 @a @m dict$Monad$m f) (pure @m dict$Monad$m @Unit Unit)
-type IO a
+data IO a
 external pure_io : ∀a. a -> IO a = "return"
 external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
 dict$Monad$IO : Dict$Monad IO =

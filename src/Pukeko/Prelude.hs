@@ -43,6 +43,7 @@ import Control.Lens          as X
        , (^.), (.~), (%~)
        , over, set
        , iso, prism, to
+       , _Right
        , iall, ifoldMap, imap, itoList, itraverse
        , makeLenses, makePrisms
        )

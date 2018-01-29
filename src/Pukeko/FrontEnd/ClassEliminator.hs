@@ -195,7 +195,9 @@ unclssType = \case
 unclssDecl :: Decl Out -> Decl Out
 unclssDecl = \case
   DType tcons ->
-    let tcon2type = tcon2dcons . traverse . traverse . dcon2flds . traverse
+    -- TODO: We're making the assmption that type synonyms don't contain class
+    -- constraints. This might change in the future.
+    let tcon2type = tcon2dcons . _Right . traverse . traverse . dcon2flds . traverse
     in  DType
         ((fmap . fmap) (\(Some1 tcon) -> Some1 (over tcon2type unclssType tcon)) tcons)
   DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
@@ -223,5 +225,5 @@ dictTConDecl :: Lctd ClssDecl -> Some1 TConDecl
 dictTConDecl (Lctd pos (MkClssDecl clss prm mthds)) =
     let flds = map _sign2type mthds
         dcon = MkDConDecl (clssTCon clss) (clssDCon clss) 0 flds
-        tcon = MkTConDecl (clssTCon clss) (Vec.singleton prm) [Lctd pos dcon]
+        tcon = MkTConDecl (clssTCon clss) (Vec.singleton prm) (Right [Lctd pos dcon])
     in  Some1 tcon

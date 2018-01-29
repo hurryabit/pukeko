@@ -13,12 +13,12 @@ bad : Typ
 
 -- TEST duplicate in one type definition
 -- FAILURE 2:6: duplicate type constructor: Typ
-data Typ
-and  Typ
+data Typ = | A
+and  Typ = | B
 
 -- TEST duplicate in two type definitions
 -- FAILURE 1:6: duplicate type constructor: Int
-data Int
+data Int = | A
 
 -- SUBSECTION data constructor
 
@@ -57,7 +57,7 @@ data Typ =
 
 -- TEST underapplication in one definition
 -- FAILURE 3:3: cannot unify kinds _3 -> * and *
-data Typ1 a
+data Typ1 a = | A
 and Typ2 =
   | Con Typ1
 
@@ -73,7 +73,7 @@ data Typ =
 
 -- TEST overapplication in one definition
 -- FAILURE 3:3: cannot unify kinds * and _6 -> *
-data Typ1 a
+data Typ1 a = | A
 and Typ2 a =
   | Con (Typ1 a a)
 
@@ -312,8 +312,8 @@ g x = f x
 
 -- TEST var instantiation
 -- SUCCESS
-data A
-data B
+type A = external
+type B = external
 x : a
 external x = "x"
 f : A -> B -> A
@@ -325,8 +325,8 @@ y = f x x
 -- SUCCESS
 data A a =
   | X
-data B
-data C
+type B = external
+type C = external
 x : a
 external x = "x"
 f : A B -> A C -> A B

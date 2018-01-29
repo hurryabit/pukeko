@@ -62,7 +62,8 @@ data Decl
 data TConDecl = MkTConDecl
   { _tcon2name  :: Id.TCon
   , _tcon2prms  :: [Id.TVar]
-  , _tcon2dcons :: [Lctd DConDecl]
+    -- FIXME: Use a proper type to distinguish between 'type' and 'data'.
+  , _tcon2dcons :: Either Type [Lctd DConDecl]
   }
 
 data DConDecl = MkDConDecl

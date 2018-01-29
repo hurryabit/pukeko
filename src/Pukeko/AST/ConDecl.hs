@@ -27,7 +27,7 @@ data Pair1 f g a = Pair1 (f a) (g a)
 data TConDecl n = KnownNat n => MkTConDecl
   { _tcon2name  :: Id.TCon
   , _tcon2prms  :: Vector n Id.TVar
-  , _tcon2dcons :: [Lctd (DConDecl n)]
+  , _tcon2dcons :: Either (Type (TFinScope n Void)) [Lctd (DConDecl n)]
   }
 
 data DConDecl n = MkDConDecl
@@ -53,12 +53,14 @@ typeOfDConDecl (MkTConDecl tname prms _) (MkDConDecl tcon dname _ flds)
         Nothing -> bug "type and data constructor have different arity" (tname, dname)
 
 instance Pretty (TConDecl n) where
-  pretty (MkTConDecl tname prms dcons)
-    | null dcons =
-        pretty tname <+> hsepMap pretty prms
-    | otherwise  =
-        pretty tname <+> hsepMap pretty prms <+> "=" $$
-        nest 2 (vcatMap pretty dcons)
+  pretty (MkTConDecl tname prms dcons0) =
+    case dcons0 of
+      Left typ -> lhs <+> "=" <+> pretty typ
+      Right dcons
+        | null dcons -> lhs
+        | otherwise  -> lhs <+> "=" $$ nest 2 (vcatMap pretty dcons)
+    where
+      lhs = pretty tname <+> hsepMap pretty prms
 
 instance Pretty (DConDecl n) where
   pretty (MkDConDecl _ dname _ flds) =

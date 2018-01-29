@@ -4,7 +4,7 @@ import std2/ord
 import std2/monoid
 import std2/num
 
-data Int
+type Int = external
 
 -- Equality
 eq_int : Int -> Int -> Bool

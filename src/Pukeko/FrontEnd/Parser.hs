@@ -265,11 +265,24 @@ expr =
           Op.AssocRight -> InfixR
           Op.AssocNone  -> InfixN
 
+dataDecl :: Parser (NonEmpty (Lctd TConDecl))
+dataDecl =
+    (:|)
+    <$> indented_ (reserved "data") (lctd tconDecl)
+    <*> many (indented_ (reserved "and") (lctd tconDecl))
+
+typeDecl :: Parser (Lctd TConDecl)
+typeDecl = indented_ (reserved "type") $ lctd $
+  MkTConDecl
+  <$> tcon
+  <*> (many tvar <* equals)
+  <*> (reserved "external" *> pure (Right []) <|> Left <$> type_)
+
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
   <$> tcon
-  <*> many tvar
-  <*> option [] (equals *> aligned (some (lctd dconDecl)))
+  <*> (many tvar <* equals)
+  <*> (Right <$> aligned (some (lctd dconDecl)))
 
 dconDecl :: Parser DConDecl
 dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
@@ -306,10 +319,7 @@ module_ file = do
   space
   imps <- many import_
   decls <- many $ lctd $ choice
-    [ DType <$> ( (:|)
-                  <$> indented_ (reserved "data") (lctd tconDecl)
-                  <*> many (indented_ (reserved "and") (lctd tconDecl))
-                )
+    [ DType <$> ((:|[]) <$> typeDecl <|> dataDecl)
     , DClss <$> indented_ (reserved "class") clssDecl
     , DInst <$> indented_ (reserved "instance") instDecl
     , DPrim <$> indented_ (reserved "external") primDecl

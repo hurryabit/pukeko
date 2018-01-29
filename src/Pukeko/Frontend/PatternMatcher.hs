@@ -188,8 +188,9 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
   let drs = toList (LS.zip ds rs)
   Some1 (Pair1 (MkTConDecl tcon _params dcons0) _dconDecl) <- findInfo info2dcons dcon0
   dcons1 <- case dcons0 of
-    []   -> bugWith "pattern match on type without data constructors" tcon
-    d:ds -> pure (d :| ds)
+    Left _       -> bugWith "pattern match on type synonym" tcon
+    Right []     -> bugWith "pattern match on type without data constructors" tcon
+    Right (d:ds) -> pure (d :| ds)
   grps <- for dcons1 $ \(Lctd _ MkDConDecl{_dcon2name = dcon1}) -> do
     let drs1 = filter (\(MkCPatn dcon2 _ts _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case

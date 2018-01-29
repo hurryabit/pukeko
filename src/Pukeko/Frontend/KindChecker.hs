@@ -87,14 +87,17 @@ kcTypDef tcons = do
     modify (Map.insert tname kind)
     pure kind
   for_ (NE.zip tcons kinds) $
-    \(Lctd pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons}), tconKind) -> do
+    \(Lctd pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons0}), tconKind) -> do
       here pos $ do
         paramKinds <- traverse (const freshUVar) prms
         unify tconKind (foldr Arrow Star paramKinds)
-        localize paramKinds $ do
-          -- TODO: Rewrite this in terms of @forOf_@.
-          for_ dcons $ lctd_ $ \MkDConDecl{_dcon2flds = flds} -> do
-            traverse_ (kcType Star) flds
+        localize paramKinds $
+          case dcons0 of
+            Left typ -> kcType Star typ
+            Right dcons ->
+              -- TODO: Rewrite this in terms of @forOf_@.
+              for_ dcons $ lctd_ $ \MkDConDecl{_dcon2flds = flds} ->
+                traverse_ (kcType Star) flds
   traverse_ close kinds
 
 kcVal :: Type Void -> KC n s ()

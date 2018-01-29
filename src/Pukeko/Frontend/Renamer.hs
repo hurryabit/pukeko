@@ -5,6 +5,7 @@ module Pukeko.FrontEnd.Renamer
 
 import Pukeko.Prelude
 
+import           Data.Bitraversable
 import qualified Data.Finite       as Fin
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
@@ -64,9 +65,12 @@ rnDecl = \case
     pure (DPrim (MkPrimDecl (MkBind z NoType) s))
 
 rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 TConDecl)
-rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = Vec.withList prms0 $ \prms1 -> do
-  Some1 <$> MkTConDecl tcon prms1
-    <$> zipWithM (\tag -> lctd (rnDConDecl tcon prms1 tag)) [0..] dcons
+rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = Vec.withList prms0 $ \prms1 ->
+  Some1 <$> MkTConDecl tcon prms1 <$>
+    bitraverse
+      (rnType (finRenamer prms1))
+      (zipWithM (\tag -> lctd (rnDConDecl tcon prms1 tag)) [0..])
+      dcons
 
 rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (DConDecl n)
 rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) =

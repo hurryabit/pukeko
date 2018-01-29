@@ -62,10 +62,13 @@ trDecl :: Decl In -> TR (Decl Out)
 trDecl top = case top of
   DType tconDecls -> do
     for_ tconDecls (lctd_ (\(Some1 tcon) -> insertTCon tcon))
-    for_ tconDecls $ lctd_ $ \(Some1 tcon@MkTConDecl{_tcon2dcons = dconDecls}) -> do
-      for_ dconDecls $ lctd_ $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
-        for_ flds trType
-        insertDCon tcon dcon
+    for_ tconDecls $ lctd_ $ \(Some1 tcon@MkTConDecl{_tcon2dcons = dconDecls0}) ->
+      case dconDecls0 of
+        Left typ -> void (trType typ)
+        Right dconDecls ->
+          for_ dconDecls $ lctd_ $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
+            for_ flds trType
+            insertDCon tcon dcon
     pure (DType tconDecls)
   DSign (MkSignDecl x t)  -> DSign <$> MkSignDecl x <$> trType t
   -- FIXME: Resolve types in class declarations and instance definitions.

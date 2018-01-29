@@ -19,6 +19,7 @@ module Pukeko.FrontEnd.Info
 
 import Pukeko.Prelude
 
+import           Control.Lens                (foldMapOf, _Right)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 import qualified Data.Vector.Sized           as Vec
@@ -75,9 +76,10 @@ itemInfo l k v = set l (Map.singleton k v) mempty
 
 tconDeclInfo :: Some1 TConDecl -> ModuleInfo
 tconDeclInfo (Some1 tcon) =
-  let dis =
-        flip foldMap (tcon^.tcon2dcons) $ \(Lctd _ dcon) ->
-          itemInfo info2dcons (dcon^.dcon2name) (Some1 (Pair1 tcon dcon))
+  let dis = foldMapOf
+        (tcon2dcons . _Right . traverse . unWhere lctd)
+        (\dcon -> itemInfo info2dcons (dcon^.dcon2name) (Some1 (Pair1 tcon dcon)))
+        tcon
   in  itemInfo info2tcons (tcon^.tcon2name) (Some1 tcon) <> dis
 
 collectInfo :: forall st. (IsType (StageType st)) => Module st -> ModuleInfo

@@ -1,7 +1,7 @@
 -- ASCII characters
 import std2/int
 
-data Char
+type Char = external
 
 ord : Char -> Int
 external ord = "ord"
