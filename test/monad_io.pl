@@ -1,19 +1,19 @@
-type Unit =
+data Unit =
        | Unit
-type Bool =
+data Bool =
        | False
        | True
-type Pair a b =
+data Pair a b =
        | Pair a b
-type Option a =
+data Option a =
        | None
        | Some a
-type Choice a b =
+data Choice a b =
        | First a
        | Second b
-type Dict$Eq a =
+data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
-type Dict$Ord a =
+data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 (>=) : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
@@ -25,16 +25,16 @@ type Dict$Ord a =
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a (<) (<=) (>=) (>) -> (>)
-type Dict$Monoid m =
+data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
-type Dict$Ring a =
+data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 (-) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a neg (+) (-) (*) -> (-)
-type Int
+data Int
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
@@ -57,15 +57,15 @@ dict$Ring$Int : Dict$Ring Int =
   and (*) : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg (+) (-) (*)
-type Char
-type Dict$Foldable t =
+data Char
+data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
-type Dict$Functor f =
+data Dict$Functor f =
        | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
-type List a =
+data List a =
        | Nil
        | Cons a (List a)
-type Dict$Monad m =
+data Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
@@ -89,7 +89,7 @@ when : ∀m. Dict$Monad m -> Bool -> m Unit -> m Unit =
       match p with
       | False -> pure @m dict$Monad$m @Unit Unit
       | True -> m
-type IO a
+data IO a
 external pure_io : ∀a. a -> IO a = "return"
 external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
 dict$Monad$IO : Dict$Monad IO =

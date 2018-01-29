@@ -2,7 +2,7 @@
 import std2/functor
 import std2/foldable
 
-type BinTree a =
+data BinTree a =
   | Leaf
   | Branch (BinTree a) a (BinTree a)
 

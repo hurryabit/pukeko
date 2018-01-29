@@ -1,18 +1,18 @@
 external abort : ∀a. a = "abort"
-type Unit =
+data Unit =
        | Unit
-type Bool =
+data Bool =
        | False
        | True
-type Pair a b =
+data Pair a b =
        | Pair a b
-type Option a =
+data Option a =
        | None
        | Some a
-type Choice a b =
+data Choice a b =
        | First a
        | Second b
-type Dict$Eq a =
+data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
 (==) : ∀a. Dict$Eq a -> a -> a -> Bool =
   fun @a ->
@@ -25,21 +25,21 @@ type Dict$Eq a =
       match (==) @a dict$Eq$a x y with
       | False -> True
       | True -> False
-type Dict$Ord a =
+data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 (<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a (<) (<=) (>=) (>) -> (<=)
-type Dict$Monoid m =
+data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 append : ∀m. Dict$Monoid m -> m -> m -> m =
   fun @m ->
     fun (dict : Dict$Monoid m) ->
       match dict with
       | Dict$Monoid @m empty append -> append
-type Dict$Ring a =
+data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 (+) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
@@ -51,7 +51,7 @@ type Dict$Ring a =
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a neg (+) (-) (*) -> (-)
-type Int
+data Int
 external eq_int : Int -> Int -> Bool = "eq"
 dict$Eq$Int : Dict$Eq Int =
   let (==) : Int -> Int -> Bool = eq_int in
@@ -79,8 +79,8 @@ dict$Ring$Int : Dict$Ring Int =
   in
   Dict$Ring @Int neg (+) (-) (*)
 external (%) : Int -> Int -> Int = "mod"
-type Char
-type Dict$Foldable t =
+data Char
+data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
 foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
@@ -92,9 +92,9 @@ foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t foldr foldl -> foldl
-type Dict$Functor f =
+data Dict$Functor f =
        | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
-type List a =
+data List a =
        | Nil
        | Cons a (List a)
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
@@ -137,14 +137,14 @@ nth_exn : ∀a. List a -> Int -> a =
         match (<=) @Int dict$Ord$Int n 0 with
         | False -> nth_exn @a xs ((-) @Int dict$Ring$Int n 1)
         | True -> x
-type Dict$Monad m =
+data Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 (>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure (>>=) -> (>>=)
-type IO a
+data IO a
 external pure_io : ∀a. a -> IO a = "return"
 external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
 dict$Monad$IO : Dict$Monad IO =

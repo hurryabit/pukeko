@@ -5,7 +5,7 @@ import std2/foldable
 import std2/functor
 import std2/monoid
 
-type List a =
+data List a =
   | Nil
   | Cons a (List a)
 

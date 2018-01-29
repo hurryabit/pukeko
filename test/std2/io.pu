@@ -3,7 +3,7 @@ import std2/char
 import std2/int
 import std2/monad
 
-type IO a
+data IO a
 
 pure_io : a -> IO a
 external pure_io = "return"

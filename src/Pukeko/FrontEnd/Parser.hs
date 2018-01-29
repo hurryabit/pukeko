@@ -102,7 +102,7 @@ reservedIdents = Set.fromList
       , "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
-      , "type", "class", "where", "instance"
+      , "data", "class", "where", "instance"
       , "external"
       , "import"
       ]
@@ -180,7 +180,7 @@ type_ =
   makeExprParser
     (mkTApp <$> atype <*> many atype)
     [ [ InfixR (arrow *> pure mkTFun) ] ]
-  <?> "type"
+  <?> "data"
 atype = choice
   [ TVar <$> tvar
   , TCon <$> tcon
@@ -307,7 +307,7 @@ module_ file = do
   imps <- many import_
   decls <- many $ lctd $ choice
     [ DType <$> ( (:|)
-                  <$> indented_ (reserved "type") (lctd tconDecl)
+                  <$> indented_ (reserved "data") (lctd tconDecl)
                   <*> many (indented_ (reserved "and") (lctd tconDecl))
                 )
     , DClss <$> indented_ (reserved "class") clssDecl

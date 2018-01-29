@@ -3,21 +3,21 @@ abort : a
 external abort = "abort"
 
 -- Fundamental types
-type Unit =
+data Unit =
   | Unit
 
-type Bool =
+data Bool =
   | False
   | True
 
-type Pair a b =
+data Pair a b =
   | Pair a b
 
-type Option a =
+data Option a =
   | None
   | Some a
 
-type Choice a b =
+data Choice a b =
   | First a
   | Second b
 

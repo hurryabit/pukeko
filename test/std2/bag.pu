@@ -1,7 +1,7 @@
 -- Multi-sets represented by (unbalanced) binary trees
 import std2/bintree
 
-type Bag a =
+data Bag a =
   | Bag (BinTree a)
 
 instance Foldable Bag where

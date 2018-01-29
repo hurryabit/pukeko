@@ -495,7 +495,7 @@ instance (PrettyStage st) => Pretty (Module st) where
 instance (PrettyStage st) => Pretty (Decl st) where
   pretty = \case
     DType (dcon0 :| dcons) ->
-      "type" <+> pretty dcon0
+      "data" <+> pretty dcon0
       $$ vcatMap (\dcon -> "and " <+> pretty dcon) dcons
     DSign s -> pretty s
     DClss (MkClssDecl c v ms) ->

@@ -1,7 +1,7 @@
 import std2/prelude
 
 -- Fixpoint of a functor
-type Fix f = | Fix (f (Fix f))
+data Fix f = | Fix (f (Fix f))
 
 unFix : Fix f -> f (Fix f)
 unFix x = match x with | Fix y -> y
@@ -18,7 +18,7 @@ hylo f g = cata f ∘ ana g
 class Bifunctor p where
   bimap : (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2
 
-type Fix2 p a = | Fix2 (p a (Fix2 p a))
+data Fix2 p a = | Fix2 (p a (Fix2 p a))
 
 unFix2 : Fix2 p a -> p a (Fix2 p a)
 unFix2 x = match x with | Fix2 y -> y
@@ -32,7 +32,7 @@ poly = Fix2 ∘ bimap id poly ∘ unFix
 mono : (Bifunctor p) => Fix2 p a -> Fix (p a)
 mono = Fix ∘ bimap id mono ∘ unFix2
 
-type FixPoly p a = | FixPoly (Fix (p a))
+data FixPoly p a = | FixPoly (Fix (p a))
 
 unFixPoly : FixPoly p a -> Fix (p a)
 unFixPoly x = match x with | FixPoly y -> y
@@ -42,7 +42,7 @@ instance (Bifunctor p) => Functor (FixPoly p) where
 
 
 -- Bifunctor whose fixpoint is isomorphic to lists
-type ListF a b =
+data ListF a b =
   | NilF
   | ConsF a b
 
