@@ -54,7 +54,7 @@ library:
   - containers
   - dlist
   - filepath
-  - freer-simple ==1.0.0.1
+  - freer-simple
   - lens
   - megaparsec
   - monad-st

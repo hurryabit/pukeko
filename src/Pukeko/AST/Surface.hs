@@ -15,6 +15,8 @@ module Pukeko.AST.Surface
   , Type (..)
   , TypeCstr (..)
   , TypeScheme (..)
+  , CoercionDir (..)
+  , Coercion (..)
   , Defn (..)
   , Expr (..)
   , Altn (..)
@@ -105,6 +107,10 @@ data TypeCstr = MkTypeCstr [(Id.Clss, Id.TVar)]
 
 data TypeScheme = MkTypeScheme TypeCstr Type
 
+data CoercionDir = Inject | Project
+
+data Coercion = MkCoercion CoercionDir Id.TCon
+
 data Defn v = MkDefn Id.EVar (Expr v)
 
 data Expr v
@@ -117,6 +123,7 @@ data Expr v
   | ELam (NonEmpty Id.EVar) (Expr v)
   | ELet (NonEmpty (Lctd (Defn v))) (Expr v)
   | ERec (NonEmpty (Lctd (Defn v))) (Expr v)
+  | ECoe Coercion (Expr v)
 
 data Altn v = MkAltn Patn (Expr v)
 
@@ -174,6 +181,8 @@ deriving instance Show PrimDecl
 deriving instance Show Type
 deriving instance Show TypeCstr
 deriving instance Show TypeScheme
+deriving instance Show CoercionDir
+deriving instance Show Coercion
 deriving instance Show v => Show (Defn v)
 deriving instance Show v => Show (Expr v)
 deriving instance Show v => Show (Altn v)

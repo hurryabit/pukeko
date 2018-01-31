@@ -182,18 +182,15 @@ dict$Foldable$BinTree : Dict$Foldable BinTree =
         fun @a @b -> dict$Foldable$BinTree$ll2 @a @b
   in
   Dict$Foldable @BinTree foldr foldl
-data Bag a =
-       | Bag (BinTree a)
+data Bag a = BinTree a
 dict$Foldable$Bag$ll1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
   fun @a @b ->
-    fun (f : a -> b -> b) (y0 : b) (s : Bag a) ->
-      match s with
-      | Bag @a t -> foldr @BinTree dict$Foldable$BinTree @a @b f y0 t
+    fun (f : a -> b -> b) (y0 : b) (bag : Bag a) ->
+      foldr @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag a -> BinTree a) bag)
 dict$Foldable$Bag$ll2 : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
   fun @a @b ->
-    fun (f : b -> a -> b) (y0 : b) (s : Bag a) ->
-      match s with
-      | Bag @a t -> foldl @BinTree dict$Foldable$BinTree @a @b f y0 t
+    fun (f : b -> a -> b) (y0 : b) (bag : Bag a) ->
+      foldl @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag a -> BinTree a) bag)
 dict$Foldable$Bag : Dict$Foldable Bag =
   let foldr : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
         fun @a @b -> dict$Foldable$Bag$ll1 @a @b
@@ -201,7 +198,8 @@ dict$Foldable$Bag : Dict$Foldable Bag =
         fun @a @b -> dict$Foldable$Bag$ll2 @a @b
   in
   Dict$Foldable @Bag foldr foldl
-bag_empty : ∀a. Bag a = fun @a -> Bag @a (Leaf @a)
+bag_empty : ∀a. Bag a =
+  fun @a -> coerce @(BinTree a -> Bag a) (Leaf @a)
 bag_insert$ll1 : ∀_12. (∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12) -> Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
   fun @_12 ->
     fun (insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12) (dict$Ord$_12 : Dict$Ord _12) (x : _12) (t : BinTree _12) ->
@@ -217,8 +215,7 @@ bag_insert : ∀a. Dict$Ord a -> a -> Bag a -> Bag a =
       let rec insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
                 fun @_12 -> bag_insert$ll1 @_12 insert
       in
-      match s with
-      | Bag @a t -> Bag @a (insert @a dict$Ord$a x t)
+      coerce @(BinTree a -> Bag a) (insert @a dict$Ord$a x (coerce @(Bag a -> BinTree a) s))
 tsort$ll1 : Bag Int -> Int -> Bag Int =
   fun (s : Bag Int) (x : Int) -> bag_insert @Int dict$Ord$Int x s
 tsort : List Int -> List Int =

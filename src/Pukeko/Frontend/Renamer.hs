@@ -108,6 +108,13 @@ rnTypeScheme env (Ps.MkTypeScheme qs t) = do
   Vec.withList (toList vs0) $ \vs1 ->
     mkTUni <$> rnTypeCstr vs1 qs <*> rnType (fmap weaken env <> finRenamer vs1) t
 
+rnCoercion :: Ps.Coercion -> Coercion (NoType tv)
+rnCoercion (Ps.MkCoercion dir0 tcon) = MkCoercion dir1 tcon NoType NoType
+  where
+    dir1 = case dir0 of
+      Ps.Inject  -> Inject
+      Ps.Project -> Project
+
 rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out tv ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
@@ -135,6 +142,7 @@ rnExpr = \case
     ELet <$> (traverse . lctd) rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
   Ps.ERec ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
     localizeDefns ds1 $ ERec <$> (traverse . lctd) rnDefn ds1 <*> rnExpr e0
+  Ps.ECoe c e -> ECoe (rnCoercion c) <$> rnExpr e
 
 rnBind :: Id.EVar -> Bind NoType tv
 rnBind x = MkBind x NoType

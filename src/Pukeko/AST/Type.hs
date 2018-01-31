@@ -7,6 +7,8 @@ module Pukeko.AST.Type
   , NoType (..)
   , Type (..)
   , QVar (..)
+  , CoercionDir (..)
+  , Coercion (..)
   , mkTVars
   , mkTVarsQ
   , mkTUni
@@ -20,6 +22,7 @@ module Pukeko.AST.Type
   , vars
   , qvar2cstr
   , qvar2tvar
+  , coercion2type
   , type2tcon
   , prettyTypeCstr
   , prettyTUni
@@ -69,6 +72,15 @@ data QVar = MkQVar
   , _qvar2tvar :: Id.TVar
   }
 
+data CoercionDir = Inject | Project
+
+data Coercion ty = MkCoercion
+  { _coeDir  :: CoercionDir
+  , _coeTCon :: Id.TCon
+  , _coeFrom :: ty
+  , _coeTo   :: ty
+  }
+
 -- instance Eq QVar where
 --   (==) = (==) `on` _qvar2tvar
 
@@ -115,6 +127,9 @@ typeInt  = TCon (Id.tcon "Int")
 
 vars :: Ord tv => Type tv -> Set tv
 vars = setOf traverse
+
+coercion2type :: Traversal (Coercion ty1) (Coercion ty2) ty1 ty2
+coercion2type f (MkCoercion dir tcon from to) = MkCoercion dir tcon <$> f from <*> f to
 
 -- * Deep traversals
 type2tcon :: Traversal' (Type tv) Id.TCon
@@ -202,6 +217,8 @@ deriving instance Traversable NoType
 
 deriving instance Show QVar
 deriving instance Show tv => Show (Type tv)
+deriving instance Show CoercionDir
+deriving instance Show ty => Show (Coercion ty)
 
 newtype Boxed tv = Box{unBox :: tv}
   deriving (Eq, Ord)

@@ -1,16 +1,19 @@
 import std2/prelude
 
 -- Fixpoint of a functor
-data Fix f = | Fix (f (Fix f))
+type Fix f = f (Fix f)
+
+fix : f (Fix f) -> Fix f
+fix x = coerce @(_ -> Fix) x
 
 unFix : Fix f -> f (Fix f)
-unFix x = match x with | Fix y -> y
+unFix x = coerce @(Fix -> _) x
 
 cata : (Functor f) => (f a -> a) -> Fix f -> a
 cata f = f ∘ map (cata f) ∘ unFix
 
 ana : (Functor f) => (a -> f a) -> a -> Fix f
-ana f = Fix ∘ map (ana f) ∘ f
+ana f = fix ∘ map (ana f) ∘ f
 
 hylo : (Functor f) => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = cata f ∘ ana g
@@ -18,27 +21,33 @@ hylo f g = cata f ∘ ana g
 class Bifunctor p where
   bimap : (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2
 
-data Fix2 p a = | Fix2 (p a (Fix2 p a))
+type Fix2 p a = p a (Fix2 p a)
+
+fix2 : p a (Fix2 p a) -> Fix2 p a
+fix2 x = coerce @(_ -> Fix2) x
 
 unFix2 : Fix2 p a -> p a (Fix2 p a)
-unFix2 x = match x with | Fix2 y -> y
+unFix2 x = coerce @(Fix2 -> _) x
 
 instance (Bifunctor p) => Functor (Fix2 p) where
-  map f = Fix2 ∘ bimap f (map f) ∘ unFix2
+  map f = fix2 ∘ bimap f (map f) ∘ unFix2
 
 poly : (Bifunctor p) => Fix (p a) -> Fix2 p a
-poly = Fix2 ∘ bimap id poly ∘ unFix
+poly = fix2 ∘ bimap id poly ∘ unFix
 
 mono : (Bifunctor p) => Fix2 p a -> Fix (p a)
-mono = Fix ∘ bimap id mono ∘ unFix2
+mono = fix ∘ bimap id mono ∘ unFix2
 
-data FixPoly p a = | FixPoly (Fix (p a))
+type FixPoly p a = Fix (p a)
+
+fixPoly : Fix (p a) -> FixPoly p a
+fixPoly x = coerce @(_ -> FixPoly) x
 
 unFixPoly : FixPoly p a -> Fix (p a)
-unFixPoly x = match x with | FixPoly y -> y
+unFixPoly x = coerce @(FixPoly -> _) x
 
 instance (Bifunctor p) => Functor (FixPoly p) where
-  map f = FixPoly ∘ mono ∘ map f ∘ poly ∘ unFixPoly
+  map f = fixPoly ∘ mono ∘ map f ∘ poly ∘ unFixPoly
 
 
 -- Bifunctor whose fixpoint is isomorphic to lists

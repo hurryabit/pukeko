@@ -10,7 +10,7 @@ module Pukeko.FrontEnd.Parser
   )
   where
 
-import Pukeko.Prelude hiding (lctd)
+import Pukeko.Prelude hiding (lctd, many, some)
 
 import qualified Control.Applicative.Combinators.NonEmpty as NE
 import qualified Control.Monad.RWS          as RWS
@@ -105,6 +105,7 @@ reservedIdents = Set.fromList
       , "data", "class", "where", "instance"
       , "external"
       , "import"
+      , "coerce"
       ]
 
 lIdentStart :: Parser Char
@@ -117,7 +118,7 @@ identLetter :: Parser Char
 identLetter = alphaNumChar <|> satisfy (\c -> c == '_' || c == '\'')
 
 reservedOperators :: Set String
-reservedOperators = Set.fromList ["->", "=>", "=", ":", "|"]
+reservedOperators = Set.fromList ["->", "<-", "=>", "=", ":", "|"]
 
 opLetter :: Parser Char
 opLetter = oneOf (Set.fromList "+-*/%=<>|&!.:;∘")
@@ -234,6 +235,11 @@ let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
   <*> NE.sepBy1 (lctd defn) (reserved "and")
 
+coercion :: Parser Coercion
+coercion =
+  MkCoercion Inject  <$> (symbol "_" *> arrow *> tcon      ) <|>
+  MkCoercion Project <$> (tcon       <* arrow <* symbol "_")
+
 expr, aexpr :: Parser (Expr Id.EVar)
 aexpr = choice
   [ EVar <$> evar
@@ -254,6 +260,7 @@ expr =
       <$> (reserved "fun" *> NE.some evar)
       <*> (arrow *> expr)
     , let_ ELet ERec <*> (reserved "in" *> expr)
+    , ECoe <$> (reserved "coerce" *> char '@' *> parens coercion) <*> aexpr
     ])
   <?> "expression"
   where

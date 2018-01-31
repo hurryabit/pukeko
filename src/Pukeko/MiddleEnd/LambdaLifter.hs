@@ -97,6 +97,7 @@ llExpr = \case
         yield (DSupC (MkSupCDecl lhs tyBinds t_lhs allBinds1 rhs2))
         pure
           (mkEApp (mkETyApp (EVal lhs) (map TVar tvCapturedL)) (map EVar evCapturedL))
+  ECoe c e0 -> ECoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
 
@@ -117,7 +118,6 @@ llCase (MkCase dcon ts0 bs e) = do
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType ds -> yield (DType ds)
-  -- FIXME: Erase type classes when converting to dictionary passing style.
   DDefn (MkDefn (MkBind lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" lhs)
     rhs <- llExpr rhs

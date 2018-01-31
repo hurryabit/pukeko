@@ -31,6 +31,11 @@ type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failu
 runTC :: (IsType (St.StageType st)) => Module st -> TC Void Void a -> Either Failure a
 runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
 
+checkCoercion :: Coercion (Type tv) -> TC tv ev ()
+checkCoercion _ = -- (MkCoercion dir tcon t_from t_to) =
+  -- FIXME: Implement the actual check.
+  pure ()
+
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   ELoc l -> lctd_ typeOf l
@@ -59,6 +64,10 @@ typeOf = \case
       typeOf e0
   EMat e0 as -> typeOfBranching typeOfAltn e0 as
   ECas e0 cs -> typeOfBranching typeOfCase e0 cs
+  ECoe c e0 -> do
+    checkCoercion c
+    check e0 (_coeFrom c)
+    pure (_coeTo c)
   ETyAbs qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0

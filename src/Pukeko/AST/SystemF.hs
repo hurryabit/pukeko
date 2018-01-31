@@ -133,6 +133,7 @@ data Expr st tv ev
     ECas (Expr st tv ev) (NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
     EMat (Expr st tv ev) (NonEmpty (Altn st tv ev))
+  | ECoe (Coercion (StageType st tv)) (Expr st tv ev)
   | forall m. (HasTypes st ~ 'True, KnownNat m) =>
     ETyAbs (Vector m QVar) (Expr st (TFinScope m tv) ev)
   | HasTypes st ~ 'True =>
@@ -225,6 +226,7 @@ expr // f = case expr of
   ELet ds t    -> ELet (over (traverse . traverse . defn2expr) (//  f) ds) (t /// f)
   ERec ds t    -> ERec (over (traverse . traverse . defn2expr) (/// f) ds) (t /// f)
   EMat t  as   -> EMat (t // f) (fmap (over altn2expr (/// f)) as)
+  ECoe c e     -> ECoe c (e // f)
   ETyAbs _ _   -> error "THIS IS NOT IMPLEMENTED"
   ETyApp e t   -> ETyApp (e // f) t
 
@@ -297,6 +299,7 @@ expr2dcon f = \case
   ELet ds t    -> ELet <$> (traverse . lctd . defn2dcon) f ds <*> expr2dcon f t
   ERec ds t    -> ERec <$> (traverse . lctd . defn2dcon) f ds <*> expr2dcon f t
   EMat t  as   -> EMat <$> expr2dcon f t <*> (traverse . altn2dcon) f as
+  ECoe d e     -> ECoe d <$> expr2dcon f e
   ETyAbs x e   -> ETyAbs x <$> expr2dcon f e
   ETyApp e t   -> ETyApp <$> expr2dcon f e <*> pure t
 
@@ -322,6 +325,7 @@ expr2type f = \case
   ELet ds e0   -> ELet <$> (traverse . lctd) (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> (traverse . lctd) (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
+  ECoe c e     -> ECoe <$> coercion2type f c <*> expr2type f e
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type f e0
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse f ts
 
@@ -371,6 +375,7 @@ expr2eval f = \case
     ERec <$> (traverse . lctd . defn2expr . expr2eval) f ds <*> expr2eval f t
   EMat t  as  -> EMat <$> expr2eval f t <*> (traverse . altn2expr . expr2eval) f as
   ECas t  cs  -> ECas <$> expr2eval f t <*> traverse (case2expr (expr2eval f)) cs
+  ECoe d  e   -> ECoe d <$> expr2eval f e
   ETyAbs x e  -> ETyAbs x <$> expr2eval f e
   ETyApp e t  -> ETyApp <$> expr2eval f e <*> pure t
 
@@ -458,6 +463,7 @@ instance IsStage st => Bitraversable (Expr st) where
     EMat e0 as -> EMat <$> bitraverse f g e0 <*> traverse (bitraverse f g) as
     ETyAbs v e -> ETyAbs v <$> bitraverse (traverse f) g e
     ETyApp e t -> ETyApp <$> bitraverse f g e <*> traverse (traverse f) t
+    ECoe c e   -> ECoe <$> coercion2type (traverse f) c <*> bitraverse f g e
 
 instance IsStage st => Bifunctor     (Case st) where
   bimap = bimapDefault
@@ -478,8 +484,8 @@ instance IsStage st => Bitraversable (Altn st) where
   bitraverse f g (MkAltn p e) = MkAltn <$> traverse f p <*> bitraverse f (traverse g) e
 
 -- * Pretty printing
-class PrettyType f where
-  prettyPrecType :: (BaseTVar tv) => Int -> f tv -> Doc ann
+class IsType ty => PrettyType ty where
+  prettyPrecType :: (BaseTVar tv) => Int -> ty tv -> Doc ann
 
 instance PrettyType NoType where
   prettyPrecType _ NoType = mempty
@@ -573,6 +579,16 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
         $$ vcatMap pretty cs
+    ECoe (MkCoercion dir tcon t_from0 t_to0) e0 ->
+      maybeParens (prec > Op.aprec) $
+        "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
+        <+> prettyPrec (Op.aprec+1) e0
+      where
+        (d_from, d_to) = case (,) <$> isType t_from0 <*> isType t_to0 of
+          Just (t_from, t_to) -> (prettyPrecType 1 t_from, prettyPrecType 0 t_to)
+          Nothing -> case dir of
+            Inject  -> ("_", pretty tcon)
+            Project -> (pretty tcon, "_")
     ETyAbs vs e -> prettyETyAbs prec vs (pretty e)
     ETyApp e0 ts ->
       maybeParens (prec > Op.aprec)
@@ -610,12 +626,9 @@ prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 instance (BaseTVar tv, PrettyType ty) => Pretty (Bind ty tv)
 
 instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Bind ty tv) where
-  prettyPrec prec (MkBind z t)
-    | isEmpty td = zd
-    | otherwise  = maybeParens (prec > 0) (zd <+> ":" <+> td)
-    where
-      zd = pretty z
-      td = prettyPrecType 0 t
+  prettyPrec prec (MkBind z t0) = case isType t0 of
+    Just t  -> maybeParens (prec > 0) (pretty z <+> ":" <+> prettyPrecType 0 t)
+    Nothing -> pretty z
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
   pretty (MkCase c ts bs e) =

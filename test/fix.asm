@@ -435,12 +435,12 @@ g_input
 g_updcons 0, 2, 1
 g_return
 
+g_globstart fix, 1
+g_update 1
+g_unwind
+
 g_globstart unFix, 1
-g_push 0
-g_eval
-g_uncons 1
-g_update 2
-g_pop 1
+g_update 1
 g_unwind
 
 g_globstart cata, 2
@@ -475,7 +475,7 @@ g_mkap 1
 g_mkap 1
 g_pushglobal op$u, 3
 g_mkap 2
-g_pushglobal gm$cons_0_1, 1
+g_pushglobal fix, 1
 g_pushglobal op$u, 3
 g_updap 2, 3
 g_pop 2
@@ -489,12 +489,12 @@ g_update 2
 g_pop 1
 g_unwind
 
+g_globstart fix2, 1
+g_update 1
+g_unwind
+
 g_globstart unFix2, 1
-g_push 0
-g_eval
-g_uncons 1
-g_update 2
-g_pop 1
+g_update 1
 g_unwind
 
 g_globstart dict$Functor$Fix2$ll1, 2
@@ -513,7 +513,7 @@ g_mkap 1
 g_mkap 2
 g_pushglobal op$u, 3
 g_mkap 2
-g_pushglobal gm$cons_0_1, 1
+g_pushglobal fix2, 1
 g_pushglobal op$u, 3
 g_updap 2, 3
 g_pop 2
@@ -540,7 +540,7 @@ g_mkap 1
 g_mkap 2
 g_pushglobal op$u, 3
 g_mkap 2
-g_pushglobal gm$cons_0_1, 1
+g_pushglobal fix2, 1
 g_pushglobal op$u, 3
 g_updap 2, 2
 g_pop 1
@@ -558,7 +558,7 @@ g_mkap 1
 g_mkap 2
 g_pushglobal op$u, 3
 g_mkap 2
-g_pushglobal gm$cons_0_1, 1
+g_pushglobal fix, 1
 g_pushglobal op$u, 3
 g_updap 2, 2
 g_pop 1

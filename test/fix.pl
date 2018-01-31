@@ -162,13 +162,11 @@ dict$Monad$IO : Dict$Monad IO =
   Dict$Monad @IO pure (>>=)
 external print : Int -> IO Unit = "print"
 external input : IO Int = "input"
-data Fix f =
-       | Fix (f (Fix f))
+data Fix f = f (Fix f)
+fix : ∀f. f (Fix f) -> Fix f =
+  fun @f -> fun (x : f (Fix f)) -> coerce @(f (Fix f) -> Fix f) x
 unFix : ∀f. Fix f -> f (Fix f) =
-  fun @f ->
-    fun (x : Fix f) ->
-      match x with
-      | Fix @f y -> y
+  fun @f -> fun (x : Fix f) -> coerce @(Fix f -> f (Fix f)) x
 cata : ∀a f. Dict$Functor f -> (f a -> a) -> Fix f -> a =
   fun @a @f ->
     fun (dict$Functor$f : Dict$Functor f) (f : f a -> a) ->
@@ -176,7 +174,7 @@ cata : ∀a f. Dict$Functor f -> (f a -> a) -> Fix f -> a =
 ana : ∀a f. Dict$Functor f -> (a -> f a) -> a -> Fix f =
   fun @a @f ->
     fun (dict$Functor$f : Dict$Functor f) (f : a -> f a) ->
-      (∘) @a @(f (Fix f)) @(Fix f) (Fix @f) ((∘) @a @(f a) @(f (Fix f)) (map @f dict$Functor$f @a @(Fix f) (ana @a @f dict$Functor$f f)) f)
+      (∘) @a @(f (Fix f)) @(Fix f) (fix @f) ((∘) @a @(f a) @(f (Fix f)) (map @f dict$Functor$f @a @(Fix f) (ana @a @f dict$Functor$f f)) f)
 data Dict$Bifunctor p =
        | Dict$Bifunctor (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2)
 bimap : ∀p. Dict$Bifunctor p -> (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2) =
@@ -184,17 +182,17 @@ bimap : ∀p. Dict$Bifunctor p -> (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p
     fun (dict : Dict$Bifunctor p) ->
       match dict with
       | Dict$Bifunctor @p bimap -> bimap
-data Fix2 p a =
-       | Fix2 (p a (Fix2 p a))
+data Fix2 p a = p a (Fix2 p a)
+fix2 : ∀a p. p a (Fix2 p a) -> Fix2 p a =
+  fun @a @p ->
+    fun (x : p a (Fix2 p a)) -> coerce @(p a (Fix2 p a) -> Fix2 p a) x
 unFix2 : ∀a p. Fix2 p a -> p a (Fix2 p a) =
   fun @a @p ->
-    fun (x : Fix2 p a) ->
-      match x with
-      | Fix2 @p @a y -> y
+    fun (x : Fix2 p a) -> coerce @(Fix2 p a -> p a (Fix2 p a)) x
 dict$Functor$Fix2$ll1 : ∀p a b. Dict$Bifunctor p -> (a -> b) -> Fix2 p a -> Fix2 p b =
   fun @p @a @b ->
     fun (dict$Bifunctor$p : Dict$Bifunctor p) (f : a -> b) ->
-      (∘) @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (Fix2 @p @b) ((∘) @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) (bimap @p dict$Bifunctor$p @a @b @(Fix2 p a) @(Fix2 p b) f (map @(Fix2 p) (dict$Functor$Fix2 @p dict$Bifunctor$p) @a @b f)) (unFix2 @a @p))
+      (∘) @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (fix2 @b @p) ((∘) @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) (bimap @p dict$Bifunctor$p @a @b @(Fix2 p a) @(Fix2 p b) f (map @(Fix2 p) (dict$Functor$Fix2 @p dict$Bifunctor$p) @a @b f)) (unFix2 @a @p))
 dict$Functor$Fix2 : ∀p. Dict$Bifunctor p -> Dict$Functor (Fix2 p) =
   fun @p ->
     fun (dict$Bifunctor$p : Dict$Bifunctor p) ->
@@ -205,13 +203,12 @@ dict$Functor$Fix2 : ∀p. Dict$Bifunctor p -> Dict$Functor (Fix2 p) =
 poly : ∀a p. Dict$Bifunctor p -> Fix (p a) -> Fix2 p a =
   fun @a @p ->
     fun (dict$Bifunctor$p : Dict$Bifunctor p) ->
-      (∘) @(Fix (p a)) @(p a (Fix2 p a)) @(Fix2 p a) (Fix2 @p @a) ((∘) @(Fix (p a)) @(p a (Fix (p a))) @(p a (Fix2 p a)) (bimap @p dict$Bifunctor$p @a @a @(Fix (p a)) @(Fix2 p a) (id @a) (poly @a @p dict$Bifunctor$p)) (unFix @(p a)))
+      (∘) @(Fix (p a)) @(p a (Fix2 p a)) @(Fix2 p a) (fix2 @a @p) ((∘) @(Fix (p a)) @(p a (Fix (p a))) @(p a (Fix2 p a)) (bimap @p dict$Bifunctor$p @a @a @(Fix (p a)) @(Fix2 p a) (id @a) (poly @a @p dict$Bifunctor$p)) (unFix @(p a)))
 mono : ∀a p. Dict$Bifunctor p -> Fix2 p a -> Fix (p a) =
   fun @a @p ->
     fun (dict$Bifunctor$p : Dict$Bifunctor p) ->
-      (∘) @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (Fix @(p a)) ((∘) @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) (bimap @p dict$Bifunctor$p @a @a @(Fix2 p a) @(Fix (p a)) (id @a) (mono @a @p dict$Bifunctor$p)) (unFix2 @a @p))
-data FixPoly p a =
-       | FixPoly (Fix (p a))
+      (∘) @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (fix @(p a)) ((∘) @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) (bimap @p dict$Bifunctor$p @a @a @(Fix2 p a) @(Fix (p a)) (id @a) (mono @a @p dict$Bifunctor$p)) (unFix2 @a @p))
+data FixPoly p a = Fix (p a)
 data ListF a b =
        | NilF
        | ConsF a b

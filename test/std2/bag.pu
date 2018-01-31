@@ -1,19 +1,14 @@
 -- Multi-sets represented by (unbalanced) binary trees
 import std2/bintree
 
-data Bag a =
-  | Bag (BinTree a)
+type Bag a = BinTree a
 
 instance Foldable Bag where
-  foldr f y0 s =
-    match s with
-    | Bag t -> foldr f y0 t
-  foldl f y0 s =
-    match s with
-    | Bag t -> foldl f y0 t
+  foldr f y0 bag = foldr f y0 (coerce @(Bag -> _) bag)
+  foldl f y0 bag = foldl f y0 (coerce @(Bag -> _) bag)
 
 bag_empty : Bag a
-bag_empty = Bag Leaf
+bag_empty = coerce @(_ -> Bag) Leaf
 
 bag_insert : (Ord a) => a -> Bag a -> Bag a
 bag_insert x s =
@@ -24,5 +19,4 @@ bag_insert x s =
       if x < y then Branch (insert x l) y r
       else Branch l y (insert x r)
   in
-  match s with
-  | Bag t -> Bag (insert x t)
+  coerce @(_ -> Bag) (insert x (coerce @(Bag -> _) s))

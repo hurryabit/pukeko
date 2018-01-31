@@ -5,10 +5,6 @@ g_globstart gm$cons_0_0, 0
 g_updcons 0, 0, 1
 g_return
 
-g_globstart gm$cons_0_1, 1
-g_updcons 0, 1, 1
-g_return
-
 g_globstart gm$cons_0_2, 2
 g_updcons 0, 2, 1
 g_return
@@ -500,30 +496,24 @@ g_return
 
 g_globstart dict$Foldable$Bag$ll1, 3
 g_push 2
-g_eval
-g_uncons 1
-g_push 0
-g_push 3
-g_push 3
+g_push 2
+g_push 2
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldr, 1
 g_mkap 1
-g_updap 3, 5
-g_pop 4
+g_updap 3, 4
+g_pop 3
 g_unwind
 
 g_globstart dict$Foldable$Bag$ll2, 3
 g_push 2
-g_eval
-g_uncons 1
-g_push 0
-g_push 3
-g_push 3
+g_push 2
+g_push 2
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldl, 1
 g_mkap 1
-g_updap 3, 5
-g_pop 4
+g_updap 3, 4
+g_pop 3
 g_unwind
 
 g_globstart dict$Foldable$Bag, 0
@@ -537,8 +527,8 @@ g_return
 
 g_globstart bag_empty, 0
 g_pushglobal gm$cons_0_0, 0
-g_updcons 0, 1, 1
-g_return
+g_update 1
+g_unwind
 
 g_globstart bag_insert$ll1, 4
 g_push 3
@@ -601,17 +591,13 @@ g_push 0
 g_pushglobal bag_insert$ll1, 4
 g_updap 1, 1
 g_push 3
-g_eval
-g_uncons 1
-g_push 0
-g_push 4
-g_push 4
-g_push 4
+g_push 3
+g_push 3
+g_push 3
 g_mkap 1
-g_mkap 2
-g_updcons 0, 1, 6
-g_pop 5
-g_return
+g_updap 2, 5
+g_pop 4
+g_unwind
 
 g_globstart tsort$ll1, 2
 g_push 0

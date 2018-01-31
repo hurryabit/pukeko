@@ -1,5 +1,4 @@
-COMPFILE = $(shell stack exec -- which pukeko)
-COMP = $(COMPFILE) -l
+COMP = $(shell stack exec -- which pukeko)
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
@@ -40,10 +39,15 @@ BENCHMARKS  = qsort.bench \
 
 all: $(EXECUTABLES)
 
+types: $(TYPES)
+
 asm: $(ASSEMBLES)
 
 %.asm: %.pu std2/*.pu $(COMPFILE)
-	$(COMP) $<
+	$(COMP) -l $<
+
+%.ti: %.pu std2/*.pu $(COMPFILE)
+	$(COMP) -t $<
 
 %.pp.asm: %.asm
 	$(NASM) -DNOATAT $(NASM_FLAGS) -E $< | grep '^ *[^% ]' > $@
@@ -60,7 +64,7 @@ gc.o: ../gc.c
 clean:
 	rm -f $(LAMBDAS) $(TYPES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
 
-.PHONEY: all asm clean bench clean.bench
+.PHONEY: all asm clean bench clean.bench types
 
 .PRECIOUS: %.asm %.ll %.ti
 
