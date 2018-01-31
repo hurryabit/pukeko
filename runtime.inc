@@ -635,9 +635,11 @@ _main:
   g_install_main
   g_mkap 1
   g_eval
+  g_uncons 2
+  g_eval
   pop  rax
   g_assert_con rax, 1, MSG_BAD_TAG_EXIT
-  mov  rax, [rax+16]
+  pop  rax
   g_assert_con rax, 1, MSG_BAD_TAG_EXIT
 
   ; set up the gc info for the final stats

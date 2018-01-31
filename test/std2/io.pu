@@ -3,33 +3,44 @@ import std2/char
 import std2/int
 import std2/monad
 
-type IO a = external
+-- Primitives used for I/O
+seq : a -> b -> b
+external seq = "seq"
 
-pure_io : a -> IO a
-external pure_io = "return"
+puti : Int -> Unit
+external puti = "puti"
 
-bind_io : IO a -> (a -> IO b) -> IO b
-external bind_io = "bind"
+geti : Unit -> Int
+external geti = "geti"
+
+putc : Int -> Unit
+external putc = "putc"
+
+getc : Unit -> Int
+external getc = "getc"
+
+-- The IO monad
+data World = | World
+
+type IO a = World -> Pair a World
 
 instance Monad IO where
-  pure = pure_io
-  (>>=) = bind_io
+  pure x = coerce @(_ -> IO) (fun world -> Pair x world)
+  (>>=) mx f = coerce @(_ -> IO) (fun world0 ->
+    match (coerce @(IO -> _) mx) world0 with
+    | Pair x world1 -> (coerce @(IO -> _) (f x)) world1)
 
+io : (a -> b) -> a -> IO b
+io f x = coerce @(_ -> IO) (fun world -> let y = f x in seq y (Pair y world))
 
 print : Int -> IO Unit
-external print = "print"
+print n = io puti n
 
 input : IO Int
-external input = "input"
+input = io geti Unit
 
 putChar : Char -> IO Unit
-external putChar = "putc"
-
-getCharRaw : IO Int
-external getCharRaw = "getc"
+putChar c = io (fun c -> putc (ord c)) c
 
 getChar : IO (Option Char)
-getChar =
-  getCharRaw
-  >>= fun n ->
-  pure (if n < 0 then None else Some (chr n))
+getChar = io (fun u -> let n = getc u in if n < 0 then None else Some (chr n)) Unit

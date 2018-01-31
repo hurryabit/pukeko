@@ -314,7 +314,7 @@ instDecl = do
 primDecl :: Parser PrimDecl
 primDecl = MkPrimDecl
   <$> evar
-  <*> (equals *> char '\"' *> some lowerChar <* symbol "\"")
+  <*> (equals *> char '\"' *> some (lowerChar <|> char '_') <* symbol "\"")
 
 import_ :: Parser FilePath
 import_ = indented_ (reserved "import") $ do

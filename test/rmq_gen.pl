@@ -162,11 +162,18 @@ traverse_ : ∀a m t. Dict$Monad m -> Dict$Foldable t -> (a -> m Unit) -> t a ->
   fun @a @m @t ->
     fun (dict$Monad$m : Dict$Monad m) (dict$Foldable$t : Dict$Foldable t) (f : a -> m Unit) ->
       foldr @t dict$Foldable$t @a @(m Unit) (traverse_$ll1 @a @m dict$Monad$m f) (pure @m dict$Monad$m @Unit Unit)
-data IO a
-external pure_io : ∀a. a -> IO a = "return"
+data World =
+       | World
+data IO a = World -> Pair a World
 external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
+  fun @a -> Pair @a @World
+dict$Monad$IO$ll2 : ∀a. a -> IO a =
+  fun @a ->
+    fun (x : a) ->
+      coerce @(World -> Pair a World -> IO a) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO : Dict$Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> pure_io @a
+  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> bind_io @a @b
   in

@@ -92,48 +92,35 @@ constructor tag arity = mkBuiltinGen (constructorName tag arity) arity
 
 io :: [Global]
 io =
-  [ mkBuiltin "return" 2
-    [ CONS 0 2
+  [ mkBuiltin "seq" 2
+    [ EVAL
+    , POP 1
     , UPDATE 1
-    , RETURN
-    ]
-  , mkBuiltin "bind" 3
-    [ PUSH 2
-    , PUSH 1
-    , MKAP 1
-    , EVAL
-    , UNCONS 2
-    , PUSH 3
-    , MKAP 2
-    , UPDATE 4
-    , POP 3
     , UNWIND
     ]
-  , mkBuiltin "print" 2
+  , mkBuiltin "puti" 1
     [ EVAL
     , PRINT
     , CONS 0 0 -- unit
-    , CONS 0 2 -- pair
     , UPDATE 1
     , RETURN
     ]
-  , mkBuiltin "input" 1
-    [ INPUT
-    , CONS 0 2 -- pair
+  , mkBuiltin "geti" 1
+    [ POP 1 -- unit
+    , INPUT
     , UPDATE 1
     , RETURN
     ]
-  , mkBuiltin "putc" 2
+  , mkBuiltin "putc" 1
     [ EVAL
     , PUTC
     , CONS 0 0 -- unit
-    , CONS 0 2 -- pair
     , UPDATE 1
     , RETURN
     ]
   , mkBuiltin "getc" 1
-    [ GETC
-    , CONS 0 2 -- pair
+    [ POP 1 -- unit
+    , GETC
     , UPDATE 1
     , RETURN
     ]

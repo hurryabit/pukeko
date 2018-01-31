@@ -35,11 +35,18 @@ pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure (>>=) -> pure
-data IO a
-external pure_io : ∀a. a -> IO a = "return"
+data World =
+       | World
+data IO a = World -> Pair a World
 external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
+dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
+  fun @a -> Pair @a @World
+dict$Monad$IO$ll2 : ∀a. a -> IO a =
+  fun @a ->
+    fun (x : a) ->
+      coerce @(World -> Pair a World -> IO a) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO : Dict$Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> pure_io @a
+  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> bind_io @a @b
   in

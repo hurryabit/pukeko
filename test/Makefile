@@ -2,6 +2,7 @@ COMP = $(shell stack exec -- which pukeko)
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
+BENCH = bench $(BENCH_OPTS)
 
 HEAP_SIZE  = 0x10000000 # 256 MB
 STACK_SIZE = 0x04000000 #  64 MB
@@ -43,10 +44,10 @@ types: $(TYPES)
 
 asm: $(ASSEMBLES)
 
-%.asm: %.pu std2/*.pu $(COMPFILE)
+%.asm: %.pu std2/*.pu $(COMP)
 	$(COMP) -l $<
 
-%.ti: %.pu std2/*.pu $(COMPFILE)
+%.ti: %.pu std2/*.pu $(COMP)
 	$(COMP) -t $<
 
 %.pp.asm: %.asm
@@ -77,30 +78,30 @@ sort20.in: sort_gen
 	echo 20000 | ./$< > $@
 
 qsort.bench: qsort sort400.in
-	bench "./$< < sort400.in > /dev/null" > $@
+	$(BENCH) "./$< < sort400.in > /dev/null" > $@
 	./$< < sort400.in > /dev/null 2>> $@
 
 tsort.bench: tsort sort400.in
-	bench "./$< < sort400.in > /dev/null" > $@
+	$(BENCH) "./$< < sort400.in > /dev/null" > $@
 	./$< < sort400.in > /dev/null 2>> $@
 
 isort.bench: isort sort20.in
-	bench "./$< < sort20.in > /dev/null" > $@
+	$(BENCH) "./$< < sort20.in > /dev/null" > $@
 	./$< < sort20.in > /dev/null 2>> $@
 
 queens.bench: queens
-	bench "echo 13 | ./$< > /dev/null" > $@
+	$(BENCH) "echo 13 | ./$< > /dev/null" > $@
 	echo 13 | ./$< > /dev/null 2>> $@
 
 catalan.bench: catalan
-	bench "echo 1666 | ./$< > /dev/null" > $@
+	$(BENCH) "echo 1666 | ./$< > /dev/null" > $@
 	echo 1666 | ./$< > /dev/null 2>> $@
 
 rmq.in: rmq_gen
 	./$< > $@
 
 rmq.bench: rmq rmq.in
-	bench "./$< < rmq.in > /dev/null" > $@
+	$(BENCH) "./$< < rmq.in > /dev/null" > $@
 	./$< < rmq.in > /dev/null 2>> $@
 
 clean.bench:
