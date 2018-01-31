@@ -213,8 +213,7 @@ g_push 1
 g_push 3
 g_pushglobal dict$Functor$List, 0
 g_pushglobal map, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_push 1
 g_push 4
 g_mkap 1
@@ -247,8 +246,7 @@ g_push 4
 g_push 4
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldr, 1
-g_mkap 1
-g_mkap 3
+g_mkap 4
 g_push 1
 g_push 4
 g_updap 2, 6
@@ -275,8 +273,7 @@ g_mkap 2
 g_push 4
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_updap 3, 6
+g_updap 4, 6
 g_pop 5
 g_unwind
 g_label .2
@@ -306,8 +303,7 @@ g_pushint 0
 g_push 4
 g_pushglobal dict$Ord$Int, 0
 g_pushglobal op$le, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_eval
 g_jumpcase .3, .4
 g_label .3
@@ -316,8 +312,7 @@ g_pushint 1
 g_push 4
 g_pushglobal dict$Ring$Int, 0
 g_pushglobal op$m, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_push 2
 g_pushglobal nth_exn, 2
 g_updap 2, 5
@@ -420,8 +415,7 @@ g_uncons 2
 g_push 1
 g_push 1
 g_push 5
-g_mkap 1
-g_updap 1, 6
+g_updap 2, 6
 g_pop 5
 g_unwind
 
@@ -490,8 +484,7 @@ g_push 2
 g_push 2
 g_pushglobal dict$Ring$Int, 0
 g_pushglobal op$t, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_eval
 g_mod
 g_update 3
@@ -505,8 +498,7 @@ g_push 2
 g_push 2
 g_pushglobal dict$Ring$Int, 0
 g_pushglobal op$p, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_eval
 g_mod
 g_update 3
@@ -518,8 +510,7 @@ g_pushint 0
 g_pushglobal add_p, 2
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_updap 2, 1
+g_updap 3, 1
 g_unwind
 
 g_globstart scanl$ll1, 4
@@ -586,8 +577,7 @@ g_mkap 3
 g_pushglobal sols$ll1, 1
 g_pushglobal dict$Functor$List, 0
 g_pushglobal map, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_pushint 1
 g_updcons 1, 2, 1
 g_return
@@ -607,6 +597,5 @@ g_pushglobal main$ll1, 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 1
+g_updap 3, 1
 g_unwind

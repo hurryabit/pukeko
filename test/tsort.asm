@@ -182,8 +182,7 @@ g_push 4
 g_push 4
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldr, 1
-g_mkap 1
-g_mkap 3
+g_mkap 4
 g_push 1
 g_push 4
 g_updap 2, 6
@@ -210,8 +209,7 @@ g_mkap 2
 g_push 4
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_updap 3, 6
+g_updap 4, 6
 g_pop 5
 g_unwind
 g_label .2
@@ -230,8 +228,7 @@ g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$cons_1_2, 2
 g_push 2
 g_pushglobal foldr, 1
-g_mkap 1
-g_updap 2, 2
+g_updap 3, 2
 g_pop 1
 g_unwind
 
@@ -240,8 +237,7 @@ g_pushint 0
 g_push 1
 g_pushglobal dict$Ord$Int, 0
 g_pushglobal op$le, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_eval
 g_jumpcase .0, .1
 g_label .0
@@ -251,8 +247,7 @@ g_pushint 1
 g_push 2
 g_pushglobal dict$Ring$Int, 0
 g_pushglobal op$m, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_pushglobal replicate, 2
 g_mkap 2
 g_push 2
@@ -297,8 +292,7 @@ g_mkap 1
 g_push 2
 g_push 2
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 4
+g_updap 3, 4
 g_pop 3
 g_unwind
 
@@ -308,8 +302,7 @@ g_push 2
 g_cons 1, 2
 g_push 1
 g_pushglobal pure, 1
-g_mkap 1
-g_updap 1, 4
+g_updap 2, 4
 g_pop 3
 g_unwind
 
@@ -321,12 +314,10 @@ g_mkap 2
 g_push 2
 g_push 2
 g_pushglobal sequence, 2
-g_mkap 1
-g_mkap 1
+g_mkap 2
 g_push 2
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 4
+g_updap 3, 4
 g_pop 3
 g_unwind
 
@@ -339,8 +330,7 @@ g_pop 1
 g_pushglobal gm$cons_0_0, 0
 g_push 1
 g_pushglobal pure, 1
-g_mkap 1
-g_updap 1, 3
+g_updap 2, 3
 g_pop 2
 g_unwind
 g_label .1
@@ -352,8 +342,7 @@ g_mkap 2
 g_push 1
 g_push 4
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 5
+g_updap 3, 5
 g_pop 4
 g_unwind
 g_label .2
@@ -365,8 +354,7 @@ g_push 3
 g_mkap 1
 g_push 2
 g_pushglobal op$s, 3
-g_mkap 1
-g_updap 2, 5
+g_updap 3, 5
 g_pop 4
 g_unwind
 
@@ -374,16 +362,14 @@ g_globstart traverse_, 3
 g_pushglobal gm$cons_0_0, 0
 g_push 1
 g_pushglobal pure, 1
-g_mkap 1
-g_mkap 1
+g_mkap 2
 g_push 3
 g_push 2
 g_pushglobal traverse_$ll1, 4
 g_mkap 2
 g_push 3
 g_pushglobal foldr, 1
-g_mkap 1
-g_updap 2, 4
+g_updap 3, 4
 g_pop 3
 g_unwind
 
@@ -426,8 +412,7 @@ g_uncons 2
 g_push 1
 g_push 1
 g_push 5
-g_mkap 1
-g_updap 1, 6
+g_updap 2, 6
 g_pop 5
 g_unwind
 
@@ -501,16 +486,14 @@ g_push 6
 g_push 6
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldr, 1
-g_mkap 1
-g_mkap 3
+g_mkap 4
 g_push 3
 g_push 6
 g_mkap 2
 g_push 5
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldr, 1
-g_mkap 1
-g_updap 3, 7
+g_updap 4, 7
 g_pop 6
 g_unwind
 g_label .2
@@ -533,15 +516,13 @@ g_push 7
 g_push 7
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_mkap 3
+g_mkap 4
 g_push 6
 g_mkap 2
 g_push 5
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_updap 3, 7
+g_updap 4, 7
 g_pop 6
 g_unwind
 g_label .2
@@ -561,8 +542,7 @@ g_push 2
 g_push 2
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldr, 1
-g_mkap 1
-g_updap 3, 4
+g_updap 4, 4
 g_pop 3
 g_unwind
 
@@ -572,8 +552,7 @@ g_push 2
 g_push 2
 g_pushglobal dict$Foldable$BinTree, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_updap 3, 4
+g_updap 4, 4
 g_pop 3
 g_unwind
 
@@ -610,8 +589,7 @@ g_push 1
 g_push 6
 g_push 6
 g_pushglobal op$l, 1
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_eval
 g_jumpcase .3, .4
 g_label .3
@@ -620,8 +598,7 @@ g_push 2
 g_push 6
 g_push 6
 g_push 6
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_push 2
 g_push 2
 g_updcons 1, 3, 8
@@ -636,8 +613,7 @@ g_push 2
 g_push 8
 g_push 8
 g_push 8
-g_mkap 1
-g_mkap 2
+g_mkap 3
 g_updcons 1, 3, 8
 g_pop 7
 g_return
@@ -655,8 +631,7 @@ g_push 3
 g_push 3
 g_push 3
 g_push 3
-g_mkap 1
-g_updap 2, 5
+g_updap 3, 5
 g_pop 4
 g_unwind
 
@@ -665,8 +640,7 @@ g_push 0
 g_push 2
 g_pushglobal dict$Ord$Int, 0
 g_pushglobal bag_insert, 3
-g_mkap 1
-g_updap 2, 3
+g_updap 3, 3
 g_pop 2
 g_unwind
 
@@ -676,12 +650,10 @@ g_pushglobal bag_empty, 0
 g_pushglobal tsort$ll1, 2
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldl, 1
-g_mkap 1
-g_mkap 3
+g_mkap 4
 g_pushglobal dict$Foldable$Bag, 0
 g_pushglobal to_list, 1
-g_mkap 1
-g_updap 1, 2
+g_updap 2, 2
 g_pop 1
 g_unwind
 
@@ -693,8 +665,7 @@ g_pushglobal print, 1
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal traverse_, 3
-g_mkap 2
-g_updap 2, 2
+g_updap 4, 2
 g_pop 1
 g_unwind
 
@@ -706,12 +677,10 @@ g_pushglobal replicate, 2
 g_mkap 2
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal sequence, 2
-g_mkap 1
-g_mkap 1
+g_mkap 2
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 2
+g_updap 3, 2
 g_pop 1
 g_unwind
 
@@ -720,6 +689,5 @@ g_pushglobal main$ll2, 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 1
+g_updap 3, 1
 g_unwind

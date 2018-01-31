@@ -658,11 +658,12 @@ _main:
   ret
 
 %macro g_fwd_compress 1
-  @@(5)
+  @@(4)
   mov  rax, %1
-  mov  rbx, rax
   cmp  byte [rax], TAG_FWD
   jne  %%done
+  @@(1)
+  mov  rbx, rax
 %%follow_loop:
   @@(4)
   mov  rax, [rax+8]

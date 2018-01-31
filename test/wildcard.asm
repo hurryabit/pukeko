@@ -30,8 +30,7 @@ g_mkap 1
 g_push 2
 g_push 2
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 4
+g_updap 3, 4
 g_pop 3
 g_unwind
 
@@ -74,8 +73,7 @@ g_uncons 2
 g_push 1
 g_push 1
 g_push 5
-g_mkap 1
-g_updap 1, 6
+g_updap 2, 6
 g_pop 5
 g_unwind
 
@@ -165,8 +163,7 @@ g_pushglobal print, 1
 g_mkap 1
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal op$s, 3
-g_mkap 1
-g_updap 2, 4
+g_updap 3, 4
 g_pop 3
 g_unwind
 
@@ -177,8 +174,7 @@ g_mkap 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 2
+g_updap 3, 2
 g_pop 1
 g_unwind
 
@@ -187,6 +183,5 @@ g_pushglobal main$ll2, 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal op$gge, 1
-g_mkap 1
-g_updap 2, 1
+g_updap 3, 1
 g_unwind

@@ -17,17 +17,6 @@ g_update 3
 g_pop 2
 g_unwind
 
-g_globstart gm$bind, 3
-g_push 2
-g_push 1
-g_mkap 1
-g_eval
-g_uncons 2
-g_push 3
-g_updap 2, 4
-g_pop 3
-g_unwind
-
 g_globstart dict$Monad$IO$ll1, 0
 g_pushglobal gm$cons_0_2, 2
 g_update 1
@@ -40,9 +29,30 @@ g_updap 1, 2
 g_pop 1
 g_unwind
 
+g_globstart dict$Monad$IO$ll3, 3
+g_push 2
+g_push 1
+g_mkap 1
+g_eval
+g_uncons 2
+g_push 1
+g_push 1
+g_push 5
+g_updap 2, 6
+g_pop 5
+g_unwind
+
+g_globstart dict$Monad$IO$ll4, 2
+g_push 1
+g_push 1
+g_pushglobal dict$Monad$IO$ll3, 3
+g_updap 2, 3
+g_pop 2
+g_unwind
+
 g_globstart dict$Monad$IO, 0
 g_pushglobal dict$Monad$IO$ll2, 1
-g_pushglobal gm$bind, 3
+g_pushglobal dict$Monad$IO$ll4, 2
 g_push 0
 g_push 2
 g_updcons 0, 2, 3
@@ -61,6 +71,5 @@ g_pushglobal h, 1
 g_mkap 1
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal pure, 1
-g_mkap 1
-g_updap 1, 1
+g_updap 2, 1
 g_unwind

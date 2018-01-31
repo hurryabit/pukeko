@@ -28,6 +28,7 @@ opt code0 = case code0 of
  UNWIND:JUMP _:code      -> Just $ UNWIND:code
  POP 0:code              -> Just code
  MKAP 0:code             -> Just code
+ MKAP k:MKAP l:code      -> Just $ MKAP (k+l):code
  MKAP a:UPDATE k:code    -> Just $ UPDAP a k:code
  CONS t a:UPDATE k:code  -> Just $ UPDCONS t a k:code
  PUSH k:UPDATE l:POP m:code

@@ -38,17 +38,26 @@ pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
 data World =
        | World
 data IO a = World -> Pair a World
-external bind_io : ∀a b. IO a -> (a -> IO b) -> IO b = "bind"
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
   fun @a ->
     fun (x : a) ->
       coerce @(World -> Pair a World -> IO a) (dict$Monad$IO$ll1 @a x)
+dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
+  fun @a @b ->
+    fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
+      match coerce @(IO a -> World -> Pair a World) mx world0 with
+      | Pair @a @World x world1 ->
+        coerce @(IO b -> World -> Pair b World) (f x) world1
+dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
+  fun @a @b ->
+    fun (mx : IO a) (f : a -> IO b) ->
+      coerce @(World -> Pair b World -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
-        fun @a @b -> bind_io @a @b
+        fun @a @b -> dict$Monad$IO$ll4 @a @b
   in
   Dict$Monad @IO pure (>>=)
 h : ∀c. c -> c = fun @c -> fun (u : c) -> u
