@@ -166,11 +166,16 @@ ccExpr mode expr =
           output [LABEL done]
 
 ccAltn :: Mode -> Altn -> CC ()
-ccAltn mode MkAltn{_binds, _rhs} = do
-  let arity = length _binds
-  output [UNCONS arity]
-  localDecls (reverse _binds) (ccExpr mode _rhs)
-  whenStackOrEval mode $ output [SLIDE arity]
+ccAltn mode MkAltn{_binds, _rhs}
+  | [(idx, bind)] <- filter (isJust . snd) (zip [0..] _binds) = do
+      output [PROJ idx]
+      localDecls [bind] (ccExpr mode _rhs)
+      whenStackOrEval mode $ output [SLIDE 1]
+  | otherwise = do
+      let arity = length _binds
+      output [UNCONS arity]
+      localDecls (reverse _binds) (ccExpr mode _rhs)
+      whenStackOrEval mode $ output [SLIDE arity]
 
 localDecls :: [Maybe Name] -> CC a -> CC a
 localDecls binds cc = do

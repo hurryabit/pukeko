@@ -1,4 +1,4 @@
 benchmarking echo 1666 | ./catalan > /dev/null
-Steps      :   1943861277
+Steps      :   1910501275
 Alloc bytes:    711956584          (Checks:     19470607)
 GC runs    :           28

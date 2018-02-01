@@ -386,7 +386,6 @@ __install__main__:
 %endif
 %endmacro
 
-;; TODO: Specialize case %1 = 0 if speed matters.
 %macro g_uncons 1
   @@(2+3*%1)
   pop rax
@@ -398,6 +397,12 @@ __install__main__:
 %endrep
 %endmacro
 
+ %macro g_proj 1
+  @@(5)
+  pop  rax
+  g_assert_con rax, MAX_CON, MSG_BAD_TAG_PROJ
+  push qword [rax+8*(%1+1)]
+ %endmacro
 
 ;; Arithmetic
 %macro g_neg 0
@@ -779,6 +784,8 @@ MSG_BAD_INPUT:
   db "INVALID INPUT", 10, 0
 MSG_BAD_TAG_UNCONS:
   db "BAD TAG IN UNCONS: #%016llx", 10, 0
+MSG_BAD_TAG_PROJ:
+  db "BAD TAG IN PROJ: #%016llx", 10, 0
 MSG_BAD_TAG_JUMPCASE:
   db "BAD TAG IN JUMPCASE: #%016llx", 10, 0
 MSG_BAD_TAG_EXIT:

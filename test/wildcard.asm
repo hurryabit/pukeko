@@ -12,8 +12,7 @@ g_return
 g_globstart op$gge, 1
 g_push 0
 g_eval
-g_uncons 2
-g_pop 1
+g_proj 1
 g_update 2
 g_pop 1
 g_unwind
@@ -133,16 +132,15 @@ g_unwind
 g_globstart fst, 1
 g_push 0
 g_eval
-g_uncons 2
-g_update 3
-g_pop 2
+g_proj 0
+g_update 2
+g_pop 1
 g_unwind
 
 g_globstart snd, 1
 g_push 0
 g_eval
-g_uncons 2
-g_pop 1
+g_proj 1
 g_update 2
 g_pop 1
 g_unwind

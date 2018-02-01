@@ -33,6 +33,7 @@ data GInst lab
   | CONS        Int Int
   | UPDCONS     Int Int Int
   | UNCONS      Int
+  | PROJ        Int
   -- Arithmetic
   | NEG
   | ADD

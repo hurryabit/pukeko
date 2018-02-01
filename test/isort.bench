@@ -1,4 +1,4 @@
 benchmarking ./isort < sort20.in > /dev/null
-Steps      :  46582785579
+Steps      :  45588892312
 Alloc bytes:  16716320432          (Checks:    497786698)
 GC runs    :          125

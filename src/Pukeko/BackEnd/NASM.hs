@@ -72,6 +72,7 @@ assembleInst arities inst = do
     CONS tag arity -> code "cons" [show tag, show arity]
     UPDCONS tag arity offset -> code "updcons" [show tag, show arity, show offset]
     UNCONS arity -> code "uncons" [show arity]
+    PROJ idx -> code "proj" [show idx]
     NEG -> code "neg" []
     ADD -> code "add" []
     SUB -> code "sub" []

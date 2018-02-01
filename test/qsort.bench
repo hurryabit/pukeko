@@ -1,4 +1,4 @@
 benchmarking ./qsort < sort400.in > /dev/null
-Steps      :  10048692659
+Steps      :   9917810849
 Alloc bytes:   3493900088          (Checks:    119850282)
 GC runs    :           34

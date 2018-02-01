@@ -23,43 +23,39 @@ g_abort
 g_globstart op$l, 1
 g_push 0
 g_eval
-g_uncons 4
-g_update 5
-g_pop 4
+g_proj 0
+g_update 2
+g_pop 1
 g_unwind
 
 g_globstart op$le, 1
 g_push 0
 g_eval
-g_uncons 4
+g_proj 1
+g_update 2
 g_pop 1
-g_update 4
-g_pop 3
 g_unwind
 
 g_globstart op$p, 1
 g_push 0
 g_eval
-g_uncons 4
+g_proj 1
+g_update 2
 g_pop 1
-g_update 4
-g_pop 3
 g_unwind
 
 g_globstart op$m, 1
 g_push 0
 g_eval
-g_uncons 4
-g_pop 2
-g_update 3
-g_pop 2
+g_proj 2
+g_update 2
+g_pop 1
 g_unwind
 
 g_globstart op$t, 1
 g_push 0
 g_eval
-g_uncons 4
-g_pop 3
+g_proj 3
 g_update 2
 g_pop 1
 g_unwind
@@ -249,8 +245,7 @@ g_label .2
 g_globstart op$gge, 1
 g_push 0
 g_eval
-g_uncons 2
-g_pop 1
+g_proj 1
 g_update 2
 g_pop 1
 g_unwind

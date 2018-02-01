@@ -1,4 +1,4 @@
 benchmarking ./tsort < sort400.in > /dev/null
-Steps      :   7886733677
+Steps      :   7767491602
 Alloc bytes:   3166484544          (Checks:     84778986)
 GC runs    :           36
