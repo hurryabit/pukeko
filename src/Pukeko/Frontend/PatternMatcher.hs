@@ -29,6 +29,7 @@ type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader SourcePos, Error Failu
 evalPM :: Module In -> PM a -> Either Failure a
 evalPM m0 = run . runError . runReader noPos . evalState [] . runInfo m0
 
+-- TODO: Use 'Supply' rather than state.
 freshEVar :: PM Id.EVar
 freshEVar = get >>= \(x:xs) -> put xs >> return x
 
@@ -217,8 +218,5 @@ grpMatchExpr :: GrpMatch tv ev -> PM (Expr Out tv ev)
 grpMatchExpr (MkGrpMatch t is) = ECas t <$> traverse grpMatchItemAltn is
 
 grpMatchItemAltn :: GrpMatchItem tv ev -> PM (Case Out tv ev)
-grpMatchItemAltn (MkGrpMatchItem con ts bs0 rm) = do
-  bs1 <- for bs0 $ \case
-    BWild   -> freshEVar
-    BName x -> pure x
-  MkCase con ts bs1 <$> pmMatch rm
+grpMatchItemAltn (MkGrpMatchItem con ts bs rm) = do
+  MkCase con ts (fmap bindName bs) <$> pmMatch rm

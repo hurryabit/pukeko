@@ -30,17 +30,17 @@ data Dict$Ord a =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (<)
+      | Dict$Ord @a (<) _ _ _ -> (<)
 (<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (<=)
+      | Dict$Ord @a _ (<=) _ _ -> (<=)
 (>) : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (>)
+      | Dict$Ord @a _ _ _ (>) -> (>)
 data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 data Dict$Ring a =
@@ -49,12 +49,12 @@ data Dict$Ring a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (+)
+      | Dict$Ring @a _ (+) _ _ -> (+)
 (-) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (-)
+      | Dict$Ring @a _ _ (-) _ -> (-)
 data Int
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
@@ -107,12 +107,12 @@ pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m pure (>>=) -> pure
+      | Dict$Monad @m pure _ -> pure
 (>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m pure (>>=) -> (>>=)
+      | Dict$Monad @m _ (>>=) -> (>>=)
 sequence$ll1 : ∀a m. Dict$Monad m -> a -> List a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (x : a) (xs : List a) ->
@@ -194,11 +194,10 @@ combine : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
     fun (op : a -> a -> a) (t1 : RmqTree a) (t2 : RmqTree a) ->
       match t1 with
       | RmqEmpty @a -> abort @(RmqTree a)
-      | RmqNode @a s1 combine$pm1 v1 combine$pm2 combine$pm3 ->
+      | RmqNode @a s1 _ v1 _ _ ->
         match t2 with
         | RmqEmpty @a -> abort @(RmqTree a)
-        | RmqNode @a combine$pm4 e2 v2 combine$pm5 combine$pm6 ->
-          RmqNode @a s1 e2 (op v1 v2) t1 t2
+        | RmqNode @a _ e2 v2 _ _ -> RmqNode @a s1 e2 (op v1 v2) t1 t2
 build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
   fun @a ->
     fun (op : a -> a -> a) (run : List (RmqTree a) -> RmqTree a) (ts : List (RmqTree a)) ->
@@ -207,7 +206,7 @@ build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqT
       | Cons @(RmqTree a) build$pm1 build$pm2 ->
         match build$pm2 with
         | Nil @(RmqTree a) -> build$pm1
-        | Cons @(RmqTree a) build$pm3 build$pm4 ->
+        | Cons @(RmqTree a) _ _ ->
           run (pair @(RmqTree a) (combine @a op) ts)
 build : ∀a. (a -> a -> a) -> List a -> RmqTree a =
   fun @a ->

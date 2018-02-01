@@ -34,7 +34,7 @@ data Dict$Monad m =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m pure (>>=) -> (>>=)
+      | Dict$Monad @m _ (>>=) -> (>>=)
 (;ll1) : ∀a m. m a -> Unit -> m a =
   fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
 (;) : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
@@ -84,12 +84,12 @@ fst : ∀a b. Pair a b -> a =
   fun @a @b ->
     fun (p : Pair a b) ->
       match p with
-      | Pair @a @b x fst$pm1 -> x
+      | Pair @a @b x _ -> x
 snd : ∀a b. Pair a b -> b =
   fun @a @b ->
     fun (p : Pair a b) ->
       match p with
-      | Pair @a @b snd$pm1 y -> y
+      | Pair @a @b _ y -> y
 main$ll1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in

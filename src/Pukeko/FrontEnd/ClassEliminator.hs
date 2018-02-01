@@ -42,11 +42,11 @@ elimDecl decl = case decl of
     let qprm = Vec.singleton (MkQVar mempty prm)
         prmType = TVar (mkBound Fin.zero prm)
         dictPrm = Id.evar "dict"
-        c_binds = fmap _sign2func mthdsV
         sels = do
           (i, MkSignDecl z t0) <- itoList mthdsV
           let t1 = TUni (Vec.singleton (MkQVar (Set.singleton clss) prm)) t0
           let e_rhs = EVar (mkBound i z)
+          let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthdsV
           let c_one = MkCase (clssDCon clss) [prmType] c_binds e_rhs
           let e_cas = ECas (EVar (mkBound Fin.zero dictPrm)) (c_one :| [])
           let b_lam = MkBind dictPrm (mkTDict clss prmType)

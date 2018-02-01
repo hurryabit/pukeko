@@ -133,8 +133,9 @@ typeOfCase ::
   (St.Typed st, IsTVar tv, IsEVar ev) =>
   Type tv -> Case st tv ev -> TC tv ev (Type tv)
 typeOfCase t (MkCase c ts bs e0) = do
-  let ps = map PVar (toList bs)
-      e1 = fmap (first (bs Vec.!)) e0
+  let ps = map (maybe PWld PVar) (toList bs)
+      lk i = maybe (bug "reference to wildcard pattern") id  (bs Vec.! i)
+      e1 = fmap (first lk) e0
   typeOfAltn t (MkAltn (PCon c ts ps) e1)
 
 patnEnvLevel ::

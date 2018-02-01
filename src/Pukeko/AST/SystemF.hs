@@ -147,7 +147,7 @@ data Bind ty tv = MkBind
 data Case st tv ev = forall n. MkCase
   { _case2dcon  :: Id.DCon
   , _case2targs :: [StageType st tv]
-  , _case2binds :: Vector n Id.EVar
+  , _case2binds :: Vector n (Maybe Id.EVar)
   , _case2expr  :: Expr st tv (EFinScope n ev)
   }
 
@@ -636,7 +636,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) wh
       ( "|"
         <+> pretty c
         <+> prettyAtType (prettyPrecType 3) ts
-        <+> hsepMap pretty bs <+> "->"
+        <+> hsepMap (maybe "_" pretty) bs <+> "->"
       )
       2 (pretty e)
 

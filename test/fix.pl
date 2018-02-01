@@ -22,7 +22,7 @@ data Dict$Ord a =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (<=)
+      | Dict$Ord @a _ (<=) _ _ -> (<=)
 data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 data Dict$Ring a =
@@ -31,12 +31,12 @@ data Dict$Ring a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (-)
+      | Dict$Ring @a _ _ (-) _ -> (-)
 (*) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (*)
+      | Dict$Ring @a _ _ _ (*) -> (*)
 data Int
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
@@ -67,12 +67,12 @@ foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
-      | Dict$Foldable @t foldr foldl -> foldr
+      | Dict$Foldable @t foldr _ -> foldr
 foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
-      | Dict$Foldable @t foldr foldl -> foldl
+      | Dict$Foldable @t _ foldl -> foldl
 data Dict$Functor f =
        | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
 map : ∀f. Dict$Functor f -> (∀a b. (a -> b) -> f a -> f b) =
@@ -116,12 +116,12 @@ pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m pure (>>=) -> pure
+      | Dict$Monad @m pure _ -> pure
 (>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m pure (>>=) -> (>>=)
+      | Dict$Monad @m _ (>>=) -> (>>=)
 (;ll1) : ∀a m. m a -> Unit -> m a =
   fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
 (;) : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =

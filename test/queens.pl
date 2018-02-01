@@ -24,36 +24,36 @@ data Dict$Ord a =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (<)
+      | Dict$Ord @a (<) _ _ _ -> (<)
 (<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) (<=) (>=) (>) -> (<=)
+      | Dict$Ord @a _ (<=) _ _ -> (<=)
 data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 empty : ∀m. Dict$Monoid m -> m =
   fun @m ->
     fun (dict : Dict$Monoid m) ->
       match dict with
-      | Dict$Monoid @m empty append -> empty
+      | Dict$Monoid @m empty _ -> empty
 append : ∀m. Dict$Monoid m -> m -> m -> m =
   fun @m ->
     fun (dict : Dict$Monoid m) ->
       match dict with
-      | Dict$Monoid @m empty append -> append
+      | Dict$Monoid @m _ append -> append
 data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 (+) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (+)
+      | Dict$Ring @a _ (+) _ _ -> (+)
 (-) : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a neg (+) (-) (*) -> (-)
+      | Dict$Ring @a _ _ (-) _ -> (-)
 data Int
 external eq_int : Int -> Int -> Bool = "eq"
 dict$Eq$Int : Dict$Eq Int =
@@ -93,12 +93,12 @@ foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
-      | Dict$Foldable @t foldr foldl -> foldr
+      | Dict$Foldable @t foldr _ -> foldr
 foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
-      | Dict$Foldable @t foldr foldl -> foldl
+      | Dict$Foldable @t _ foldl -> foldl
 foldMap$ll1 : ∀a m. Dict$Monoid m -> (a -> m) -> a -> m -> m =
   fun @a @m ->
     fun (dict$Monoid$m : Dict$Monoid m) (f : a -> m) (x : a) (m : m) ->
@@ -196,7 +196,7 @@ data Dict$Monad m =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m pure (>>=) -> (>>=)
+      | Dict$Monad @m _ (>>=) -> (>>=)
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
