@@ -42,6 +42,7 @@ import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
+import           Pukeko.AST.Functor2
 import           Pukeko.AST.Scope
 
 infixr 1 ~>, *~>
@@ -132,13 +133,13 @@ coercion2type :: Traversal (Coercion ty1) (Coercion ty2) ty1 ty2
 coercion2type f (MkCoercion dir tcon from to) = MkCoercion dir tcon <$> f from <*> f to
 
 -- * Deep traversals
-type2tcon :: Traversal' (Type tv) Id.TCon
-type2tcon f = \case
-  TVar v     -> pure (TVar v)
-  TArr       -> pure TArr
-  TCon c     -> TCon <$> f c
-  TApp tf tp -> TApp <$> type2tcon f tf <*> type2tcon f tp
-  TUni xs tq -> TUni xs <$> type2tcon f tq
+type2tcon :: forall m tv. Monad m => (Id.TCon -> m Id.TCon) -> Type tv -> m (Type tv)
+type2tcon f = cataM2 (fmap embed2 . step)
+  where
+    step :: TypeF Type tv' -> m (TypeF Type tv')
+    step = \case
+      TConF c -> TConF <$> f c
+      x       -> pure x
 
 instance IsType NoType where
   isType = const Nothing
@@ -205,8 +206,6 @@ prettyQVar (MkQVar q v)
   | null q    = pretty v
   | otherwise = parens (pretty v <+> "|" <+> hsepMap pretty q)
 
-makeLenses ''QVar
-
 deriving instance Functor     Type
 deriving instance Foldable    Type
 deriving instance Traversable Type
@@ -226,6 +225,43 @@ newtype Boxed tv = Box{unBox :: tv}
 instance (BaseTVar tv, Ord tv) => HasEnv (Boxed tv) where
   type EnvOf (Boxed tv) = Map (Boxed tv)
   lookupEnv v@(Box v0) = Map.findWithDefault (bugWith "lookupEnv" (baseTVar v0)) v
+
+data TypeF typ tv
+  = TVarF tv
+  | TArrF
+  | TConF Id.TCon
+  | TAppF (typ tv) (typ tv)
+  | forall n. KnownNat n =>
+    TUniF (Vector n QVar) (typ (TFinScope n tv))
+
+type instance Base2 Type = TypeF
+
+instance Functor2 TypeF
+instance Traversable2 TypeF where
+  traverse2 f = \case
+    TVarF v      -> pure (TVarF v)
+    TArrF        -> pure TArrF
+    TConF c      -> pure (TConF c)
+    TAppF t1 t2  -> TAppF <$> f t1 <*> f t2
+    TUniF qvs t1 -> TUniF qvs <$> f t1
+
+instance Recursive2 Type where
+  project2 = \case
+    TVar v      -> TVarF v
+    TArr        -> TArrF
+    TCon c      -> TConF c
+    TApp t1 t2  -> TAppF t1 t2
+    TUni qvs t1 -> TUniF qvs t1
+
+instance Corecursive2 Type where
+  embed2 = \case
+    TVarF v      -> TVar v
+    TArrF        -> TArr
+    TConF c      -> TCon c
+    TAppF t1 t2  -> TApp t1 t2
+    TUniF qvs t1 -> TUni qvs t1
+
+makeLenses ''QVar
 
 renameType :: (BaseTVar tv, Ord tv) => Type tv -> Type tv
 renameType t0 =
