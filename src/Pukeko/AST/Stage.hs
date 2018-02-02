@@ -2,6 +2,8 @@ module Pukeko.AST.Stage where
 
 import Pukeko.Prelude
 
+import GHC.TypeLits (type (<=?))
+
 import Pukeko.AST.Type (NoType, Type)
 
 data Parser

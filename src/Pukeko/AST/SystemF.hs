@@ -17,9 +17,7 @@ module Pukeko.AST.SystemF
   , Altn (..)
   , Patn (..)
 
-  , Some1 (..)
-  , Pair1 (..)
-
+  , weakenE
   , mkEApp
   , mkELam
   , mkETyApp
@@ -55,7 +53,6 @@ import Pukeko.Prelude
 
 import Data.Bifoldable
 import Data.Bitraversable
-import qualified Data.Finite as Fin
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
@@ -70,13 +67,13 @@ data Module st = MkModule
   }
 
 data Decl st
-  =                          DType (NonEmpty (Lctd (Some1 TConDecl)))
+  =                          DType (NonEmpty (Lctd TConDecl))
   | Untyped    st ~ 'True => DSign (SignDecl Void)
   | HasClasses st ~ 'True => DClss ClssDecl
   | HasClasses st ~ 'True => DInst (InstDecl st)
   | HasLambda  st ~ 'True => DDefn (Defn st Void Void)
-  | forall m n. (HasLambda st ~ 'False, StageType st ~ Type, KnownNat m) =>
-                             DSupC (SupCDecl st m n)
+  | (HasLambda st ~ 'False, StageType st ~ Type) =>
+                             DSupC (SupCDecl st)
   |                          DPrim (PrimDecl (StageType st))
 
 data SignDecl tv = MkSignDecl
@@ -87,23 +84,23 @@ data SignDecl tv = MkSignDecl
 data ClssDecl = MkClssDecl
   { _clss2name  :: Id.Clss
   , _clss2prm   :: Id.TVar
-  , _clss2mthds :: [SignDecl (TFinScope 1 Void)]
+  , _clss2mthds :: [SignDecl (TScope Int Void)]
   }
 
-data InstDecl st = forall m. (KnownNat m) => MkInstDecl
+data InstDecl st = MkInstDecl
   { _inst2clss  :: Id.Clss
     -- FIXME: There's no way to define instances on (->).
   , _inst2tcon  :: Id.TCon
-  , _inst2qvars :: Vector m QVar
-  , _inst2defns :: [Lctd (Defn st (TFinScope m Void) Void)]
+  , _inst2qvars :: [QVar]
+  , _inst2defns :: [Lctd (Defn st (TScope Int Void) Void)]
   }
 
-data SupCDecl st m n = MkSupCDecl
+data SupCDecl st = MkSupCDecl
   { _supc2func  :: Id.EVar
-  , _supc2tprms :: Vector m QVar
-  , _supc2type  :: StageType st (TFinScope m Void)
-  , _supc2eprms :: Vector n (Bind (StageType st) (TFinScope m Void))
-  , _supc2expr  :: Expr st (TFinScope m Void) (EFinScope n Void)
+  , _supc2tprms :: [QVar]
+  , _supc2type  :: StageType st (TScope Int Void)
+  , _supc2eprms :: [Bind (StageType st) (TScope Int Void)]
+  , _supc2expr  :: Expr st (TScope Int Void) (EScope Int Void)
   }
 
 data PrimDecl ty = MkPrimDecl
@@ -123,19 +120,17 @@ data Expr st tv ev
   | ECon Id.DCon
   | ENum Int
   | EApp (Expr st tv ev) (NonEmpty (Expr st tv ev))
-  | forall n. HasLambda st ~ 'True =>
-    ELam (Vector n (Bind (StageType st) tv)) (Expr st tv (EFinScope n ev)) (StageType st tv)
-  | forall n.
-    ELet (Vector n (Lctd (Defn st tv ev))) (Expr st tv (EFinScope n ev))
-  | forall n.
-    ERec (Vector n (Lctd (Defn st tv (EFinScope n ev)))) (Expr st tv (EFinScope n ev))
+  | HasLambda st ~ 'True =>
+    ELam (NonEmpty (Bind (StageType st) tv)) (Expr st tv (EScope Int ev)) (StageType st tv)
+  | ELet [Lctd (Defn st tv ev)] (Expr st tv (EScope Int ev))
+  | ERec [Lctd (Defn st tv (EScope Int ev))] (Expr st tv (EScope Int ev))
   | HasNested st ~ 'False =>
     ECas (Expr st tv ev) (NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
     EMat (Expr st tv ev) (NonEmpty (Altn st tv ev))
   | ECoe (Coercion (StageType st tv)) (Expr st tv ev)
-  | forall m. (HasTypes st ~ 'True, KnownNat m) =>
-    ETyAbs (Vector m QVar) (Expr st (TFinScope m tv) ev)
+  | (HasTypes st ~ 'True) =>
+    ETyAbs (NonEmpty QVar) (Expr st (TScope Int tv) ev)
   | HasTypes st ~ 'True =>
     ETyApp (Expr st tv ev) (NonEmpty (StageType st tv))
 
@@ -144,11 +139,11 @@ data Bind ty tv = MkBind
   , _bind2type :: ty tv
   }
 
-data Case st tv ev = forall n. MkCase
+data Case st tv ev = MkCase
   { _case2dcon  :: Id.DCon
   , _case2targs :: [StageType st tv]
-  , _case2binds :: Vector n (Maybe Id.EVar)
-  , _case2expr  :: Expr st tv (EFinScope n ev)
+  , _case2binds :: [Maybe Id.EVar]
+  , _case2expr  :: Expr st tv (EScope Int ev)
   }
 
 data Altn st tv ev = MkAltn
@@ -173,6 +168,12 @@ makeLenses ''Bind
 makeLenses ''Case
 makeLenses ''Altn
 
+weakenE :: Expr st tv ev -> Expr st tv (EScope i ev)
+weakenE = fmap weakenScope
+
+strengthenE0 :: Expr st tv (EScope Int ev) -> Expr st tv ev
+strengthenE0 = fmap strengthenScope0
+
 mkEApp :: (Foldable t) => Expr st tv ev -> t (Expr st tv ev) -> Expr st tv ev
 mkEApp e0 es0 = case toList es0 of
   []    -> e0
@@ -180,13 +181,13 @@ mkEApp e0 es0 = case toList es0 of
 
 mkELam ::
   (HasLambda st ~ 'True) =>
-  Vector n (Bind (StageType st) tv) ->
-  Expr st tv (EFinScope n ev)       ->
-  StageType st tv                   ->
+  [Bind (StageType st) tv]   ->
+  Expr st tv (EScope Int ev) ->
+  StageType st tv            ->
   Expr st tv ev
-mkELam bs e0 t0
-  | null bs   = fmap unsafeStrengthen e0
-  | otherwise = ELam bs e0 t0
+mkELam bs0 e0 t0 = case bs0 of
+  []   -> strengthenE0 e0
+  b:bs -> ELam (b :| bs) e0 t0
 
 mkETyApp ::
   (HasTypes st ~ 'True) => Expr st tv ev -> [StageType st tv] -> Expr st tv ev
@@ -194,13 +195,11 @@ mkETyApp e0 = \case
   []    -> e0
   t1:ts -> ETyApp e0 (t1 :| ts)
 
-mkETyAbs ::
-  forall st m tv ev. (IsStage st, HasTypes st ~ 'True, KnownNat m) =>
-  Vector m QVar -> Expr st (TFinScope m tv) ev -> Expr st tv ev
-mkETyAbs qvs e0 =
-  case sameNat (Proxy @m) (Proxy @0) of
-    Nothing -> ETyAbs qvs e0
-    Just Refl -> first (strengthenWith Fin.absurd0) e0
+mkETyAbs :: (IsStage st, HasTypes st ~ 'True) =>
+  [QVar] -> Expr st (TScope Int tv) ev -> Expr st tv ev
+mkETyAbs qvs0 e0 = case qvs0 of
+  []     -> first strengthenScope0 e0
+  qv:qvs -> ETyAbs (qv :| qvs) e0
 
 -- * Abstraction and substition
 
@@ -239,11 +238,9 @@ pdist (Bound i x) = EVar (Bound i x)
 pdist (Free t)    = fmap Free t
 
 -- * Lenses and traversals
-inst2defn ::
-  (Applicative f, Where f) =>
-  (forall n.
-    Defn st1 (TFinScope n Void) Void -> f (Defn st2 (TFinScope n Void) Void)) ->
-  InstDecl st1 -> f (InstDecl st2)
+inst2defn :: WhereTraversal
+  (InstDecl st1) (InstDecl st2)
+  (Defn st1 (TScope Int Void) Void) (Defn st2 (TScope Int Void) Void)
 inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> (traverse . lctd) f ds
 
 -- | Travere over the names of all the functions defined in either a 'DDefn', a
@@ -395,9 +392,6 @@ over' ::
    (forall i. g (s i v1) ->           g (s i v2))  -> f v1 ->           f v2
 over' l f = runIdentity . l (Identity . f)
 
-case2expr :: EScopedLens (Case st tv) (Case st tv) (Expr st tv) (Expr st tv)
-case2expr f (MkCase c ts bs e) = MkCase c ts bs <$> f e
-
 
 -- * Instances
 
@@ -511,7 +505,7 @@ instance (PrettyStage st) => Pretty (Decl st) where
       "instance" <+> prettyTypeCstr qvs <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where
-        t1 :: Type (TFinScope _ Void)
+        t1 :: Type (TScope Int Void)
         t1 = mkTApp (TCon t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
     DDefn d -> pretty d
     DSupC (MkSupCDecl z qvs t bs e) ->
@@ -529,9 +523,9 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) wh
 
 prettyDefns ::
   (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
-  Bool -> Vector n (Lctd (Defn st tv ev)) -> Doc ann
-prettyDefns isrec ds = case toList ds of
-    [] -> mempty
+  Bool -> [Lctd (Defn st tv ev)] -> Doc ann
+prettyDefns isrec ds = case ds of
+    [] -> bug "empty definitions"
     d0:ds ->
       let_ <+> pretty d0
       $$ vcatMap (\d -> "and" <+> pretty d) ds
@@ -596,7 +590,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
 
 prettyELam ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  Int -> Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> Doc ann
+  Int -> [Bind (StageType st) tv] -> Expr st tv (EScope Int ev) -> Doc ann
 prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
@@ -606,14 +600,12 @@ prettyELam prec bs e
 prettyELamT ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
   Int ->
-  Vector n (Bind (StageType st) tv) -> Expr st tv (EFinScope n ev) -> StageType st tv -> Doc ann
-prettyELamT prec bs e t
-  | null bs   = bug "empty lambda" -- prettyPrec prec e
-  | otherwise =
-      maybeParens (prec > 0)
-      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (pretty e)
+  NonEmpty (Bind (StageType st) tv) -> Expr st tv (EScope Int ev) -> StageType st tv -> Doc ann
+prettyELamT prec bs e t =
+  maybeParens (prec > 0)
+  $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (pretty e)
 
-prettyETyAbs :: Int -> Vector m QVar -> Doc ann -> Doc ann
+prettyETyAbs :: (Foldable t) => Int -> t QVar -> Doc ann -> Doc ann
 prettyETyAbs prec qvs d
   | null qvs   = maybeParens (prec > 0) d
   | otherwise =
@@ -659,7 +651,7 @@ deriving instance (StageType st ~ Type) => Show (Decl st)
 deriving instance (Show tv)             => Show (SignDecl tv)
 deriving instance                          Show (ClssDecl)
 deriving instance (StageType st ~ Type) => Show (InstDecl st)
-deriving instance (StageType st ~ Type) => Show (SupCDecl st m n)
+deriving instance (StageType st ~ Type) => Show (SupCDecl st)
 deriving instance                          Show (PrimDecl Type)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)

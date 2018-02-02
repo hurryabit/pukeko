@@ -17,8 +17,8 @@ type In  = St.Renamer
 type Out = St.Renamer
 
 data TRState = MkTRState
-  { _st2tcons :: Map Id.TCon (Some1 TConDecl)
-  , _st2dcons :: Map Id.DCon (Some1 (Pair1 TConDecl DConDecl))
+  { _st2tcons :: Map Id.TCon TConDecl
+  , _st2dcons :: Map Id.DCon (TConDecl, DConDecl)
   }
 makeLenses ''TRState
 
@@ -36,17 +36,17 @@ trType = type2tcon $ \tcon -> do
   unless ex (throwHere ("unknown type constructor:" <+> pretty tcon))
   pure tcon
 
-insertTCon :: TConDecl n -> TR ()
+insertTCon :: TConDecl -> TR ()
 insertTCon tcon@MkTConDecl{_tcon2name = tname} = do
   old <- uses st2tcons (Map.lookup tname)
   when (isJust old) $ throwHere ("duplicate type constructor:" <+> pretty tname)
-  modifying st2tcons (Map.insert tname (Some1 tcon))
+  modifying st2tcons (Map.insert tname tcon)
 
-insertDCon :: KnownNat n => TConDecl n -> DConDecl n -> TR ()
+insertDCon :: TConDecl -> DConDecl -> TR ()
 insertDCon tcon dcon@MkDConDecl{_dcon2name = dname} = do
   old <- uses st2dcons (Map.lookup dname)
   when (isJust old) $ throwHere ("duplicate data constructor:" <+> pretty dname)
-  modifying st2dcons (Map.insert dname (Some1 (Pair1 tcon dcon)))
+  modifying st2dcons (Map.insert dname (tcon, dcon))
 
 findDCon :: Id.DCon -> TR Id.DCon
 findDCon dcon = do
@@ -61,8 +61,8 @@ trDefn = traverseOf defn2dcon findDCon
 trDecl :: Decl In -> TR (Decl Out)
 trDecl top = case top of
   DType tconDecls -> do
-    for_ tconDecls (lctd_ (\(Some1 tcon) -> insertTCon tcon))
-    for_ tconDecls $ lctd_ $ \(Some1 tcon@MkTConDecl{_tcon2dcons = dconDecls0}) ->
+    for_ tconDecls (lctd_ insertTCon)
+    for_ tconDecls $ lctd_ $ \tcon@MkTConDecl{_tcon2dcons = dconDecls0} ->
       case dconDecls0 of
         Left typ -> void (trType typ)
         Right dconDecls ->

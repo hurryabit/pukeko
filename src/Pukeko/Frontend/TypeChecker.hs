@@ -4,9 +4,10 @@ module Pukeko.FrontEnd.TypeChecker
 
 import Pukeko.Prelude
 
-import qualified Data.Map             as Map
-import qualified Data.Set             as Set
-import qualified Data.Vector.Sized    as Vec
+import qualified Data.List.NE as NE
+import qualified Data.Map     as Map
+import qualified Data.Set     as Set
+import qualified Data.Vector  as Vec
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
@@ -53,13 +54,13 @@ typeOf = \case
         _          -> throwHere "unexpected value argument"
   ELam bs e0 t0 -> do
     let ts = fmap _bind2type bs
-    withinEScope ts (check e0 t0)
+    withinEScope' id ts (check e0 t0)
     pure (ts *~> t0)
   ELet ds e0 -> do
     (traverse_ . lctd_) checkDefn ds
-    withBinds (fmap (_defn2bind . unlctd) ds) (typeOf e0)
+    withinEScope' (_bind2type . _defn2bind . unlctd) ds (typeOf e0)
   ERec ds e0 -> do
-    withBinds (fmap (_defn2bind . unlctd) ds) $ do
+    withinEScope' (_bind2type . _defn2bind . unlctd) ds $ do
       (traverse_ . lctd_) checkDefn ds
       typeOf e0
   EMat e0 as -> typeOfBranching typeOfAltn e0 as
@@ -72,14 +73,12 @@ typeOf = \case
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
-      TUni qvs t1 ->
-        case Vec.matchNonEmpty qvs ts1 of
-          Nothing -> throwHere
-            ("expected" <+> pretty (length qvs) <+> "type arguments, but found"
-             <+> pretty (length ts1) <+> "type arguments")
-          Just ts2 -> do
-            Vec.zipWithM_ satisfiesCstrs ts2 qvs
-            pure (t1 >>= scope TVar (ts2 Vec.!))
+      TUni qvs tq -> do
+        unless (length qvs == length ts1) $
+          throwHere ("expected" <+> pretty (length qvs) <+> "type arguments, but found"
+                     <+> pretty (length ts1) <+> "type arguments")
+        NE.zipWithM_ satisfiesCstrs ts1 qvs
+        pure (instantiateN ts1 tq)
       TFun{} ->
         throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
@@ -127,14 +126,15 @@ typeOfAltn ::
   Type tv -> Altn st tv ev -> TC tv ev (Type tv)
 typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
-  withinEScope env (typeOf e)
+  withinEScope id env (typeOf e)
 
 typeOfCase ::
   (St.Typed st, IsTVar tv, IsEVar ev) =>
   Type tv -> Case st tv ev -> TC tv ev (Type tv)
 typeOfCase t (MkCase c ts bs e0) = do
   let ps = map (maybe PWld PVar) (toList bs)
-      lk i = maybe (bug "reference to wildcard pattern") id  (bs Vec.! i)
+      bs1 = Vec.fromList bs
+      lk i = maybe (bug "reference to wildcard pattern") id  (bs1 Vec.! i)
       e1 = fmap (first lk) e0
   typeOfAltn t (MkAltn (PCon c ts ps) e1)
 
@@ -144,7 +144,7 @@ patnEnvLevel p t0 = case p of
   PWld -> pure Map.empty
   PVar x -> pure (Map.singleton x t0)
   PCon c ts1 ps -> do
-    Some1 (Pair1 _tconDecl (MkDConDecl tcon dcon _tag flds1)) <- findInfo info2dcons c
+    (_tconDecl, MkDConDecl tcon dcon _tag flds1) <- findInfo info2dcons c
     let t1 = mkTApp (TCon tcon) (toList ts1)
     unless (t0 == t1) $ throwHere
       ("expected pattern of type" <+> pretty t0
@@ -152,14 +152,11 @@ patnEnvLevel p t0 = case p of
     unless (length flds1 == length ps) $ throwHere
       ("expected" <+> pretty (length flds1) <+> "pattern arguments of" <+> pretty dcon
        <> ", but found" <+> pretty (length ps) <+> "pattern arguments")
-    Vec.withList ts1 $ \ts2 -> do
-      let fldsProxy :: [Type (TFinScope n tv)] -> Proxy n
-          fldsProxy _ = Proxy
-      case sameNat (Vec.plength ts2) (fldsProxy flds1) of
-        Nothing -> bugWith "mismatching kinds for type constructor" tcon
-        Just Refl -> do
-          let t_ps = map (>>= scope absurd (ts2 Vec.!)) flds1
-          Map.unions <$> zipWithM patnEnvLevel ps t_ps
+    -- NOTE: If the instantiation fails, the field type contains type
+    -- variables not mentioned in the parameter list of the type constructor.
+    -- The renamer should have caught this.
+    let t_ps = map (instantiateN' ts1) flds1
+    Map.unions <$> zipWithM patnEnvLevel ps t_ps
 
 match :: (IsTVar tv) => Type tv -> Type tv -> TC tv ev ()
 match t0 t1 =
@@ -182,11 +179,11 @@ checkDecl = \case
     -- FIXME: Ensure that the type in @b@ is correct as well.
     withQVars qvs $ for_ ds $ lctd_ $ \(MkDefn b e) -> do
       (_, MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar)
-      let t_decl = renameType (t_mthd >>= scope absurd (const t_inst))
+      let t_decl = renameType (instantiate' (const t_inst) t_mthd)
       check e t_decl
   DDefn d -> checkDefn d
   DSupC (MkSupCDecl z qvs t0 bs e0) -> do
-      t1 <- withQVars qvs (withBinds bs (typeOf e0))
+      t1 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
       let t2 = fmap _bind2type bs *~> t1
       match (mkTUni qvs t0) (mkTUni qvs t2)
     `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

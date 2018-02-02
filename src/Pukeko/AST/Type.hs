@@ -9,10 +9,12 @@ module Pukeko.AST.Type
   , QVar (..)
   , CoercionDir (..)
   , Coercion (..)
+  , weakenT
+  , strengthenT0
   , mkTVars
   , mkTVarsQ
   , mkTUni
-  , withTUni
+  , gatherTUni
   , pattern TFun
   , (~>)
   , (*~>)
@@ -33,12 +35,11 @@ module Pukeko.AST.Type
 
 import Pukeko.Prelude
 
-import           Control.Lens ()
+import           Control.Lens.Indexed (FunctorWithIndex)
 import           Control.Monad.Freer.Supply
-import           Data.Finite       (absurd0)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
-import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
@@ -57,8 +58,7 @@ data Type tv
   | TArr
   | TCon Id.TCon
   | TApp (Type tv) (Type tv)
-  | forall n. KnownNat n =>
-    TUni (Vector n QVar) (Type (TFinScope n tv))
+  | TUni (NonEmpty QVar) (Type (TScope Int tv))
 
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
@@ -82,30 +82,28 @@ data Coercion ty = MkCoercion
   , _coeTo   :: ty
   }
 
--- instance Eq QVar where
---   (==) = (==) `on` _qvar2tvar
+strengthenT0 :: Type (TScope Int tv) -> Type tv
+strengthenT0 = fmap strengthenScope0
 
--- instance Ord QVar where
---   compare = compare `on` _qvar2tvar
+weakenT :: Type tv -> Type (TScope i tv)
+weakenT = fmap weakenScope
 
-mkTVars :: Vector n Id.TVar -> Vector n (Type (TFinScope n tv))
+mkTVars :: (FunctorWithIndex Int t) => t Id.TVar -> t (Type (TScope Int tv))
 mkTVars = imap (\i b -> TVar (mkBound i b))
 
 -- TODO: Use class 'BaseTVar' to avoid this duplication.
-mkTVarsQ :: Vector n QVar -> Vector n (Type (TFinScope n tv))
+mkTVarsQ :: FunctorWithIndex Int t => t QVar -> t (Type (TScope Int tv))
 mkTVarsQ = mkTVars . fmap _qvar2tvar
 
-mkTUni :: forall n tv. KnownNat n => Vector n QVar -> Type (TFinScope n tv) -> Type tv
-mkTUni xs t =
-  case sameNat (Proxy @n) (Proxy @0) of
-    Nothing   -> TUni xs t
-    Just Refl -> fmap (strengthenWith absurd0) t
+mkTUni :: [QVar] -> Type (TScope Int tv) -> Type tv
+mkTUni qvs0 t0 = case qvs0 of
+  []     -> strengthenT0 t0
+  qv:qvs -> TUni (qv :| qvs) t0
 
-withTUni ::
-  Type tv -> (forall m. (KnownNat m) => Vector m QVar -> Type (TFinScope m tv) -> a) -> a
-withTUni t0 k = case t0 of
-  TUni qvs t1 -> k qvs t1
-  _           -> k Vec.empty (fmap weaken t0)
+gatherTUni :: Type tv -> ([QVar], Type (TScope Int tv))
+gatherTUni = \case
+  TUni qvs t1 -> (toList qvs, t1)
+  t0          -> ([], weakenT t0)
 
 (~>) :: Type tv -> Type tv -> Type tv
 (~>) = TFun
@@ -154,9 +152,9 @@ instance (Eq tv) => Eq (Type tv) where
     (TCon c1, TCon c2) -> c1 == c2
     (TApp tf1 tp1, TApp tf2 tp2) -> tf1 == tf2 && tp1 == tp2
     (TUni xs1 tq1, TUni xs2 tq2) ->
-      case sameNat (Vec.plength xs1) (Vec.plength xs2) of
-        Nothing   -> False
-        Just Refl -> and (Vec.zipWith ((==) `on` _qvar2cstr) xs1 xs2) && tq1 == tq2
+      length xs1 == length xs2
+      && and (NE.zipWith ((==) `on` _qvar2cstr) xs1 xs2)
+      && tq1 == tq2
     (TVar{}, _) -> False
     (TArr{}, _) -> False
     (TCon{}, _) -> False
@@ -231,8 +229,7 @@ data TypeF typ tv
   | TArrF
   | TConF Id.TCon
   | TAppF (typ tv) (typ tv)
-  | forall n. KnownNat n =>
-    TUniF (Vector n QVar) (typ (TFinScope n tv))
+  | TUniF (NonEmpty QVar) (typ (TScope Int tv))
 
 type instance Base2 Type = TypeF
 
@@ -282,8 +279,8 @@ renameType t0 =
       TArr -> pure TArr
       TCon c -> pure (TCon c)
       TApp tf tp -> TApp <$> go tf <*> go tp
-      TUni (qvs0 :: Vector n QVar) tq -> do
+      TUni qvs0 tq -> do
         qvs1 <- traverse (qvar2tvar (const fresh)) qvs0
         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
-        local' (\env0 -> extendEnv @(Finite n) @tv env1 (fmap weaken env0)) $
+        local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
           TUni qvs1 <$> go tq

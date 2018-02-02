@@ -12,7 +12,6 @@ import Pukeko.Prelude
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Sized  as LS
 import qualified Data.Map         as Map
-import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
@@ -74,7 +73,7 @@ pmMatch rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBPatnCols colMatch1 $ \case
     MkColMatch LS.Nil (LS.Cons u2 us2)
-      | LS.Nil    <- us2 -> pmExpr (fmap unsafeStrengthen u2)
+      | LS.Nil    <- us2 -> pmExpr (fmap unsafeStrengthenScope u2)
       | LS.Cons{} <- us2 -> throwHere "overlapping patterns"
     colMatch2@(MkColMatch LS.Cons{} _) -> do
       (conCol, colMatch3) <- findCPatnCol colMatch2
@@ -178,8 +177,8 @@ findCPatnCol (MkColMatch cs0 us) =
       LS.Cons x             xs@LS.Cons{} -> fmap (second (LS.Cons x)) (find f xs)
 
 data GrpMatchItem tv ev =
-  forall m m' n k. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon [Type tv] (Vector k BPatn) (RowMatch m n tv (EFinScope k ev))
+  forall m m' n. m ~ 'LS.Succ m' =>
+  MkGrpMatchItem Id.DCon [Type tv] [BPatn] (RowMatch m n tv (EScope Int ev))
 
 data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev))
 
@@ -188,7 +187,7 @@ groupCPatns ::
   Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
 groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
-  Some1 (Pair1 (MkTConDecl tcon _params dcons0) _dconDecl) <- findInfo info2dcons dcon0
+  (MkTConDecl tcon _params dcons0, _dconDecl) <- findInfo info2dcons dcon0
   dcons1 <- case dcons0 of
     Left _       -> bugWith "pattern match on type synonym" tcon
     Right []     -> bugWith "pattern match on type without data constructors" tcon
@@ -197,20 +196,19 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
     let drs1 = filter (\(MkCPatn dcon2 _ts _, _)-> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwHere ("unmatched constructor:" <+> pretty dcon1)
-      LS.Cons (MkCPatn con ts (traverse patnToBPatn -> Just bs0), MkRow qs u) LS.Nil ->
-        Vec.withList bs0 $ \bs -> do
-          let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
-          let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
-          let es1 = LS.map (fmap weaken) es
-          pure $ MkGrpMatchItem con ts bs (MkRowMatch es1 (LS.Singleton row))
-      drs2@(LS.Cons (MkCPatn con ts ps0, _) _) -> Vec.withList ps0 $ \ps -> do
+      LS.Cons (MkCPatn con ts (traverse patnToBPatn -> Just bs), MkRow qs u) LS.Nil -> do
+        let mp = ifoldMap (\i -> maybe mempty (\x -> Map.singleton x i) . bindName) bs
+        let row = MkRow qs (fmap (abstract1 (`Map.lookup` mp)) u)
+        let es1 = LS.map weakenE es
+        pure $ MkGrpMatchItem con ts bs (MkRowMatch es1 (LS.Singleton row))
+      drs2@(LS.Cons (MkCPatn con ts ps, _) _) -> do
         ixs0 <- itraverse (\i _ -> (,) i <$> freshEVar) ps
         LS.withList (toList ixs0)$ \ixs -> do
           grpRows <- for drs2 $ \(MkCPatn _ _ts ps, MkRow qs u) ->
             case LS.match ixs ps of
               Nothing  -> bug "wrong number of patterns"
-              Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (fmap weaken) u)
-          let es1 = LS.map (EVar . uncurry mkBound) ixs LS.++ LS.map (fmap weaken) es
+              Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (over _Free weakenScope) u)
+          let es1 = LS.map (EVar . uncurry mkBound) ixs LS.++ LS.map weakenE es
           pure (MkGrpMatchItem con ts (fmap (BName . snd) ixs0) (MkRowMatch es1 grpRows))
   pure $ MkGrpMatch t grps
 

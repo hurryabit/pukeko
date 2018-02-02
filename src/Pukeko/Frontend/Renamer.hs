@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 -- | Transform AST to use type safe de Bruijn indices.
 module Pukeko.FrontEnd.Renamer
   ( renameModule
@@ -5,11 +6,10 @@ module Pukeko.FrontEnd.Renamer
 
 import Pukeko.Prelude
 
+import           Control.Lens.Indexed
 import           Data.Bitraversable
-import qualified Data.Finite       as Fin
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
-import qualified Data.Vector.Sized as Vec
 
 import           Pukeko.AST.SystemF
 import qualified Pukeko.AST.Stage      as St
@@ -42,7 +42,8 @@ localize bs = local' upd
     upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
 -- TODO: Make @\(Ps.MkDefn x _) -> x@ a function and use it.
-localizeDefns :: Vector n (Lctd (Ps.Defn _)) -> Rn (EFinScope n ev) a -> Rn ev a
+localizeDefns :: FoldableWithIndex Int t =>
+  t (Lctd (Ps.Defn _)) -> Rn (EScope Int ev) a -> Rn ev a
 localizeDefns = localize . ifoldMap (\i (Lctd _ (Ps.MkDefn x _)) -> Map.singleton x i)
 
 rnDecl :: Ps.Decl -> Rn Void (Decl Out)
@@ -50,29 +51,28 @@ rnDecl = \case
   Ps.DType ts -> DType <$> (traverse . lctd) rnTConDecl ts
   Ps.DSign s -> DSign <$> rnSignDecl mempty s
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
-    let env = Map.singleton v (mkBound Fin.zero v)
+    let env = Map.singleton v (mkBound 0 v)
     ms1 <- traverse (rnSignDecl env) ms0
     modify (<> setOf (traverse . sign2func) ms1)
     pure (DClss (MkClssDecl c v ms1))
   Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
-    Vec.withList vs0 $ \vs1 -> do
-      qvs <- rnTypeCstr vs1 qs
-      ds1 <- (traverse . lctd) rnDefn ds0
-      pure (DInst (MkInstDecl c t qvs ds1))
+    qvs <- rnTypeCstr vs0 qs
+    ds1 <- (traverse . lctd) rnDefn ds0
+    pure (DInst (MkInstDecl c t qvs ds1))
   Ps.DDefn d -> DDefn <$> rnDefn d
   Ps.DPrim (Ps.MkPrimDecl z s) -> do
     modify (<> Set.singleton z)
     pure (DPrim (MkPrimDecl (MkBind z NoType) s))
 
-rnTConDecl :: Ps.TConDecl -> Rn ev (Some1 TConDecl)
-rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = Vec.withList prms0 $ \prms1 ->
-  Some1 <$> MkTConDecl tcon prms1 <$>
+rnTConDecl :: Ps.TConDecl -> Rn ev TConDecl
+rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = do
+  MkTConDecl tcon prms0 <$>
     bitraverse
-      (rnType (finRenamer prms1))
-      (zipWithM (\tag -> lctd (rnDConDecl tcon prms1 tag)) [0..])
+      (rnType (finRenamer prms0))
+      (zipWithM (\tag -> lctd (rnDConDecl tcon prms0 tag)) [0..])
       dcons
 
-rnDConDecl :: Id.TCon -> Vector n Id.TVar -> Int -> Ps.DConDecl -> Rn ev (DConDecl n)
+rnDConDecl :: Id.TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Rn ev DConDecl
 rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) =
   MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
   where
@@ -94,7 +94,7 @@ rnType env = go
       Ps.TArr   -> pure TArr
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
-rnTypeCstr :: Vector n Id.TVar -> Ps.TypeCstr -> Rn ev (Vector n QVar)
+rnTypeCstr :: [Id.TVar] -> Ps.TypeCstr -> Rn ev [QVar]
 rnTypeCstr vs (Ps.MkTypeCstr qs) = do
   -- FIXME: Fail if there are constraints on variables that are not in @vs0@. In
   -- the worst case they could constrain the type variable of a class
@@ -104,9 +104,8 @@ rnTypeCstr vs (Ps.MkTypeCstr qs) = do
 
 rnTypeScheme :: Map Id.TVar tv -> Ps.TypeScheme -> Rn ev (Type tv)
 rnTypeScheme env (Ps.MkTypeScheme qs t) = do
-  let vs0 = setOf Ps.type2tvar t `Set.difference` Map.keysSet env
-  Vec.withList (toList vs0) $ \vs1 ->
-    mkTUni <$> rnTypeCstr vs1 qs <*> rnType (fmap weaken env <> finRenamer vs1) t
+  let vs0 = toList (setOf Ps.type2tvar t `Set.difference` Map.keysSet env)
+  mkTUni <$> rnTypeCstr vs0 qs <*> rnType (fmap weakenScope env <> finRenamer vs0) t
 
 rnCoercion :: Ps.Coercion -> Coercion (NoType tv)
 rnCoercion (Ps.MkCoercion dir0 tcon) = MkCoercion dir1 tcon NoType NoType
@@ -135,13 +134,14 @@ rnExpr = \case
     case as0 of
       []   -> throwHere "pattern match without alternatives"
       a:as -> EMat <$> rnExpr e0 <*> traverse rnAltn (a :| as)
-  Ps.ELam bs0 e0 -> Vec.withNonEmpty (fmap rnBind bs0) $ \bs1 -> do
+  Ps.ELam bs0 e0 -> do
+    let bs1 = fmap rnBind bs0
     let bs2 = ifoldMap (\i (MkBind x NoType) -> Map.singleton x i) bs1
     ELam bs1 <$> localize bs2 (rnExpr e0) <*> pure NoType
-  Ps.ELet ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
-    ELet <$> (traverse . lctd) rnDefn ds1 <*> localizeDefns ds1 (rnExpr e0)
-  Ps.ERec ds0 e0 -> Vec.withNonEmpty ds0 $ \ds1 -> do
-    localizeDefns ds1 $ ERec <$> (traverse . lctd) rnDefn ds1 <*> rnExpr e0
+  Ps.ELet (toList -> ds0) e0 ->
+    ELet <$> (traverse . lctd) rnDefn ds0 <*> localizeDefns ds0 (rnExpr e0)
+  Ps.ERec (toList -> ds0) e0 ->
+    localizeDefns ds0 $ ERec <$> (traverse . lctd) rnDefn ds0 <*> rnExpr e0
   Ps.ECoe c e -> ECoe (rnCoercion c) <$> rnExpr e
 
 rnBind :: Id.EVar -> Bind NoType tv

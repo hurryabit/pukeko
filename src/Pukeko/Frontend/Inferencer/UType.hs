@@ -26,7 +26,7 @@ import           Control.Monad.ST
 import           Data.Coerce        (coerce)
 import           Data.STRef
 import qualified Data.Map           as Map
-import qualified Data.Vector.Sized  as Vec
+import qualified Data.Vector        as Vec
 
 import           Pukeko.Pretty
 import           Pukeko.AST.Type       (Type (..), QVar (..), prettyTUni)
@@ -102,9 +102,9 @@ open1 = \case
   TArr -> UTArr
   TCon c -> UTCon c
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
-  TUni xs tq -> mkUTUni (toList xs) (open1 (fmap (scope id utvar) tq))
+  TUni xs tq -> UTUni xs (open1 (fmap (scope id utvar) tq))
     where
-      utvar = UTVar . _qvar2tvar . (xs Vec.!)
+      utvar = UTVar . _qvar2tvar . (Vec.fromList (toList xs) Vec.!)
 
 subst :: Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env = go

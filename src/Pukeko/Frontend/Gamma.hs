@@ -2,6 +2,8 @@ module Pukeko.FrontEnd.Gamma where
 
 import Pukeko.Prelude
 
+import qualified Data.Vector as Vec
+
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
@@ -20,16 +22,20 @@ runGamma :: EffXGamma tf ef Void Void effs a -> Eff effs a
 runGamma = runReader (Gamma voidEnv voidEnv)
 
 withinEScope ::
-  forall i tf ef tv ev effs a. (HasEnvLevel i, HasEnv tv, HasEnv ev, Functor tf) =>
-  EnvLevelOf i (ef tv) ->
+  forall i tf ef tv ev effs a x. (HasEnvLevel i, HasEnv tv, HasEnv ev, Functor tf) =>
+  (x -> ef tv) ->
+  EnvLevelOf i x ->
   EffXGamma tf ef tv (EScope i ev) effs a ->
   EffXGamma tf ef tv ev effs a
-withinEScope ts = localX (extendEnv @i @ev ts) (fmap (fmap weaken))
+withinEScope f ts = localX (extendEnv @i @ev (fmap f ts)) (fmap (fmap weakenScope))
 
-withBinds ::
-  (HasEnvLevel i, HasEnv tv, HasEnv ev) =>
-  EnvLevelOf i (Bind Type tv) -> EffGamma tv (EScope i ev) m a -> EffGamma tv ev m a
-withBinds = withinEScope . fmap _bind2type
+withinEScope' ::
+  forall tf ef tv ev t effs a x. (HasEnv tv, HasEnv ev, Functor tf, Foldable t) =>
+  (x -> ef tv) ->
+  t x ->
+  EffXGamma tf ef tv (EScope Int ev) effs a ->
+  EffXGamma tf ef tv ev effs a
+withinEScope' f = withinEScope f . Vec.fromList . toList
 
 withinTScope ::
   forall i tf ef tv ev effs a.
@@ -37,12 +43,12 @@ withinTScope ::
   EnvLevelOf i (tf ev) ->
   EffXGamma tf ef (TScope i tv) ev effs a ->
   EffXGamma tf ef tv ev effs a
-withinTScope qs = localX (fmap (fmap weaken)) (extendEnv @i @tv qs)
+withinTScope qs = localX (fmap (fmap weakenScope)) (extendEnv @i @tv qs)
 
 withQVars ::
-  (HasEnvLevel i, HasEnv tv, HasEnv ev) =>
-  EnvLevelOf i QVar -> EffGamma (TScope i tv) ev effs a -> EffGamma tv ev effs a
-withQVars = withinTScope . fmap (Const . _qvar2cstr)
+  (HasEnv tv, HasEnv ev, Foldable t) =>
+  t QVar -> EffGamma (TScope Int tv) ev effs a -> EffGamma tv ev effs a
+withQVars = withinTScope . Vec.fromList . map (Const . _qvar2cstr) . toList
 
 withinXScope ::
   forall i j tf ef tv ev effs a.
@@ -50,8 +56,8 @@ withinXScope ::
   EnvLevelOf i (tf (EScope j ev)) -> EnvLevelOf j (ef (TScope i tv)) ->
   EffXGamma tf ef (TScope i tv) (EScope j ev) effs a -> EffXGamma tf ef tv ev effs a
 withinXScope qs ts = localX
-  (extendEnv @j @ev ts . fmap (fmap weaken))
-  (extendEnv @i @tv qs . fmap (fmap weaken))
+  (extendEnv @j @ev ts . fmap (fmap weakenScope))
+  (extendEnv @i @tv qs . fmap (fmap weakenScope))
 
 lookupEVar ::
   forall tf ef tv ev effs. (HasEnv ev) => ev -> EffXGamma tf ef tv ev effs (ef tv)

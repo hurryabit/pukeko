@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Pukeko.FrontEnd.Inferencer
   ( Out
   , inferModule
@@ -6,18 +7,19 @@ where
 
 import Pukeko.Prelude
 
+import           Control.Lens.Indexed
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
-import qualified Data.List.NonEmpty as NE
+import qualified Data.List.NE     as NE
 import qualified Data.Map         as Map
 import qualified Data.Sequence    as Seq
 import qualified Data.Set         as Set
 import           Data.STRef
-import qualified Data.Vector.Sized as Vec
+import qualified Data.Vector      as Vec
 
 import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Info
-import           Pukeko.AST.SystemF
+import           Pukeko.AST.SystemF    hiding (instantiate)
 import qualified Pukeko.AST.Stage      as St
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
@@ -138,17 +140,15 @@ inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
   PVar x -> pure (PVar x, Map.singleton x t_expr)
   PCon dcon (_ :: [NoType _]) ps0 -> do
-    Some1 (Pair1
-            MkTConDecl{_tcon2name = tcon, _tcon2prms = params}
-            MkDConDecl{_dcon2flds = flds}) <-
-      findInfo info2dcons dcon
+    (MkTConDecl{_tcon2name = tcon, _tcon2prms = params}, MkDConDecl{_dcon2flds = flds})
+      <- findInfo info2dcons dcon
     when (length ps0 /= length flds) $
       throwHere ("data constructor" <+> quotes (pretty dcon) <+>
                  "expects" <+> pretty (length flds) <+> "arguments")
     t_params <- traverse (const freshUVar) params
     let t_inst = appTCon tcon (toList t_params)
     unify t_expr t_inst
-    let t_fields = map (open1 . fmap (scope absurd (t_params Vec.!))) flds
+    let t_fields = map (open1 . fmap (scope absurd (Vec.fromList t_params Vec.!))) flds
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
     pure (PCon dcon (toList t_params) ps1, Map.unions binds)
 
@@ -164,23 +164,20 @@ inferLet (Lctd pos (MkDefn l0 r0)) = do
   let t3 = mkUTUni qvs t2
   pure (Lctd pos (MkDefn (l0 & bind2type .~ t3) r1), t3, ds1)
 
+-- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
+-- have the same length as the input list.
 inferRec ::
   (BaseTVar tv, HasEnv ev) =>
-  Vector n (Lctd (Defn In tv (EFinScope n ev))) ->
-  IT s ev ( Vector n (Lctd (Defn (Aux s) tv (EFinScope n ev)))
-          , Vector n (UType s tv)
-          , Cstrs s tv
-          )
+  [Lctd (Defn In tv (EScope Int ev))] ->
+  IT s ev ([Lctd (Defn (Aux s) tv (EScope Int ev))], [UType s tv], Cstrs s tv)
 inferRec defns0 = do
-  let (poss, ls0, rs0) =
-        Vec.unzip3 (fmap (\(Lctd pos (MkDefn l r)) -> (pos, l, r)) defns0)
+  let (poss, ls0, rs0) = unzip3 (map (\(Lctd pos (MkDefn l r)) -> (pos, l, r)) defns0)
   (rs1, ts1, cstrs1) <- withinTScope $ do
     us <- traverse (const freshUVar) ls0
-    (rs1, ts1, cstrs1) <-
-      Vec.unzip3 <$> withinEScope us (traverse infer rs0)
-    Vec.zipWithM_ unify us ts1
+    (rs1, ts1, cstrs1) <- unzip3 <$> withinEScope (Vec.fromList us) (traverse infer rs0)
+    zipWithM_ unify us ts1
     pure (rs1, ts1, fold cstrs1)
-  (ts2, vs2) <- second fold . Vec.unzip <$> traverse generalize ts1
+  (ts2, vs2) <- second fold . unzip <$> traverse generalize ts1
   MkSplitCstrs cstrs_ret1 cstrs_def <- splitCstrs cstrs1
   let cstrs_ret2 = Map.unionWith (<>) cstrs_ret1 (Map.fromSet (const mempty) vs2)
   let qvs = map (\(v, q) -> MkQVar q v) (Map.toList cstrs_ret2)
@@ -188,8 +185,8 @@ inferRec defns0 = do
   let vs3 = map (UTVar . _qvar2tvar) qvs
   let addETyApp = scope' (EVar . Free) (\i b -> mkETyApp (EVar (mkBound i b)) vs3)
   let rs2 = fmap (// addETyApp) rs1
-  let defns1 = Vec.zipWith3 (\t3 -> MkDefn . (bind2type .~ t3)) ts3 ls0 rs2
-  pure (Vec.zipWith Lctd poss defns1, ts3, cstrs_def)
+  let defns1 = zipWith3 (\t3 -> MkDefn . (bind2type .~ t3)) ts3 ls0 rs2
+  pure (zipWith Lctd poss defns1, ts3, cstrs_def)
 
 infer ::
   (BaseTVar tv, HasEnv ev) =>
@@ -214,16 +211,16 @@ infer = \case
       pure (EApp fun1 args1, t_res, cstrs_fun <> fold cstrs_args)
     ELam binds0 rhs0 NoType -> do
       t_binds <- traverse (const freshUVar) binds0
-      (rhs1, t_rhs, cstrs) <- withinEScope t_binds (infer rhs0)
-      let binds1 = Vec.zipWith (\(MkBind x NoType) -> MkBind x) binds0 t_binds
+      (rhs1, t_rhs, cstrs) <- withinEScope (NE.toVector t_binds) (infer rhs0)
+      let binds1 = NE.zipWith (\(MkBind x NoType) -> MkBind x) binds0 t_binds
       pure (ELam binds1 rhs1 t_rhs, t_binds *~> t_rhs, cstrs)
     ELet defns0 rhs0 -> do
-      (defns1, t_defns, cstrs_defns) <- Vec.unzip3 <$> traverse inferLet defns0
-      (rhs1, t_rhs, cstrs_rhs) <- withinEScope t_defns (infer rhs0)
+      (defns1, t_defns, cstrs_defns) <- unzip3 <$> traverse inferLet defns0
+      (rhs1, t_rhs, cstrs_rhs) <- withinEScope (Vec.fromList t_defns) (infer rhs0)
       pure (ELet defns1 rhs1, t_rhs, fold cstrs_defns <> cstrs_rhs)
     ERec defns0 rhs0 -> do
       (defns1, t_defns, cstrs_defns) <- inferRec defns0
-      (rhs1, t_rhs, cstrs_rhs) <- withinEScope t_defns (infer rhs0)
+      (rhs1, t_rhs, cstrs_rhs) <- withinEScope (Vec.fromList t_defns) (infer rhs0)
       pure (ERec defns1 rhs1, t_rhs, cstrs_defns <> cstrs_rhs)
     EMat expr0 altns0 -> do
       (expr1, t_expr, cstrs0) <- infer expr0
@@ -235,13 +232,13 @@ infer = \case
         pure (MkAltn patn1 rhs1, cstrs1)
       pure (EMat expr1 altns1, t_res, cstrs0 <> fold cstrss1)
     ECoe c@(MkCoercion dir tcon NoType NoType) e0 -> do
-      Some1 (MkTConDecl _ prms dcons) <- findInfo info2tcons tcon
+      MkTConDecl _ prms dcons <- findInfo info2tcons tcon
       t_rhs0 <- case dcons of
         Right _ -> throwHere ("type constructor" <+> pretty tcon <+> "is not coercible")
         Left t_rhs0 -> pure t_rhs0
       t_prms <- traverse (const freshUVar) prms
       let t_lhs = appTCon tcon (toList t_prms)
-      let t_rhs = open1 (fmap (scope absurd (t_prms Vec.!)) t_rhs0)
+      let t_rhs = open1 (fmap (scope absurd (Vec.fromList t_prms Vec.!)) t_rhs0)
       let (t_to, t_from) = case dir of
             Inject  -> (t_lhs, t_rhs)
             Project -> (t_rhs, t_lhs)
@@ -278,12 +275,12 @@ inferDecl = \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
   DClss c -> yield (DClss c)
-  DInst (MkInstDecl clss tcon (qvs :: Vector n _) ds0) -> do
+  DInst (MkInstDecl clss tcon qvs ds0) -> do
     ds1 <- for ds0 $ lctd $ \d0 -> do
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (d0^.defn2bind.bind2evar)
       let t_inst = mkTApp (TCon tcon) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
-      let t_decl1 :: Type (TFinScope n Void)
-          t_decl1 = renameType (t_decl0 >>= scope absurd (const t_inst))
+      let t_decl1 :: Type (TScope Int Void)
+          t_decl1 = renameType (instantiate' (const t_inst) t_decl0)
       withQVars qvs (inferTypedDefn d0 (open t_decl1))
     yield (DInst (MkInstDecl clss tcon qvs ds1))
   DDefn d0 -> do
@@ -312,19 +309,12 @@ runTQ = evalSupply sup0 . runReader noPos . runReader env0
     env0 = mempty
     sup0 = map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars
 
-localizeTQ ::
-  Vector n QVar ->
-  (Vector n QVar -> TQ (TFinScope n tv) s a) ->
-  TQ tv s a
-localizeTQ xs m = do
-  -- ys <- traverse (qvar2tvar (const fresh)) xs
-  ys <- traverse (qvar2tvar pure) xs
-  let env1 =
-        ifoldMap
-          (\i (x, y) -> Map.singleton (x^.qvar2tvar) (mkBound i (y^.qvar2tvar)))
-          (Vec.zip xs ys)
-  let upd env0 = env1 <> fmap Free env0
-  local' upd (m ys)
+localizeTQ :: (TraversableWithIndex Int t) =>
+  t QVar -> TQ (TScope Int tv) s a -> TQ tv s a
+localizeTQ qvs =
+  let env1 = ifoldMap (\i (MkQVar _ v) -> Map.singleton v (mkBound i v)) qvs
+      upd env0 = env1 <> fmap Free env0
+  in  local' upd
 
 qualType :: UType s tv' -> TQ tv s (Type tv)
 qualType = \case
@@ -344,12 +334,12 @@ qualType = \case
       ULink t -> qualType t
 
 qualDefn :: Defn (Aux s) tv' ev -> TQ tv s (Defn Out tv ev)
-qualDefn (MkDefn (MkBind x ts) e0) = case ts of
-  UTUni ys0 t0 -> Vec.withList (toList ys0) $ \ys1 -> localizeTQ ys1 $ \ys2 -> do
-    t1  <- TUni ys2 <$> qualType t0
-    e1  <- ETyAbs ys2 <$> qualExpr e0
-    pure (MkDefn (MkBind x t1) e1)
-  t0 -> MkDefn <$> (MkBind x <$> qualType t0) <*> qualExpr e0
+qualDefn (MkDefn (MkBind x t0) e0) = case t0 of
+  UTUni (toList -> qvs) t1 -> localizeTQ qvs $ do
+    t2  <- mkTUni qvs <$> qualType t1
+    e2  <- mkETyAbs qvs <$> qualExpr e0
+    pure (MkDefn (MkBind x t2) e2)
+  _ -> MkDefn <$> (MkBind x <$> qualType t0) <*> qualExpr e0
 
 qualExpr :: Expr (Aux s) tv' ev -> TQ tv s (Expr Out tv ev)
 qualExpr = \case
@@ -385,14 +375,12 @@ qualDecl = \case
   DClss c -> pure (DClss c)
   -- FIXME: Do type inference for type class instances.
   DInst (MkInstDecl c t qvs ds0) -> do
-    ds1 <- for ds0 $ lctd $ \d0 -> localizeTQ qvs (\_ -> qualDefn d0)
+    ds1 <- for ds0 $ lctd $ \d0 -> localizeTQ qvs (qualDefn d0)
     pure (DInst (MkInstDecl c t qvs ds1))
   DDefn d -> DDefn <$> qualDefn d
   DPrim (MkPrimDecl (MkBind x ts) s) -> do
     t1 <- case ts of
-      UTUni ys0 t0 ->
-        Vec.withList (toList ys0) $ \ys1 ->
-          localizeTQ ys1 (\ys2 -> TUni ys2 <$> qualType t0)
+      UTUni (toList -> qvs) t0 -> localizeTQ qvs (mkTUni qvs <$> qualType t0)
       t0 -> qualType t0
     pure (DPrim (MkPrimDecl (MkBind x t1) s))
 

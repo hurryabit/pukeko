@@ -72,15 +72,8 @@ import Data.Semigroup        as X (Monoid (..), Semigroup (..))
 import Data.Set              as X (Set)
 import Data.Set.Lens         as X (setOf)
 import Data.Traversable      as X
-import Data.Type.Equality    as X ((:~:) (Refl))
+import Data.Vector           as X (Vector)
 import Data.Void             as X (Void, absurd)
-
-import GHC.TypeLits          as X ( type (+), type (<=?), Nat, KnownNat
-                                  , natVal, sameNat
-                                  )
-
-import Data.Finite           as X (Finite)
-import Data.Vector.Sized     as X (Vector)
 
 import           Data.Functor.Compose           (Compose (..))
 import qualified Text.PrettyPrint.Annotated     as PP

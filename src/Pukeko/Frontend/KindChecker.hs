@@ -13,7 +13,7 @@ import           Data.Forget      (Forget (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map           as Map
 import           Data.STRef
-import qualified Data.Vector.Sized as Vec
+import qualified Data.Vector        as Vec
 
 import           Pukeko.Pretty
 import           Pukeko.AST.SystemF    hiding (Free)
@@ -36,7 +36,7 @@ data Kind a where
   Arrow :: Kind a -> Kind a -> Kind a
   UVar  :: STRef s (UVar s) -> Kind (Open s)
 
-type KCEnv n s = Vector n (Kind (Open s))
+type KCEnv n s = Vector (Kind (Open s))
 
 type KCState s = Map Id.TCon (Kind (Open s))
 
@@ -60,10 +60,10 @@ freshUVar = do
   v <- fresh
   UVar <$> sendM (newSTRef (Free (Forget v)))
 
-localize :: Vector n (Kind (Open s)) -> KC n s a -> KC m s a
-localize env = local' (const env)
+localize :: [Kind (Open s)] -> KC n s a -> KC m s a
+localize env = local' (const (Vec.fromList env))
 
-kcType :: Kind (Open s) -> Type (TFinScope n Void) -> KC n s ()
+kcType :: Kind (Open s) -> Type (TScope Int Void) -> KC n s ()
 kcType k = \case
   TVar v -> do
     kv <- asks (Vec.! scope absurd id v)
@@ -80,14 +80,14 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: NonEmpty (Lctd (Some1 TConDecl)) -> KC n s ()
+kcTypDef :: NonEmpty (Lctd TConDecl) -> KC n s ()
 kcTypDef tcons = do
-  kinds <- for tcons $ \(Lctd _ (Some1 MkTConDecl{_tcon2name = tname})) -> do
+  kinds <- for tcons $ \(Lctd _ MkTConDecl{_tcon2name = tname}) -> do
     kind <- freshUVar
     modify (Map.insert tname kind)
     pure kind
   for_ (NE.zip tcons kinds) $
-    \(Lctd pos (Some1 MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons0}), tconKind) -> do
+    \(Lctd pos MkTConDecl{_tcon2prms = prms, _tcon2dcons = dcons0}, tconKind) -> do
       here pos $ do
         paramKinds <- traverse (const freshUVar) prms
         unify tconKind (foldr Arrow Star paramKinds)
@@ -102,8 +102,8 @@ kcTypDef tcons = do
 
 kcVal :: Type Void -> KC n s ()
 kcVal = \case
-  TUni xs t -> k xs t
-  t         -> k Vec.empty (fmap absurd t)
+  TUni xs t -> k (toList xs) t
+  t         -> k [] (fmap absurd t)
   where
     k xs t = do
       env <- traverse (const freshUVar) xs

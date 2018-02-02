@@ -2,9 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 module Pukeko.AST.ConDecl
-  ( Some1 (..)
-  , Pair1 (..)
-  , TConDecl (..)
+  ( TConDecl (..)
   , DConDecl (..)
   , tcon2name
   , tcon2dcons
@@ -20,39 +18,27 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Scope
 import           Pukeko.Pretty
 
-data Some1 f = forall n. KnownNat n => Some1 (f n)
-
-data Pair1 f g a = Pair1 (f a) (g a)
-
-data TConDecl n = KnownNat n => MkTConDecl
+data TConDecl = MkTConDecl
   { _tcon2name  :: Id.TCon
-  , _tcon2prms  :: Vector n Id.TVar
-  , _tcon2dcons :: Either (Type (TFinScope n Void)) [Lctd (DConDecl n)]
+  , _tcon2prms  :: [Id.TVar]
+  , _tcon2dcons :: Either (Type (TScope Int Void)) [Lctd DConDecl]
   }
 
-data DConDecl n = MkDConDecl
+data DConDecl = MkDConDecl
   { _dcon2tcon :: Id.TCon
   , _dcon2name :: Id.DCon
   , _dcon2tag  :: Int
-  , _dcon2flds :: [Type (TFinScope n Void)]
+  , _dcon2flds :: [Type (TScope Int Void)]
   }
 
-typeOfDConDecl :: TConDecl n -> DConDecl n -> Type Void
+typeOfDConDecl :: TConDecl -> DConDecl -> Type Void
 typeOfDConDecl (MkTConDecl tname prms _) (MkDConDecl tcon dname _ flds)
   | tname /= tcon = bugWith "type and data constructor do not match" (tname, dname)
-  | otherwise     = go prms flds
-  where
-    go ::
-      forall n1 n2. (KnownNat n1, KnownNat n2) =>
-      Vector n1 Id.TVar -> [Type (TFinScope n2 Void)] -> Type Void
-    go xs flds =
-      case sameNat (Proxy @n1) (Proxy @n2) of
-        Just Refl ->
-          let res = mkTApp (TCon tcon) (mkTVars xs)
-          in  mkTUni (fmap (MkQVar mempty) xs) (flds *~> res)
-        Nothing -> bug "type and data constructor have different arity" (tname, dname)
+  | otherwise     =
+      let res = mkTApp (TCon tcon) (mkTVars prms)
+      in  mkTUni (map (MkQVar mempty) prms) (flds *~> res)
 
-instance Pretty (TConDecl n) where
+instance Pretty TConDecl where
   pretty (MkTConDecl tname prms dcons0) =
     case dcons0 of
       Left typ -> lhs <+> "=" <+> pretty typ
@@ -62,27 +48,12 @@ instance Pretty (TConDecl n) where
     where
       lhs = pretty tname <+> hsepMap pretty prms
 
-instance Pretty (DConDecl n) where
+instance Pretty DConDecl where
   pretty (MkDConDecl _ dname _ flds) =
     "|" <+> pretty dname <+> hsepMap (prettyPrec 3) flds
 
-instance Pretty (Some1 TConDecl) where
-  pretty (Some1 tcon) = pretty tcon
-
-instance Pretty (Some1 DConDecl) where
-  pretty (Some1 dcon) = pretty dcon
-
-instance Show (Some1 TConDecl) where
-  show (Some1 tcon) = show tcon
-
-instance Show (Some1 DConDecl) where
-  show (Some1 dcon) = show dcon
-
-instance (Show (f a), Show (g a)) => Show (Pair1 f g a) where
-  show (Pair1 x y) = show (x, y)
-
-deriving instance Show (TConDecl n)
-deriving instance Show (DConDecl n)
+deriving instance Show TConDecl
+deriving instance Show DConDecl
 
 makeLenses ''TConDecl
 makeLenses ''DConDecl

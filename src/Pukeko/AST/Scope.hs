@@ -5,25 +5,27 @@
 module Pukeko.AST.Scope
   ( Scope (..)
   , EScope
-  , EFinScope
   , TScope
-  , TOneScope
-  , TFinScope
   , scope
   , scope'
   , _Bound
   , _Free
   , mkBound
-  , strengthen
-  , strengthenWith
-  , unsafeStrengthen
-  , weaken
+  , strengthenScope
+  , strengthenScope0
+  , unsafeStrengthenScope
+  , weakenScope
+  , instantiate
+  , instantiateN
+  , instantiate'
+  , instantiateN'
   , abstract1
   , dist
   , (>>>=)
   , finRenamer
   , voidEnv
   , extendEnv
+  , extendEnv'
   , HasEnvLevel (..)
   , HasEnv (..)
   , BaseEVar
@@ -36,9 +38,10 @@ module Pukeko.AST.Scope
 
 import Pukeko.Prelude
 
+import           Control.Lens.Indexed
 import           Data.Forget
 import qualified Data.Map          as Map
-import qualified Data.Vector.Sized as Vec
+import qualified Data.Vector       as Vec
 
 import qualified Pukeko.AST.Identifier as Id
 
@@ -52,13 +55,7 @@ data Scope b i v
 
 type EScope = Scope Id.EVar
 
-type EFinScope n = EScope (Finite n)
-
 type TScope = Scope Id.TVar
-
-type TOneScope = TScope ()
-
-type TFinScope n = TScope (Finite n)
 
 scope :: (v -> a) -> (i -> a) -> Scope b i v -> a
 scope f g = scope' f (const . g)
@@ -71,20 +68,39 @@ scope' f g = \case
 mkBound :: i -> b -> Scope b i v
 mkBound i b = Bound i (Forget b)
 
-strengthenEither :: Scope b i v -> Either (i, b) v
-strengthenEither = scope' Right (\i b -> Left (i, b))
+strengthenScopeEither :: Scope b i v -> Either (i, b) v
+strengthenScopeEither = scope' Right (\i b -> Left (i, b))
 
-strengthen :: Scope b i v -> Maybe v
-strengthen = either (const Nothing) Just . strengthenEither
+strengthenScope :: Scope b i v -> Maybe v
+strengthenScope = either (const Nothing) Just . strengthenScopeEither
 
-strengthenWith :: (forall j. i -> j) -> Scope b i v -> v
-strengthenWith f = either (f . fst) id . strengthenEither
+strengthenScope0 :: (HasCallStack, Show b) => Scope b Int v -> v
+strengthenScope0 = either (bugWith "strengthenScope0") id . strengthenScopeEither
 
-unsafeStrengthen :: (HasCallStack, Show b) => Scope b i v -> v
-unsafeStrengthen = either (bugWith "unsafeStrengthen" . snd) id . strengthenEither
+unsafeStrengthenScope :: (HasCallStack, Show b) => Scope b i v -> v
+unsafeStrengthenScope =
+  either (bugWith "unsafeStrengthenScope" . snd) id . strengthenScopeEither
 
-weaken :: v -> Scope b i v
-weaken = Free
+weakenScope :: v -> Scope b i v
+weakenScope = Free
+
+instantiate :: Monad f => (i -> f v) -> f (Scope b i v) -> f v
+instantiate f e = e >>= scope pure f
+
+instantiate' :: Monad f => (i -> f v) -> f (Scope b i Void) -> f v
+instantiate' f e = e >>= scope absurd f
+
+instantiateN :: (HasCallStack, Monad f, Foldable t) =>
+  t (f v) -> f (Scope b Int v) -> f v
+instantiateN xsL = instantiate lk
+  where xsV = Vec.fromList (toList xsL)
+        lk i = maybe (bugWith "instantiateN" i) id (xsV Vec.!? i)
+
+instantiateN' :: (HasCallStack, Monad f, Foldable t) =>
+  t (f v) -> f (Scope b Int Void) -> f v
+instantiateN' xsL = instantiate' lk
+  where xsV = Vec.fromList (toList xsL)
+        lk i = maybe (bugWith "instantiateN" i) id (xsV Vec.!? i)
 
 abstract1 :: (j -> Maybe i) -> Scope b j v -> Scope b j (Scope b i v)
 abstract1 f = \case
@@ -110,7 +126,7 @@ _Bound = prism (uncurry mkBound) $ \case
   Free x -> Left (Free x)
   Bound i (Forget b) -> Right (i, b)
 
-finRenamer :: Ord b => Vector n b -> Map b (Scope b (Finite n) tv)
+finRenamer :: (Ord b, FoldableWithIndex Int t) => t b -> Map b (Scope b Int tv)
 finRenamer = ifoldMap (\i b -> Map.singleton b (mkBound i b))
 
 lookupMap :: (Ord i, Pretty i) => i -> Map i a -> a
@@ -130,6 +146,14 @@ extendEnv ::
   EnvOf (Scope b i v) a
 extendEnv env_i env_v = Pair env_i env_v
 
+extendEnv' ::
+  forall i v t a b.
+  (HasEnvLevel i, EnvLevelOf i ~ Vector, HasEnv v, Foldable t) =>
+  t a ->
+  EnvOf v a ->
+  EnvOf (Scope b i v) a
+extendEnv' = extendEnv @i @v . Vec.fromList . toList
+
 class (Functor (EnvLevelOf i)) => HasEnvLevel i where
   type EnvLevelOf i :: * -> *
   lookupEnvLevel :: i -> EnvLevelOf i a -> a
@@ -138,8 +162,8 @@ instance HasEnvLevel Id.EVar where
   type EnvLevelOf Id.EVar = Map Id.EVar
   lookupEnvLevel = lookupMap
 
-instance HasEnvLevel (Finite n) where
-  type EnvLevelOf (Finite n) = Vector n
+instance HasEnvLevel Int where
+  type EnvLevelOf Int = Vec.Vector
   lookupEnvLevel = flip (Vec.!)
 
 instance HasEnvLevel () where
