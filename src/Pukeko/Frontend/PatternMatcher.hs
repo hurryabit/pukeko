@@ -36,9 +36,7 @@ pmExpr :: Expr In tv ev -> PM (Expr Out tv ev)
 pmExpr = \case
   ELoc le         -> here le $ ELoc <$> lctd pmExpr le
   EVar x          -> pure (EVar x)
-  EVal z          -> pure (EVal z)
-  ECon c          -> pure (ECon c)
-  ENum n          -> pure (ENum n)
+  EAtm a          -> pure (EAtm a)
   EApp t  us      -> EApp <$> pmExpr t <*> traverse pmExpr us
   ELam bs e t     -> ELam bs <$> pmExpr e <*> pure t
   ELet ds t       -> ELet <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t

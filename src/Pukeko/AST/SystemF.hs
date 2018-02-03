@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.SystemF
   ( Module (..)
@@ -10,12 +11,17 @@ module Pukeko.AST.SystemF
   , InstDecl (..)
   , SupCDecl (..)
   , ExtnDecl (..)
+  , Atom (..)
   , Defn (..)
   , Expr (..)
   , Bind (..)
   , Case (..)
   , Altn (..)
   , Patn (..)
+
+  , pattern EVal
+  , pattern ECon
+  , pattern ENum
 
   , weakenE
   , mkEApp
@@ -36,14 +42,17 @@ module Pukeko.AST.SystemF
   , defn2func
   , defn2expr
   , defn2exprSt
-  , defn2dcon
+  , defn2atom
   , defn2type
   , bind2evar
   , bind2type
 
-  , decl2eval
-  , expr2eval
+  , decl2atom
+  , expr2atom
   , patn2evar
+
+  , _AVal
+  , _ACon
 
   , module Pukeko.AST.Scope
   )
@@ -114,12 +123,15 @@ data Defn st tv ev = MkDefn
   , _defn2expr :: Expr st tv ev
   }
 
+data Atom
+  = AVal Id.EVar
+  | ACon Id.DCon
+  | ANum Int
+
 data Expr st tv ev
   = ELoc (Lctd (Expr st tv ev))
   | EVar ev
-  | EVal Id.EVar
-  | ECon Id.DCon
-  | ENum Int
+  | EAtm Atom
   | EApp (Expr st tv ev) (NonEmpty (Expr st tv ev))
   | HasLambda st ~ 'True =>
     ELam (NonEmpty (Bind (StType st) tv)) (Expr st tv (EScope Int ev)) (StType st tv)
@@ -157,6 +169,18 @@ data Patn ty tv
   | PVar Id.EVar
   | PCon Id.DCon [ty tv] [Patn ty tv]
 
+pattern EVal :: Id.EVar -> Expr st tv ev
+pattern EVal z = EAtm (AVal z)
+
+pattern ECon :: Id.DCon -> Expr st tv ev
+pattern ECon c = EAtm (ACon c)
+
+pattern ENum :: Int -> Expr st tv ev
+pattern ENum n = EAtm (ANum n)
+
+{-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, ECas, EMat, ECoe,
+             ETyAbs, ETyApp #-}
+
 -- * Derived optics
 makeLenses ''Module
 makeLenses ''SignDecl
@@ -168,6 +192,8 @@ makeLenses ''Defn
 makeLenses ''Bind
 makeLenses ''Case
 makeLenses ''Altn
+
+makePrisms ''Atom
 
 weakenE :: Expr st tv ev -> Expr st tv (EScope i ev)
 weakenE = fmap weakenScope
@@ -217,9 +243,7 @@ abstract f = fmap (match f)
 expr // f = case expr of
   ELoc l       -> ELoc (fmap (// f) l)
   EVar x       -> f x
-  EVal z       -> EVal z
-  ECon c       -> ECon c
-  ENum n       -> ENum n
+  EAtm a       -> EAtm a
   EApp t  us   -> EApp (t // f) (fmap (// f) us)
   ECas t  cs   -> ECas (t // f) (fmap (over' case2expr (/// f)) cs)
   ELam ps e t  -> ELam ps (e /// f) t
@@ -268,8 +292,8 @@ decl2expr f top = case top of
   DSupC s -> DSupC <$> supc2expr f s
   DExtn p -> pure (DExtn p)
 
-decl2eval :: Traversal' (Decl st) Id.EVar
-decl2eval f = decl2expr (expr2eval f)
+decl2atom :: Traversal' (Decl st) Atom
+decl2atom f = decl2expr (expr2atom f)
 
 defn2func :: Lens' (Defn st tv ev) Id.EVar
 defn2func = defn2bind . bind2evar . lctd
@@ -281,25 +305,23 @@ defn2exprSt f (MkDefn b e) = MkDefn b <$> f e
 
 
 -- * Deep traversals
-defn2dcon :: WhereTraversal' (Defn st tv ev) Id.DCon
-defn2dcon f (MkDefn b e) = MkDefn b <$> expr2dcon f e
+defn2atom :: Traversal' (Defn st tv ev) Atom
+defn2atom f (MkDefn b e) = MkDefn b <$> expr2atom f e
 
-expr2dcon :: WhereTraversal' (Expr st tv ev) Id.DCon
-expr2dcon f = \case
-  ELoc e       -> here e $ ELoc <$> lctd (expr2dcon f) e
+expr2atom :: Traversal' (Expr st tv ev) Atom
+expr2atom f = \case
+  ELoc e       -> ELoc <$> lctd (expr2atom f) e
   EVar x       -> pure (EVar x)
-  EVal z       -> pure (EVal z)
-  ECon c       -> ECon <$> f c
-  ENum n       -> pure (ENum n)
-  EApp t  us   -> EApp <$> expr2dcon f t <*> (traverse . expr2dcon) f us
-  ECas t  cs   -> ECas <$> expr2dcon f t <*> (traverse . case2dcon) f cs
-  ELam bs e t  -> ELam bs <$> expr2dcon f e <*> pure t
-  ELet ds t    -> ELet <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
-  ERec ds t    -> ERec <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
-  EMat t  as   -> EMat <$> expr2dcon f t <*> (traverse . altn2dcon) f as
-  ECoe d e     -> ECoe d <$> expr2dcon f e
-  ETyAbs x e   -> ETyAbs x <$> expr2dcon f e
-  ETyApp e t   -> ETyApp <$> expr2dcon f e <*> pure t
+  EAtm a       -> EAtm <$> f a
+  EApp t  us   -> EApp <$> expr2atom f t <*> (traverse . expr2atom) f us
+  ECas t  cs   -> ECas <$> expr2atom f t <*> (traverse . case2expr . expr2atom) f cs
+  ELam bs e t  -> ELam bs <$> expr2atom f e <*> pure t
+  ELet ds t    -> ELet <$> (traverse . defn2atom) f ds <*> expr2atom f t
+  ERec ds t    -> ERec <$> (traverse . defn2atom) f ds <*> expr2atom f t
+  EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
+  ECoe d e     -> ECoe d <$> expr2atom f e
+  ETyAbs x e   -> ETyAbs x <$> expr2atom f e
+  ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
 
 defn2type ::
   forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
@@ -314,9 +336,7 @@ expr2type ::
 expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
   EVar x       -> pure (EVar x)
-  EVal z       -> pure (EVal z)
-  ECon c       -> pure (ECon c)
-  ENum n       -> pure (ENum n)
+  EAtm a       -> pure (EAtm a)
   EApp e0 es   -> EApp <$> expr2type f e0 <*> traverse (expr2type f) es
   ECas e0 cs   -> ECas <$> expr2type f e0 <*> traverse (case2type f ) cs
   ELam bs e t  -> ELam <$> traverse (bind2type f) bs <*> expr2type f e <*> f t
@@ -349,33 +369,11 @@ patn2type f = \case
   PCon dcon targs patns ->
     PCon dcon <$> traverse f targs <*> traverse (patn2type f) patns
 
-altn2dcon :: WhereTraversal' (Altn st tv ev) Id.DCon
-altn2dcon f (MkAltn p t) = MkAltn <$> patn2dcon f p <*> expr2dcon f t
-
 patn2dcon :: Traversal (Patn ty tv) (Patn ty tv) Id.DCon Id.DCon
 patn2dcon f = \case
   PWld      -> pure PWld
   PVar x    -> pure (PVar x)
   PCon c ts ps -> PCon <$> f c <*> pure ts <*> (traverse . patn2dcon) f ps
-
-expr2eval :: Traversal' (Expr st tv ev) Id.EVar
-expr2eval f = \case
-  ELoc l      -> ELoc <$> traverse (expr2eval f) l
-  EVar x      -> pure (EVar x)
-  EVal z      -> EVal <$> f z
-  ECon c      -> pure (ECon c)
-  ENum n      -> pure (ENum n)
-  EApp t  us  -> EApp <$> expr2eval f t <*> (traverse . expr2eval) f us
-  ELam bs e t -> ELam bs <$> expr2eval f e <*> pure t
-  ELet ds t   ->
-    ELet <$> (traverse . defn2expr . expr2eval) f ds <*> expr2eval f t
-  ERec ds t   ->
-    ERec <$> (traverse . defn2expr . expr2eval) f ds <*> expr2eval f t
-  EMat t  as  -> EMat <$> expr2eval f t <*> (traverse . altn2expr . expr2eval) f as
-  ECas t  cs  -> ECas <$> expr2eval f t <*> traverse (case2expr (expr2eval f)) cs
-  ECoe d  e   -> ECoe d <$> expr2eval f e
-  ETyAbs x e  -> ETyAbs x <$> expr2eval f e
-  ETyApp e t  -> ETyApp <$> expr2eval f e <*> pure t
 
 patn2evar :: Traversal' (Patn st tv) Id.EVar
 patn2evar f = \case
@@ -437,9 +435,7 @@ instance IsStage st => Bitraversable (Expr st) where
   bitraverse f g = \case
     ELoc l -> ELoc <$> traverse (bitraverse f g) l
     EVar x -> EVar <$> g x
-    EVal z -> pure (EVal z)
-    ECon c -> pure (ECon c)
-    ENum n -> pure (ENum n)
+    EAtm a -> pure (EAtm a)
     EApp e0 es -> EApp <$> bitraverse f g e0 <*> traverse (bitraverse f g) es
     ELam bs e0 t ->
       ELam
@@ -549,15 +545,19 @@ prettyDefns isrec ds = case ds of
       let_ | isrec     = "let rec"
            | otherwise = "let"
 
+instance Pretty Atom where
+  pretty = \case
+    AVal z -> pretty z
+    ACon c -> pretty c
+    ANum n -> pretty n
+
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Expr st tv ev)
 
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev) where
   prettyPrec prec = \case
     ELoc l -> prettyPrec prec l
     EVar x -> pretty (baseEVar x)
-    EVal z -> pretty z
-    ECon c -> pretty c
-    ENum n -> pretty n
+    EAtm a -> pretty a
     EApp t us ->
       maybeParens (prec > Op.aprec)
       $ prettyPrec Op.aprec t <+> hsepMap (prettyPrec (Op.aprec+1)) us
@@ -673,5 +673,6 @@ deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
 deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
 deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Case st tv ev)
 deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
+deriving instance                                         Show Atom
 deriving instance (                     Show tv) => Show (Patn Type tv)
 deriving instance (                     Show tv) => Show (Bind Type tv)

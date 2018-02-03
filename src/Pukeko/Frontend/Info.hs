@@ -12,8 +12,8 @@ module Pukeko.FrontEnd.Info
   , runInfo
   , lookupInfo
   , findInfo
-  , typeOfDCon
   , typeOfFunc
+  , typeOfAtom
   , tconDeclInfo
   ) where
 
@@ -59,16 +59,17 @@ findInfo ::
   Lens' ModuleInfo (Map k v) -> k -> Eff effs v
 findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k <$> view l
 
-typeOfDCon ::
-  (HasCallStack, Member (Reader ModuleInfo) effs) => Id.DCon -> Eff effs (Type tv)
-typeOfDCon dcon = do
-  (tconDecl, dconDecl) <- findInfo info2dcons dcon
-  pure (fmap absurd (typeOfDConDecl tconDecl dconDecl))
-
 typeOfFunc ::
   (HasCallStack, Member (Reader ModuleInfo) effs) =>
   Id.EVar -> Eff effs (Type tv)
 typeOfFunc func = fmap absurd . _sign2type <$> findInfo info2signs func
+
+typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
+  Atom -> Eff effs (Type tv)
+typeOfAtom = \case
+  AVal z -> typeOfFunc z
+  ACon c -> fmap absurd <$> uncurry typeOfDCon <$> findInfo info2dcons c
+  ANum _ -> pure typeInt
 
 itemInfo :: (Ord k) => Lens' ModuleInfo (Map k v) -> k -> v -> ModuleInfo
 itemInfo l k v = set l (Map.singleton k v) mempty

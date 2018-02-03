@@ -23,4 +23,4 @@ cleanModule (MkModule tops0) =
       tops1 = filter (maybe True keep . firstOf decl2func) tops0
   in  MkModule tops1
   where
-    deps = Set.toList . setOf decl2eval
+    deps = Set.toList . setOf (decl2atom . _AVal)

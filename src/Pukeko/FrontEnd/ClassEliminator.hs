@@ -106,9 +106,7 @@ elimExpr ::
 elimExpr = \case
   ELoc (Lctd pos e0) -> here_ pos $ first (ELoc . Lctd pos) <$> elimExpr e0
   EVar x -> (,) <$> pure (EVar x) <*> lookupEVar x
-  EVal z -> (,) <$> pure (EVal z) <*> typeOfFunc z
-  ECon c -> (,) <$> pure (ECon c) <*> typeOfDCon c
-  ENum n -> pure (ENum n, typeInt)
+  EAtm a -> (,) <$> pure (EAtm a) <*> typeOfAtom a
   EApp e0 es0 -> do
     (e1, t1) <- elimExpr e0
     (es1, ts1) <- NE.unzip <$> traverse elimExpr es0

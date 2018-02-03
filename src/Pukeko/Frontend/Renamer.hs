@@ -127,7 +127,9 @@ rnExpr = \case
       Just y -> pure (EVar y)
       Nothing -> do
         global <- gets (x `Set.member`)
-        if global then pure (EVal x) else throwHere ("unknown variable:" <+> pretty x)
+        if global
+          then pure (EVal x)
+          else throwHere ("unknown variable:" <+> pretty x)
   Ps.ECon c -> pure (ECon c)
   Ps.ENum n -> pure (ENum n)
   Ps.EApp e0  es -> EApp <$> rnExpr e0 <*> traverse rnExpr es

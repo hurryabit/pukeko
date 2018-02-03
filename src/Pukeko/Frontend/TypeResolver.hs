@@ -5,7 +5,6 @@ module Pukeko.FrontEnd.TypeResolver
 
 import Pukeko.Prelude
 
-import           Control.Lens (traverseOf)
 import qualified Data.Map     as Map
 
 import           Pukeko.AST.SystemF
@@ -57,7 +56,7 @@ findDCon dcon = do
 
 -- FIXME: Move this check into the renamer.
 trDefn :: Defn In tv ev -> TR (Defn Out tv ev)
-trDefn = traverseOf defn2dcon findDCon
+trDefn = (defn2atom . _ACon) findDCon
 
 trDecl :: Decl In -> TR (Decl Out)
 trDecl top = case top of

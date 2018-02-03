@@ -41,9 +41,7 @@ llExpr ::
 llExpr = \case
   ELoc le -> here le $ ELoc <$> lctd llExpr le
   EVar x -> pure (EVar x)
-  EVal z -> pure (EVal z)
-  ECon c -> pure (ECon c)
-  ENum n -> pure (ENum n)
+  EAtm a -> pure (EAtm a)
   EApp t  us -> EApp <$> llExpr t <*> traverse llExpr us
   ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
   ELet ds e0 ->

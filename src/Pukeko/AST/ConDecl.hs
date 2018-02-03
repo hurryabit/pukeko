@@ -7,7 +7,7 @@ module Pukeko.AST.ConDecl
   , tcon2dcons
   , dcon2name
   , dcon2flds
-  , typeOfDConDecl
+  , typeOfDCon
   ) where
 
 import Pukeko.Prelude
@@ -31,8 +31,8 @@ data DConDecl = MkDConDecl
   , _dcon2flds :: [Type (TScope Int Void)]
   }
 
-typeOfDConDecl :: TConDecl -> DConDecl -> Type Void
-typeOfDConDecl
+typeOfDCon :: TConDecl -> DConDecl -> Type Void
+typeOfDCon
   (MkTConDecl (unlctd -> tname) prms _) (MkDConDecl tcon dname _ flds)
   | tname /= tcon = bugWith "type and data constructor do not match" (tname, dname)
   | otherwise     =

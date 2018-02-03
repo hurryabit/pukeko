@@ -194,9 +194,7 @@ infer = \case
       (e1, t1, cstrs) <- infer e0
       pure (ELoc (Lctd pos e1), t1, cstrs)
     EVar x -> lookupEVar x >>= instantiate (EVar x)
-    EVal z -> typeOfFunc z >>= instantiate (EVal z) . open
-    ECon c -> typeOfDCon c >>= instantiate (ECon c) . open
-    ENum n -> pure (ENum n, open typeInt, mempty)
+    EAtm a -> typeOfAtom a >>= instantiate (EAtm a) . open
     EApp fun0 args0 -> do
       let neUnzip3 :: NonEmpty (a, b, c) -> (NonEmpty a, NonEmpty b, NonEmpty c)
           neUnzip3 ((x, y, z) :| xyzs) = (x :| xs, y :| ys, z :| zs)
@@ -343,9 +341,7 @@ qualExpr :: Expr (Aux s) tv' ev -> TQ tv s (Expr Out tv ev)
 qualExpr = \case
   ELoc le -> here le $ ELoc <$> lctd qualExpr le
   EVar x -> pure (EVar x)
-  EVal z -> pure (EVal z)
-  ECon c -> pure (ECon c)
-  ENum n -> pure (ENum n)
+  EAtm a -> pure (EAtm a)
   EApp e0 es -> EApp <$> qualExpr e0 <*> traverse qualExpr es
   ELam bs0 e0 t -> do
     bs1 <- for bs0 $ \(MkBind x ts) -> do

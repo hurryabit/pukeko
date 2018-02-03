@@ -41,9 +41,7 @@ typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
-  EVal z -> typeOfFunc z
-  ECon c -> typeOfDCon c
-  ENum _ -> pure typeInt
+  EAtm a -> typeOfAtom a
   EApp e0 es -> do
     t0 <- typeOf e0
     foldlM app t0 es

@@ -17,7 +17,8 @@ inlineModule :: Module st -> Module st
 inlineModule (MkModule decls0) =
   let ls = mapMaybe declLink decls0
       uf = unionFind ls
-      decls1 = over (traverse . decl2eval) (\x -> Map.findWithDefault x x uf) decls0
+      decls1 = over (traverse . decl2atom . _AVal)
+               (\x -> Map.findWithDefault x x uf) decls0
   in  MkModule decls1
 
 declLink :: Decl st -> Maybe (Id.EVar, Id.EVar)
