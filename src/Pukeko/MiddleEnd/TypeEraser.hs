@@ -41,7 +41,7 @@ ccDecl = \case
   In.DType{} -> pure Nothing
   In.DSupC (In.MkSupCDecl (unlctd -> z) _ _ bs e) ->
     Just <$> Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
-  In.DPrim (In.MkPrimDecl b s) -> do
+  In.DExtn (In.MkExtnDecl b s) -> do
     let n = MkName s
     modify (Map.insert (unlctd (In._bind2evar b)) n)
     pure (Just (Asm n))

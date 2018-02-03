@@ -31,7 +31,7 @@ erDecl :: forall st. ERStage st => Decl st -> Decl st
 erDecl top = case top of
   DType{} -> top
   DSign{} -> top
-  DPrim{} -> top
+  DExtn{} -> top
   DSupC (MkSupCDecl z vs0 t0 bs0 e0) ->
     case e0 of
       -- Reduce expression parameters:

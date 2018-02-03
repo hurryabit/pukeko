@@ -94,7 +94,7 @@ collectInfo (MkModule decls) = foldFor decls $ \case
     itemInfo info2insts (c, t) (SomeInstDecl inst)
   DDefn (MkDefn b _) -> signBind b
   DSupC (MkSupCDecl z xs t _ _) -> sign (MkSignDecl z (mkTUni xs t))
-  DPrim (MkPrimDecl b _) -> signBind b
+  DExtn (MkExtnDecl b _) -> signBind b
   where
     foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
     foldFor = flip foldMap

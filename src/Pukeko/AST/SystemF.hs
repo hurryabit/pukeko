@@ -9,7 +9,7 @@ module Pukeko.AST.SystemF
   , ClssDecl (..)
   , InstDecl (..)
   , SupCDecl (..)
-  , PrimDecl (..)
+  , ExtnDecl (..)
   , Defn (..)
   , Expr (..)
   , Bind (..)
@@ -31,7 +31,7 @@ module Pukeko.AST.SystemF
   , sign2func
   , sign2type
   , inst2defn
-  , prim2bind
+  , extn2bind
   , defn2bind
   , defn2func
   , defn2expr
@@ -75,7 +75,7 @@ data Decl st
   | HasLambda  st ~ 'True => DDefn (Defn st Void Void)
   | (HasLambda st ~ 'False, StageType st ~ Type) =>
                              DSupC (SupCDecl st)
-  |                          DPrim (PrimDecl (StageType st))
+  |                          DExtn (ExtnDecl (StageType st))
 
 data SignDecl tv = MkSignDecl
   { _sign2func :: Lctd Id.EVar
@@ -104,9 +104,9 @@ data SupCDecl st = MkSupCDecl
   , _supc2expr  :: Expr st (TScope Int Void) (EScope Int Void)
   }
 
-data PrimDecl ty = MkPrimDecl
-  { _prim2bind :: Bind ty Void
-  , _prim2extn :: String
+data ExtnDecl ty = MkExtnDecl
+  { _extn2bind :: Bind ty Void
+  , _extn2extn :: String
   }
 
 data Defn st tv ev = MkDefn
@@ -163,7 +163,7 @@ makeLenses ''SignDecl
 makeLenses ''ClssDecl
 makeLenses ''InstDecl
 makeLenses ''SupCDecl
-makeLenses ''PrimDecl
+makeLenses ''ExtnDecl
 makeLenses ''Defn
 makeLenses ''Bind
 makeLenses ''Case
@@ -245,7 +245,7 @@ inst2defn :: Traversal
 inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> traverse f ds
 
 -- | Travere over the names of all the functions defined in either a 'DDefn', a
--- 'DSupC' or a 'DPrim'.
+-- 'DSupC' or a 'DExtn'.
 decl2func :: Traversal' (Decl st) Id.EVar
 decl2func f top = case top of
   DType{} -> pure top
@@ -254,7 +254,7 @@ decl2func f top = case top of
   DInst{} -> pure top
   DDefn d -> DDefn <$> defn2bind (bind2evar (lctd f)) d
   DSupC s -> DSupC <$> supc2func (lctd f) s
-  DPrim p -> DPrim <$> prim2bind (bind2evar (lctd f)) p
+  DExtn p -> DExtn <$> extn2bind (bind2evar (lctd f)) p
 
 decl2expr ::
   (Applicative f) =>
@@ -266,7 +266,7 @@ decl2expr f top = case top of
   DInst i -> DInst <$> inst2defn (defn2expr f) i
   DDefn d -> DDefn <$> defn2expr f d
   DSupC s -> DSupC <$> supc2expr f s
-  DPrim p -> pure (DPrim p)
+  DExtn p -> pure (DExtn p)
 
 decl2eval :: Traversal' (Decl st) Id.EVar
 decl2eval f = decl2expr (expr2eval f)
@@ -492,7 +492,7 @@ instance HasPos (Decl st) where
     DInst inst  -> getPos (_inst2clss inst)
     DDefn defn  -> getPos (_defn2bind defn)
     DSupC supc  -> getPos (_supc2func supc)
-    DPrim prim  -> getPos (_prim2bind prim)
+    DExtn extn  -> getPos (_extn2bind extn)
 
 -- * Pretty printing
 class IsType ty => PrettyType ty where
@@ -528,7 +528,7 @@ instance (PrettyStage st) => Pretty (Decl st) where
     DSupC (MkSupCDecl z qvs t bs e) ->
       hang (pretty z <+> ":" <+> prettyPrecType 0 (mkTUni qvs t) <+> "=") 2
         (prettyETyAbs 0 qvs (prettyELam 0 bs e))
-    DPrim (MkPrimDecl b s) ->
+    DExtn (MkExtnDecl b s) ->
       hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
 
 instance (BaseTVar tv) => Pretty (SignDecl tv) where
@@ -668,7 +668,7 @@ deriving instance (Show tv)             => Show (SignDecl tv)
 deriving instance                          Show (ClssDecl)
 deriving instance (StageType st ~ Type) => Show (InstDecl st)
 deriving instance (StageType st ~ Type) => Show (SupCDecl st)
-deriving instance                          Show (PrimDecl Type)
+deriving instance                          Show (ExtnDecl Type)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
 deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Case st tv ev)

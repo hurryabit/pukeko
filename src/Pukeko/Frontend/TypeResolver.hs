@@ -76,7 +76,7 @@ trDecl top = case top of
   DClss c -> pure (DClss c)
   DInst i -> DInst <$> inst2defn trDefn i
   DDefn d -> DDefn <$> trDefn d
-  DPrim p -> pure (DPrim p)
+  DExtn p -> pure (DExtn p)
 
 resolveModule :: Module In -> Either Failure (Module Out)
 resolveModule = evalTR . module2decls (traverse trDecl)

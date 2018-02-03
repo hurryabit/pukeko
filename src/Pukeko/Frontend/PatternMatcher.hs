@@ -61,7 +61,7 @@ pmDecl = \case
   DClss c -> pure (DClss c)
   DInst i -> DInst <$> inst2defn pmDefn i
   DDefn d -> DDefn <$> pmDefn d
-  DPrim p -> pure (DPrim p)
+  DExtn p -> pure (DExtn p)
 
 compileModule :: Module In -> Either Failure (Module Out)
 compileModule m0 = evalPM m0 (module2decls (traverse pmDecl) m0)

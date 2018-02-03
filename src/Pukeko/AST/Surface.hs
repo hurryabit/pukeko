@@ -11,7 +11,7 @@ module Pukeko.AST.Surface
   , SignDecl (..)
   , ClssDecl (..)
   , InstDecl (..)
-  , PrimDecl (..)
+  , ExtnDecl (..)
   , Type (..)
   , TypeCstr (..)
   , TypeScheme (..)
@@ -59,7 +59,7 @@ data Decl
   | DClss ClssDecl
   | DInst InstDecl
   | DDefn (Defn Id.EVar)
-  | DPrim PrimDecl
+  | DExtn ExtnDecl
 
 data TConDecl = MkTConDecl
   { _tcon2name  :: Lctd Id.TCon
@@ -92,9 +92,9 @@ data InstDecl = MkInstDecl
   , _inst2defns :: [Defn Id.EVar]
   }
 
-data PrimDecl = MkPrimDecl
-  { _prim2func :: Lctd Id.EVar
-  , _prim2prim :: String
+data ExtnDecl = MkExtnDecl
+  { _extn2func :: Lctd Id.EVar
+  , _extn2name :: String
   }
 
 data Type
@@ -177,7 +177,7 @@ deriving instance Show DConDecl
 deriving instance Show SignDecl
 deriving instance Show ClssDecl
 deriving instance Show InstDecl
-deriving instance Show PrimDecl
+deriving instance Show ExtnDecl
 deriving instance Show Type
 deriving instance Show TypeCstr
 deriving instance Show TypeScheme

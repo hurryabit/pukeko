@@ -312,8 +312,8 @@ instDecl = do
   ds      <- reserved "where" *> aligned (many defn)
   pure (MkInstDecl c t vs q ds)
 
-primDecl :: Parser PrimDecl
-primDecl = MkPrimDecl
+extnDecl :: Parser ExtnDecl
+extnDecl = MkExtnDecl
   <$> lctd evar
   <*> (equals *> char '\"' *> some (lowerChar <|> char '_') <* symbol "\"")
 
@@ -330,7 +330,7 @@ module_ file = do
     [ DType <$> (NE.singleton <$> typeDecl <|> dataDecl)
     , DClss <$> indented_ (reserved "class") clssDecl
     , DInst <$> indented_ (reserved "instance") instDecl
-    , DPrim <$> indented_ (reserved "external") primDecl
+    , DExtn <$> indented_ (reserved "external") extnDecl
     , DSign <$> signDecl <?> "function declaration"
     , DDefn <$> defn <?> "function definition"
     ]

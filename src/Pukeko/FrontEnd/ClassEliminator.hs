@@ -70,7 +70,7 @@ elimDecl decl = case decl of
         elimDecl (DDefn (MkDefn (MkBind (Lctd ipos z_dict) t_dict) e_rhs))
   DDefn defn  -> (:[]) . DDefn <$> elimDefn defn
   DType tcons -> pure [DType tcons]
-  DPrim prim  -> pure [DPrim prim]
+  DExtn extn  -> pure [DExtn extn]
 
 buildDict :: (IsTVar tv) => Id.Clss -> Type tv -> CE tv ev (Expr Out tv ev)
 buildDict clss t0 = do
@@ -192,7 +192,7 @@ unclssDecl = \case
     let tcon2type = tcon2dcons . _Right . traverse . dcon2flds . traverse
     in  DType (fmap (over tcon2type unclssType) tcons)
   DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
-  DPrim prim -> DPrim (over (prim2bind . bind2type) unclssType prim)
+  DExtn extn -> DExtn (over (extn2bind . bind2type) unclssType extn)
 
 -- TODO: Make this less hacky.
 clssTCon :: Id.Clss -> Id.TCon

@@ -61,9 +61,9 @@ rnDecl = \case
     ds1 <- traverse rnDefn ds0
     pure (DInst (MkInstDecl c t qvs ds1))
   Ps.DDefn d -> DDefn <$> rnDefn d
-  Ps.DPrim (Ps.MkPrimDecl z s) -> do
+  Ps.DExtn (Ps.MkExtnDecl z s) -> do
     modify (<> Set.singleton (z^.lctd))
-    pure (DPrim (MkPrimDecl (MkBind z NoType) s))
+    pure (DExtn (MkExtnDecl (MkBind z NoType) s))
 
 rnTConDecl :: Ps.TConDecl -> Rn ev TConDecl
 rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = do

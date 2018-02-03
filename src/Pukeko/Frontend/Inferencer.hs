@@ -287,9 +287,9 @@ inferDecl = here' $ \case
     t_decl <- open <$> typeOfFunc (d0^.defn2bind.bind2evar.lctd)
     d1 <- inferTypedDefn d0 t_decl
     yield (DDefn d1)
-  DPrim (MkPrimDecl (MkBind z NoType) s) -> do
+  DExtn (MkExtnDecl (MkBind z NoType) s) -> do
     t <- open <$> typeOfFunc (unlctd z)
-    yield (DPrim (MkPrimDecl (MkBind z t) s))
+    yield (DExtn (MkExtnDecl (MkBind z t) s))
   where
     yield = pure . Just
 
@@ -376,11 +376,11 @@ qualDecl = \case
     ds1 <- for ds0 $ \d0 -> localizeTQ qvs (qualDefn d0)
     pure (DInst (MkInstDecl c t qvs ds1))
   DDefn d -> DDefn <$> qualDefn d
-  DPrim (MkPrimDecl (MkBind x ts) s) -> do
+  DExtn (MkExtnDecl (MkBind x ts) s) -> do
     t1 <- case ts of
       UTUni (toList -> qvs) t0 -> localizeTQ qvs (mkTUni qvs <$> qualType t0)
       t0 -> qualType t0
-    pure (DPrim (MkPrimDecl (MkBind x t1) s))
+    pure (DExtn (MkExtnDecl (MkBind x t1) s))
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule = module2decls (traverse (\decl -> reset @Id.TVar *> qualDecl decl))

@@ -121,7 +121,7 @@ kcDecl decl = case decl of
   DClss{} -> passOn
   DInst{} -> passOn
   DDefn{} -> passOn
-  DPrim{} -> passOn
+  DExtn{} -> passOn
   where
     passOn = pure decl
 

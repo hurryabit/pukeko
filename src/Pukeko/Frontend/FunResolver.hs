@@ -72,6 +72,6 @@ frDecl = \case
   DDefn d -> do
     defineFun (d^.defn2bind.bind2evar)
     pure (DDefn d)
-  DPrim p -> do
-    defineFun (p^.prim2bind.bind2evar)
-    pure (DPrim p)
+  DExtn p -> do
+    defineFun (p^.extn2bind.bind2evar)
+    pure (DExtn p)

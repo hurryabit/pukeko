@@ -187,4 +187,4 @@ checkDecl = \case
       let t2 = fmap _bind2type bs *~> t1
       match (mkTUni qvs t0) (mkTUni qvs t2)
     `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)
-  DPrim _ -> pure ()
+  DExtn _ -> pure ()

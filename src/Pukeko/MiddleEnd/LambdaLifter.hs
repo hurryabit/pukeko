@@ -100,7 +100,7 @@ llDecl = \case
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
     yield (DSupC (MkSupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
-  DPrim p -> yield (DPrim p)
+  DExtn p -> yield (DExtn p)
 
 liftModule :: Module In -> Module Out
 liftModule m0@(MkModule tops0) = MkModule (execLL m0 (traverse_ llDecl tops0))
