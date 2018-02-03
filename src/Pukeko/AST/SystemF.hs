@@ -35,6 +35,8 @@ module Pukeko.AST.SystemF
   , decl2func
   , sign2func
   , sign2type
+  , clss2mthds
+  , inst2clss
   , inst2defn
   , extn2bind
   , defn2bind
