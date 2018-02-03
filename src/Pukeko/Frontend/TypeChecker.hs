@@ -29,7 +29,7 @@ type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
 type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
-runTC :: (IsType (St.StageType st)) => Module st -> TC Void Void a -> Either Failure a
+runTC :: (IsType (St.StType st)) => Module st -> TC Void Void a -> Either Failure a
 runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
 
 checkCoercion :: Coercion (Type tv) -> TC tv ev ()

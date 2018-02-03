@@ -24,15 +24,15 @@ type family StageId st where
   StageId ClassEliminator = 600
   StageId LambdaLifter    = 700
 
-type family StageType st where
-  StageType Renamer         = NoType
-  StageType KindChecker     = NoType
-  StageType (Inferencer t)  = t
-  StageType PatternMatcher  = Type
-  StageType ClassEliminator = Type
-  StageType LambdaLifter    = Type
+type family StType st where
+  StType Renamer         = NoType
+  StType KindChecker     = NoType
+  StType (Inferencer t)  = t
+  StType PatternMatcher  = Type
+  StType ClassEliminator = Type
+  StType LambdaLifter    = Type
 
-type IsStage st = Traversable (StageType st)
+type IsStage st = Traversable (StType st)
 
 type HasLambda st = StageId st <=? 650
 type HasNested st = StageId st <=? 450
@@ -50,11 +50,11 @@ type SameNodes st1 st2 =
   , HasTypes  st1 ~ HasTypes  st2
   )
 
-type SameTypes st1 st2 = (StageType st1 ~ StageType st2)
+type SameTypes st1 st2 = (StType st1 ~ StType st2)
 
 -- NOTE: We cannot express that @Untyped@ shall be the negation of @Typed@ in
 -- the type system, so we need to ensure this by hand.
-type Typed st = (StageType st ~ Type)
+type Typed st = (StType st ~ Type)
 type Untyped st = (StageId st <=? 300)
 
 type family (&&) (x :: Bool) (y :: Bool) where

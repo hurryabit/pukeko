@@ -73,9 +73,9 @@ data Decl st
   | HasClasses st ~ 'True => DClss ClssDecl
   | HasClasses st ~ 'True => DInst (InstDecl st)
   | HasLambda  st ~ 'True => DDefn (Defn st Void Void)
-  | (HasLambda st ~ 'False, StageType st ~ Type) =>
+  | (HasLambda st ~ 'False, StType st ~ Type) =>
                              DSupC (SupCDecl st)
-  |                          DExtn (ExtnDecl (StageType st))
+  |                          DExtn (ExtnDecl (StType st))
 
 data SignDecl tv = MkSignDecl
   { _sign2func :: Lctd Id.EVar
@@ -99,8 +99,8 @@ data InstDecl st = MkInstDecl
 data SupCDecl st = MkSupCDecl
   { _supc2func  :: Lctd Id.EVar
   , _supc2tprms :: [QVar]
-  , _supc2type  :: StageType st (TScope Int Void)
-  , _supc2eprms :: [Bind (StageType st) (TScope Int Void)]
+  , _supc2type  :: StType st (TScope Int Void)
+  , _supc2eprms :: [Bind (StType st) (TScope Int Void)]
   , _supc2expr  :: Expr st (TScope Int Void) (EScope Int Void)
   }
 
@@ -110,7 +110,7 @@ data ExtnDecl ty = MkExtnDecl
   }
 
 data Defn st tv ev = MkDefn
-  { _defn2bind :: Bind (StageType st) tv
+  { _defn2bind :: Bind (StType st) tv
   , _defn2expr :: Expr st tv ev
   }
 
@@ -122,18 +122,18 @@ data Expr st tv ev
   | ENum Int
   | EApp (Expr st tv ev) (NonEmpty (Expr st tv ev))
   | HasLambda st ~ 'True =>
-    ELam (NonEmpty (Bind (StageType st) tv)) (Expr st tv (EScope Int ev)) (StageType st tv)
+    ELam (NonEmpty (Bind (StType st) tv)) (Expr st tv (EScope Int ev)) (StType st tv)
   | ELet [Defn st tv ev] (Expr st tv (EScope Int ev))
   | ERec [Defn st tv (EScope Int ev)] (Expr st tv (EScope Int ev))
   | HasNested st ~ 'False =>
     ECas (Expr st tv ev) (NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
     EMat (Expr st tv ev) (NonEmpty (Altn st tv ev))
-  | ECoe (Coercion (StageType st tv)) (Expr st tv ev)
+  | ECoe (Coercion (StType st tv)) (Expr st tv ev)
   | (HasTypes st ~ 'True) =>
     ETyAbs (NonEmpty QVar) (Expr st (TScope Int tv) ev)
   | HasTypes st ~ 'True =>
-    ETyApp (Expr st tv ev) (NonEmpty (StageType st tv))
+    ETyApp (Expr st tv ev) (NonEmpty (StType st tv))
 
 data Bind ty tv = MkBind
   { _bind2evar :: Lctd Id.EVar
@@ -142,13 +142,13 @@ data Bind ty tv = MkBind
 
 data Case st tv ev = MkCase
   { _case2dcon  :: Id.DCon
-  , _case2targs :: [StageType st tv]
+  , _case2targs :: [StType st tv]
   , _case2binds :: [Maybe Id.EVar]
   , _case2expr  :: Expr st tv (EScope Int ev)
   }
 
 data Altn st tv ev = MkAltn
-  { _altn2patn :: Patn (StageType st) tv
+  { _altn2patn :: Patn (StType st) tv
   , _altn2expr :: Expr st tv (EScope Id.EVar ev)
   }
 
@@ -182,16 +182,16 @@ mkEApp e0 es0 = case toList es0 of
 
 mkELam ::
   (HasLambda st ~ 'True) =>
-  [Bind (StageType st) tv]   ->
+  [Bind (StType st) tv]   ->
   Expr st tv (EScope Int ev) ->
-  StageType st tv            ->
+  StType st tv            ->
   Expr st tv ev
 mkELam bs0 e0 t0 = case bs0 of
   []   -> strengthenE0 e0
   b:bs -> ELam (b :| bs) e0 t0
 
 mkETyApp ::
-  (HasTypes st ~ 'True) => Expr st tv ev -> [StageType st tv] -> Expr st tv ev
+  (HasTypes st ~ 'True) => Expr st tv ev -> [StType st tv] -> Expr st tv ev
 mkETyApp e0 = \case
   []    -> e0
   t1:ts -> ETyApp e0 (t1 :| ts)
@@ -275,7 +275,7 @@ defn2func :: Lens' (Defn st tv ev) Id.EVar
 defn2func = defn2bind . bind2evar . lctd
 
 defn2exprSt ::
-  (StageType st1 ~ StageType st2) =>
+  (StType st1 ~ StType st2) =>
   Lens (Defn st1 tv ev1) (Defn st2 tv ev2) (Expr st1 tv ev1) (Expr st2 tv ev2)
 defn2exprSt f (MkDefn b e) = MkDefn b <$> f e
 
@@ -303,13 +303,13 @@ expr2dcon f = \case
 
 defn2type ::
   forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  (forall tv. StType st1 tv -> f (StType st2 tv)) ->
   Defn st1 tv ev -> f (Defn st2 tv ev)
 defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
 
 expr2type ::
   forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  (forall tv. StType st1 tv -> f (StType st2 tv)) ->
   Expr st1 tv ev -> f (Expr st2 tv ev)
 expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
@@ -329,14 +329,14 @@ expr2type f = \case
 
 case2type ::
   forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  (forall tv. StType st1 tv -> f (StType st2 tv)) ->
   Case st1 tv ev -> f (Case st2 tv ev)
 case2type f (MkCase dcon targs bnds e0) =
   MkCase dcon <$> traverse f targs <*> pure bnds <*> expr2type f e0
 
 altn2type ::
   forall f st1 st2 tv ev. (Applicative f, Where f, SameNodes st1 st2) =>
-  (forall tv. StageType st1 tv -> f (StageType st2 tv)) ->
+  (forall tv. StType st1 tv -> f (StType st2 tv)) ->
   Altn st1 tv ev -> f (Altn st2 tv ev)
 altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0
 
@@ -504,7 +504,7 @@ instance PrettyType NoType where
 instance PrettyType Type where
   prettyPrecType = prettyPrec
 
-type PrettyStage st = PrettyType (StageType st)
+type PrettyStage st = PrettyType (StType st)
 
 instance (PrettyStage st) => Pretty (Module st) where
   pretty (MkModule decls) = vcatMap pretty decls
@@ -606,7 +606,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
 
 prettyELam ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  Int -> [Bind (StageType st) tv] -> Expr st tv (EScope Int ev) -> Doc ann
+  Int -> [Bind (StType st) tv] -> Expr st tv (EScope Int ev) -> Doc ann
 prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
@@ -616,7 +616,7 @@ prettyELam prec bs e
 prettyELamT ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
   Int ->
-  NonEmpty (Bind (StageType st) tv) -> Expr st tv (EScope Int ev) -> StageType st tv -> Doc ann
+  NonEmpty (Bind (StType st) tv) -> Expr st tv (EScope Int ev) -> StType st tv -> Doc ann
 prettyELamT prec bs e t =
   maybeParens (prec > 0)
   $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (pretty e)
@@ -663,15 +663,15 @@ instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Patn ty tv) where
         <+> prettyAtType (prettyPrecType 3) ts
         <+> hsep (map (prettyPrec 1) ps)
 
-deriving instance (StageType st ~ Type) => Show (Decl st)
+deriving instance (StType st ~ Type) => Show (Decl st)
 deriving instance (Show tv)             => Show (SignDecl tv)
 deriving instance                          Show (ClssDecl)
-deriving instance (StageType st ~ Type) => Show (InstDecl st)
-deriving instance (StageType st ~ Type) => Show (SupCDecl st)
+deriving instance (StType st ~ Type) => Show (InstDecl st)
+deriving instance (StType st ~ Type) => Show (SupCDecl st)
 deriving instance                          Show (ExtnDecl Type)
-deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
-deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
-deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Case st tv ev)
-deriving instance (StageType st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
+deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
+deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
+deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Case st tv ev)
+deriving instance (StType st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
 deriving instance (                     Show tv) => Show (Patn Type tv)
 deriving instance (                     Show tv) => Show (Bind Type tv)

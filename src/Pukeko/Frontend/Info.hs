@@ -45,7 +45,7 @@ makeLenses ''ModuleInfo
 makePrisms ''ModuleInfo
 
 runInfo ::
-  (IsType (StageType st)) =>
+  (IsType (StType st)) =>
   Module st -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
 runInfo = runReader . collectInfo
 
@@ -81,7 +81,7 @@ tconDeclInfo tcon =
         tcon
   in  itemInfo info2tcons (tcon^.tcon2name.lctd) tcon <> dis
 
-collectInfo :: forall st. (IsType (StageType st)) => Module st -> ModuleInfo
+collectInfo :: forall st. (IsType (StType st)) => Module st -> ModuleInfo
 collectInfo (MkModule decls) = foldFor decls $ \case
   DType tcons -> foldMap tconDeclInfo tcons
   DSign s -> sign s
