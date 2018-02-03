@@ -15,18 +15,16 @@ import qualified Pukeko.AST.Identifier as Id
 
 inlineModule :: Module st -> Module st
 inlineModule (MkModule decls0) =
-  let ls = mapMaybe (declLink . unlctd) decls0
+  let ls = mapMaybe declLink decls0
       uf = unionFind ls
-      decls1 = over
-        (unWhere (traverse . lctd . decl2eval))
-        (\x -> Map.findWithDefault x x uf) decls0
+      decls1 = over (traverse . decl2eval) (\x -> Map.findWithDefault x x uf) decls0
   in  MkModule decls1
 
 declLink :: Decl st -> Maybe (Id.EVar, Id.EVar)
 declLink = \case
-  DDefn (MkDefn b (EVal x)) -> Just (b^.bind2evar, x)
+  DDefn (MkDefn b (EVal x)) -> Just (b^.bind2evar.lctd, x)
   DSupC (MkSupCDecl z vs _ xs (EVal x))
-    | null vs && null xs -> Just (z, x)
+    | null vs && null xs -> Just (z^.lctd, x)
   _ -> Nothing
 
 data UnionFind st a = UnionFind

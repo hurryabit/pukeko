@@ -50,11 +50,11 @@ data Package = MkPackage
 data Module = MkModule
   { _mod2file    :: FilePath
   , _mod2imports :: [FilePath]
-  , _mod2decls   :: [Lctd Decl]
+  , _mod2decls   :: [Decl]
   }
 
 data Decl
-  = DType (NonEmpty (Lctd TConDecl))
+  = DType (NonEmpty TConDecl)
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
@@ -62,38 +62,38 @@ data Decl
   | DPrim PrimDecl
 
 data TConDecl = MkTConDecl
-  { _tcon2name  :: Id.TCon
+  { _tcon2name  :: Lctd Id.TCon
   , _tcon2prms  :: [Id.TVar]
     -- FIXME: Use a proper type to distinguish between 'type' and 'data'.
-  , _tcon2dcons :: Either Type [Lctd DConDecl]
+  , _tcon2dcons :: Either Type [DConDecl]
   }
 
 data DConDecl = MkDConDecl
-  { _dcon2name :: Id.DCon
+  { _dcon2name :: Lctd Id.DCon
   , _dcon2flds :: [Type]
   }
 
 data SignDecl = MkSignDecl
-  { _sign2func :: Id.EVar
+  { _sign2func :: Lctd Id.EVar
   , _sign2type :: TypeScheme
   }
 
 data ClssDecl = MkClssDecl
-  { _clss2name  :: Id.Clss
+  { _clss2name  :: Lctd Id.Clss
   , _clss2prm   :: Id.TVar
   , _clss2mthds :: [SignDecl]
   }
 
 data InstDecl = MkInstDecl
-  { _inst2clss  :: Id.Clss
+  { _inst2clss  :: Lctd Id.Clss
   , _inst2tcon  :: Id.TCon
   , _inst2tvars :: [Id.TVar]
   , _inst2cstr  :: TypeCstr
-  , _inst2defns :: [Lctd (Defn Id.EVar)]
+  , _inst2defns :: [Defn Id.EVar]
   }
 
 data PrimDecl = MkPrimDecl
-  { _prim2func :: Id.EVar
+  { _prim2func :: Lctd Id.EVar
   , _prim2prim :: String
   }
 
@@ -111,7 +111,7 @@ data CoercionDir = Inject | Project
 
 data Coercion = MkCoercion CoercionDir Id.TCon
 
-data Defn v = MkDefn Id.EVar (Expr v)
+data Defn v = MkDefn (Lctd Id.EVar) (Expr v)
 
 data Expr v
   = ELoc (Lctd (Expr v))
@@ -120,9 +120,9 @@ data Expr v
   | ENum Int
   | EApp (Expr v) (NonEmpty (Expr v))
   | EMat (Expr v) [Altn v]
-  | ELam (NonEmpty Id.EVar) (Expr v)
-  | ELet (NonEmpty (Lctd (Defn v))) (Expr v)
-  | ERec (NonEmpty (Lctd (Defn v))) (Expr v)
+  | ELam (NonEmpty (Lctd Id.EVar)) (Expr v)
+  | ELet (NonEmpty (Defn v)) (Expr v)
+  | ERec (NonEmpty (Defn v)) (Expr v)
   | ECoe Coercion (Expr v)
 
 data Altn v = MkAltn Patn (Expr v)
@@ -151,7 +151,7 @@ mkIf t u v =
          , MkAltn (PCon (Id.dcon "False") []) v
          ]
 
-mkLam :: [Id.EVar] -> Expr v -> Expr v
+mkLam :: [Lctd Id.EVar] -> Expr v -> Expr v
 mkLam = \case
   []     -> id
   (b:bs) -> ELam (b :| bs)

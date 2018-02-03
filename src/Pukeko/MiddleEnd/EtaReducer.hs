@@ -15,7 +15,7 @@ import           Pukeko.AST.Type
 type ERStage st = (HasLambda st ~ 'False, HasClasses st ~ 'False)
 
 reduceModule :: ERStage st => Module st -> Module st
-reduceModule = over (module2decls . traverse . traverse) erDecl
+reduceModule = over (module2decls . traverse) erDecl
 
 _EVar :: Expr st tv ev -> Maybe ev
 _EVar = \case
@@ -63,5 +63,5 @@ erDecl top = case top of
                      (flip bitraverse pure . _Bound)
                      (\(i, _) -> (i, (Vec.fromList vs2 Vec.! i)^.qvar2tvar)) e2
             in  erDecl (DSupC (MkSupCDecl z vs2 t2 [] e3))
-      ELoc e1 -> erDecl (DSupC (MkSupCDecl z vs0 t0 bs0 (unlctd e1)))
+      ELoc e1 -> erDecl (DSupC (MkSupCDecl z vs0 t0 bs0 (e1^.lctd)))
       _ -> top

@@ -1,4 +1,3 @@
-{-# LANGUAGE IncoherentInstances #-}
 module Main where
 
 import Pukeko.Prelude
@@ -33,8 +32,8 @@ compile write_pl stop_tc unsafe file = do
               render (pretty module_pl) ++ "\n"
           writeFile (file -<.> "asm") nasm
   case ok_or_error of
-    Left error -> do
-      putStrLn $ "Error: " ++ render error
+    Left err -> do
+      putStrLn $ "Error: " ++ render err
       exitWith (ExitFailure 1)
     Right () -> exitWith ExitSuccess
 

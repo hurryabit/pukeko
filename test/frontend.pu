@@ -3,7 +3,7 @@
 -- SUBSECTION type cons
 
 -- TEST unknown in type definition
--- FAILURE 2:3: unknown type constructor: Bad
+-- FAILURE 2:5: unknown type constructor: Bad
 data Typ =
   | Con Bad
 
@@ -33,20 +33,20 @@ f x =
   | Con -> 1
 
 -- TEST duplicate in one type
--- FAILURE 3:3: duplicate data constructor: Con
+-- FAILURE 3:5: duplicate data constructor: Con
 data Typ =
   | Con
   | Con
 
 -- TEST duplicate in mutually recursive types
--- FAILURE 4:3: duplicate data constructor: Con
+-- FAILURE 4:5: duplicate data constructor: Con
 data Typ1 =
   | Con
 and Typ2 =
   | Con
 
 -- TEST duplicate in two types
--- FAILURE 2:3: duplicate data constructor: Nil
+-- FAILURE 2:5: duplicate data constructor: Nil
 data Typ =
   | Nil
 
@@ -56,39 +56,39 @@ data Typ =
 -- SUBSECTION type definition
 
 -- TEST underapplication in one definition
--- FAILURE 3:3: cannot unify kinds _3 -> * and *
+-- FAILURE 3:5: cannot unify kinds _3 -> * and *
 data Typ1 a = | A
 and Typ2 =
   | Con Typ1
 
 -- TEST underapplication in recursive definition
--- FAILURE 2:3: cannot unify kinds _3 -> * and *
+-- FAILURE 2:5: cannot unify kinds _3 -> * and *
 data Typ a b =
   | Con (Typ a)
 
 -- TEST underapplication in two definitions
--- FAILURE 2:3: cannot unify kinds * -> * and *
+-- FAILURE 2:5: cannot unify kinds * -> * and *
 data Typ =
   | Con List
 
 -- TEST overapplication in one definition
--- FAILURE 3:3: cannot unify kinds * and _6 -> *
+-- FAILURE 3:5: cannot unify kinds * and _6 -> *
 data Typ1 a = | A
 and Typ2 a =
   | Con (Typ1 a a)
 
 -- TEST overapplication in recursive definition
--- FAILURE 2:3: cannot unify kinds * and _4 -> *
+-- FAILURE 2:5: cannot unify kinds * and _4 -> *
 data Typ a =
   | Con (Typ a a)
 
 -- TEST overapplication in two definitions
--- FAILURE 2:3: cannot unify kinds * and _3 -> *
+-- FAILURE 2:5: cannot unify kinds * and _3 -> *
 data Typ a =
   | Con (Int a)
 
 -- TEST unbound type variable
--- FAILURE 2:3: unknown type variable: b
+-- FAILURE 2:5: unknown type variable: b
 data Typ a =
   | Con b
 
@@ -98,22 +98,22 @@ data Typ a a =
   | Con a
 
 -- TEST self application of type variable
--- FAILURE 2:3: occurs check
+-- FAILURE 2:5: occurs check
 data Typ f =
   | Con (f f)
 
 -- TEST type variable of kinds * and * -> *
--- FAILURE 2:3: cannot unify kinds * and _4 -> *
+-- FAILURE 2:5: cannot unify kinds * and _4 -> *
 data Typ f a =
   | Con f (f a)
 
 -- TEST type variable of kinds * -> * and * -> * -> *
--- FAILURE 2:3: cannot unify kinds _5 -> * and *
+-- FAILURE 2:5: cannot unify kinds _5 -> * and *
 data Typ f a b =
   | Con (f a b) (f a)
 
 -- TEST phantom type variable has kind *
--- FAILURE 6:3: cannot unify kinds * -> * and *
+-- FAILURE 6:5: cannot unify kinds * -> * and *
 data Typ1 a =
   | Con1
 and Typ2 a b =
@@ -176,7 +176,7 @@ f x = x
 f : a -> a
 
 -- TEST external
--- FAILURE 1:1: undeclared function: f
+-- FAILURE 1:10: undeclared function: f
 external f = "f"
 
 -- SUBSECTION call of undeclared function

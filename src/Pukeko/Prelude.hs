@@ -19,17 +19,18 @@ module Pukeko.Prelude
   , Failure
   , throwFailure
 
+  , HasPos (..)
   , Where (..)
+  , here
+  , here'
   , throwHere
   , WhereLens
   , WhereLens'
   , WhereTraversal
   , WhereTraversal'
-  , unWhere
 
   , Lctd (..)
   , lctd
-  , lctd_
 
   , bug
   , bugWith
@@ -104,18 +105,26 @@ class Pretty a => PrettyPrec a where
 
 noPos :: SourcePos
 noPos = initialPos ""
+class HasPos a where
+  getPos :: a -> SourcePos
 
 class Where f where
   where_ :: f SourcePos
-  here :: SourcePos -> f a -> f a
+  here_ :: SourcePos -> f a -> f a
 
 instance (Member (Reader SourcePos) effs) => Where (Eff effs) where
   where_ = ask
-  here pos = local (const pos)
+  here_ pos = local (const pos)
 
 instance (Applicative f) => Where (Compose ((->) SourcePos) f) where
   where_ = Compose pure
-  here pos (Compose f) = Compose (const (f pos))
+  here_ pos (Compose f) = Compose (const (f pos))
+
+here :: (Where f, HasPos a) => a -> f b -> f b
+here = here_ . getPos
+
+here' :: (Where f, HasPos a) => (a -> f b) -> a -> f b
+here' f x = here x (f x)
 
 throwHere :: (Members [Reader SourcePos, Error Failure] effs) => Failure -> Eff effs a
 throwHere msg = do
@@ -132,17 +141,11 @@ type WhereTraversal s t a b =
 
 type WhereTraversal' s a = WhereTraversal s s a a
 
-unWhere :: WhereTraversal s t a b -> Traversal s t a b
-unWhere t f s = getCompose (t (Compose . const . f) s) noPos
-
 data Lctd a = Lctd{pos :: SourcePos, unlctd :: a}
   deriving (Show, Foldable, Functor, Traversable)
 
-lctd :: WhereLens (Lctd a) (Lctd b) a b
-lctd f (Lctd pos thng) = Lctd pos <$> here pos (f thng)
-
-lctd_ :: (Where f) => (a -> f b) -> Lctd a -> f b
-lctd_ f (Lctd pos thng) = here pos (f thng)
+lctd :: Lens (Lctd a) (Lctd b) a b
+lctd f (Lctd pos thng) = Lctd pos <$> f thng
 
 bug :: HasCallStack => String -> a
 bug msg = error ("BUG! " ++ msg)
@@ -152,6 +155,9 @@ bugWith msg x = bug (msg ++ " (" ++ show x ++ ")")
 
 local' :: (r1 -> r2) -> Eff (Reader r2 : effs) a -> Eff (Reader r1 : effs) a
 local' f = reinterpret (\Ask -> asks f)
+
+instance HasPos (Lctd a) where
+  getPos = pos
 
 instance Pretty String where
   pretty = PP.text

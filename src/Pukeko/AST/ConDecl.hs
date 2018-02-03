@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ViewPatterns #-}
 module Pukeko.AST.ConDecl
   ( TConDecl (..)
   , DConDecl (..)
@@ -19,24 +18,32 @@ import           Pukeko.AST.Scope
 import           Pukeko.Pretty
 
 data TConDecl = MkTConDecl
-  { _tcon2name  :: Id.TCon
+  { _tcon2name  :: Lctd Id.TCon
   , _tcon2prms  :: [Id.TVar]
-  , _tcon2dcons :: Either (Type (TScope Int Void)) [Lctd DConDecl]
+  , _tcon2dcons :: Either (Type (TScope Int Void)) [DConDecl]
   }
 
+-- FIXME: The Lctd is at the wrong name.
 data DConDecl = MkDConDecl
   { _dcon2tcon :: Id.TCon
-  , _dcon2name :: Id.DCon
+  , _dcon2name :: Lctd Id.DCon
   , _dcon2tag  :: Int
   , _dcon2flds :: [Type (TScope Int Void)]
   }
 
 typeOfDConDecl :: TConDecl -> DConDecl -> Type Void
-typeOfDConDecl (MkTConDecl tname prms _) (MkDConDecl tcon dname _ flds)
+typeOfDConDecl
+  (MkTConDecl (unlctd -> tname) prms _) (MkDConDecl tcon dname _ flds)
   | tname /= tcon = bugWith "type and data constructor do not match" (tname, dname)
   | otherwise     =
       let res = mkTApp (TCon tcon) (mkTVars prms)
       in  mkTUni (map (MkQVar mempty) prms) (flds *~> res)
+
+instance HasPos TConDecl where
+  getPos = getPos . _tcon2name
+
+instance HasPos DConDecl where
+  getPos = getPos . _dcon2name
 
 instance Pretty TConDecl where
   pretty (MkTConDecl tname prms dcons0) =

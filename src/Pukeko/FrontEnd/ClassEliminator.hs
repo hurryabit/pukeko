@@ -30,48 +30,44 @@ runCE m0 = run . runReader noPos . runInfo m0 . runGamma
 
 elimModule :: Module In -> Module Out
 elimModule m0@(MkModule decls) = runCE m0 $
-  MkModule . fmap (fmap unclssDecl) . concatMap sequence
-  <$> (traverse . lctd) elimDecl decls
+  MkModule . map unclssDecl . concat <$> traverse elimDecl decls
 
 elimDecl :: Decl In -> CE Void Void [Decl Out]
 elimDecl decl = case decl of
-  DClss clssDecl@(MkClssDecl clss prm mthds) -> do
-    pos <- where_
-    let tcon = dictTConDecl (Lctd pos clssDecl)
+  DClss clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) -> do
+    let tcon = dictTConDecl clssDecl
     let qprm = NE.singleton (MkQVar mempty prm)
         prmType = TVar (mkBound 0 prm)
         dictPrm = Id.evar "dict"
         sels = do
-          (i, MkSignDecl z t0) <- itoList mthds
+          (i, MkSignDecl (Lctd mpos z) t0) <- itoList mthds
           let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
           let e_rhs = EVar (mkBound i z)
           let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
           let c_one = MkCase (clssDCon clss) [prmType] c_binds e_rhs
           let e_cas = ECas (EVar (mkBound 0 dictPrm)) (c_one :| [])
-          let b_lam = MkBind dictPrm (mkTDict clss prmType)
+          let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
           let e_lam = ELam (NE.singleton b_lam) e_cas t0
           let e_tyabs = ETyAbs qprm e_lam
-          pure (DDefn (MkDefn (MkBind z t1) e_tyabs))
-    pure (DType (Lctd pos tcon :| []) : sels)
-  DInst inst@(MkInstDecl clss tcon qvs defns0) -> do
+          pure (DDefn (MkDefn (MkBind (Lctd mpos z) t1) e_tyabs))
+    pure (DType (NE.singleton tcon) : sels)
+  DInst inst@(MkInstDecl (Lctd ipos clss) tcon qvs defns0) -> do
     let t_inst = mkTApp (TCon tcon) (mkTVarsQ qvs)
     let (z_dict, t_dict) = instDictInfo inst
     clssDecl@(MkClssDecl _ _ mthds) <- findInfo info2clsss clss
-    pos <- where_
-    local (<> tconDeclInfo (dictTConDecl (Lctd pos clssDecl))) $ do
-        defns1 <- for mthds $ \(MkSignDecl mthd _) -> do
-          case find (\defn -> unlctd defn^.defn2func == mthd) defns0 of
+    local (<> tconDeclInfo (dictTConDecl clssDecl)) $ do
+        defns1 <- for mthds $ \(MkSignDecl (unlctd -> mthd) _) -> do
+          case find (\defn -> defn^.defn2func == mthd) defns0 of
             Nothing -> bugWith "missing method" (clss, tcon, mthd)
             Just defn -> pure defn
         let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
         let e_body =
-              mkEApp e_dcon
-                (imap (\i -> EVar . mkBound i . (^.defn2func) . unlctd) defns1)
+              mkEApp e_dcon (imap (\i -> EVar . mkBound i . (^.defn2func)) defns1)
         let e_let :: Expr In _ _
             e_let = ELet defns1 e_body
         let e_rhs :: Expr In _ _
             e_rhs = mkETyAbs qvs e_let
-        elimDecl (DDefn (MkDefn (MkBind z_dict t_dict) e_rhs))
+        elimDecl (DDefn (MkDefn (MkBind (Lctd ipos z_dict) t_dict) e_rhs))
   DDefn defn  -> (:[]) . DDefn <$> elimDefn defn
   DType tcons -> pure [DType tcons]
   DPrim prim  -> pure [DPrim prim]
@@ -108,8 +104,7 @@ elimDefn = defn2exprSt (fmap fst . elimExpr)
 elimExpr ::
   (IsTVar tv, HasEnv ev) => Expr In tv ev -> CE tv ev (Expr Out tv ev, Type tv)
 elimExpr = \case
-  ELoc (Lctd pos e0) -> here pos $ first (ELoc . Lctd pos) <$> elimExpr e0
-
+  ELoc (Lctd pos e0) -> here_ pos $ first (ELoc . Lctd pos) <$> elimExpr e0
   EVar x -> (,) <$> pure (EVar x) <*> lookupEVar x
   EVal z -> (,) <$> pure (EVal z) <*> typeOfFunc z
   ECon c -> (,) <$> pure (ECon c) <*> typeOfDCon c
@@ -123,12 +118,12 @@ elimExpr = \case
     (e1, t1) <- withinEScope' id ts (elimExpr e0)
     pure (ELam bs e1 t0, ts *~> t1)
   ELet ds0 e0 -> do
-    ds1 <- traverse (lctd elimDefn) ds0
-    (e1, t1) <- withinEScope' (_bind2type . _defn2bind . unlctd) ds1 (elimExpr e0)
+    ds1 <- traverse elimDefn ds0
+    (e1, t1) <- withinEScope' (_bind2type . _defn2bind) ds1 (elimExpr e0)
     pure (ELet ds1 e1, t1)
   ERec ds0 e0 -> do
-    withinEScope' (_bind2type . _defn2bind . unlctd) ds0 $ do
-      ds1 <- (traverse . lctd) elimDefn ds0
+    withinEScope' (_bind2type . _defn2bind) ds0 $ do
+      ds1 <- traverse elimDefn ds0
       (e1, t1) <- elimExpr e0
       pure (ERec ds1 e1, t1)
   ECas e0 (c0 :| cs0) -> do
@@ -141,11 +136,13 @@ elimExpr = \case
     (e1, t_e1) <- elimExpr e0
     elimETyApp e1 t_e1 (toList ts0)
   ETyAbs qvs0 e0 -> do
+    pos <- where_
     let ixbs = do
           (i, MkQVar qual v) <- itoList qvs0
           clss <- toList qual
           let x = dictEVar clss v
-          pure ((i, clss, x), MkBind x (mkTDict clss (TVar (mkBound i v))))
+
+          pure ((i, clss, x), MkBind (Lctd pos x) (mkTDict clss (TVar (mkBound i v))))
     let (ixs, bs) = unzip ixbs
     let refs = Vec.accum Map.union (Vec.replicate (length qvs0) mempty)
                [ (i, Map.singleton clss (mkBound j x))
@@ -160,7 +157,7 @@ elimCase ::
   (IsTVar tv, HasEnv ev) =>
   Case In tv ev -> CE tv ev (Case Out tv ev, Type tv)
 elimCase (MkCase dcon targs0 bnds e0) = do
-  (_, MkDConDecl _ dcon _ flds0) <- findInfo info2dcons dcon
+  (_, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
   let flds1 = map (instantiateN' targs0) flds0
   withinEScope' id flds1 $ do
     (e1, t1) <- elimExpr e0
@@ -192,8 +189,8 @@ unclssDecl = \case
   DType tcons ->
     -- TODO: We're making the assmption that type synonyms don't contain class
     -- constraints. This might change in the future.
-    let tcon2type = tcon2dcons . _Right . traverse . traverse . dcon2flds . traverse
-    in  DType ((fmap . fmap) (over tcon2type unclssType) tcons)
+    let tcon2type = tcon2dcons . _Right . traverse . dcon2flds . traverse
+    in  DType (fmap (over tcon2type unclssType) tcons)
   DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
   DPrim prim -> DPrim (over (prim2bind . bind2type) unclssType prim)
 
@@ -211,12 +208,12 @@ dictEVar :: (Id.Named t) => Id.Clss -> t -> Id.EVar
 dictEVar clss tcon = Id.evar ("dict$" ++ Id.name clss ++ "$" ++ Id.name tcon)
 
 instDictInfo :: InstDecl st -> (Id.EVar, Type Void)
-instDictInfo (MkInstDecl clss tcon qvs _) =
+instDictInfo (MkInstDecl (unlctd -> clss) tcon qvs _) =
     let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TCon tcon) (mkTVarsQ qvs)))
     in  (dictEVar clss tcon, t_dict)
 
-dictTConDecl :: Lctd ClssDecl -> TConDecl
-dictTConDecl (Lctd pos (MkClssDecl clss prm mthds)) =
+dictTConDecl :: ClssDecl -> TConDecl
+dictTConDecl (MkClssDecl (Lctd pos clss) prm mthds) =
     let flds = map _sign2type mthds
-        dcon = MkDConDecl (clssTCon clss) (clssDCon clss) 0 flds
-    in  MkTConDecl (clssTCon clss) [prm] (Right [Lctd pos dcon])
+        dcon = MkDConDecl (clssTCon clss) (Lctd pos (clssDCon clss)) 0 flds
+    in  MkTConDecl (Lctd pos (clssTCon clss)) [prm] (Right [dcon])

@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Pukeko.FrontEnd.TypeResolver
   ( resolveModule
   ) where
@@ -37,13 +38,13 @@ trType = type2tcon $ \tcon -> do
   pure tcon
 
 insertTCon :: TConDecl -> TR ()
-insertTCon tcon@MkTConDecl{_tcon2name = tname} = do
+insertTCon = here' $ \tcon@MkTConDecl{_tcon2name = unlctd -> tname} -> do
   old <- uses st2tcons (Map.lookup tname)
   when (isJust old) $ throwHere ("duplicate type constructor:" <+> pretty tname)
   modifying st2tcons (Map.insert tname tcon)
 
 insertDCon :: TConDecl -> DConDecl -> TR ()
-insertDCon tcon dcon@MkDConDecl{_dcon2name = dname} = do
+insertDCon tcon dcon@MkDConDecl{_dcon2name = unlctd -> dname} = do
   old <- uses st2dcons (Map.lookup dname)
   when (isJust old) $ throwHere ("duplicate data constructor:" <+> pretty dname)
   modifying st2dcons (Map.insert dname (tcon, dcon))
@@ -61,12 +62,12 @@ trDefn = traverseOf defn2dcon findDCon
 trDecl :: Decl In -> TR (Decl Out)
 trDecl top = case top of
   DType tconDecls -> do
-    for_ tconDecls (lctd_ insertTCon)
-    for_ tconDecls $ lctd_ $ \tcon@MkTConDecl{_tcon2dcons = dconDecls0} ->
+    for_ tconDecls insertTCon
+    for_ tconDecls $ \tcon@MkTConDecl{_tcon2dcons = dconDecls0} ->
       case dconDecls0 of
         Left typ -> void (trType typ)
         Right dconDecls ->
-          for_ dconDecls $ lctd_ $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
+          for_ dconDecls $ here' $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
             for_ flds trType
             insertDCon tcon dcon
     pure (DType tconDecls)
@@ -78,4 +79,4 @@ trDecl top = case top of
   DPrim p -> pure (DPrim p)
 
 resolveModule :: Module In -> Either Failure (Module Out)
-resolveModule = evalTR . module2decls (traverse (lctd trDecl))
+resolveModule = evalTR . module2decls (traverse trDecl)

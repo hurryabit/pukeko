@@ -34,15 +34,15 @@ freshEVar = get >>= \(x:xs) -> put xs >> return x
 
 pmExpr :: Expr In tv ev -> PM (Expr Out tv ev)
 pmExpr = \case
-  ELoc l          -> ELoc <$> lctd pmExpr l
+  ELoc le         -> here le $ ELoc <$> lctd pmExpr le
   EVar x          -> pure (EVar x)
   EVal z          -> pure (EVal z)
   ECon c          -> pure (ECon c)
   ENum n          -> pure (ENum n)
   EApp t  us      -> EApp <$> pmExpr t <*> traverse pmExpr us
   ELam bs e t     -> ELam bs <$> pmExpr e <*> pure t
-  ELet ds t       -> ELet <$> (traverse . lctd) (defn2exprSt pmExpr) ds <*> pmExpr t
-  ERec ds t       -> ERec <$> (traverse . lctd) (defn2exprSt pmExpr) ds <*> pmExpr t
+  ELet ds t       -> ELet <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t
+  ERec ds t       -> ERec <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch (mkRowMatch1 t1 as1)
@@ -52,7 +52,7 @@ pmExpr = \case
 
 pmDefn :: Defn In tv ev -> PM (Defn Out tv ev)
 pmDefn (MkDefn b e) = do
-    put (Id.freshEVars "pm" (b^.bind2evar))
+    put (Id.freshEVars "pm" (unlctd (b^.bind2evar)))
     MkDefn b <$> pmExpr e
 
 pmDecl :: Decl In -> PM (Decl Out)
@@ -64,7 +64,7 @@ pmDecl = \case
   DPrim p -> pure (DPrim p)
 
 compileModule :: Module In -> Either Failure (Module Out)
-compileModule m0 = evalPM m0 (module2decls ((traverse . lctd) pmDecl) m0)
+compileModule m0 = evalPM m0 (module2decls (traverse pmDecl) m0)
 
 pmMatch ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
@@ -192,8 +192,8 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
     Left _       -> bugWith "pattern match on type synonym" tcon
     Right []     -> bugWith "pattern match on type without data constructors" tcon
     Right (d:ds) -> pure (d :| ds)
-  grps <- for dcons1 $ \(Lctd _ MkDConDecl{_dcon2name = dcon1}) -> do
-    let drs1 = filter (\(MkCPatn dcon2 _ts _, _)-> dcon1 == dcon2) drs
+  grps <- for dcons1 $ \MkDConDecl{_dcon2name = unlctd -> dcon1} -> do
+    let drs1 = filter (\(MkCPatn dcon2 _ts _, _) -> dcon1 == dcon2) drs
     LS.withList drs1 $ \case
       LS.Nil -> throwHere ("unmatched constructor:" <+> pretty dcon1)
       LS.Cons (MkCPatn con ts (traverse patnToBPatn -> Just bs), MkRow qs u) LS.Nil -> do

@@ -20,7 +20,7 @@ import           Pukeko.AST.Type
 
 checkModule :: (St.Typed st) => Module st -> Either Failure (Module st)
 checkModule m0@(MkModule decls) = runTC m0 $ do
-  for_ decls (lctd_ checkDecl)
+  for_ decls checkDecl
   pure m0
 
 type IsEVar ev = (HasEnv ev)
@@ -39,7 +39,7 @@ checkCoercion _ = -- (MkCoercion dir tcon t_from t_to) =
 
 typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
-  ELoc l -> lctd_ typeOf l
+  ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
   EVal z -> typeOfFunc z
   ECon c -> typeOfDCon c
@@ -57,11 +57,11 @@ typeOf = \case
     withinEScope' id ts (check e0 t0)
     pure (ts *~> t0)
   ELet ds e0 -> do
-    (traverse_ . lctd_) checkDefn ds
-    withinEScope' (_bind2type . _defn2bind . unlctd) ds (typeOf e0)
+    traverse_ checkDefn ds
+    withinEScope' (_bind2type . _defn2bind) ds (typeOf e0)
   ERec ds e0 -> do
-    withinEScope' (_bind2type . _defn2bind . unlctd) ds $ do
-      (traverse_ . lctd_) checkDefn ds
+    withinEScope' (_bind2type . _defn2bind) ds $ do
+      traverse_ checkDefn ds
       typeOf e0
   EMat e0 as -> typeOfBranching typeOfAltn e0 as
   ECas e0 cs -> typeOfBranching typeOfCase e0 cs
@@ -177,8 +177,8 @@ checkDecl = \case
   DInst (MkInstDecl _ tcon qvs ds) -> do
     let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
     -- FIXME: Ensure that the type in @b@ is correct as well.
-    withQVars qvs $ for_ ds $ lctd_ $ \(MkDefn b e) -> do
-      (_, MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar)
+    withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
+      (_, MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)
       let t_decl = renameType (instantiate' (const t_inst) t_mthd)
       check e t_decl
   DDefn d -> checkDefn d

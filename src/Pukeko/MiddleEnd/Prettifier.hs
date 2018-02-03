@@ -12,11 +12,12 @@ import qualified Pukeko.AST.Identifier as Id
 
 prettifyModule :: Module st -> Module st
 prettifyModule (MkModule tops0) =
-  let xs = setOf (traverse . traverse . decl2func) tops0
+  let xs :: Set Id.EVar
+      xs = setOf (traverse . decl2func) tops0
       mp = cluster xs
       rename x = Map.findWithDefault x x mp
-      tops1 = over (unWhere (traverse . lctd . decl2func)) rename tops0
-      tops2 = over (unWhere (traverse . lctd . decl2eval)) rename tops1
+      tops1 = over (traverse . decl2func) rename tops0
+      tops2 = over (traverse . decl2eval) rename tops1
   in  MkModule tops2
 
 cluster :: Set Id.EVar -> Map Id.EVar Id.EVar

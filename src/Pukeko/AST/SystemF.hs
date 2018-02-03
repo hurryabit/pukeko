@@ -53,6 +53,7 @@ import Pukeko.Prelude
 
 import Data.Bifoldable
 import Data.Bitraversable
+import qualified Data.List.NE as NE
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
@@ -63,11 +64,11 @@ import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
 
 data Module st = MkModule
-  { _module2decls :: [Lctd (Decl st)]
+  { _module2decls :: [Decl st]
   }
 
 data Decl st
-  =                          DType (NonEmpty (Lctd TConDecl))
+  =                          DType (NonEmpty TConDecl)
   | Untyped    st ~ 'True => DSign (SignDecl Void)
   | HasClasses st ~ 'True => DClss ClssDecl
   | HasClasses st ~ 'True => DInst (InstDecl st)
@@ -77,26 +78,26 @@ data Decl st
   |                          DPrim (PrimDecl (StageType st))
 
 data SignDecl tv = MkSignDecl
-  { _sign2func :: Id.EVar
+  { _sign2func :: Lctd Id.EVar
   , _sign2type :: Type tv
   }
 
 data ClssDecl = MkClssDecl
-  { _clss2name  :: Id.Clss
+  { _clss2name  :: Lctd Id.Clss
   , _clss2prm   :: Id.TVar
   , _clss2mthds :: [SignDecl (TScope Int Void)]
   }
 
 data InstDecl st = MkInstDecl
-  { _inst2clss  :: Id.Clss
+  { _inst2clss  :: Lctd Id.Clss
     -- FIXME: There's no way to define instances on (->).
   , _inst2tcon  :: Id.TCon
   , _inst2qvars :: [QVar]
-  , _inst2defns :: [Lctd (Defn st (TScope Int Void) Void)]
+  , _inst2defns :: [Defn st (TScope Int Void) Void]
   }
 
 data SupCDecl st = MkSupCDecl
-  { _supc2func  :: Id.EVar
+  { _supc2func  :: Lctd Id.EVar
   , _supc2tprms :: [QVar]
   , _supc2type  :: StageType st (TScope Int Void)
   , _supc2eprms :: [Bind (StageType st) (TScope Int Void)]
@@ -122,8 +123,8 @@ data Expr st tv ev
   | EApp (Expr st tv ev) (NonEmpty (Expr st tv ev))
   | HasLambda st ~ 'True =>
     ELam (NonEmpty (Bind (StageType st) tv)) (Expr st tv (EScope Int ev)) (StageType st tv)
-  | ELet [Lctd (Defn st tv ev)] (Expr st tv (EScope Int ev))
-  | ERec [Lctd (Defn st tv (EScope Int ev))] (Expr st tv (EScope Int ev))
+  | ELet [Defn st tv ev] (Expr st tv (EScope Int ev))
+  | ERec [Defn st tv (EScope Int ev)] (Expr st tv (EScope Int ev))
   | HasNested st ~ 'False =>
     ECas (Expr st tv ev) (NonEmpty (Case st tv ev))
   | HasNested st ~ 'True =>
@@ -135,7 +136,7 @@ data Expr st tv ev
     ETyApp (Expr st tv ev) (NonEmpty (StageType st tv))
 
 data Bind ty tv = MkBind
-  { _bind2evar :: Id.EVar
+  { _bind2evar :: Lctd Id.EVar
   , _bind2type :: ty tv
   }
 
@@ -222,8 +223,8 @@ expr // f = case expr of
   EApp t  us   -> EApp (t // f) (fmap (// f) us)
   ECas t  cs   -> ECas (t // f) (fmap (over' case2expr (/// f)) cs)
   ELam ps e t  -> ELam ps (e /// f) t
-  ELet ds t    -> ELet (over (traverse . traverse . defn2expr) (//  f) ds) (t /// f)
-  ERec ds t    -> ERec (over (traverse . traverse . defn2expr) (/// f) ds) (t /// f)
+  ELet ds t    -> ELet (over (traverse . defn2expr) (//  f) ds) (t /// f)
+  ERec ds t    -> ERec (over (traverse . defn2expr) (/// f) ds) (t /// f)
   EMat t  as   -> EMat (t // f) (fmap (over altn2expr (/// f)) as)
   ECoe c e     -> ECoe c (e // f)
   ETyAbs _ _   -> error "THIS IS NOT IMPLEMENTED"
@@ -238,10 +239,10 @@ pdist (Bound i x) = EVar (Bound i x)
 pdist (Free t)    = fmap Free t
 
 -- * Lenses and traversals
-inst2defn :: WhereTraversal
+inst2defn :: Traversal
   (InstDecl st1) (InstDecl st2)
   (Defn st1 (TScope Int Void) Void) (Defn st2 (TScope Int Void) Void)
-inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> (traverse . lctd) f ds
+inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> traverse f ds
 
 -- | Travere over the names of all the functions defined in either a 'DDefn', a
 -- 'DSupC' or a 'DPrim'.
@@ -251,12 +252,12 @@ decl2func f top = case top of
   DSign{} -> pure top
   DClss{} -> pure top
   DInst{} -> pure top
-  DDefn d -> DDefn <$> defn2bind (bind2evar f) d
-  DSupC s -> DSupC <$> supc2func f s
-  DPrim p -> DPrim <$> prim2bind (bind2evar f) p
+  DDefn d -> DDefn <$> defn2bind (bind2evar (lctd f)) d
+  DSupC s -> DSupC <$> supc2func (lctd f) s
+  DPrim p -> DPrim <$> prim2bind (bind2evar (lctd f)) p
 
 decl2expr ::
-  (Applicative f, Where f) =>
+  (Applicative f) =>
   (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> Decl st -> f (Decl st)
 decl2expr f top = case top of
   DType{} -> pure top
@@ -267,11 +268,11 @@ decl2expr f top = case top of
   DSupC s -> DSupC <$> supc2expr f s
   DPrim p -> pure (DPrim p)
 
-decl2eval :: WhereTraversal' (Decl st) Id.EVar
+decl2eval :: Traversal' (Decl st) Id.EVar
 decl2eval f = decl2expr (expr2eval f)
 
 defn2func :: Lens' (Defn st tv ev) Id.EVar
-defn2func = defn2bind . bind2evar
+defn2func = defn2bind . bind2evar . lctd
 
 defn2exprSt ::
   (StageType st1 ~ StageType st2) =>
@@ -285,7 +286,7 @@ defn2dcon f (MkDefn b e) = MkDefn b <$> expr2dcon f e
 
 expr2dcon :: WhereTraversal' (Expr st tv ev) Id.DCon
 expr2dcon f = \case
-  ELoc l       -> ELoc <$> lctd (expr2dcon f) l
+  ELoc e       -> here e $ ELoc <$> lctd (expr2dcon f) e
   EVar x       -> pure (EVar x)
   EVal z       -> pure (EVal z)
   ECon c       -> ECon <$> f c
@@ -293,8 +294,8 @@ expr2dcon f = \case
   EApp t  us   -> EApp <$> expr2dcon f t <*> (traverse . expr2dcon) f us
   ECas t  cs   -> ECas <$> expr2dcon f t <*> (traverse . case2dcon) f cs
   ELam bs e t  -> ELam bs <$> expr2dcon f e <*> pure t
-  ELet ds t    -> ELet <$> (traverse . lctd . defn2dcon) f ds <*> expr2dcon f t
-  ERec ds t    -> ERec <$> (traverse . lctd . defn2dcon) f ds <*> expr2dcon f t
+  ELet ds t    -> ELet <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
+  ERec ds t    -> ERec <$> (traverse . defn2dcon) f ds <*> expr2dcon f t
   EMat t  as   -> EMat <$> expr2dcon f t <*> (traverse . altn2dcon) f as
   ECoe d e     -> ECoe d <$> expr2dcon f e
   ETyAbs x e   -> ETyAbs x <$> expr2dcon f e
@@ -319,8 +320,8 @@ expr2type f = \case
   EApp e0 es   -> EApp <$> expr2type f e0 <*> traverse (expr2type f) es
   ECas e0 cs   -> ECas <$> expr2type f e0 <*> traverse (case2type f ) cs
   ELam bs e t  -> ELam <$> traverse (bind2type f) bs <*> expr2type f e <*> f t
-  ELet ds e0   -> ELet <$> (traverse . lctd) (defn2type f) ds <*> expr2type f e0
-  ERec ds e0   -> ERec <$> (traverse . lctd) (defn2type f) ds <*> expr2type f e0
+  ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
+  ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
   ECoe c e     -> ECoe <$> coercion2type f c <*> expr2type f e
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type f e0
@@ -357,7 +358,7 @@ patn2dcon f = \case
   PVar x    -> pure (PVar x)
   PCon c ts ps -> PCon <$> f c <*> pure ts <*> (traverse . patn2dcon) f ps
 
-expr2eval :: WhereTraversal' (Expr st tv ev) Id.EVar
+expr2eval :: Traversal' (Expr st tv ev) Id.EVar
 expr2eval f = \case
   ELoc l      -> ELoc <$> traverse (expr2eval f) l
   EVar x      -> pure (EVar x)
@@ -367,9 +368,9 @@ expr2eval f = \case
   EApp t  us  -> EApp <$> expr2eval f t <*> (traverse . expr2eval) f us
   ELam bs e t -> ELam bs <$> expr2eval f e <*> pure t
   ELet ds t   ->
-    ELet <$> (traverse . lctd . defn2expr . expr2eval) f ds <*> expr2eval f t
+    ELet <$> (traverse . defn2expr . expr2eval) f ds <*> expr2eval f t
   ERec ds t   ->
-    ERec <$> (traverse . lctd . defn2expr . expr2eval) f ds <*> expr2eval f t
+    ERec <$> (traverse . defn2expr . expr2eval) f ds <*> expr2eval f t
   EMat t  as  -> EMat <$> expr2eval f t <*> (traverse . altn2expr . expr2eval) f as
   ECas t  cs  -> ECas <$> expr2eval f t <*> traverse (case2expr (expr2eval f)) cs
   ECoe d  e   -> ECoe d <$> expr2eval f e
@@ -447,11 +448,11 @@ instance IsStage st => Bitraversable (Expr st) where
       <*> traverse f t
     ELet ds e0 ->
       ELet
-      <$> traverse (traverse (bitraverse f g)) ds
+      <$> traverse (bitraverse f g) ds
       <*> bitraverse f (traverse g) e0
     ERec ds e0 ->
       ERec
-      <$> traverse (traverse (bitraverse f (traverse g))) ds
+      <$> traverse (bitraverse f (traverse g)) ds
       <*> bitraverse f (traverse g) e0
     ECas e0 cs -> ECas <$> bitraverse f g e0 <*> traverse (bitraverse f g) cs
     EMat e0 as -> EMat <$> bitraverse f g e0 <*> traverse (bitraverse f g) as
@@ -476,6 +477,22 @@ instance IsStage st => Bifoldable    (Altn st) where
   bifoldMap = bifoldMapDefault
 instance IsStage st => Bitraversable (Altn st) where
   bitraverse f g (MkAltn p e) = MkAltn <$> traverse f p <*> bitraverse f (traverse g) e
+
+instance HasPos (SignDecl tv) where
+  getPos = getPos . _sign2func
+
+instance HasPos (Bind ty tv) where
+  getPos = getPos . _bind2evar
+
+instance HasPos (Decl st) where
+  getPos = \case
+    DType tcons -> getPos (NE.head tcons)
+    DSign sign  -> getPos sign
+    DClss clss  -> getPos (_clss2name clss)
+    DInst inst  -> getPos (_inst2clss inst)
+    DDefn defn  -> getPos (_defn2bind defn)
+    DSupC supc  -> getPos (_supc2func supc)
+    DPrim prim  -> getPos (_prim2bind prim)
 
 -- * Pretty printing
 class IsType ty => PrettyType ty where
@@ -521,9 +538,8 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) wh
   pretty (MkDefn b t) =
     hang (pretty b <+> "=") 2 (prettyPrec 0 t)
 
-prettyDefns ::
-  (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
-  Bool -> [Lctd (Defn st tv ev)] -> Doc ann
+prettyDefns :: (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
+  Bool -> [Defn st tv ev] -> Doc ann
 prettyDefns isrec ds = case ds of
     [] -> bug "empty definitions"
     d0:ds ->

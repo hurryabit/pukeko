@@ -33,6 +33,7 @@ default-extensions:
 - TypeApplications
 - TypeFamilies
 - TypeOperators
+- ViewPatterns
 ghc-options:
 - -Wall
 - -Werror

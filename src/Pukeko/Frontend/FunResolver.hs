@@ -32,23 +32,23 @@ runFR = run . runError . runReader noPos . evalState st0
 
 resolveModule :: Module In -> Either Failure (Module Out)
 resolveModule (MkModule tops0) = runFR $ do
-  tops1 <- (traverse . lctd) frDecl tops0
+  tops1 <- traverse frDecl tops0
   MkFRState decld defnd <- get
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   case Map.minViewWithKey undefnd of
     Just ((fun, pos), _) ->
-      here pos (throwHere ("declared but undefined function:" <+> pretty fun))
+      here_ pos (throwHere ("declared but undefined function:" <+> pretty fun))
     Nothing -> pure (MkModule tops1)
 
 declareFun :: SignDecl tv -> FR ()
-declareFun (MkSignDecl fun _) = do
+declareFun = here' $ \(MkSignDecl (unlctd -> fun) _) -> do
   dup <- uses declared (Map.member fun)
   when dup (throwHere ("duplicate declaration of function:" <+> pretty fun))
   pos <- where_
   modifying declared (Map.insert fun pos)
 
-defineFun :: Id.EVar -> FR ()
-defineFun fun = do
+defineFun :: Lctd Id.EVar -> FR ()
+defineFun = here' $ \(unlctd -> fun) -> do
   ex <- uses declared (Map.member fun)
   unless ex (throwHere ("undeclared function:" <+> pretty fun))
   dup <- uses defined (Set.member fun)

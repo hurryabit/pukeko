@@ -76,21 +76,22 @@ itemInfo l k v = set l (Map.singleton k v) mempty
 tconDeclInfo :: TConDecl -> ModuleInfo
 tconDeclInfo tcon =
   let dis = foldMapOf
-        (tcon2dcons . _Right . traverse . unWhere lctd)
-        (\dcon -> itemInfo info2dcons (dcon^.dcon2name) (tcon, dcon))
+        (tcon2dcons . _Right . traverse)
+        (\dcon -> itemInfo info2dcons (dcon^.dcon2name.lctd) (tcon, dcon))
         tcon
-  in  itemInfo info2tcons (tcon^.tcon2name) tcon <> dis
+  in  itemInfo info2tcons (tcon^.tcon2name.lctd) tcon <> dis
 
 collectInfo :: forall st. (IsType (StageType st)) => Module st -> ModuleInfo
-collectInfo (MkModule decls) = foldFor decls $ \decl -> case unlctd decl of
-  DType tcons -> foldMap (tconDeclInfo . unlctd) tcons
+collectInfo (MkModule decls) = foldFor decls $ \case
+  DType tcons -> foldMap tconDeclInfo tcons
   DSign s -> sign s
-  DClss clss@(MkClssDecl c v ms) ->
+  DClss clss@(MkClssDecl (unlctd -> c) v ms) ->
     let mthds_info = foldFor ms $ \mthd@(MkSignDecl z t0) ->
-          let t1 = TUni (MkQVar (Set.singleton c) v :| []) t0
-          in  sign (MkSignDecl z t1) <> itemInfo info2mthds z (clss, mthd)
+          let t1 = mkTUni [MkQVar (Set.singleton c) v] t0
+          in  sign (MkSignDecl z t1) <> itemInfo info2mthds (z^.lctd) (clss, mthd)
     in  itemInfo info2clsss c clss <> mthds_info
-  DInst inst@(MkInstDecl c t _ _) -> itemInfo info2insts (c, t) (SomeInstDecl inst)
+  DInst inst@(MkInstDecl (unlctd -> c) t _ _) ->
+    itemInfo info2insts (c, t) (SomeInstDecl inst)
   DDefn (MkDefn b _) -> signBind b
   DSupC (MkSupCDecl z xs t _ _) -> sign (MkSignDecl z (mkTUni xs t))
   DPrim (MkPrimDecl b _) -> signBind b
@@ -99,7 +100,7 @@ collectInfo (MkModule decls) = foldFor decls $ \decl -> case unlctd decl of
     foldFor = flip foldMap
     -- FIXME: Detect multiple definitions.
     sign :: SignDecl Void -> ModuleInfo
-    sign s = itemInfo info2signs (s^.sign2func) s
+    sign s = itemInfo info2signs (unlctd (s^.sign2func)) s
     signBind :: IsType ty => Bind ty Void -> ModuleInfo
     signBind (MkBind z t) = maybe mempty (sign . MkSignDecl z) (isType t)
 

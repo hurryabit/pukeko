@@ -14,7 +14,7 @@ import Pukeko.Prelude hiding (lctd, many, some)
 
 import qualified Control.Applicative.Combinators.NonEmpty as NE
 import qualified Control.Monad.RWS          as RWS
-import qualified Data.List.NonEmpty         as NE
+import qualified Data.List.NE               as NE
 import qualified Data.Set                   as Set
 import           System.FilePath            as Sys
 import           Text.Megaparsec            hiding (parse, parseTest)
@@ -206,7 +206,8 @@ apatn = symbol "_" *> pure PWld   <|>
         parens patn
 
 defn :: Parser (Defn Id.EVar)
-defn = indented evar $ \z -> MkDefn z <$> (mkLam <$> many evar <*> (equals *> expr))
+defn = indented (lctd evar) $ \z ->
+  MkDefn z <$> (mkLam <$> many (lctd evar) <*> (equals *> expr))
 
 exprMatch :: Parser (Expr Id.EVar)
 exprMatch = do
@@ -228,12 +229,12 @@ altn :: Parser (Altn Id.EVar)
 altn = indented_ bar (MkAltn <$> patn <*> (arrow *> expr))
 
 let_ ::
-  (NonEmpty (Lctd (Defn Id.EVar)) -> a) ->
-  (NonEmpty (Lctd (Defn Id.EVar)) -> a) ->
+  (NonEmpty (Defn Id.EVar) -> a) ->
+  (NonEmpty (Defn Id.EVar) -> a) ->
   Parser a
 let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
-  <*> NE.sepBy1 (lctd defn) (reserved "and")
+  <*> NE.sepBy1 defn (reserved "and")
 
 coercion :: Parser Coercion
 coercion =
@@ -257,7 +258,7 @@ expr =
       <*> (reserved "else" *> expr)
     , exprMatch
     , ELam
-      <$> (reserved "fun" *> NE.some evar)
+      <$> (reserved "fun" *> NE.some (lctd evar))
       <*> (arrow *> expr)
     , let_ ELet ERec <*> (reserved "in" *> expr)
     , ECoe <$> (reserved "coerce" *> char '@' *> parens coercion) <*> aexpr
@@ -272,48 +273,48 @@ expr =
           Op.AssocRight -> InfixR
           Op.AssocNone  -> InfixN
 
-dataDecl :: Parser (NonEmpty (Lctd TConDecl))
+dataDecl :: Parser (NonEmpty TConDecl)
 dataDecl =
     (:|)
-    <$> indented_ (reserved "data") (lctd tconDecl)
-    <*> many (indented_ (reserved "and") (lctd tconDecl))
+    <$> indented_ (reserved "data") tconDecl
+    <*> many (indented_ (reserved "and") tconDecl)
 
-typeDecl :: Parser (Lctd TConDecl)
-typeDecl = indented_ (reserved "type") $ lctd $
+typeDecl :: Parser TConDecl
+typeDecl = indented_ (reserved "type") $
   MkTConDecl
-  <$> tcon
+  <$> lctd tcon
   <*> (many tvar <* equals)
   <*> (reserved "external" *> pure (Right []) <|> Left <$> type_)
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
-  <$> tcon
+  <$> lctd tcon
   <*> (many tvar <* equals)
-  <*> (Right <$> aligned (some (lctd dconDecl)))
+  <*> (Right <$> aligned (some dconDecl))
 
 dconDecl :: Parser DConDecl
-dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
+dconDecl = indented_ bar (MkDConDecl <$> lctd dcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
-  (try (indented evar (\z -> colon *> pure z)))
+  (try (indented (lctd evar) (\z -> colon *> pure z)))
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
 clssDecl =
-  MkClssDecl <$> clss <*> tvar <*> (reserved "where" *> aligned (many signDecl))
+  MkClssDecl <$> lctd clss <*> tvar <*> (reserved "where" *> aligned (many signDecl))
 
 instDecl :: Parser InstDecl
 instDecl = do
   q       <- typeCstr
-  c       <- clss
+  c       <- lctd clss
   (t, vs) <- (,) <$> tcon <*> pure [] <|> parens ((,) <$> tcon <*> many tvar)
-  ds      <- reserved "where" *> aligned (many (lctd defn))
+  ds      <- reserved "where" *> aligned (many defn)
   pure (MkInstDecl c t vs q ds)
 
 primDecl :: Parser PrimDecl
 primDecl = MkPrimDecl
-  <$> evar
+  <$> lctd evar
   <*> (equals *> char '\"' *> some (lowerChar <|> char '_') <* symbol "\"")
 
 import_ :: Parser FilePath
@@ -325,8 +326,8 @@ module_ :: FilePath -> Parser Module
 module_ file = do
   space
   imps <- many import_
-  decls <- many $ lctd $ choice
-    [ DType <$> ((:|[]) <$> typeDecl <|> dataDecl)
+  decls <- many $ choice
+    [ DType <$> (NE.singleton <$> typeDecl <|> dataDecl)
     , DClss <$> indented_ (reserved "class") clssDecl
     , DInst <$> indented_ (reserved "instance") instDecl
     , DPrim <$> indented_ (reserved "external") primDecl

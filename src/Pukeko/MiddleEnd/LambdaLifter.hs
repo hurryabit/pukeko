@@ -26,22 +26,20 @@ type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer [Lctd (Decl Out)]]
+    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer [Decl Out]]
 
-execLL :: Module In -> LL Void Void () -> [Lctd (Decl Out)]
+execLL :: Module In -> LL Void Void () -> [Decl Out]
 execLL m0 =
   snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
 
 yield :: Decl Out -> LL tv ev ()
-yield decl = do
-  pos <- where_
-  tell [Lctd pos decl]
+yield decl = tell [decl]
 
 llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
   Expr In tv ev -> LL tv ev (Expr Out tv ev)
 llExpr = \case
-  ELoc l -> ELoc <$> lctd llExpr l
+  ELoc le -> here le $ ELoc <$> lctd llExpr le
   EVar x -> pure (EVar x)
   EVal z -> pure (EVal z)
   ECon c -> pure (ECon c)
@@ -50,17 +48,18 @@ llExpr = \case
   ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
   ELet ds e0 ->
     ELet
-    <$> (traverse . lctd . defn2exprSt) llExpr ds
-    <*> withinEScope' (_bind2type . _defn2bind . unlctd) ds (llExpr e0)
+    <$> (traverse . defn2exprSt) llExpr ds
+    <*> withinEScope' (_bind2type . _defn2bind) ds (llExpr e0)
   ERec ds e0 ->
-    withinEScope' (_bind2type . _defn2bind . unlctd) ds $
-      ERec <$> (traverse . lctd . defn2exprSt) llExpr ds <*> llExpr e0
+    withinEScope' (_bind2type . _defn2bind) ds $
+      ERec <$> (traverse . defn2exprSt) llExpr ds <*> llExpr e0
   -- TODO: It might be nice to use Liquid Haskell here.
   ELam oldBinds rhs0 t_rhs -> do
     rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
     let evCaptured = Set.toList (setOf (traverse . _Free) rhs1)
     let n0 = length evCaptured
-    newBinds <- for evCaptured $ \x -> MkBind (baseEVar x) <$> lookupEVar x
+    -- TODO: We should figure out a location for @x@.
+    newBinds <- for evCaptured $ \x -> MkBind (Lctd noPos (baseEVar x)) <$> lookupEVar x
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
           (setOf (traverse . bind2type . traverse) allBinds0 <> setOf traverse t_rhs)
@@ -77,7 +76,8 @@ llExpr = \case
     let rhs2 = bimap tvRename evRename rhs1
     lhs <- fresh
     let t_lhs = map _bind2type allBinds1 *~> fmap tvRename t_rhs
-    yield (DSupC (MkSupCDecl lhs tyBinds t_lhs allBinds1 rhs2))
+    -- TODO: We could use the pos of the lambda for @lhs@.
+    yield (DSupC (MkSupCDecl (Lctd noPos lhs) tyBinds t_lhs allBinds1 rhs2))
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
   ECoe c e0 -> ECoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
@@ -97,12 +97,10 @@ llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType ds -> yield (DType ds)
   DDefn (MkDefn (MkBind lhs t) rhs) -> do
-    resetWith (Id.freshEVars "ll" lhs)
+    resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
     yield (DSupC (MkSupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
   DPrim p -> yield (DPrim p)
 
 liftModule :: Module In -> Module Out
-liftModule m0@(MkModule tops0) =
-  let tops1 = execLL m0 (traverse_ (lctd_ llDecl) tops0)
-  in  MkModule tops1
+liftModule m0@(MkModule tops0) = MkModule (execLL m0 (traverse_ llDecl tops0))
