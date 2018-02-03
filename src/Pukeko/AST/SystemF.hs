@@ -30,7 +30,6 @@ module Pukeko.AST.SystemF
   , mkETyAbs
 
   , abstract
-  , (//)
 
   , module2decls
   , decl2func
@@ -238,29 +237,24 @@ abstract f = fmap (match f)
     match f v = maybe (Free v) (uncurry mkBound) (f v)
 
 -- | Replace subexpressions.
--- FIXME: Make this a proper monad instance.
-(//) :: Expr st tv ev1 -> (ev1 -> Expr st tv ev2) -> Expr st tv ev2
-expr // f = case expr of
-  ELoc l       -> ELoc (fmap (// f) l)
-  EVar x       -> f x
-  EAtm a       -> EAtm a
-  EApp t  us   -> EApp (t // f) (fmap (// f) us)
-  ECas t  cs   -> ECas (t // f) (fmap (over' case2expr (/// f)) cs)
-  ELam ps e t  -> ELam ps (e /// f) t
-  ELet ds t    -> ELet (over (traverse . defn2expr) (//  f) ds) (t /// f)
-  ERec ds t    -> ERec (over (traverse . defn2expr) (/// f) ds) (t /// f)
-  EMat t  as   -> EMat (t // f) (fmap (over altn2expr (/// f)) as)
-  ECoe c e     -> ECoe c (e // f)
-  ETyAbs _ _   -> error "THIS IS NOT IMPLEMENTED"
-  ETyApp e t   -> ETyApp (e // f) t
+instance Applicative (Expr st tv) where
+  pure = EVar
+  (<*>) = ap
 
-(///) ::
-  Expr st tv (EScope i ev1) -> (ev1 -> Expr st tv ev2) -> Expr st tv (EScope i ev2)
-t /// f = t // (\x -> pdist (fmap f x))
-
-pdist :: EScope i (Expr st tv ev) -> Expr st tv (EScope i ev)
-pdist (Bound i x) = EVar (Bound i x)
-pdist (Free t)    = fmap Free t
+instance Monad (Expr st tv ) where
+  expr >>= f = case expr of
+    ELoc l       -> ELoc (fmap (>>= f) l)
+    EVar x       -> f x
+    EAtm a       -> EAtm a
+    EApp t  us   -> EApp (t >>= f) (fmap (>>= f) us)
+    ECas t  cs   -> ECas (t >>= f) (fmap (over' case2expr (>>>= f)) cs)
+    ELam ps e t  -> ELam ps (e >>>= f) t
+    ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
+    ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
+    EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
+    ECoe c e     -> ECoe c (e >>= f)
+    ETyAbs _ _   -> error "THIS IS NOT IMPLEMENTED"
+    ETyApp e t   -> ETyApp (e >>= f) t
 
 -- * Lenses and traversals
 inst2defn :: Traversal

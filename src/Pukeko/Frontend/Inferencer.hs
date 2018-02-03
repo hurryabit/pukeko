@@ -182,7 +182,7 @@ inferRec defns0 = do
   let ts3 = fmap (mkUTUni qvs) ts2
   let vs3 = map (UTVar . _qvar2tvar) qvs
   let addETyApp = scope' (EVar . Free) (\i b -> mkETyApp (EVar (mkBound i b)) vs3)
-  let rs2 = fmap (// addETyApp) rs1
+  let rs2 = fmap (>>= addETyApp) rs1
   let defns1 = zipWith3 (\t3 -> MkDefn . (bind2type .~ t3)) ts3 ls0 rs2
   pure (defns1, ts3, cstrs_def)
 
