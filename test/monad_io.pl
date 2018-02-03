@@ -100,7 +100,7 @@ dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
   fun @a ->
     fun (x : a) ->
-      coerce @(World -> Pair a World -> IO a) (dict$Monad$IO$ll1 @a x)
+      coerce @((World -> Pair a World) -> IO a) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
@@ -110,7 +110,7 @@ dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) ->
-      coerce @(World -> Pair b World -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
+      coerce @((World -> Pair b World) -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
@@ -125,7 +125,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
     fun (f : a -> b) (x : a) ->
-      coerce @(World -> Pair b World -> IO b) (io$ll1 @a @b f x)
+      coerce @((World -> Pair b World) -> IO b) (io$ll1 @a @b f x)
 print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
 input : IO Int = io @Unit @Int geti Unit
 count_down : Int -> IO Unit =

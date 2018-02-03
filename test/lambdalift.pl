@@ -43,7 +43,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
     fun (f : a -> b) (x : a) ->
-      coerce @(World -> Pair b World -> IO b) (io$ll1 @a @b f x)
+      coerce @((World -> Pair b World) -> IO b) (io$ll1 @a @b f x)
 print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
 g : Int -> Int -> Int -> Int -> Int =
   fun (a : Int) (b : Int) (c : Int) (d : Int) -> a

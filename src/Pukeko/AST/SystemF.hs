@@ -591,7 +591,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
         <+> prettyPrec (Op.aprec+1) e0
       where
         (d_from, d_to) = case (,) <$> isType t_from0 <*> isType t_to0 of
-          Just (t_from, t_to) -> (prettyPrecType 1 t_from, prettyPrecType 0 t_to)
+          Just (t_from, t_to) -> (prettyPrecType 2 t_from, prettyPrecType 1 t_to)
           Nothing -> case dir of
             Inject  -> ("_", pretty tcon)
             Project -> (pretty tcon, "_")
