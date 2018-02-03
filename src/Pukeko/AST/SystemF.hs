@@ -98,7 +98,7 @@ data ClssDecl = MkClssDecl
 
 data InstDecl st = MkInstDecl
   { _inst2clss  :: Lctd Id.Clss
-    -- FIXME: There's no way to define instances on (->).
+    -- TODO: Allow type instances for (->).
   , _inst2tcon  :: Id.TCon
   , _inst2qvars :: [QVar]
   , _inst2defns :: [Defn st (TScope Int Void) Void]

@@ -94,7 +94,6 @@ kcTypDef tcons = do
           case dcons0 of
             Left typ -> kcType Star typ
             Right dcons ->
-              -- TODO: Rewrite this in terms of @forOf_@.
               for_ dcons $ here' $ \MkDConDecl{_dcon2flds = flds} ->
                 traverse_ (kcType Star) flds
   traverse_ close kinds

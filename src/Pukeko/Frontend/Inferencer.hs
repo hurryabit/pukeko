@@ -39,7 +39,6 @@ data SplitCstrs s tv = MkSplitCstrs
   , _deferred :: Cstrs s tv
   }
 
-
 type TI ev s = TU s ev
 type IT s ev = TU s ev
 
@@ -196,12 +195,8 @@ infer = \case
     EVar x -> lookupEVar x >>= instantiate (EVar x)
     EAtm a -> typeOfAtom a >>= instantiate (EAtm a) . open
     EApp fun0 args0 -> do
-      let neUnzip3 :: NonEmpty (a, b, c) -> (NonEmpty a, NonEmpty b, NonEmpty c)
-          neUnzip3 ((x, y, z) :| xyzs) = (x :| xs, y :| ys, z :| zs)
-            where
-              (xs, ys, zs) = unzip3 xyzs
       (fun1, t_fun, cstrs_fun) <- infer fun0
-      (args1, t_args, cstrs_args) <- neUnzip3 <$> traverse infer args0
+      (args1, t_args, cstrs_args) <- NE.unzip3 <$> traverse infer args0
       t_res <- freshUVar
       unify t_fun (t_args *~> t_res)
       pure (EApp fun1 args1, t_res, cstrs_fun <> fold cstrs_args)
@@ -367,7 +362,6 @@ qualDecl :: Decl (Aux s) -> TQ Void s (Decl Out)
 qualDecl = \case
   DType ds -> pure (DType ds)
   DClss c -> pure (DClss c)
-  -- FIXME: Do type inference for type class instances.
   DInst (MkInstDecl c t qvs ds0) -> do
     ds1 <- for ds0 $ \d0 -> localizeTQ qvs (qualDefn d0)
     pure (DInst (MkInstDecl c t qvs ds1))

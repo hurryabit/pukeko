@@ -54,7 +54,7 @@ findDCon dcon = do
   unless ex (throwHere ("unknown data constructor:" <+> pretty dcon))
   pure dcon
 
--- FIXME: Move this check into the renamer.
+-- TODO: Move this check into the renamer.
 trDefn :: Defn In tv ev -> TR (Defn Out tv ev)
 trDefn = (defn2atom . _ACon) findDCon
 

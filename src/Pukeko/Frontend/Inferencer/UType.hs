@@ -56,7 +56,7 @@ mkUTUni xs0 t0 = case xs0 of
   [] -> t0
   x:xs -> UTUni (x :| xs) t0
 
--- FIXME: Follow links.
+-- TODO: Follow links.
 unUTUni1 :: UType s tv -> ([QVar], UType s tv)
 unUTUni1 = \case
   UTUni qvs t1 -> (toList qvs, t1)

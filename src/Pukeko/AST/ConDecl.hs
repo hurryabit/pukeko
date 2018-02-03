@@ -23,7 +23,6 @@ data TConDecl = MkTConDecl
   , _tcon2dcons :: Either (Type (TScope Int Void)) [DConDecl]
   }
 
--- FIXME: The Lctd is at the wrong name.
 data DConDecl = MkDConDecl
   { _dcon2tcon :: Id.TCon
   , _dcon2name :: Lctd Id.DCon

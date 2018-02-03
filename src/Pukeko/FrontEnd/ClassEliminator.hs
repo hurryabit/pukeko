@@ -185,7 +185,7 @@ unclssType = \case
 unclssDecl :: Decl Out -> Decl Out
 unclssDecl = \case
   DType tcons ->
-    -- TODO: We're making the assmption that type synonyms don't contain class
+    -- TODO: We're making the asusmption that type synonyms don't contain class
     -- constraints. This might change in the future.
     let tcon2type = tcon2dcons . _Right . traverse . dcon2flds . traverse
     in  DType (fmap (over tcon2type unclssType) tcons)
