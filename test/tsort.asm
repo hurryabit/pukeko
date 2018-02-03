@@ -21,23 +21,23 @@ g_globstart gm$cons_1_3, 3
 g_updcons 1, 3, 1
 g_return
 
-g_globstart op$l, 1
+g_globstart le, 1
 g_push 0
 g_eval
-g_proj 0
+g_proj 2
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart op$le, 1
+g_globstart lt, 1
 g_push 0
 g_eval
-g_proj 1
+g_proj 3
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart op$m, 1
+g_globstart sub, 1
 g_push 0
 g_eval
 g_proj 2
@@ -86,10 +86,10 @@ g_pop 2
 g_return
 
 g_globstart dict$Ord$Int, 0
-g_pushglobal gm$lt, 2
-g_pushglobal gm$le, 2
 g_pushglobal gm$ge, 2
 g_pushglobal gm$gt, 2
+g_pushglobal gm$le, 2
+g_pushglobal gm$lt, 2
 g_push 0
 g_push 2
 g_push 4
@@ -233,7 +233,7 @@ g_globstart replicate, 2
 g_pushint 0
 g_push 1
 g_pushglobal dict$Ord$Int, 0
-g_pushglobal op$le, 1
+g_pushglobal le, 1
 g_mkap 3
 g_eval
 g_jumpcase .0, .1
@@ -243,7 +243,7 @@ g_push 1
 g_pushint 1
 g_push 2
 g_pushglobal dict$Ring$Int, 0
-g_pushglobal op$m, 1
+g_pushglobal sub, 1
 g_mkap 3
 g_pushglobal replicate, 2
 g_mkap 2
@@ -268,7 +268,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart op$gge, 1
+g_globstart bind, 1
 g_push 0
 g_eval
 g_proj 1
@@ -276,18 +276,18 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart op$s$ll1, 2
+g_globstart semi$ll1, 2
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart op$s, 3
+g_globstart semi, 3
 g_push 2
-g_pushglobal op$s$ll1, 2
+g_pushglobal semi$ll1, 2
 g_mkap 1
 g_push 2
 g_push 2
-g_pushglobal op$gge, 1
+g_pushglobal bind, 1
 g_updap 3, 4
 g_pop 3
 g_unwind
@@ -312,7 +312,7 @@ g_push 2
 g_pushglobal sequence, 2
 g_mkap 2
 g_push 2
-g_pushglobal op$gge, 1
+g_pushglobal bind, 1
 g_updap 3, 4
 g_pop 3
 g_unwind
@@ -337,7 +337,7 @@ g_pushglobal sequence$ll2, 3
 g_mkap 2
 g_push 1
 g_push 4
-g_pushglobal op$gge, 1
+g_pushglobal bind, 1
 g_updap 3, 5
 g_pop 4
 g_unwind
@@ -349,7 +349,7 @@ g_push 3
 g_push 3
 g_mkap 1
 g_push 2
-g_pushglobal op$s, 3
+g_pushglobal semi, 3
 g_updap 3, 5
 g_pop 4
 g_unwind
@@ -584,7 +584,7 @@ g_uncons 3
 g_push 1
 g_push 6
 g_push 6
-g_pushglobal op$l, 1
+g_pushglobal lt, 1
 g_mkap 3
 g_eval
 g_jumpcase .3, .4
@@ -675,7 +675,7 @@ g_pushglobal dict$Monad$IO, 0
 g_pushglobal sequence, 2
 g_mkap 2
 g_pushglobal dict$Monad$IO, 0
-g_pushglobal op$gge, 1
+g_pushglobal bind, 1
 g_updap 3, 2
 g_pop 1
 g_unwind
@@ -684,6 +684,6 @@ g_globstart main, 0
 g_pushglobal main$ll2, 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
-g_pushglobal op$gge, 1
+g_pushglobal bind, 1
 g_updap 3, 1
 g_unwind

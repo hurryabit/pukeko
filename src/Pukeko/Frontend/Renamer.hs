@@ -16,24 +16,30 @@ import qualified Pukeko.AST.Stage      as St
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Identifier as Id
+import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Type
 
 type Out = St.Renamer
 
+type RnEnv ev = Map Id.EVar ev
+data RnState = MkRnState
+  { _funcs  :: Set Id.EVar
+  , _binops :: Map Op.Binary Id.EVar
+  }
+
+type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader SourcePos, Error Failure]
+
+makeLenses ''RnState
+
 renameModule :: Ps.Package -> Either Failure (Module Out)
 renameModule (Ps.MkPackage _ modules) = runRn $ do
   let ldecls = concatMap Ps._mod2decls modules
-  MkModule <$> traverse rnDecl ldecls
-
-type RnEnv ev = Map Id.EVar ev
-type RnState = Set Id.EVar
-
-type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader SourcePos, Error Failure]
+  MkModule . catMaybes <$> traverse rnDecl ldecls
 
 runRn :: Rn Void a -> Either Failure a
 runRn = run . runError . runReader noPos . evalState st0 . runReader env0
   where
-    st0 = mempty
+    st0 = MkRnState mempty mempty
     env0 = mempty
 
 localize :: Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
@@ -47,23 +53,41 @@ localizeDefns :: FoldableWithIndex Int t =>
 localizeDefns =
   localize . ifoldMap (\i (Ps.MkDefn (unlctd -> x) _) -> Map.singleton x i)
 
-rnDecl :: Ps.Decl -> Rn Void (Decl Out)
+checkFunc :: Id.EVar -> Rn ev ()
+checkFunc z = do
+  global <- uses funcs (Set.member z)
+  unless global (throwHere ("unknown variable:" <+> pretty z))
+
+findBinop :: Op.Binary -> Rn ev Id.EVar
+findBinop op = do
+  fun_mb <- uses binops (Map.lookup op)
+  case fun_mb of
+    Just fun -> pure fun
+    Nothing  -> throwHere ("unknown operator:" <+> pretty op)
+
+rnDecl :: Ps.Decl -> Rn Void (Maybe (Decl Out))
 rnDecl = \case
-  Ps.DType ts -> DType <$> traverse rnTConDecl ts
-  Ps.DSign s -> DSign <$> rnSignDecl mempty s
+  Ps.DType ts -> Just . DType <$> traverse rnTConDecl ts
+  Ps.DSign s -> Just . DSign <$> rnSignDecl mempty s
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
     let env = Map.singleton v (mkBound 0 v)
     ms1 <- traverse (rnSignDecl env) ms0
-    modify (<> setOf (traverse . sign2func . lctd) ms1)
-    pure (DClss (MkClssDecl c v ms1))
+    modifying funcs (<> setOf (traverse . sign2func . lctd) ms1)
+    yield (DClss (MkClssDecl c v ms1))
   Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
     qvs <- rnTypeCstr vs0 qs
     ds1 <- traverse rnDefn ds0
-    pure (DInst (MkInstDecl c t qvs ds1))
-  Ps.DDefn d -> DDefn <$> rnDefn d
+    yield (DInst (MkInstDecl c t qvs ds1))
+  Ps.DDefn d -> Just . DDefn <$> rnDefn d
   Ps.DExtn (Ps.MkExtnDecl z s) -> do
-    modify (<> Set.singleton (z^.lctd))
-    pure (DExtn (MkExtnDecl (MkBind z NoType) s))
+    modifying funcs (<> Set.singleton (z^.lctd))
+    yield (DExtn (MkExtnDecl (MkBind z NoType) s))
+  Ps.DInfx (Ps.MkInfxDecl l@(unlctd -> op) fun) -> here l $ do
+    checkFunc fun
+    modifying binops (Map.insert op fun)
+    pure Nothing
+  where
+    yield = pure . Just
 
 rnTConDecl :: Ps.TConDecl -> Rn ev TConDecl
 rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = do
@@ -81,7 +105,7 @@ rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
 
 rnSignDecl :: Map Id.TVar tv -> Ps.SignDecl -> Rn ev (SignDecl tv)
 rnSignDecl env (Ps.MkSignDecl z t) = do
-  modify (Set.insert (z^.lctd))
+  modifying funcs (Set.insert (z^.lctd))
   MkSignDecl z <$> rnTypeScheme env t
 
 rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)
@@ -126,14 +150,13 @@ rnExpr = \case
     case y_mb of
       Just y -> pure (EVar y)
       Nothing -> do
-        global <- gets (x `Set.member`)
-        if global
-          then pure (EVal x)
-          else throwHere ("unknown variable:" <+> pretty x)
+        checkFunc x
+        pure (EVal x)
   Ps.ECon c -> pure (ECon c)
   Ps.ENum n -> pure (ENum n)
-  Ps.EApp e0  es -> EApp <$> rnExpr e0 <*> traverse rnExpr es
-  Ps.EMat e0  as0 ->
+  Ps.EApp e0 es -> EApp <$> rnExpr e0 <*> traverse rnExpr es
+  Ps.EOpp op e1 e2 -> mkEApp . EVal <$> findBinop op <*> sequence [rnExpr e1, rnExpr e2]
+  Ps.EMat e0 as0 ->
     case as0 of
       []   -> throwHere "pattern match without alternatives"
       a:as -> EMat <$> rnExpr e0 <*> traverse rnAltn (a :| as)

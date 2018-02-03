@@ -14,24 +14,24 @@ data Choice a b =
        | Second b
 data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
-(==) : ∀a. Dict$Eq a -> a -> a -> Bool =
+eq : ∀a. Dict$Eq a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Eq a) ->
       match dict with
-      | Dict$Eq @a (==) -> (==)
-(!=) : ∀a. Dict$Eq a -> a -> a -> Bool =
+      | Dict$Eq @a eq -> eq
+neq : ∀a. Dict$Eq a -> a -> a -> Bool =
   fun @a ->
     fun (dict$Eq$a : Dict$Eq a) (x : a) (y : a) ->
-      match (==) @a dict$Eq$a x y with
+      match eq @a dict$Eq$a x y with
       | False -> True
       | True -> False
 data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
-(<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
+le : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a _ (<=) _ _ -> (<=)
+      | Dict$Ord @a _ _ le _ -> le
 data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 append : ∀m. Dict$Monoid m -> m -> m -> m =
@@ -41,44 +41,44 @@ append : ∀m. Dict$Monoid m -> m -> m -> m =
       | Dict$Monoid @m _ append -> append
 data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
-(+) : ∀a. Dict$Ring a -> a -> a -> a =
+add : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a _ (+) _ _ -> (+)
-(-) : ∀a. Dict$Ring a -> a -> a -> a =
+      | Dict$Ring @a _ add _ _ -> add
+sub : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a _ _ (-) _ -> (-)
+      | Dict$Ring @a _ _ sub _ -> sub
 data Int
 external eq_int : Int -> Int -> Bool = "eq"
 dict$Eq$Int : Dict$Eq Int =
-  let (==) : Int -> Int -> Bool = eq_int in
-  Dict$Eq @Int (==)
+  let eq : Int -> Int -> Bool = eq_int in
+  Dict$Eq @Int eq
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
 dict$Ord$Int : Dict$Ord Int =
-  let (<) : Int -> Int -> Bool = lt_int
-  and (<=) : Int -> Int -> Bool = le_int
-  and (>=) : Int -> Int -> Bool = ge_int
-  and (>) : Int -> Int -> Bool = gt_int
+  let ge : Int -> Int -> Bool = ge_int
+  and gt : Int -> Int -> Bool = gt_int
+  and le : Int -> Int -> Bool = le_int
+  and lt : Int -> Int -> Bool = lt_int
   in
-  Dict$Ord @Int (<) (<=) (>=) (>)
+  Dict$Ord @Int ge gt le lt
 external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 dict$Ring$Int : Dict$Ring Int =
   let neg : Int -> Int = neg_int
-  and (+) : Int -> Int -> Int = add_int
-  and (-) : Int -> Int -> Int = sub_int
-  and (*) : Int -> Int -> Int = mul_int
+  and add : Int -> Int -> Int = add_int
+  and sub : Int -> Int -> Int = sub_int
+  and mul : Int -> Int -> Int = mul_int
   in
-  Dict$Ring @Int neg (+) (-) (*)
-external (%) : Int -> Int -> Int = "mod"
+  Dict$Ring @Int neg add sub mul
+external mod : Int -> Int -> Int = "mod"
 data Char
 data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
@@ -134,16 +134,16 @@ nth_exn : ∀a. List a -> Int -> a =
       match xs with
       | Nil @a -> abort @a
       | Cons @a x xs ->
-        match (<=) @Int dict$Ord$Int n 0 with
-        | False -> nth_exn @a xs ((-) @Int dict$Ring$Int n 1)
+        match le @Int dict$Ord$Int n 0 with
+        | False -> nth_exn @a xs (sub @Int dict$Ring$Int n 1)
         | True -> x
 data Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
-(>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m _ (>>=) -> (>>=)
+      | Dict$Monad @m _ bind -> bind
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
@@ -168,10 +168,10 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
       coerce @(World -> Pair b World -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> dict$Monad$IO$ll4 @a @b
   in
-  Dict$Monad @IO pure (>>=)
+  Dict$Monad @IO pure bind
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
@@ -195,7 +195,7 @@ psums$ll1 : ∀_9. (∀_9. Dict$Ring _9 -> _9 -> List _9 -> List _9) -> Dict$Rin
       match xs with
       | Nil @_9 -> Nil @_9
       | Cons @_9 x xs ->
-        let y : _9 = (+) @_9 dict$Ring$_9 x n in
+        let y : _9 = add @_9 dict$Ring$_9 x n in
         Cons @_9 y (psums0 @_9 dict$Ring$_9 y xs)
 psums : List Int -> List Int =
   let rec psums0 : ∀_9. Dict$Ring _9 -> _9 -> List _9 -> List _9 =
@@ -218,7 +218,7 @@ filter : ∀a. (a -> Bool) -> List a -> List a =
       let rec filter_p : List a -> List a = filter$ll1 @a p filter_p in
       filter_p
 sieve$ll1 : Int -> Int -> Bool =
-  fun (p : Int) (k : Int) -> (!=) @Int dict$Eq$Int ((%) k p) 0
+  fun (p : Int) (k : Int) -> neq @Int dict$Eq$Int (mod k p) 0
 sieve : List Int -> List Int =
   fun (ks : List Int) ->
     match ks with
@@ -229,4 +229,4 @@ primes : List Int =
   Cons @Int 2 (Cons @Int 3 (sieve (psums (Cons @Int 5 (repeat @Int (Cons @Int 2 (Cons @Int 4 (Nil @Int))))))))
 main$ll1 : Int -> IO Unit =
   fun (n : Int) -> print (nth_exn @Int primes n)
-main : IO Unit = (>>=) @IO dict$Monad$IO @Int @Unit input main$ll1
+main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll1

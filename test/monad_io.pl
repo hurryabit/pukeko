@@ -15,48 +15,48 @@ data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
 data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
-(>=) : ∀a. Dict$Ord a -> a -> a -> Bool =
+ge : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a _ _ (>=) _ -> (>=)
-(>) : ∀a. Dict$Ord a -> a -> a -> Bool =
+      | Dict$Ord @a ge _ _ _ -> ge
+gt : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a _ _ _ (>) -> (>)
+      | Dict$Ord @a _ gt _ _ -> gt
 data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
-(-) : ∀a. Dict$Ring a -> a -> a -> a =
+sub : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a _ _ (-) _ -> (-)
+      | Dict$Ring @a _ _ sub _ -> sub
 data Int
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
 dict$Ord$Int : Dict$Ord Int =
-  let (<) : Int -> Int -> Bool = lt_int
-  and (<=) : Int -> Int -> Bool = le_int
-  and (>=) : Int -> Int -> Bool = ge_int
-  and (>) : Int -> Int -> Bool = gt_int
+  let ge : Int -> Int -> Bool = ge_int
+  and gt : Int -> Int -> Bool = gt_int
+  and le : Int -> Int -> Bool = le_int
+  and lt : Int -> Int -> Bool = lt_int
   in
-  Dict$Ord @Int (<) (<=) (>=) (>)
+  Dict$Ord @Int ge gt le lt
 external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 dict$Ring$Int : Dict$Ring Int =
   let neg : Int -> Int = neg_int
-  and (+) : Int -> Int -> Int = add_int
-  and (-) : Int -> Int -> Int = sub_int
-  and (*) : Int -> Int -> Int = mul_int
+  and add : Int -> Int -> Int = add_int
+  and sub : Int -> Int -> Int = sub_int
+  and mul : Int -> Int -> Int = mul_int
   in
-  Dict$Ring @Int neg (+) (-) (*)
+  Dict$Ring @Int neg add sub mul
 data Char
 data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
@@ -72,17 +72,17 @@ pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure _ -> pure
-(>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m _ (>>=) -> (>>=)
-(;ll1) : ∀a m. m a -> Unit -> m a =
+      | Dict$Monad @m _ bind -> bind
+semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
-(;) : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
+semi : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (m1 : m Unit) (m2 : m a) ->
-      (>>=) @m dict$Monad$m @Unit @a m1 ((;ll1) @a @m m2)
+      bind @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 when : ∀m. Dict$Monad m -> Bool -> m Unit -> m Unit =
   fun @m ->
     fun (dict$Monad$m : Dict$Monad m) (p : Bool) (m : m Unit) ->
@@ -113,10 +113,10 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
       coerce @(World -> Pair b World -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> dict$Monad$IO$ll4 @a @b
   in
-  Dict$Monad @IO pure (>>=)
+  Dict$Monad @IO pure bind
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
@@ -130,15 +130,15 @@ print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
 input : IO Int = io @Unit @Int geti Unit
 count_down : Int -> IO Unit =
   fun (k : Int) ->
-    when @IO dict$Monad$IO ((>=) @Int dict$Ord$Int k 0) ((;) @Unit @IO dict$Monad$IO (print k) (count_down ((-) @Int dict$Ring$Int k 1)))
+    when @IO dict$Monad$IO (ge @Int dict$Ord$Int k 0) (semi @Unit @IO dict$Monad$IO (print k) (count_down (sub @Int dict$Ring$Int k 1)))
 repeat : ∀m. Dict$Monad m -> Int -> m Unit -> m Unit =
   fun @m ->
     fun (dict$Monad$m : Dict$Monad m) (k : Int) (m : m Unit) ->
-      when @m dict$Monad$m ((>) @Int dict$Ord$Int k 0) ((;) @Unit @m dict$Monad$m m (repeat @m dict$Monad$m ((-) @Int dict$Ring$Int k 1) m))
+      when @m dict$Monad$m (gt @Int dict$Ord$Int k 0) (semi @Unit @m dict$Monad$m m (repeat @m dict$Monad$m (sub @Int dict$Ring$Int k 1) m))
 main$ll1 : Int -> Int -> IO Unit =
   fun (k : Int) (n : Int) ->
     repeat @IO dict$Monad$IO k (count_down n)
 main$ll2 : Int -> IO Unit =
   fun (k : Int) ->
-    (>>=) @IO dict$Monad$IO @Int @Unit input (main$ll1 k)
-main : IO Unit = (>>=) @IO dict$Monad$IO @Int @Unit input main$ll2
+    bind @IO dict$Monad$IO @Int @Unit input (main$ll1 k)
+main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll2

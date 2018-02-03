@@ -37,13 +37,12 @@ parseInput file =
 parseModule ::
   (Member (Error Failure) effs, LastMember IO effs) => FilePath -> Eff effs Module
 parseModule file = do
-  sendM (putStr (file ++ " "))
   code <- sendM (readFile file)
   parseInput file code
 
 parsePackage ::
   (Member (Error Failure) effs, LastMember IO effs) => FilePath -> Eff effs Package
-parsePackage file = build parseModule file <* sendM (putStrLn "")
+parsePackage file = build parseModule file
 
 type Parser = RWS.RWST (Pos, Ordering) () SourcePos (Parsec Void String)
 
@@ -105,7 +104,7 @@ reservedIdents = Set.fromList
       , "data", "class", "where", "instance"
       , "external"
       , "import"
-      , "coerce"
+      , "coerce", "infix"
       ]
 
 lIdentStart :: Parser Char
@@ -121,7 +120,7 @@ reservedOperators :: Set String
 reservedOperators = Set.fromList ["->", "<-", "=>", "=", ":", "|"]
 
 opLetter :: Parser Char
-opLetter = oneOf (Set.fromList "+-*/%=<>|&!.:;∘")
+opLetter = oneOf Op.letters
 
 reserved :: String -> Parser ()
 reserved kw = void (lexeme (string kw <* notFollowedBy identLetter))
@@ -136,15 +135,15 @@ lIdent = lexeme $ try $ do
     unexpected (Label (NE.fromList ("reserved " ++ x)))
   pure x
 
-uIdent :: Parser String
-uIdent = lexeme $ (:) <$> uIdentStart <*> many identLetter
-
-prefixOperator :: Parser String
-prefixOperator = lexeme $ try $ do
-  op <- between (char '(') (char ')') (some opLetter)
+binOp :: Parser Op.Binary
+binOp = lexeme $ try $ do
+  op <- some opLetter
   when (op `Set.member` reservedOperators) $
     unexpected (Label (NE.fromList ("reserved op " ++ op)))
-  pure op
+  pure (Op.binary op)
+
+uIdent :: Parser String
+uIdent = lexeme $ (:) <$> uIdentStart <*> many identLetter
 
 decimal :: Parser Int
 decimal = lexeme L.decimal
@@ -160,9 +159,7 @@ colon   = reservedOp ":"
 bar     = reservedOp "|"
 
 evar :: Parser Id.EVar
-evar = Id.evar <$> lIdent
-  <|> Id.op <$> prefixOperator
-  <?> "expression variable"
+evar = Id.evar <$> lIdent <?> "expression variable"
 
 tvar :: Parser Id.TVar
 tvar = Id.tvar <$> lIdent <?> "type variable"
@@ -267,7 +264,8 @@ expr =
   where
     operatorTable = map (map f) (reverse Op.table)
       where
-        f MkSpec{_sym, _assoc} = g _assoc (try (reservedOp _sym *> pure (mkAppOp _sym)))
+        f MkSpec{_sym, _assoc} =
+          g _assoc (try (reservedOp (untag _sym) *> pure (EOpp _sym)))
         g = \case
           Op.AssocLeft  -> InfixL
           Op.AssocRight -> InfixR
@@ -317,6 +315,9 @@ extnDecl = MkExtnDecl
   <$> lctd evar
   <*> (equals *> char '\"' *> some (lowerChar <|> char '_') <* symbol "\"")
 
+infxDecl :: Parser InfxDecl
+infxDecl = MkInfxDecl <$> lctd binOp <*> evar
+
 import_ :: Parser FilePath
 import_ = indented_ (reserved "import") $ do
   comps <- lexeme (sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/'))
@@ -333,5 +334,6 @@ module_ file = do
     , DExtn <$> indented_ (reserved "external") extnDecl
     , DSign <$> signDecl <?> "function declaration"
     , DDefn <$> defn <?> "function definition"
+    , DInfx <$> indented_ (reserved "infix") infxDecl
     ]
   pure (MkModule file imps decls)

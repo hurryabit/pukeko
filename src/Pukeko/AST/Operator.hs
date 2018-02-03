@@ -1,39 +1,36 @@
 module Pukeko.AST.Operator
-  ( Spec (..)
+  ( Binary
+  , binary
+  , Spec (..)
   , Assoc (..)
   , table
   , letters
   , aprec
-  , mangle
   )
 where
 
 import Pukeko.Prelude
 
-import qualified Data.Map as Map
+import qualified Data.Set as Set
+
+data BinaryTag
+
+type Binary = Tagged BinaryTag String
+
+binary :: String -> Binary
+binary op
+  | all (`Set.member` letters) op = Tagged op
+  | otherwise                     = bugWith "invalid operator name" op
 
 data Assoc = AssocLeft | AssocRight | AssocNone
 
-data Spec = MkSpec{ _sym :: String, _prec :: Int, _assoc :: Assoc }
+data Spec = MkSpec{_sym :: Binary, _prec :: Int, _assoc :: Assoc}
 
-mangleTable :: Map Char Char
-mangleTable = Map.fromList
-  [ ('+', 'p'), ('-', 'm'), ('*', 't'), ('/', 'd'), ('%', 'r')
-  , ('=', 'e'), ('<', 'l'), ('>', 'g'), ('!', 'n')
-  , ('&', 'a'), ('|', 'o'), (';', 's'), (':', 'c'), ('∘', 'u')
-  ]
-
-mangle :: String -> Maybe String
-mangle "" = Nothing
-mangle xs = ("op$" ++) <$> traverse (`Map.lookup` mangleTable) xs
-
-letters :: [Char]
-letters = Map.keys mangleTable
+letters :: Set Char
+letters = Set.fromList "+-*/%=<>!&|;:∘"
 
 mkSpec :: Assoc -> String -> Spec
-mkSpec _assoc _sym = case mangle _sym of
-  Just _  -> MkSpec{ _sym, _prec = undefined, _assoc }
-  Nothing -> bugWith "invalid operator name" _sym
+mkSpec _assoc op = MkSpec{_sym = binary op, _prec = undefined, _assoc}
 
 left, right, none :: String -> Spec
 left  = mkSpec AssocLeft

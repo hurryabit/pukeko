@@ -72,6 +72,7 @@ import Data.Sequence         as X (Seq)
 import Data.Semigroup        as X (Monoid (..), Semigroup (..))
 import Data.Set              as X (Set)
 import Data.Set.Lens         as X (setOf)
+import Data.Tagged           as X
 import Data.Traversable      as X
 import Data.Vector           as X (Vector)
 import Data.Void             as X (Void, absurd)
@@ -164,6 +165,9 @@ instance Pretty String where
 
 instance Pretty Int where
   pretty = PP.int
+
+instance Pretty a => Pretty (Tagged tag a) where
+  pretty = pretty . untag
 
 instance Pretty Void where
   pretty = absurd

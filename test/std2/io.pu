@@ -26,7 +26,7 @@ type IO a = World -> Pair a World
 
 instance Monad IO where
   pure x = coerce @(_ -> IO) (fun world -> Pair x world)
-  (>>=) mx f = coerce @(_ -> IO) (fun world0 ->
+  bind mx f = coerce @(_ -> IO) (fun world0 ->
     match (coerce @(IO -> _) mx) world0 with
     | Pair x world1 -> (coerce @(IO -> _) (f x)) world1)
 

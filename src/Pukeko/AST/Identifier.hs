@@ -2,10 +2,7 @@ module Pukeko.AST.Identifier
   ( Named (..)
   , EVar
   , evar
-  , op
   , main
-  , isVar
-  , isOp
   , stripPart
   , freshEVars
   , mangled
@@ -25,33 +22,19 @@ where
 import Pukeko.Prelude
 import Data.Char (isLower, isUpper)
 
-import Pukeko.Pretty
-import qualified Pukeko.AST.Operator as Operator
-
 class Named a where
   name :: a -> String
 
-data EVar
-  = EVar{_name :: String,                  _part :: Maybe (String, Int)}
-  | Op  {_sym  :: String, _name :: String, _part :: Maybe (String, Int)}
+data EVar = EVar{_name :: String, _part :: Maybe (String, Int)}
   deriving (Show, Eq, Ord)
 
-evar, op :: String -> EVar
+evar :: String -> EVar
 evar _name@(first:_)
   | isLower first = EVar{_name, _part = Nothing}
 evar _name = bugWith "invalid variable name" _name
-op _sym = case Operator.mangle _sym of
-  Just _name -> Op{_sym, _name, _part = Nothing}
-  Nothing -> bugWith "invalid operator symbol" _sym
 
 main :: EVar
 main = evar "main"
-
-isVar, isOp :: EVar -> Bool
-isVar EVar{} = True
-isVar _      = False
-isOp  Op{}   = True
-isOp  _      = False
 
 stripPart :: EVar -> EVar
 stripPart x = x{_part = Nothing}
@@ -63,9 +46,8 @@ mangled :: EVar -> String
 mangled var = (_name :: EVar -> _) var ++ maybe "" (\(comp, n) -> '$':comp ++ show n) (_part var)
 
 instance Pretty EVar where
-  pretty var = case var of
-    EVar{_name, _part} -> pretty _name <> maybe mempty (\(comp, n) -> "$" <> pretty comp <> pretty n) _part
-    Op  {_sym , _part} -> parens (pretty _sym <> maybe mempty (\(comp, n) -> pretty comp <> pretty n) _part)
+  pretty EVar{_name, _part} =
+    pretty _name <> maybe mempty (\(comp, n) -> "$" <> pretty comp <> pretty n) _part
 
 data TVar
   = TVar{_name :: String}

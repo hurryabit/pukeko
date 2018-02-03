@@ -4,10 +4,14 @@ import std2/list
 
 class Monad m where
   pure : a -> m a
-  (>>=) : m a -> (a -> m b) -> m b
+  bind : m a -> (a -> m b) -> m b
 
-(;) : (Monad m) => m Unit -> m a -> m a
-(;) m1 m2 = m1 >>= fun x -> m2
+infix >>= bind
+
+semi : (Monad m) => m Unit -> m a -> m a
+semi m1 m2 = m1 >>= fun x -> m2
+
+infix ; semi
 
 sequence : (Monad m) => List (m a) -> m (List a)
 sequence ms =

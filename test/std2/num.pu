@@ -2,6 +2,10 @@
 
 class Ring a where
   neg : a -> a
-  (+) : a -> a -> a
-  (-) : a -> a -> a
-  (*) : a -> a -> a
+  add : a -> a -> a
+  sub : a -> a -> a
+  mul : a -> a -> a
+
+infix + add
+infix - sub
+infix * mul

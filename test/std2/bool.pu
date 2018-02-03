@@ -4,11 +4,15 @@ import std2/basic
 not : Bool -> Bool
 not x = if x then False else True
 
-(&&) : Bool -> Bool -> Bool
-(&&) x y = if x then y else False
+conj : Bool -> Bool -> Bool
+conj x y = if x then y else False
 
-(||) : Bool -> Bool -> Bool
-(||) x y = if x then True else y
+infix && conj
+
+disj : Bool -> Bool -> Bool
+disj x y = if x then True else y
+
+infix || disj
 
 instance Eq Bool where
-  (==) x y = if x then y else if y then False else True
+  eq x y = if x then y else if y then False else True

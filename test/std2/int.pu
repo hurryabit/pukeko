@@ -11,7 +11,7 @@ eq_int : Int -> Int -> Bool
 external eq_int = "eq"
 
 instance Eq Int where
-  (==) = eq_int
+  eq = eq_int
 
 
 -- Ordering
@@ -28,10 +28,10 @@ gt_int : Int -> Int -> Bool
 external gt_int = "gt"
 
 instance Ord Int where
-  (<)  = lt_int
-  (<=) = le_int
-  (>=) = ge_int
-  (>)  = gt_int
+  lt = lt_int
+  le = le_int
+  ge = ge_int
+  gt = gt_int
 
 
 -- Algebra
@@ -49,16 +49,19 @@ external mul_int = "mul"
 
 instance Ring Int where
   neg = neg_int
-  (+) = add_int
-  (-) = sub_int
-  (*) = mul_int
+  add = add_int
+  sub = sub_int
+  mul = mul_int
 
-(/) : Int -> Int -> Int
-external (/) = "div"
+div : Int -> Int -> Int
+external div = "div"
 
-(%) : Int -> Int -> Int
-external (%) = "mod"
+mod : Int -> Int -> Int
+external mod = "mod"
+
+infix / div
+infix % mod
 
 instance Monoid Int where
   empty = 0
-  append = (+)
+  append = add_int

@@ -22,14 +22,21 @@ data Choice a b =
   | Second b
 
 -- Fundamental classes
-class Eq a where (==) : a -> a -> Bool
+class Eq a where
+  eq : a -> a -> Bool
 
-(!=) : (Eq a) => a -> a -> Bool
-(!=) x y = if x == y then False else True
+infix == eq
+
+neq : (Eq a) => a -> a -> Bool
+neq x y = if x == y then False else True
+
+infix != neq
 
 -- Fundamental functions
 id : a -> a
 id x = x
 
-(∘) : (b -> c) -> (a -> b) -> (a -> c)
-(∘) f g x = f (g x)
+compose : (b -> c) -> (a -> b) -> (a -> c)
+compose f g x = f (g x)
+
+infix ∘ compose

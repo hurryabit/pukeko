@@ -12,6 +12,7 @@ module Pukeko.AST.Surface
   , ClssDecl (..)
   , InstDecl (..)
   , ExtnDecl (..)
+  , InfxDecl (..)
   , Type (..)
   , TypeCstr (..)
   , TypeScheme (..)
@@ -24,7 +25,6 @@ module Pukeko.AST.Surface
 
     -- * Smart constructors
   , mkApp
-  , mkAppOp
   , mkIf
   , mkLam
   , mkTApp
@@ -38,6 +38,7 @@ where
 import Pukeko.Prelude
 
 import qualified Pukeko.AST.Identifier as Id
+import qualified Pukeko.AST.Operator   as Op
 
 type TCon = Id.TCon
 type DCon = Id.DCon
@@ -60,6 +61,7 @@ data Decl
   | DInst InstDecl
   | DDefn (Defn Id.EVar)
   | DExtn ExtnDecl
+  | DInfx InfxDecl
 
 data TConDecl = MkTConDecl
   { _tcon2name  :: Lctd Id.TCon
@@ -97,6 +99,11 @@ data ExtnDecl = MkExtnDecl
   , _extn2name :: String
   }
 
+data InfxDecl = MkInfxDecl
+  { _infx2op   :: Lctd Op.Binary
+  , _infx2func :: Id.EVar
+  }
+
 data Type
   = TVar Id.TVar
   | TCon Id.TCon
@@ -119,6 +126,7 @@ data Expr v
   | ECon DCon
   | ENum Int
   | EApp (Expr v) (NonEmpty (Expr v))
+  | EOpp Op.Binary (Expr v) (Expr v)
   | EMat (Expr v) [Altn v]
   | ELam (NonEmpty (Lctd Id.EVar)) (Expr v)
   | ELet (NonEmpty (Defn v)) (Expr v)
@@ -139,11 +147,6 @@ mkApp :: Expr v -> [Expr v] -> Expr v
 mkApp fun = \case
   []       -> fun
   arg:args -> EApp fun (arg :| args)
-
-mkAppOp :: String -> Expr Id.EVar -> Expr Id.EVar -> Expr Id.EVar
-mkAppOp sym arg1 arg2 =
-  let fun = EVar (Id.op sym)
-  in  EApp fun (arg1 :| [arg2])
 
 mkIf :: Expr v -> Expr v -> Expr v -> Expr v
 mkIf t u v =
@@ -178,6 +181,7 @@ deriving instance Show SignDecl
 deriving instance Show ClssDecl
 deriving instance Show InstDecl
 deriving instance Show ExtnDecl
+deriving instance Show InfxDecl
 deriving instance Show Type
 deriving instance Show TypeCstr
 deriving instance Show TypeScheme

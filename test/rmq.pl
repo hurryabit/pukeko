@@ -14,70 +14,70 @@ data Choice a b =
        | Second b
 data Dict$Eq a =
        | Dict$Eq (a -> a -> Bool)
-(&&) : Bool -> Bool -> Bool =
+conj : Bool -> Bool -> Bool =
   fun (x : Bool) (y : Bool) ->
     match x with
     | False -> False
     | True -> y
-(||) : Bool -> Bool -> Bool =
+disj : Bool -> Bool -> Bool =
   fun (x : Bool) (y : Bool) ->
     match x with
     | False -> y
     | True -> True
 data Dict$Ord a =
        | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
-(<) : ∀a. Dict$Ord a -> a -> a -> Bool =
+gt : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a (<) _ _ _ -> (<)
-(<=) : ∀a. Dict$Ord a -> a -> a -> Bool =
+      | Dict$Ord @a _ gt _ _ -> gt
+le : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a _ (<=) _ _ -> (<=)
-(>) : ∀a. Dict$Ord a -> a -> a -> Bool =
+      | Dict$Ord @a _ _ le _ -> le
+lt : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
-      | Dict$Ord @a _ _ _ (>) -> (>)
+      | Dict$Ord @a _ _ _ lt -> lt
 data Dict$Monoid m =
        | Dict$Monoid m (m -> m -> m)
 data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
-(+) : ∀a. Dict$Ring a -> a -> a -> a =
+add : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a _ (+) _ _ -> (+)
-(-) : ∀a. Dict$Ring a -> a -> a -> a =
+      | Dict$Ring @a _ add _ _ -> add
+sub : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
-      | Dict$Ring @a _ _ (-) _ -> (-)
+      | Dict$Ring @a _ _ sub _ -> sub
 data Int
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
 dict$Ord$Int : Dict$Ord Int =
-  let (<) : Int -> Int -> Bool = lt_int
-  and (<=) : Int -> Int -> Bool = le_int
-  and (>=) : Int -> Int -> Bool = ge_int
-  and (>) : Int -> Int -> Bool = gt_int
+  let ge : Int -> Int -> Bool = ge_int
+  and gt : Int -> Int -> Bool = gt_int
+  and le : Int -> Int -> Bool = le_int
+  and lt : Int -> Int -> Bool = lt_int
   in
-  Dict$Ord @Int (<) (<=) (>=) (>)
+  Dict$Ord @Int ge gt le lt
 external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 dict$Ring$Int : Dict$Ring Int =
   let neg : Int -> Int = neg_int
-  and (+) : Int -> Int -> Int = add_int
-  and (-) : Int -> Int -> Int = sub_int
-  and (*) : Int -> Int -> Int = mul_int
+  and add : Int -> Int -> Int = add_int
+  and sub : Int -> Int -> Int = sub_int
+  and mul : Int -> Int -> Int = mul_int
   in
-  Dict$Ring @Int neg (+) (-) (*)
+  Dict$Ring @Int neg add sub mul
 data Char
 data Dict$Foldable t =
        | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
@@ -89,8 +89,8 @@ data List a =
 replicate : ∀a. Int -> a -> List a =
   fun @a ->
     fun (n : Int) (x : a) ->
-      match (<=) @Int dict$Ord$Int n 0 with
-      | False -> Cons @a x (replicate @a ((-) @Int dict$Ring$Int n 1) x)
+      match le @Int dict$Ord$Int n 0 with
+      | False -> Cons @a x (replicate @a (sub @Int dict$Ring$Int n 1) x)
       | True -> Nil @a
 zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c ->
@@ -108,11 +108,11 @@ pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure _ -> pure
-(>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m _ (>>=) -> (>>=)
+      | Dict$Monad @m _ bind -> bind
 sequence$ll1 : ∀a m. Dict$Monad m -> a -> List a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (x : a) (xs : List a) ->
@@ -120,14 +120,14 @@ sequence$ll1 : ∀a m. Dict$Monad m -> a -> List a -> m (List a) =
 sequence$ll2 : ∀a m. Dict$Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) (x : a) ->
-      (>>=) @m dict$Monad$m @(List a) @(List a) (sequence @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
+      bind @m dict$Monad$m @(List a) @(List a) (sequence @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
 sequence : ∀a m. Dict$Monad m -> List (m a) -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) ->
       match ms with
       | Nil @(m a) -> pure @m dict$Monad$m @(List a) (Nil @a)
       | Cons @(m a) m ms ->
-        (>>=) @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
+        bind @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
@@ -152,10 +152,10 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
       coerce @(World -> Pair b World -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> dict$Monad$IO$ll4 @a @b
   in
-  Dict$Monad @IO pure (>>=)
+  Dict$Monad @IO pure bind
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
@@ -169,7 +169,7 @@ print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
 input : IO Int = io @Unit @Int geti Unit
 nats$ll1 : (Int -> List Int) -> Int -> List Int =
   fun (nats_from : Int -> List Int) (n : Int) ->
-    Cons @Int n (nats_from ((+) @Int dict$Ring$Int n 1))
+    Cons @Int n (nats_from (add @Int dict$Ring$Int n 1))
 nats : List Int =
   let rec nats_from : Int -> List Int = nats$ll1 nats_from in
   nats_from 0
@@ -220,9 +220,9 @@ query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTre
       match t with
       | RmqEmpty @a -> one
       | RmqNode @a t_lo t_hi value left right ->
-        match (||) ((<) @Int dict$Ord$Int q_hi t_lo) ((>) @Int dict$Ord$Int q_lo t_hi) with
+        match disj (lt @Int dict$Ord$Int q_hi t_lo) (gt @Int dict$Ord$Int q_lo t_hi) with
         | False ->
-          match (&&) ((<=) @Int dict$Ord$Int q_lo t_lo) ((<=) @Int dict$Ord$Int t_hi q_hi) with
+          match conj (le @Int dict$Ord$Int q_lo t_lo) (le @Int dict$Ord$Int t_hi q_hi) with
           | False -> op (aux left) (aux right)
           | True -> value
         | True -> one
@@ -234,7 +234,7 @@ query : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
 infinity : Int = 1000000000
 min : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    match (<=) @Int dict$Ord$Int x y with
+    match le @Int dict$Ord$Int x y with
     | False -> y
     | True -> x
 replicate_io : ∀a. Int -> IO a -> IO (List a) =
@@ -247,17 +247,17 @@ main$ll1 : RmqTree Int -> Int -> Int -> IO Unit =
     print res
 main$ll2 : RmqTree Int -> Int -> IO Unit =
   fun (t : RmqTree Int) (lo : Int) ->
-    (>>=) @IO dict$Monad$IO @Int @Unit input (main$ll1 t lo)
+    bind @IO dict$Monad$IO @Int @Unit input (main$ll1 t lo)
 main$ll3 : List Unit -> IO Unit =
   fun (x : List Unit) -> pure @IO dict$Monad$IO @Unit Unit
 main$ll4 : Int -> List Int -> IO Unit =
   fun (m : Int) (xs : List Int) ->
     let t : RmqTree Int = build @Int min xs in
-    (>>=) @IO dict$Monad$IO @(List Unit) @Unit (replicate_io @Unit m ((>>=) @IO dict$Monad$IO @Int @Unit input (main$ll2 t))) main$ll3
+    bind @IO dict$Monad$IO @(List Unit) @Unit (replicate_io @Unit m (bind @IO dict$Monad$IO @Int @Unit input (main$ll2 t))) main$ll3
 main$ll5 : Int -> Int -> IO Unit =
   fun (n : Int) (m : Int) ->
-    (>>=) @IO dict$Monad$IO @(List Int) @Unit (replicate_io @Int n input) (main$ll4 m)
+    bind @IO dict$Monad$IO @(List Int) @Unit (replicate_io @Int n input) (main$ll4 m)
 main$ll6 : Int -> IO Unit =
   fun (n : Int) ->
-    (>>=) @IO dict$Monad$IO @Int @Unit input (main$ll5 n)
-main : IO Unit = (>>=) @IO dict$Monad$IO @Int @Unit input main$ll6
+    bind @IO dict$Monad$IO @Int @Unit input (main$ll5 n)
+main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll6

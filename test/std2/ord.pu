@@ -2,7 +2,12 @@
 import std2/basic
 
 class Ord a where
-  (<)  : a -> a -> Bool
-  (<=) : a -> a -> Bool
-  (>=) : a -> a -> Bool
-  (>)  : a -> a -> Bool
+  ge : a -> a -> Bool
+  gt : a -> a -> Bool
+  le : a -> a -> Bool
+  lt : a -> a -> Bool
+
+infix >= ge
+infix >  gt
+infix <= le
+infix <  lt

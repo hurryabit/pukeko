@@ -10,7 +10,7 @@ data List a =
   | Cons a (List a)
 
 instance (Eq a) => Eq (List a) where
-  (==) xs ys = match xs with
+  eq xs ys = match xs with
     | Nil -> match ys with
       | Nil -> True
       | Cons _ _ -> False

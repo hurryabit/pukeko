@@ -30,17 +30,17 @@ data List a =
        | Cons a (List a)
 data Dict$Monad m =
        | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
-(>>=) : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
-      | Dict$Monad @m _ (>>=) -> (>>=)
-(;ll1) : ∀a m. m a -> Unit -> m a =
+      | Dict$Monad @m _ bind -> bind
+semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
-(;) : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
+semi : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (m1 : m Unit) (m2 : m a) ->
-      (>>=) @m dict$Monad$m @Unit @a m1 ((;ll1) @a @m m2)
+      bind @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
@@ -65,10 +65,10 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
       coerce @(World -> Pair b World -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and (>>=) : ∀a b. IO a -> (a -> IO b) -> IO b =
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> dict$Monad$IO$ll4 @a @b
   in
-  Dict$Monad @IO pure (>>=)
+  Dict$Monad @IO pure bind
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
@@ -93,8 +93,8 @@ snd : ∀a b. Pair a b -> b =
 main$ll1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in
-    (;) @Unit @IO dict$Monad$IO (print (fst @Int @Int p)) (print (snd @Int @Int p))
+    semi @Unit @IO dict$Monad$IO (print (fst @Int @Int p)) (print (snd @Int @Int p))
 main$ll2 : Int -> IO Unit =
   fun (x : Int) ->
-    (>>=) @IO dict$Monad$IO @Int @Unit input (main$ll1 x)
-main : IO Unit = (>>=) @IO dict$Monad$IO @Int @Unit input main$ll2
+    bind @IO dict$Monad$IO @Int @Unit input (main$ll1 x)
+main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll2
