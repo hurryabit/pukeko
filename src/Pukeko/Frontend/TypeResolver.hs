@@ -54,7 +54,7 @@ findDCon dcon = do
 
 -- TODO: Move this check into the renamer.
 trDefn :: Defn In tv ev -> TR ()
-trDefn = traverseOf_ (defn2atom . _ACon) findDCon
+trDefn = traverseOf_ (defn2expr . expr2atom . _ACon) findDCon
 
 trDecl :: Decl In -> TR ()
 trDecl top = case top of
