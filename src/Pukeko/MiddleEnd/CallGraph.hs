@@ -15,6 +15,7 @@ import qualified Data.GraphViz.Printing            as D
 import qualified Data.GraphViz.Types.Generalised   as D
 import qualified Data.GraphViz.Types.Monadic       as D
 import qualified Data.Text.Lazy as T
+import           Data.Tuple.Extra (fst3)
 
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Language
@@ -22,24 +23,27 @@ import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Type
 
-data CallGraph = CallGraph
+data CallGraph m = CallGraph
   { graph    :: G.Graph
-  , toDecl   :: G.Vertex -> FuncDecl 'Any
+  , toDecl   :: G.Vertex -> FuncDecl m
   , fromEVar :: Id.EVar -> Maybe G.Vertex
   }
 
-makeCallGraph :: Module -> CallGraph
-makeCallGraph mod0 = CallGraph g ((^._1) . f) n
+makeCallGraph' :: Foldable t => t (FuncDecl m) -> CallGraph m
+makeCallGraph' decls = CallGraph g (fst3 . f) n
   where
-    (g, f, n) = G.graphFromEdges (supcs ++ extns)
-    supcs = [ (castAny supc, z, toList (setOf (func2expr . expr2atom . _AVal) supc))
-            | (z, supc) <- itoList (mod0^.mod2supcs)
-            ]
-    extns = [ (castAny extn, z, []) | (z, extn) <- itoList (mod0^.mod2extns) ]
+    (g, f, n) = G.graphFromEdges (map deps (toList decls))
+    deps decl =
+      (decl, decl^.func2name, toList (setOf (func2expr . expr2atom . _AVal) decl))
 
-scc :: CallGraph -> [G.SCC (FuncDecl 'Any)]
+makeCallGraph :: Module -> CallGraph 'Any
+makeCallGraph (MkModule _types extns supcs) =
+  makeCallGraph' (fmap castAny extns <> fmap castAny supcs)
+
+scc :: CallGraph m -> [G.SCC (FuncDecl m)]
 scc (CallGraph graph vertex_fn _) = map decode forest
   where
+    -- TODO: Simplify.
     forest = G.scc graph
     decode (G.Node v []) | mentions_itself v = G.CyclicSCC [vertex_fn v]
                          | otherwise         = G.AcyclicSCC (vertex_fn v)
@@ -48,7 +52,7 @@ scc (CallGraph graph vertex_fn _) = map decode forest
                    dec (G.Node v ts) vs = vertex_fn v : foldr dec vs ts
     mentions_itself v = v `elem` (graph A.! v)
 
-renderCallGraph :: CallGraph -> T.Text
+renderCallGraph :: CallGraph m -> T.Text
 renderCallGraph g = D.renderDot . D.toDot . D.digraph' $ do
   ifor_ (graph g) $ \v us -> do
     let decl = toDecl g v
