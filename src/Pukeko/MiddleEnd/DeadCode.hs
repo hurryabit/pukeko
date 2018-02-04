@@ -5,21 +5,20 @@ where
 
 import Pukeko.Prelude
 
-import           Control.Lens  (firstOf)
 import qualified Data.Graph    as G
+import qualified Data.Map      as Map
 import qualified Data.Set      as Set
 
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage
+import           Pukeko.AST.SuperCore
 import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.MiddleEnd.CallGraph as CG
 
-cleanModule :: Module LambdaLifter -> Module LambdaLifter
-cleanModule mod0@(MkModule decls0) =
+cleanModule :: ModuleSC -> ModuleSC
+cleanModule mod0@(MkModuleSC types extns supcs) =
   let g = CG.makeCallGraph mod0
       reach = Set.fromList
               $ map (CG.fdecl2evar . CG.toDecl g)
               $ maybe [] (G.reachable (CG.graph g)) (CG.fromEVar g Id.main)
-      keep = (`Set.member` reach)
-      decls1 = filter (maybe True keep . firstOf decl2func) decls0
-  in  MkModule decls1
+      clean :: Map Id.EVar a -> Map Id.EVar a
+      clean = Map.filterWithKey (\z _ -> z `Set.member` reach)
+  in  MkModuleSC types (clean extns) (clean supcs)

@@ -12,13 +12,13 @@ import qualified Data.Vector       as Vec
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage
+import           Pukeko.AST.Language
 import           Pukeko.AST.Type
 import           Pukeko.FrontEnd.Info
 import           Pukeko.FrontEnd.Gamma
 
-type In  = PatternMatcher
-type Out = ClassEliminator
+type In  = Unnested
+type Out = Unclassy
 
 type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
 
@@ -190,7 +190,7 @@ elimETyApp e0 t_e0 ts0 = do
     pure (mkEApp (mkETyApp e0 ts0) dicts, instantiateN ts0 t_e1)
 
 elimDefn :: (IsTVar tv, HasEnv ev) => Defn In tv ev -> CE tv ev (Defn Out tv ev)
-elimDefn = defn2exprSt (fmap fst . elimExpr)
+elimDefn = defn2expr (fmap fst . elimExpr)
 
 elimExpr ::
   (IsTVar tv, HasEnv ev) => Expr In tv ev -> CE tv ev (Expr Out tv ev, Type tv)

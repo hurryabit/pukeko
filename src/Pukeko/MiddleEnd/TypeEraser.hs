@@ -11,24 +11,23 @@ import qualified Data.Map as Map
 import           Pukeko.AST.NoLambda
 import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.SystemF    as In
+import qualified Pukeko.AST.SuperCore  as In
 import qualified Pukeko.AST.Type       as In
-import qualified Pukeko.AST.Stage      as St
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Info
 
-type In = St.LambdaLifter
-
-eraseModule :: In.Module In -> Module
-eraseModule m0@(In.MkModule decls) =
-  runCC m0 $ catMaybes <$> traverse ccDecl decls
+eraseModule :: In.ModuleSC -> Module
+eraseModule m0 = runCC m0 $ do
+  extns <- traverse ccExtnDecl (toList (m0^.In.modsc2extns))
+  supcs <- traverse ccSupCDecl (toList (m0^.In.modsc2supcs))
+  pure (extns ++ supcs)
 
 type CCState = Map Id.EVar Name
 
 type CC = Eff [Reader ModuleInfo, State CCState]
 
-runCC :: In.Module In -> CC a -> a
-runCC decls = run . evalState mempty . runInfo decls
+runCC :: In.ModuleSC -> CC a -> a
+runCC mod0 = run . evalState mempty . runInfoSC mod0
 
 name :: Id.EVar -> Name
 name = MkName . Id.mangled
@@ -36,20 +35,20 @@ name = MkName . Id.mangled
 bindName :: In.Bind In.Type tv -> Name
 bindName = name . unlctd . In._bind2evar
 
-ccDecl :: In.Decl In -> CC (Maybe TopLevel)
-ccDecl = \case
-  In.DType{} -> pure Nothing
-  In.DSupC (In.MkSupCDecl (unlctd -> z) _ _ bs e) ->
-    Just <$> Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
-  In.DExtn (In.MkExtnDecl b s) -> do
+ccSupCDecl :: In.SupCDecl -> CC TopLevel
+ccSupCDecl (In.MkSupCDecl (unlctd -> z) _ _ bs e) =
+  Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
+
+ccExtnDecl :: In.ExtnDecl In.Type -> CC TopLevel
+ccExtnDecl (In.MkExtnDecl b s) = do
     let n = MkName s
     modify (Map.insert (unlctd (In._bind2evar b)) n)
-    pure (Just (Asm n))
+    pure (Asm n)
 
-ccDefn :: (BaseEVar ev) => In.Defn In tv ev -> CC Defn
+ccDefn :: (BaseEVar ev) => In.DefnSC tv ev -> CC Defn
 ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
-ccExpr :: (BaseEVar ev) => In.Expr In tv ev -> CC Expr
+ccExpr :: (BaseEVar ev) => In.ExprSC tv ev -> CC Expr
 ccExpr = \case
   In.ELoc (unlctd -> e) -> ccExpr e
   In.EVar x -> pure (Local (name (baseEVar x)))
@@ -70,5 +69,5 @@ ccExpr = \case
   In.ETyAbs _vs e0 -> ccExpr e0
   In.ECoe _ e0 -> ccExpr e0
 
-ccCase :: (BaseEVar ev) => In.Case In tv ev -> CC Altn
+ccCase :: (BaseEVar ev) => In.CaseSC tv ev -> CC Altn
 ccCase (In.MkCase _ _ bs t) = MkAltn (map (fmap name) (toList bs)) <$> ccExpr t

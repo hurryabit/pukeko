@@ -17,15 +17,14 @@ import qualified Data.GraphViz.Types.Monadic       as D
 import qualified Data.Text.Lazy as T
 
 import qualified Pukeko.AST.Identifier as Id
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage
+import           Pukeko.AST.Language
+import           Pukeko.AST.SuperCore
+import           Pukeko.AST.Type
 
-
-type St = LambdaLifter
 
 data FuncDecl
-  = FSupC (SupCDecl St)
-  | FExtn (ExtnDecl (StType St))
+  = FSupC SupCDecl
+  | FExtn (ExtnDecl Type)
 
 data CallGraph = CallGraph
   { graph    :: G.Graph
@@ -38,22 +37,19 @@ fdecl2evar = \case
   FSupC supc -> supc^.supc2func.lctd
   FExtn extn -> extn^.extn2bind.bind2evar.lctd
 
-fdecl2decl :: FuncDecl -> Decl St
+fdecl2decl :: FuncDecl -> ModuleSC
 fdecl2decl = \case
-  FSupC supc -> DSupC supc
-  FExtn extn -> DExtn extn
+  FSupC supc -> mkSupCDecl supc
+  FExtn extn -> mkExtnDecl extn
 
-makeCallGraph :: Module St -> CallGraph
-makeCallGraph (MkModule decls) = CallGraph g ((^._1) . f) n
+makeCallGraph :: ModuleSC -> CallGraph
+makeCallGraph mod0 = CallGraph g ((^._1) . f) n
   where
-    (g, f, n) = G.graphFromEdges (mapMaybe deps decls)
-    deps :: Decl St -> Maybe (FuncDecl, Id.EVar, [Id.EVar])
-    deps = \case
-      DSupC decl@(MkSupCDecl (unlctd -> z) _ _ _ e) ->
-        Just (FSupC decl, z, toList (setOf (expr2atom . _AVal) e))
-      DExtn decl ->
-        Just (FExtn decl, decl^.extn2bind.bind2evar.lctd, [])
-      _ -> Nothing
+    (g, f, n) = G.graphFromEdges (supcs ++ extns)
+    supcs = [ (FSupC supc, z, toList (setOf (supc2expr . expr2atom . _AVal) supc))
+            | (z, supc) <- itoList (mod0^.modsc2supcs)
+            ]
+    extns = [ (FExtn extn, z, []) | (z, extn) <- itoList (mod0^.modsc2extns) ]
 
 scc :: CallGraph -> [G.SCC FuncDecl]
 scc (CallGraph graph vertex_fn _) = map decode forest

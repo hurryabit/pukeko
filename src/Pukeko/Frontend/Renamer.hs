@@ -12,14 +12,14 @@ import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.SystemF
-import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Type
 
-type Out = St.Renamer
+type Out = Surface
 
 type RnEnv ev = Map Id.EVar ev
 data RnState = MkRnState

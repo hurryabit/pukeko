@@ -1,6 +1,5 @@
 module Pukeko.MiddleEnd.LambdaLifter
-  ( Out
-  , liftModule
+  ( liftModule
   )
 where
 
@@ -10,34 +9,31 @@ import           Control.Monad.Freer.Supply
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 
-import           Pukeko.AST.SystemF
-import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.SuperCore
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 
-type In  = St.ClassEliminator
-type Out = St.LambdaLifter
+type In  = Unclassy
+-- type Out = SuperCore
 
 type IsTVar tv = (Ord tv, BaseTVar tv)
 type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer [Decl Out]]
+    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer ModuleSC]
 
-execLL :: Module In -> LL Void Void () -> [Decl Out]
+execLL :: Module In -> LL Void Void () -> ModuleSC
 execLL m0 =
   snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
 
-yield :: Decl Out -> LL tv ev ()
-yield decl = tell [decl]
-
 llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
-  Expr In tv ev -> LL tv ev (Expr Out tv ev)
+  Expr In tv ev -> LL tv ev (ExprSC tv ev)
 llExpr = \case
   ELoc le -> here le $ ELoc <$> lctd llExpr le
   EVar x -> pure (EVar x)
@@ -46,11 +42,11 @@ llExpr = \case
   ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
   ELet ds e0 ->
     ELet
-    <$> (traverse . defn2exprSt) llExpr ds
+    <$> (traverse . defn2expr) llExpr ds
     <*> withinEScope' (_bind2type . _defn2bind) ds (llExpr e0)
   ERec ds e0 ->
     withinEScope' (_bind2type . _defn2bind) ds $
-      ERec <$> (traverse . defn2exprSt) llExpr ds <*> llExpr e0
+      ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
   -- TODO: It might be nice to use Liquid Haskell here.
   ELam oldBinds rhs0 t_rhs -> do
     rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
@@ -75,14 +71,14 @@ llExpr = \case
     lhs <- fresh
     let t_lhs = map _bind2type allBinds1 *~> fmap tvRename t_rhs
     -- TODO: We could use the pos of the lambda for @lhs@.
-    yield (DSupC (MkSupCDecl (Lctd noPos lhs) tyBinds t_lhs allBinds1 rhs2))
+    tell (mkSupCDecl (MkSupCDecl (Lctd noPos lhs) tyBinds t_lhs allBinds1 rhs2))
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
   ECoe c e0 -> ECoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
 
 llCase ::
-  (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)
+  (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (CaseSC tv ev)
 llCase (MkCase dcon ts0 bs e) = do
   (MkTConDecl _ vs _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
   unless (length vs == length ts0)
@@ -93,12 +89,12 @@ llCase (MkCase dcon ts0 bs e) = do
 
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
-  DType ds -> yield (DType ds)
+  DType ds -> tell (foldMap mkTypeDecl ds)
   DDefn (MkDefn (MkBind lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
-    yield (DSupC (MkSupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
-  DExtn p -> yield (DExtn p)
+    tell (mkSupCDecl (MkSupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
+  DExtn p -> tell (mkExtnDecl p)
 
-liftModule :: Module In -> Module Out
-liftModule m0@(MkModule tops0) = MkModule (execLL m0 (traverse_ llDecl tops0))
+liftModule :: Module In -> ModuleSC
+liftModule m0@(MkModule decls) = execLL m0 (traverse_ llDecl decls)

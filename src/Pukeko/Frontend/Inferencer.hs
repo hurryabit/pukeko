@@ -20,7 +20,7 @@ import qualified Data.Vector      as Vec
 import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.SystemF    hiding (instantiate)
-import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type       hiding ((*~>))
@@ -28,9 +28,9 @@ import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.Unify
 
-type In    = St.Renamer
-type Out   = St.Inferencer Type
-type Aux s = St.Inferencer (UType s)
+type In    = Surface
+type Out   = Typed
+type Aux s = PreTyped (UType s)
 
 type Cstrs s tv = Seq (UType s tv, Id.Clss)
 

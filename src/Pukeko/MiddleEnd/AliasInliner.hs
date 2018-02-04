@@ -22,32 +22,31 @@ import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.UnionFind.ST as UF
 
-import           Pukeko.AST.SystemF
+import           Pukeko.AST.SuperCore
 import qualified Pukeko.AST.Identifier as Id
 
 -- | Follow all chains of links in a module and adjust all call sites accordingly.
-inlineModule :: Module st -> Module st
-inlineModule = over module2decls inlineDecls
+inlineModule :: ModuleSC -> ModuleSC
+inlineModule = over modsc2supcs inlineSupCDecls
 
 -- | Follow all chains of links in a group of declarations and adjust all call
 -- sites within this group.
-inlineDecls :: [Decl st] -> [Decl st]
-inlineDecls decls0 =
-  let ls = mapMaybe declLink decls0
+inlineSupCDecls :: Traversable t => t SupCDecl -> t SupCDecl
+inlineSupCDecls decls0 =
+  let ls = mapMaybe isLink (toList decls0)
       uf = unionFind ls
-  in  over (traverse . decl2atom . _AVal) (\x -> Map.findWithDefault x x uf) decls0
+  in  over (traverse . supc2expr . expr2atom . _AVal) (\x -> Map.findWithDefault x x uf) decls0
 
 -- | Determine if a declaration is a link, i.e., of the form
 --
 -- > f = g
 --
 -- If it is, return the pair @(f, g)@.
-declLink :: Decl st -> Maybe (Id.EVar, Id.EVar)
-declLink = \case
-  DDefn (MkDefn b (EVal x)) -> Just (b^.bind2evar.lctd, x)
-  DSupC (MkSupCDecl z vs _ xs (EVal x))
+isLink :: SupCDecl -> Maybe (Id.EVar, Id.EVar)
+isLink = \case
+  MkSupCDecl z vs _ xs (EVal x)
     | null vs && null xs -> Just (z^.lctd, x)
-  _ -> Nothing
+  _                      -> Nothing
 
 -- | Run Tarjan's union find algorithm on a list of equivalences and return a
 -- map from each element to its representative.

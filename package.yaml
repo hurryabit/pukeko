@@ -55,6 +55,7 @@ library:
   - call-stack
   - containers
   - dlist
+  - extra
   - filepath
   - freer-simple
   - graphviz

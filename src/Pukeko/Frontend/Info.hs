@@ -10,6 +10,7 @@ module Pukeko.FrontEnd.Info
   , info2mthds
   , info2insts
   , runInfo
+  , runInfoSC
   , lookupInfo
   , findInfo
   , typeOfFunc
@@ -24,7 +25,8 @@ import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.Stage
+import           Pukeko.AST.SuperCore
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
@@ -45,9 +47,12 @@ makeLenses ''ModuleInfo
 makePrisms ''ModuleInfo
 
 runInfo ::
-  (IsType (StType st)) =>
+  (IsType (TypeOf st)) =>
   Module st -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
 runInfo = runReader . collectInfo
+
+runInfoSC :: ModuleSC -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
+runInfoSC = runReader . collectInfoSC
 
 lookupInfo ::
   (Member (Reader ModuleInfo) effs, Ord k) =>
@@ -82,28 +87,45 @@ tconDeclInfo tcon =
         tcon
   in  itemInfo info2tcons (tcon^.tcon2name.lctd) tcon <> dis
 
-collectInfo :: forall st. (IsType (StType st)) => Module st -> ModuleInfo
+-- FIXME: Detect multiple definitions.
+signDeclInfo :: SignDecl Void -> ModuleInfo
+signDeclInfo s = itemInfo info2signs (unlctd (s^.sign2func)) s
+
+supcDeclInfo :: SupCDecl -> ModuleInfo
+supcDeclInfo (MkSupCDecl z xs t _ _) = signDeclInfo (MkSignDecl z (mkTUni xs t))
+
+bindInfo :: IsType ty => Bind ty Void -> ModuleInfo
+bindInfo (MkBind z t) = maybe mempty (signDeclInfo . MkSignDecl z) (isType t)
+
+extnDeclInfo :: IsType ty => ExtnDecl ty -> ModuleInfo
+extnDeclInfo (MkExtnDecl b _) = bindInfo b
+
+collectInfo :: (IsType (TypeOf st)) => Module st -> ModuleInfo
 collectInfo (MkModule decls) = foldFor decls $ \case
   DType tcons -> foldMap tconDeclInfo tcons
-  DSign s -> sign s
+  DSign s -> signDeclInfo s
   DClss clss@(MkClssDecl (unlctd -> c) v ms) ->
     let mthds_info = foldFor ms $ \mthd@(MkSignDecl z t0) ->
           let t1 = mkTUni [MkQVar (Set.singleton c) v] t0
-          in  sign (MkSignDecl z t1) <> itemInfo info2mthds (z^.lctd) (clss, mthd)
+          in  signDeclInfo (MkSignDecl z t1)
+              <> itemInfo info2mthds (z^.lctd) (clss, mthd)
     in  itemInfo info2clsss c clss <> mthds_info
   DInst inst@(MkInstDecl (unlctd -> c) t _ _) ->
     itemInfo info2insts (c, t) (SomeInstDecl inst)
-  DDefn (MkDefn b _) -> signBind b
-  DSupC (MkSupCDecl z xs t _ _) -> sign (MkSignDecl z (mkTUni xs t))
-  DExtn (MkExtnDecl b _) -> signBind b
+  DDefn (MkDefn b _) -> bindInfo b
+  DSupC supc -> supcDeclInfo supc
+  DExtn extn -> extnDeclInfo extn
   where
     foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
     foldFor = flip foldMap
-    -- FIXME: Detect multiple definitions.
-    sign :: SignDecl Void -> ModuleInfo
-    sign s = itemInfo info2signs (unlctd (s^.sign2func)) s
-    signBind :: IsType ty => Bind ty Void -> ModuleInfo
-    signBind (MkBind z t) = maybe mempty (sign . MkSignDecl z) (isType t)
+
+
+collectInfoSC :: ModuleSC -> ModuleInfo
+collectInfoSC (MkModuleSC types extns supcs) = fold
+  [ foldMap tconDeclInfo types
+  , foldMap extnDeclInfo extns
+  , foldMap supcDeclInfo supcs
+  ]
 
 instance Semigroup ModuleInfo where
   MkModuleInfo a1 b1 c1 d1 e1 f1 <> MkModuleInfo a2 b2 c2 d2 e2 f2 =

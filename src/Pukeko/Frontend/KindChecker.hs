@@ -17,13 +17,12 @@ import qualified Data.Vector        as Vec
 
 import           Pukeko.Pretty
 import           Pukeko.AST.SystemF    hiding (Free)
-import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
-type In  = St.Renamer
-type Out = St.Renamer
+type In  = Surface
 
 data Open s
 
@@ -107,29 +106,21 @@ kcVal = \case
       env <- traverse (const freshUVar) xs
       localize env (kcType Star t)
 
-
-kcDecl :: Decl In -> KC n s (Decl Out)
+kcDecl :: Decl In -> KC n s ()
 kcDecl decl = case decl of
-  DType tcons -> do
-    (kcTypDef tcons)
-    pure (DType tcons)
-  DSign (MkSignDecl z t) -> do
-    kcVal t
-    pure (DSign (MkSignDecl z t))
+  DType tcons            -> kcTypDef tcons
+  DSign (MkSignDecl _ t) -> kcVal t
   -- FIXME: Check kinds in type class declarations and instance definitions.
-  DClss{} -> passOn
-  DInst{} -> passOn
-  DDefn{} -> passOn
-  DExtn{} -> passOn
-  where
-    passOn = pure decl
+  DClss{} -> pure ()
+  DInst{} -> pure ()
+  DDefn{} -> pure ()
+  DExtn{} -> pure ()
 
-kcModule ::Module In -> KC n s (Module Out)
-kcModule = module2decls (traverse (\top -> reset @Id.TVar *> kcDecl top))
+kcModule ::Module In -> KC n s ()
+kcModule (MkModule decls)= traverse_ (\top -> reset @Id.TVar *> kcDecl top) decls
 
-checkModule :: Module In -> Either Failure (Module Out)
+checkModule :: Module In -> Either Failure ()
 checkModule module_ = runKC (kcModule module_)
-
 
 unwind :: Kind (Open s) -> KC n s (Kind (Open s))
 unwind = \case

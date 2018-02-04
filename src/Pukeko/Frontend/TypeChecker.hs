@@ -14,14 +14,13 @@ import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.SystemF
-import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 
-checkModule :: (St.Typed st) => Module st -> Either Failure (Module st)
+checkModule :: (IsTyped st) => Module st -> Either Failure ()
 checkModule m0@(MkModule decls) = runTC m0 $ do
   for_ decls checkDecl
-  pure m0
 
 type IsEVar ev = (HasEnv ev)
 
@@ -29,7 +28,7 @@ type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
 type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
-runTC :: (IsType (St.StType st)) => Module st -> TC Void Void a -> Either Failure a
+runTC :: (IsType (TypeOf st)) => Module st -> TC Void Void a -> Either Failure a
 runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
 
 checkCoercion :: Coercion (Type tv) -> TC tv ev ()
@@ -37,7 +36,7 @@ checkCoercion _ = -- (MkCoercion dir tcon t_from t_to) =
   -- FIXME: Implement the actual check.
   pure ()
 
-typeOf :: (St.Typed st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
+typeOf :: (IsTyped st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
@@ -107,7 +106,7 @@ satisfiesCstr t0 clss = do
 
 
 typeOfBranching ::
-  (St.Typed st, IsTVar tv, IsEVar ev) =>
+  (IsTyped st, IsTVar tv, IsEVar ev) =>
   (Type tv -> branch -> TC tv ev (Type tv)) ->
   Expr st tv ev -> NonEmpty branch -> TC tv ev (Type tv)
 typeOfBranching typeOfBranch e0 (b1 :| bs) = do
@@ -120,14 +119,14 @@ typeOfBranching typeOfBranch e0 (b1 :| bs) = do
   pure t1
 
 typeOfAltn ::
-  (St.Typed st, IsTVar tv, IsEVar ev) =>
+  (IsTyped st, IsTVar tv, IsEVar ev) =>
   Type tv -> Altn st tv ev -> TC tv ev (Type tv)
 typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
   withinEScope id env (typeOf e)
 
 typeOfCase ::
-  (St.Typed st, IsTVar tv, IsEVar ev) =>
+  (IsTyped st, IsTVar tv, IsEVar ev) =>
   Type tv -> Case st tv ev -> TC tv ev (Type tv)
 typeOfCase t (MkCase c ts bs e0) = do
   let ps = map (maybe PWld PVar) (toList bs)
@@ -161,13 +160,13 @@ match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-check :: (St.Typed st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
+check :: (IsTyped st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
 check e t0 = typeOf e >>= match t0
 
-checkDefn :: (St.Typed st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
+checkDefn :: (IsTyped st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
 checkDefn (MkDefn (MkBind _ t) e) = check e t
 
-checkDecl :: (St.Typed st) => Decl st -> TC Void Void ()
+checkDecl :: (IsTyped st) => Decl st -> TC Void Void ()
 checkDecl = \case
   DType{} -> pure ()
   DSign{} -> pure ()

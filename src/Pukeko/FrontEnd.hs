@@ -7,7 +7,7 @@ module Pukeko.FrontEnd
 import Pukeko.Prelude hiding (run)
 
 import qualified Pukeko.AST.SystemF             as SystemF
-import qualified Pukeko.AST.Stage               as Stage
+import           Pukeko.AST.Language
 import qualified Pukeko.FrontEnd.ClassEliminator as ClassEliminator
 import qualified Pukeko.FrontEnd.Renamer        as Renamer
 import qualified Pukeko.FrontEnd.KindChecker    as KindChecker
@@ -18,17 +18,18 @@ import qualified Pukeko.FrontEnd.TypeChecker    as TypeChecker
 import qualified Pukeko.FrontEnd.TypeResolver   as TypeResolver
 import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
 
-type Module = SystemF.Module Stage.ClassEliminator
+type Module = SystemF.Module SystemF
 
 run :: Bool -> Parser.Package -> Either Failure Module
-run unsafe =
-  Renamer.renameModule
-  >=> TypeResolver.resolveModule
-  >=> FunResolver.resolveModule
-  >=> KindChecker.checkModule
-  >=> Inferencer.inferModule
-  >=> TypeChecker.checkModule
-  >=> PatternMatcher.compileModule
-  >=> TypeChecker.checkModule
-  >=> pure . ClassEliminator.elimModule
-  >=> if unsafe then pure else TypeChecker.checkModule
+run unsafe pkg = do
+  surface <- Renamer.renameModule pkg
+  TypeResolver.resolveModule surface
+  FunResolver.resolveModule  surface
+  KindChecker.checkModule    surface
+  typed <- Inferencer.inferModule surface
+  TypeChecker.checkModule typed
+  unnested <- PatternMatcher.compileModule typed
+  TypeChecker.checkModule unnested
+  let unclassy = ClassEliminator.elimModule unnested
+  unless unsafe (TypeChecker.checkModule unclassy)
+  pure unclassy

@@ -16,12 +16,12 @@ import qualified Data.Map         as Map
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 import           Pukeko.AST.SystemF
-import qualified Pukeko.AST.Stage      as St
+import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 
-type In  = St.Inferencer Type
-type Out = St.PatternMatcher
+type In  = Typed
+type Out = Unnested
 
 type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader SourcePos, Error Failure]
 
@@ -39,8 +39,8 @@ pmExpr = \case
   EAtm a          -> pure (EAtm a)
   EApp t  us      -> EApp <$> pmExpr t <*> traverse pmExpr us
   ELam bs e t     -> ELam bs <$> pmExpr e <*> pure t
-  ELet ds t       -> ELet <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t
-  ERec ds t       -> ERec <$> traverse (defn2exprSt pmExpr) ds <*> pmExpr t
+  ELet ds t       -> ELet <$> traverse (defn2expr pmExpr) ds <*> pmExpr t
+  ERec ds t       -> ERec <$> traverse (defn2expr pmExpr) ds <*> pmExpr t
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch (mkRowMatch1 t1 as1)

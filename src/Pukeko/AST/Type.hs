@@ -26,6 +26,7 @@ module Pukeko.AST.Type
   , qvar2tvar
   , coercion2type
   , type2tcon
+  , type2tcon_
   , prettyTypeCstr
   , prettyTUni
   , prettyQVar
@@ -138,6 +139,14 @@ type2tcon f = cataM2 (fmap embed2 . step)
     step = \case
       TConF c -> TConF <$> f c
       x       -> pure x
+
+type2tcon_ :: forall m tv. Monad m => (Id.TCon -> m ()) -> Type tv -> m ()
+type2tcon_ f = fmap getConst . cataM2 (fmap Const . step)
+  where
+    step :: TypeF _ _ -> m ()
+    step = \case
+      TConF c -> f c
+      _       -> pure ()
 
 instance IsType NoType where
   isType = const Nothing
