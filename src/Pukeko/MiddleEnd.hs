@@ -16,6 +16,7 @@ import qualified Pukeko.AST.SystemF            as SysF
 import           Pukeko.AST.Language
 import qualified Pukeko.FrontEnd.TypeChecker   as TypeChecker
 import qualified Pukeko.MiddleEnd.AliasInliner as AliasInliner
+import qualified Pukeko.MiddleEnd.Inliner      as Inliner
 import qualified Pukeko.MiddleEnd.TypeEraser   as TypeEraser
 import qualified Pukeko.MiddleEnd.DeadCode     as DeadCode
 import qualified Pukeko.MiddleEnd.EtaReducer   as EtaReducer
@@ -27,6 +28,7 @@ type Module = NoLambda.Module
 data Optimization
   = EtaReduction
   | AliasInlining
+  | Inlining
   | DeadCodeElimination
   | Prettification
 
@@ -37,7 +39,7 @@ data Config = Config
 
 defaultConfig :: Config
 defaultConfig = Config
-  { optimizations = [EtaReduction, AliasInlining, DeadCodeElimination, Prettification]
+  { optimizations = [EtaReduction, Inlining, DeadCodeElimination, Prettification]
   , typeChecking  = True
   }
 
@@ -45,6 +47,7 @@ runOptimization :: Optimization -> Core.Module -> Core.Module
 runOptimization = \case
   EtaReduction        -> EtaReducer.reduceModule
   AliasInlining       -> AliasInliner.inlineModule
+  Inlining            -> Inliner.inlineModule
   DeadCodeElimination -> DeadCode.cleanModule
   Prettification      -> Prettifier.prettifyModule
 

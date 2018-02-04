@@ -51,6 +51,7 @@ optimizations =
     f = traverse $ \case
       'E' -> Just MiddleEnd.EtaReduction
       'A' -> Just MiddleEnd.AliasInlining
+      'I' -> Just MiddleEnd.Inlining
       'D' -> Just MiddleEnd.DeadCodeElimination
       'P' -> Just MiddleEnd.Prettification
       _   -> Nothing
