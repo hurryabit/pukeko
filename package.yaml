@@ -66,6 +66,7 @@ library:
   - profunctors
   - safe
   - tagged
+  - union-find
   - vector
 
 executables:
