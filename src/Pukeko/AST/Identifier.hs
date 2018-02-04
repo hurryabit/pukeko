@@ -45,6 +45,9 @@ freshEVars comp var = map (\n -> var{_part = Just (comp, n)}) [1 ..]
 mangled :: EVar -> String
 mangled var = (_name :: EVar -> _) var ++ maybe "" (\(comp, n) -> '$':comp ++ show n) (_part var)
 
+instance Named EVar where
+  name = render . pretty
+
 instance Pretty EVar where
   pretty EVar{_name, _part} =
     pretty _name <> maybe mempty (\(comp, n) -> "$" <> pretty comp <> pretty n) _part

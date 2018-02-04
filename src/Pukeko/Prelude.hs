@@ -44,8 +44,9 @@ import Control.Lens          as X
        , (^.), (.~), (%~)
        , over, set
        , iso, prism, to
-       , _Right
-       , iall, ifoldMap, imap, itoList, itraverse
+       , _1, _2, _3, _Right
+       , toListOf
+       , iall, ifoldMap, ifor, ifor_, imap, itoList, itraverse
        , makeLenses, makePrisms
        )
 import Control.Lens.Freer         as X

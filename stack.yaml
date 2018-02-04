@@ -40,8 +40,9 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-- monad-st-0.2.4.1
+- graphviz-2999.19.0.0
 
+allow-newer: true
 # Override default flag values for local packages and extra-deps
 flags: {}
 

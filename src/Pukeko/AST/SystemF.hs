@@ -4,57 +4,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.SystemF
-  ( Module (..)
-  , Decl (..)
-  , SignDecl (..)
-  , ClssDecl (..)
-  , InstDecl (..)
-  , SupCDecl (..)
-  , ExtnDecl (..)
-  , Atom (..)
-  , Defn (..)
-  , Expr (..)
-  , Bind (..)
-  , Case (..)
-  , Altn (..)
-  , Patn (..)
-
-  , pattern EVal
-  , pattern ECon
-  , pattern ENum
-
-  , weakenE
-  , mkEApp
-  , mkELam
-  , mkETyApp
-  , mkETyAbs
-
-  , abstract
-
-  , module2decls
-  , decl2func
-  , sign2func
-  , sign2type
-  , clss2mthds
-  , inst2clss
-  , inst2defn
-  , extn2bind
-  , defn2bind
-  , defn2func
-  , defn2expr
-  , defn2exprSt
-  , defn2atom
-  , defn2type
-  , bind2evar
-  , bind2type
-
-  , decl2atom
-  , expr2atom
-  , patn2evar
-
-  , _AVal
-  , _ACon
-
+  ( module Pukeko.AST.SystemF
   , module Pukeko.AST.Scope
   )
   where
@@ -195,6 +145,7 @@ makeLenses ''Case
 makeLenses ''Altn
 
 makePrisms ''Atom
+makePrisms ''Decl
 
 weakenE :: Expr st tv ev -> Expr st tv (EScope i ev)
 weakenE = fmap weakenScope

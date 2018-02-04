@@ -1,4 +1,5 @@
 COMP = $(shell stack exec -- which pukeko)
+OPTS =
 NASM = nasm
 LINK = clang
 TIME = /usr/bin/time
@@ -45,10 +46,16 @@ types: $(TYPES)
 asm: $(ASSEMBLES)
 
 %.asm: %.pu std2/*.pu $(COMP)
-	$(COMP) -l $<
+	$(COMP) $(OPTS) -l $<
 
 %.ti: %.pu std2/*.pu $(COMP)
-	$(COMP) -t $<
+	$(COMP) $(OPTS) -t $<
+
+%.dot: %.pu std2/*.pu $(COMP)
+	$(COMP) $(OPTS) -g $<
+
+%.pdf: %.dot
+	dot -o $@ -Tpdf $<
 
 %.pp.asm: %.asm
 	$(NASM) -DNOATAT $(NASM_FLAGS) -E $< | grep '^ *[^% ]' > $@
