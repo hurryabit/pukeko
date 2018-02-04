@@ -38,14 +38,6 @@ data InstDecl st = MkInstDecl
   , _inst2defns :: [Defn st (TScope Int Void) Void]
   }
 
-data SupCDecl = MkSupCDecl
-  { _supc2func  :: Lctd Id.EVar
-  , _supc2tprms :: [QVar]
-  , _supc2type  :: Type (TScope Int Void)
-  , _supc2eprms :: [Bind Type (TScope Int Void)]
-  , _supc2expr  :: Expr SuperCore (TScope Int Void) (EScope Int Void)
-  }
-
 data ExtnDecl ty = MkExtnDecl
   { _extn2bind :: Bind ty Void
   , _extn2extn :: String
@@ -56,8 +48,7 @@ data Decl lg
   | IsPreTyped lg ~ False => DSign (SignDecl Void)
   | IsClassy   lg ~ True  => DClss ClssDecl
   | IsClassy   lg ~ True  => DInst (InstDecl lg)
-  | IsLambda   lg ~ True  => DDefn (Defn lg Void Void)
-  | lg ~ SuperCore        => DSupC SupCDecl
+  |                          DDefn (Defn lg Void Void)
   |                          DExtn (ExtnDecl (TypeOf lg))
 
 data Module lg = MkModule
@@ -67,7 +58,6 @@ data Module lg = MkModule
 makeLenses ''SignDecl
 makeLenses ''ClssDecl
 makeLenses ''InstDecl
-makeLenses ''SupCDecl
 makeLenses ''ExtnDecl
 makePrisms ''Decl
 makeLenses ''Module
@@ -87,7 +77,6 @@ decl2func f top = case top of
   DClss{} -> pure top
   DInst{} -> pure top
   DDefn d -> DDefn <$> defn2bind (bind2evar (lctd f)) d
-  DSupC s -> DSupC <$> supc2func (lctd f) s
   DExtn p -> DExtn <$> extn2bind (bind2evar (lctd f)) p
 
 decl2expr ::
@@ -99,7 +88,6 @@ decl2expr f top = case top of
   DClss{} -> pure top
   DInst i -> DInst <$> inst2defn (defn2expr f) i
   DDefn d -> DDefn <$> defn2expr f d
-  DSupC s -> DSupC <$> supc2expr f s
   DExtn p -> pure (DExtn p)
 
 instance HasPos (SignDecl tv) where
@@ -112,7 +100,6 @@ instance HasPos (Decl st) where
     DClss clss  -> getPos (_clss2name clss)
     DInst inst  -> getPos (_inst2clss inst)
     DDefn defn  -> getPos (_defn2bind defn)
-    DSupC supc  -> getPos (_supc2func supc)
     DExtn extn  -> getPos (_extn2bind extn)
 
 instance (BaseTVar tv) => Pretty (SignDecl tv) where
@@ -134,9 +121,6 @@ instance (PrettyStage st) => Pretty (Decl st) where
         t1 :: Type (TScope Int Void)
         t1 = mkTApp (TCon t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
     DDefn d -> pretty d
-    DSupC (MkSupCDecl z qvs t bs e) ->
-      hang (pretty z <+> ":" <+> prettyPrecType 0 (mkTUni qvs t) <+> "=") 2
-        (prettyETyAbs 0 qvs (prettyELam 0 bs e))
     DExtn (MkExtnDecl b s) ->
       hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
 
@@ -146,6 +130,5 @@ instance (PrettyStage st) => Pretty (Module st) where
 deriving instance                   (Show tv)          => Show (SignDecl tv)
 deriving instance                                         Show  ClssDecl
 deriving instance (TypeOf st ~ Type)                   => Show (InstDecl st)
-deriving instance                                         Show  SupCDecl
 deriving instance                                         Show (ExtnDecl Type)
 deriving instance (TypeOf st ~ Type)                   => Show (Decl st)

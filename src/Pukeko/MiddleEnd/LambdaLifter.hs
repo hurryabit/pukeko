@@ -9,7 +9,9 @@ import           Control.Monad.Freer.Supply
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 
-import           Pukeko.AST.SuperCore
+import           Pukeko.AST.SystemF
+import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Case, Bind)
+import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
@@ -18,22 +20,22 @@ import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 
 type In  = Unclassy
--- type Out = SuperCore
+type Out = SuperCore
 
 type IsTVar tv = (Ord tv, BaseTVar tv)
 type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer ModuleSC]
+    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer Core.Module]
 
-execLL :: Module In -> LL Void Void () -> ModuleSC
+execLL :: Module In -> LL Void Void () -> Core.Module
 execLL m0 =
   snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
 
 llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
-  Expr In tv ev -> LL tv ev (ExprSC tv ev)
+  Expr In tv ev -> LL tv ev (Expr Out tv ev)
 llExpr = \case
   ELoc le -> here le $ ELoc <$> lctd llExpr le
   EVar x -> pure (EVar x)
@@ -71,14 +73,14 @@ llExpr = \case
     lhs <- fresh
     let t_lhs = map _bind2type allBinds1 *~> fmap tvRename t_rhs
     -- TODO: We could use the pos of the lambda for @lhs@.
-    tell (mkSupCDecl (MkSupCDecl (Lctd noPos lhs) tyBinds t_lhs allBinds1 rhs2))
+    tell (mkFuncDecl @'SupC (SupCDecl (Lctd noPos lhs) tyBinds t_lhs allBinds1 rhs2))
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
   ECoe c e0 -> ECoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
 
 llCase ::
-  (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (CaseSC tv ev)
+  (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)
 llCase (MkCase dcon ts0 bs e) = do
   (MkTConDecl _ vs _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
   unless (length vs == length ts0)
@@ -93,8 +95,9 @@ llDecl = \case
   DDefn (MkDefn (MkBind lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
-    tell (mkSupCDecl (MkSupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
-  DExtn p -> tell (mkExtnDecl p)
+    tell
+      (mkFuncDecl @'SupC (SupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
+  DExtn (MkExtnDecl z s) -> tell (mkFuncDecl @'Extn (ExtnDecl z s))
 
-liftModule :: Module In -> ModuleSC
+liftModule :: Module In -> Core.Module
 liftModule m0@(MkModule decls) = execLL m0 (traverse_ llDecl decls)

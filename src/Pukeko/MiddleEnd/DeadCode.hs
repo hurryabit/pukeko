@@ -13,12 +13,12 @@ import           Pukeko.AST.SuperCore
 import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.MiddleEnd.CallGraph as CG
 
-cleanModule :: ModuleSC -> ModuleSC
-cleanModule mod0@(MkModuleSC types extns supcs) =
+cleanModule :: Module -> Module
+cleanModule mod0@(MkModule types extns supcs) =
   let g = CG.makeCallGraph mod0
       reach = Set.fromList
-              $ map (CG.fdecl2evar . CG.toDecl g)
+              $ map ((^. func2name) . CG.toDecl g)
               $ maybe [] (G.reachable (CG.graph g)) (CG.fromEVar g Id.main)
       clean :: Map Id.EVar a -> Map Id.EVar a
       clean = Map.filterWithKey (\z _ -> z `Set.member` reach)
-  in  MkModuleSC types (clean extns) (clean supcs)
+  in  MkModule types (clean extns) (clean supcs)

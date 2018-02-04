@@ -1,7 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Pukeko.FrontEnd.Info
   ( ModuleInfo
+  , HasModuleInfo
   , SomeInstDecl (..)
   , info2tcons
   , info2dcons
@@ -10,7 +12,6 @@ module Pukeko.FrontEnd.Info
   , info2mthds
   , info2insts
   , runInfo
-  , runInfoSC
   , lookupInfo
   , findInfo
   , typeOfFunc
@@ -24,35 +25,34 @@ import           Control.Lens                (foldMapOf, _Right)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.SuperCore
+import qualified Pukeko.AST.SystemF    as SysF
+import qualified Pukeko.AST.SuperCore  as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
+import           Pukeko.AST.Expr
 import           Pukeko.AST.Type
 
 
 data ModuleInfo = MkModuleInfo
   { _info2tcons :: Map Id.TCon TConDecl
   , _info2dcons :: Map Id.DCon (TConDecl, DConDecl)
-  , _info2signs :: Map Id.EVar (SignDecl Void)
-  , _info2clsss :: Map Id.Clss ClssDecl
-  , _info2mthds :: Map Id.EVar (ClssDecl, SignDecl (TScope Int Void))
+  , _info2signs :: Map Id.EVar (Type Void)
+  , _info2clsss :: Map Id.Clss SysF.ClssDecl
+  , _info2mthds :: Map Id.EVar (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
   , _info2insts :: Map (Id.Clss, Id.TCon) SomeInstDecl
   }
 
-data SomeInstDecl = forall st. SomeInstDecl (InstDecl st)
+data SomeInstDecl = forall st. SomeInstDecl (SysF.InstDecl st)
+
+class HasModuleInfo m where
+  collectInfo :: m -> ModuleInfo
 
 makeLenses ''ModuleInfo
 makePrisms ''ModuleInfo
 
-runInfo ::
-  (IsType (TypeOf st)) =>
-  Module st -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
+runInfo :: (HasModuleInfo m) => m -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
 runInfo = runReader . collectInfo
-
-runInfoSC :: ModuleSC -> Eff (Reader ModuleInfo : effs) a -> Eff effs a
-runInfoSC = runReader . collectInfoSC
 
 lookupInfo ::
   (Member (Reader ModuleInfo) effs, Ord k) =>
@@ -67,7 +67,7 @@ findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k <$> view l
 typeOfFunc ::
   (HasCallStack, Member (Reader ModuleInfo) effs) =>
   Id.EVar -> Eff effs (Type tv)
-typeOfFunc func = fmap absurd . _sign2type <$> findInfo info2signs func
+typeOfFunc func = fmap absurd <$> findInfo info2signs func
 
 typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
   Atom -> Eff effs (Type tv)
@@ -88,44 +88,33 @@ tconDeclInfo tcon =
   in  itemInfo info2tcons (tcon^.tcon2name.lctd) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
-signDeclInfo :: SignDecl Void -> ModuleInfo
-signDeclInfo s = itemInfo info2signs (unlctd (s^.sign2func)) s
-
-supcDeclInfo :: SupCDecl -> ModuleInfo
-supcDeclInfo (MkSupCDecl z xs t _ _) = signDeclInfo (MkSignDecl z (mkTUni xs t))
-
 bindInfo :: IsType ty => Bind ty Void -> ModuleInfo
-bindInfo (MkBind z t) = maybe mempty (signDeclInfo . MkSignDecl z) (isType t)
+bindInfo (MkBind z t) = maybe mempty (itemInfo info2signs (unlctd z)) (isType t)
 
-extnDeclInfo :: IsType ty => ExtnDecl ty -> ModuleInfo
-extnDeclInfo (MkExtnDecl b _) = bindInfo b
+instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
+  collectInfo (SysF.MkModule decls) = foldFor decls $ \case
+    SysF.DType tcons -> foldMap tconDeclInfo tcons
+    SysF.DSign (SysF.MkSignDecl z t) -> bindInfo (MkBind z t)
+    SysF.DClss clss@(SysF.MkClssDecl (unlctd -> c) v ms) ->
+      let mthds_info = foldFor ms $ \mthd@(SysF.MkSignDecl z t0) ->
+            let t1 = mkTUni [MkQVar (Set.singleton c) v] t0
+            in  bindInfo (MkBind z t1)
+                <> itemInfo info2mthds (z^.lctd) (clss, mthd)
+      in  itemInfo info2clsss c clss <> mthds_info
+    SysF.DInst inst@(SysF.MkInstDecl (unlctd -> c) t _ _) ->
+      itemInfo info2insts (c, t) (SomeInstDecl inst)
+    SysF.DDefn (MkDefn b _) -> bindInfo b
+    SysF.DExtn (SysF.MkExtnDecl b _) -> bindInfo b
 
-collectInfo :: (IsType (TypeOf st)) => Module st -> ModuleInfo
-collectInfo (MkModule decls) = foldFor decls $ \case
-  DType tcons -> foldMap tconDeclInfo tcons
-  DSign s -> signDeclInfo s
-  DClss clss@(MkClssDecl (unlctd -> c) v ms) ->
-    let mthds_info = foldFor ms $ \mthd@(MkSignDecl z t0) ->
-          let t1 = mkTUni [MkQVar (Set.singleton c) v] t0
-          in  signDeclInfo (MkSignDecl z t1)
-              <> itemInfo info2mthds (z^.lctd) (clss, mthd)
-    in  itemInfo info2clsss c clss <> mthds_info
-  DInst inst@(MkInstDecl (unlctd -> c) t _ _) ->
-    itemInfo info2insts (c, t) (SomeInstDecl inst)
-  DDefn (MkDefn b _) -> bindInfo b
-  DSupC supc -> supcDeclInfo supc
-  DExtn extn -> extnDeclInfo extn
-  where
-    foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
-    foldFor = flip foldMap
+instance HasModuleInfo Core.Module where
+  collectInfo (Core.MkModule types extns supcs) = fold
+    [ foldMap tconDeclInfo types
+    , foldFor extns $ \(Core.ExtnDecl b _) -> bindInfo b
+    , foldFor supcs $ \(Core.SupCDecl z qvs t _ _) -> bindInfo (MkBind z (mkTUni qvs t))
+    ]
 
-
-collectInfoSC :: ModuleSC -> ModuleInfo
-collectInfoSC (MkModuleSC types extns supcs) = fold
-  [ foldMap tconDeclInfo types
-  , foldMap extnDeclInfo extns
-  , foldMap supcDeclInfo supcs
-  ]
+foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
+foldFor = flip foldMap
 
 instance Semigroup ModuleInfo where
   MkModuleInfo a1 b1 c1 d1 e1 f1 <> MkModuleInfo a2 b2 c2 d2 e2 f2 =

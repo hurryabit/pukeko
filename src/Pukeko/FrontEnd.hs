@@ -27,9 +27,9 @@ run unsafe pkg = do
   FunResolver.resolveModule  surface
   KindChecker.checkModule    surface
   typed <- Inferencer.inferModule surface
-  TypeChecker.checkModule typed
+  TypeChecker.check typed
   unnested <- PatternMatcher.compileModule typed
-  TypeChecker.checkModule unnested
+  TypeChecker.check unnested
   let unclassy = ClassEliminator.elimModule unnested
-  unless unsafe (TypeChecker.checkModule unclassy)
+  unless unsafe (TypeChecker.check unclassy)
   pure unclassy

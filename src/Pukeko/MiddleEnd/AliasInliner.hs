@@ -23,28 +23,30 @@ import qualified Data.Set          as Set
 import qualified Data.UnionFind.ST as UF
 
 import           Pukeko.AST.SuperCore
+import           Pukeko.AST.Expr.Optics
 import qualified Pukeko.AST.Identifier as Id
 
 -- | Follow all chains of links in a module and adjust all call sites accordingly.
-inlineModule :: ModuleSC -> ModuleSC
-inlineModule = over modsc2supcs inlineSupCDecls
+inlineModule :: Module -> Module
+inlineModule = over mod2supcs inlineSupCDecls
 
 -- | Follow all chains of links in a group of declarations and adjust all call
 -- sites within this group.
-inlineSupCDecls :: Traversable t => t SupCDecl -> t SupCDecl
+inlineSupCDecls :: Traversable t => t (FuncDecl 'SupC) -> t (FuncDecl 'SupC)
 inlineSupCDecls decls0 =
   let ls = mapMaybe isLink (toList decls0)
       uf = unionFind ls
-  in  over (traverse . supc2expr . expr2atom . _AVal) (\x -> Map.findWithDefault x x uf) decls0
+  in  over (traverse . func2expr . expr2atom . _AVal)
+        (\x -> Map.findWithDefault x x uf) decls0
 
 -- | Determine if a declaration is a link, i.e., of the form
 --
 -- > f = g
 --
 -- If it is, return the pair @(f, g)@.
-isLink :: SupCDecl -> Maybe (Id.EVar, Id.EVar)
+isLink :: FuncDecl 'SupC -> Maybe (Id.EVar, Id.EVar)
 isLink = \case
-  MkSupCDecl z vs _ xs (EVal x)
+  SupCDecl z vs _ xs (EVal x)
     | null vs && null xs -> Just (z^.lctd, x)
   _                      -> Nothing
 

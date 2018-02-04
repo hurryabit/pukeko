@@ -11,7 +11,8 @@ module Pukeko.MiddleEnd
 import Pukeko.Prelude hiding (run)
 
 import qualified Pukeko.AST.NoLambda           as NoLambda
-import qualified Pukeko.AST.SuperCore          as SC
+import qualified Pukeko.AST.SuperCore          as Core
+import qualified Pukeko.AST.SystemF            as SysF
 import           Pukeko.AST.Language
 import qualified Pukeko.FrontEnd.TypeChecker   as TypeChecker
 import qualified Pukeko.MiddleEnd.AliasInliner as AliasInliner
@@ -22,8 +23,6 @@ import qualified Pukeko.MiddleEnd.LambdaLifter as LambdaLifter
 import qualified Pukeko.MiddleEnd.Prettifier   as Prettifier
 
 type Module = NoLambda.Module
-
-type ModuleSC = SC.ModuleSC
 
 data Optimization
   = EtaReduction
@@ -42,7 +41,7 @@ defaultConfig = Config
   , typeChecking  = True
   }
 
-runOptimization :: Optimization -> ModuleSC -> ModuleSC
+runOptimization :: Optimization -> Core.Module -> Core.Module
 runOptimization = \case
   EtaReduction        -> EtaReducer.reduceModule
   AliasInlining       -> AliasInliner.inlineModule
@@ -51,16 +50,17 @@ runOptimization = \case
 
 run
   :: Config
-  -> SC.Module SystemF
-  -> Either Failure (ModuleSC, Module)
+  -> SysF.Module SystemF
+  -> Either Failure (Core.Module, NoLambda.Module)
 run cfg module_sf = do
-  let typeChecked :: (ModuleSC -> ModuleSC) -> (ModuleSC -> Either Failure ModuleSC)
+  let typeChecked ::
+        (Core.Module -> Core.Module) -> (Core.Module -> Either Failure Core.Module)
       typeChecked f m0 = do
         let m1 = f m0
-        when (typeChecking cfg) (TypeChecker.checkModule (SC.toModule m1))
+        when (typeChecking cfg) (TypeChecker.check m1)
         pure m1
   let module_ll = LambdaLifter.liftModule module_sf
-  when (typeChecking cfg) (TypeChecker.checkModule (SC.toModule module_ll))
+  when (typeChecking cfg) (TypeChecker.check module_ll)
   module_opt <-
     foldlM (\m opt -> typeChecked (runOptimization opt) m) module_ll (optimizations cfg)
   let module_lm = TypeEraser.eraseModule module_opt

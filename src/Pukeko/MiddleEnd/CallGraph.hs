@@ -19,39 +19,25 @@ import qualified Data.Text.Lazy as T
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Language
 import           Pukeko.AST.SuperCore
+import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Type
-
-
-data FuncDecl
-  = FSupC SupCDecl
-  | FExtn (ExtnDecl Type)
 
 data CallGraph = CallGraph
   { graph    :: G.Graph
-  , toDecl   :: G.Vertex -> FuncDecl
+  , toDecl   :: G.Vertex -> FuncDecl 'Any
   , fromEVar :: Id.EVar -> Maybe G.Vertex
   }
 
-fdecl2evar :: FuncDecl -> Id.EVar
-fdecl2evar = \case
-  FSupC supc -> supc^.supc2func.lctd
-  FExtn extn -> extn^.extn2bind.bind2evar.lctd
-
-fdecl2decl :: FuncDecl -> ModuleSC
-fdecl2decl = \case
-  FSupC supc -> mkSupCDecl supc
-  FExtn extn -> mkExtnDecl extn
-
-makeCallGraph :: ModuleSC -> CallGraph
+makeCallGraph :: Module -> CallGraph
 makeCallGraph mod0 = CallGraph g ((^._1) . f) n
   where
     (g, f, n) = G.graphFromEdges (supcs ++ extns)
-    supcs = [ (FSupC supc, z, toList (setOf (supc2expr . expr2atom . _AVal) supc))
-            | (z, supc) <- itoList (mod0^.modsc2supcs)
+    supcs = [ (castAny supc, z, toList (setOf (func2expr . expr2atom . _AVal) supc))
+            | (z, supc) <- itoList (mod0^.mod2supcs)
             ]
-    extns = [ (FExtn extn, z, []) | (z, extn) <- itoList (mod0^.modsc2extns) ]
+    extns = [ (castAny extn, z, []) | (z, extn) <- itoList (mod0^.mod2extns) ]
 
-scc :: CallGraph -> [G.SCC FuncDecl]
+scc :: CallGraph -> [G.SCC (FuncDecl 'Any)]
 scc (CallGraph graph vertex_fn _) = map decode forest
   where
     forest = G.scc graph
@@ -67,7 +53,7 @@ renderCallGraph g = D.renderDot . D.toDot . D.digraph' $ do
   ifor_ (graph g) $ \v us -> do
     let decl = toDecl g v
     let shape = case decl of
-          FSupC _ -> D.Ellipse
-          FExtn _ -> D.BoxShape
-    D.node v [D.Label (D.StrLabel (T.pack (Id.name (fdecl2evar decl)))), D.Shape shape]
+          SupCDecl{} -> D.Ellipse
+          ExtnDecl{} -> D.BoxShape
+    D.node v [D.Label (D.StrLabel (T.pack (Id.name (decl^.func2name)))), D.Shape shape]
     traverse (v D.-->) us

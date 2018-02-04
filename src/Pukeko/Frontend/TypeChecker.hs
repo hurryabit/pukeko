@@ -1,5 +1,5 @@
 module Pukeko.FrontEnd.TypeChecker
-  ( checkModule
+  ( check
   ) where
 
 import Pukeko.Prelude
@@ -13,14 +13,12 @@ import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
-import           Pukeko.AST.SystemF
+import           Pukeko.AST.Expr
+import qualified Pukeko.AST.SystemF   as SysF
+import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
-
-checkModule :: (IsTyped st) => Module st -> Either Failure ()
-checkModule m0@(MkModule decls) = runTC m0 $ do
-  for_ decls checkDecl
 
 type IsEVar ev = (HasEnv ev)
 
@@ -28,8 +26,15 @@ type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
 type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
-runTC :: (IsType (TypeOf st)) => Module st -> TC Void Void a -> Either Failure a
+runTC :: HasModuleInfo m => m -> TC Void Void a -> Either Failure a
 runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
+
+class HasModuleInfo m => TypeCheckable m where
+  checkModule :: m -> TC Void Void ()
+
+check :: TypeCheckable m => m -> Either Failure ()
+check m = runTC m (checkModule m)
+
 
 checkCoercion :: Coercion (Type tv) -> TC tv ev ()
 checkCoercion _ = -- (MkCoercion dir tcon t_from t_to) =
@@ -46,12 +51,12 @@ typeOf = \case
     foldlM app t0 es
     where
       app tf ek = case tf of
-        TFun tx ty -> check ek tx *> pure ty
+        TFun tx ty -> checkExpr ek tx *> pure ty
         TUni{}     -> throwHere "expected type argument, but found value argument"
         _          -> throwHere "unexpected value argument"
   ELam bs e0 t0 -> do
     let ts = fmap _bind2type bs
-    withinEScope' id ts (check e0 t0)
+    withinEScope' id ts (checkExpr e0 t0)
     pure (ts *~> t0)
   ELet ds e0 -> do
     traverse_ checkDefn ds
@@ -64,7 +69,7 @@ typeOf = \case
   ECas e0 cs -> typeOfBranching typeOfCase e0 cs
   ECoe c e0 -> do
     checkCoercion c
-    check e0 (_coeFrom c)
+    checkExpr e0 (_coeFrom c)
     pure (_coeTo c)
   ETyAbs qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
   ETyApp e0 ts1 -> do
@@ -92,7 +97,7 @@ satisfiesCstr t0 clss = do
       inst_mb <- lookupInfo info2insts (clss, tcon)
       case inst_mb of
         Nothing -> throwNoInst
-        Just (SomeInstDecl MkInstDecl{_inst2qvars = qvsV}) -> do
+        Just (SomeInstDecl SysF.MkInstDecl{_inst2qvars = qvsV}) -> do
           let qvs = toList qvsV
           unless (length tps == length qvs) $
             -- NOTE: This should be caught by the kind checker.
@@ -160,28 +165,32 @@ match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-check :: (IsTyped st, IsTVar tv, IsEVar ev) => Expr st tv ev -> Type tv -> TC tv ev ()
-check e t0 = typeOf e >>= match t0
+checkExpr :: (IsTyped st, IsTVar tv, IsEVar ev) =>
+  Expr st tv ev -> Type tv -> TC tv ev ()
+checkExpr e t0 = typeOf e >>= match t0
 
 checkDefn :: (IsTyped st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
-checkDefn (MkDefn (MkBind _ t) e) = check e t
+checkDefn (MkDefn (MkBind _ t) e) = checkExpr e t
 
-checkDecl :: (IsTyped st) => Decl st -> TC Void Void ()
-checkDecl = \case
-  DType{} -> pure ()
-  DSign{} -> pure ()
-  DClss{} -> pure ()
-  DInst (MkInstDecl _ tcon qvs ds) -> do
-    let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
-    -- FIXME: Ensure that the type in @b@ is correct as well.
-    withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
-      (_, MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)
-      let t_decl = renameType (instantiate' (const t_inst) t_mthd)
-      check e t_decl
-  DDefn d -> checkDefn d
-  DSupC (MkSupCDecl z qvs t0 bs e0) -> do
-      t1 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
-      let t2 = fmap _bind2type bs *~> t1
-      match (mkTUni qvs t0) (mkTUni qvs t2)
-    `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)
-  DExtn _ -> pure ()
+instance IsTyped st => TypeCheckable (SysF.Module st) where
+  checkModule (SysF.MkModule decls) = for_ decls $ \case
+    SysF.DType{} -> pure ()
+    SysF.DSign{} -> pure ()
+    SysF.DClss{} -> pure ()
+    SysF.DInst (SysF.MkInstDecl _ tcon qvs ds) -> do
+      let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
+      -- FIXME: Ensure that the type in @b@ is correct as well.
+      withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
+        (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)
+        let t_decl = renameType (instantiate' (const t_inst) t_mthd)
+        checkExpr e t_decl
+    SysF.DDefn d -> checkDefn d
+    SysF.DExtn _ -> pure ()
+
+instance TypeCheckable Core.Module where
+  checkModule (Core.MkModule _types _extns supcs) =
+    for_ supcs $ \(Core.SupCDecl z qvs t0 bs e0) -> do
+        t1 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
+        let t2 = fmap _bind2type bs *~> t1
+        match (mkTUni qvs t0) (mkTUni qvs t2)
+      `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)
