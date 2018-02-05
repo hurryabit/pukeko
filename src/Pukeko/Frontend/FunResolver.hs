@@ -13,6 +13,7 @@ import qualified Data.Set      as Set
 
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
+import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
 
 type In  = Surface
@@ -38,8 +39,8 @@ resolveModule (MkModule decls) = runFR $ do
   whenJust (Map.minViewWithKey undefnd) $ \((fun, pos), _) ->
     here_ pos (throwHere ("declared but undefined function:" <+> pretty fun))
 
-declareFun :: SignDecl tv -> FR ()
-declareFun = here' $ \(MkSignDecl (unlctd -> fun) _) -> do
+declareFun :: Bind Type tv -> FR ()
+declareFun = here' $ \(MkBind (unlctd -> fun) _) -> do
   whenM (uses declared (Map.member fun)) $
     throwHere ("duplicate declaration of function:" <+> pretty fun)
   pos <- where_
@@ -60,7 +61,7 @@ frDecl = \case
   -- FIXME: Check that classes are declared only once and before their first
   -- instantiation. Check that no class/type constructor pair is instantiated
   -- twice.
-  DClss c -> for_ (_clss2mthds c) $ \m -> declareFun m *> defineFun (m^.sign2func)
+  DClss c -> for_ (_clss2mthds c) $ \m -> declareFun m *> defineFun (m^.bind2evar)
   DInst _ -> pure ()
   DDefn d -> defineFun (d^.defn2bind.bind2evar)
   DExtn p -> defineFun (p^.extn2bind.bind2evar)

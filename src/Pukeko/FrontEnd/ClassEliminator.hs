@@ -75,7 +75,7 @@ instDictInfo (MkInstDecl (unlctd -> clss) tcon qvs _) =
 -- See 'elimClssDecl' for an example.
 dictTConDecl :: ClssDecl -> TConDecl
 dictTConDecl (MkClssDecl (Lctd pos clss) prm mthds) =
-    let flds = map _sign2type mthds
+    let flds = map _bind2type mthds
         dcon = MkDConDecl (clssTCon clss) (Lctd pos (clssDCon clss)) 0 flds
     in  MkTConDecl (Lctd pos (clssTCon clss)) [prm] (Right [dcon])
 
@@ -104,7 +104,7 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
       prmType = TVar (mkBound 0 prm)
       dictPrm = Id.evar "dict"
       sels = do
-        (i, MkSignDecl (Lctd mpos z) t0) <- itoList mthds
+        (i, MkBind (Lctd mpos z) t0) <- itoList mthds
         let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
         let e_rhs = EVar (mkBound i z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
@@ -136,7 +136,7 @@ elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
 elimInstDecl clssDecl inst@(MkInstDecl (Lctd ipos clss) tcon qvs defns0) = do
   let t_inst = mkTApp (TCon tcon) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
-  defns1 <- for (clssDecl^.clss2mthds) $ \(MkSignDecl (unlctd -> mthd) _) -> do
+  defns1 <- for (clssDecl^.clss2mthds) $ \(MkBind (unlctd -> mthd) _) -> do
     case find (\defn -> defn^.defn2func == mthd) defns0 of
       Nothing -> bugWith "missing method" (clss, tcon, mthd)
       Just defn -> pure defn

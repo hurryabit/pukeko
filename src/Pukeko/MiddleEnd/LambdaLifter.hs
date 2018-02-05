@@ -71,9 +71,10 @@ llExpr = \case
     let allBinds1 = map (fmap tvRename) allBinds0
     let rhs2 = bimap tvRename evRename rhs1
     lhs <- fresh
-    let t_lhs = map _bind2type allBinds1 *~> fmap tvRename t_rhs
+    let t_lhs = mkTUni tyBinds (map _bind2type allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
-    tell (mkFuncDecl @'SupC (SupCDecl (Lctd noPos lhs) tyBinds t_lhs allBinds1 rhs2))
+    let supc = SupCDecl (MkBind (Lctd noPos lhs) t_lhs) tyBinds allBinds1 rhs2
+    tell (mkFuncDecl @'SupC supc)
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
   ECoe c e0 -> ECoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
@@ -95,8 +96,8 @@ llDecl = \case
   DDefn (MkDefn (MkBind lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
-    tell
-      (mkFuncDecl @'SupC (SupCDecl lhs [] (fmap absurd t) [] (bimap absurd absurd rhs)))
+    let supc = SupCDecl (MkBind lhs (fmap absurd t)) [] [] (bimap absurd absurd rhs)
+    tell (mkFuncDecl @'SupC supc)
   DExtn (MkExtnDecl z s) -> tell (mkFuncDecl @'Extn (ExtnDecl z s))
 
 liftModule :: Module In -> Core.Module

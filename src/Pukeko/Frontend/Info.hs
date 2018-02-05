@@ -39,7 +39,7 @@ data ModuleInfo = MkModuleInfo
   , _info2dcons :: Map Id.DCon (TConDecl, DConDecl)
   , _info2signs :: Map Id.EVar (Type Void)
   , _info2clsss :: Map Id.Clss SysF.ClssDecl
-  , _info2mthds :: Map Id.EVar (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
+  , _info2mthds :: Map Id.EVar (SysF.ClssDecl, Bind Type (TScope Int Void))
   , _info2insts :: Map (Id.Clss, Id.TCon) SomeInstDecl
   }
 
@@ -88,29 +88,30 @@ tconDeclInfo tcon =
   in  itemInfo info2tcons (tcon^.tcon2name.lctd) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
-bindInfo :: IsType ty => Bind ty Void -> ModuleInfo
-bindInfo (MkBind z t) = maybe mempty (itemInfo info2signs (unlctd z)) (isType t)
+bindInfo :: IsType ty => Lens' decl (Bind ty Void) -> decl -> ModuleInfo
+bindInfo l ((^.l) -> MkBind z t) =
+  maybe mempty (itemInfo info2signs (unlctd z)) (isType t)
 
 instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
   collectInfo (SysF.MkModule decls) = foldFor decls $ \case
     SysF.DType tcons -> foldMap tconDeclInfo tcons
-    SysF.DSign (SysF.MkSignDecl z t) -> bindInfo (MkBind z t)
+    SysF.DSign (MkBind z t) -> bindInfo id (MkBind z t)
     SysF.DClss clss@(SysF.MkClssDecl (unlctd -> c) v ms) ->
-      let mthds_info = foldFor ms $ \mthd@(SysF.MkSignDecl z t0) ->
+      let mthds_info = foldFor ms $ \mthd@(MkBind z t0) ->
             let t1 = mkTUni [MkQVar (Set.singleton c) v] t0
-            in  bindInfo (MkBind z t1)
+            in  bindInfo id (MkBind z t1)
                 <> itemInfo info2mthds (z^.lctd) (clss, mthd)
       in  itemInfo info2clsss c clss <> mthds_info
     SysF.DInst inst@(SysF.MkInstDecl (unlctd -> c) t _ _) ->
       itemInfo info2insts (c, t) (SomeInstDecl inst)
-    SysF.DDefn (MkDefn b _) -> bindInfo b
-    SysF.DExtn (SysF.MkExtnDecl b _) -> bindInfo b
+    SysF.DDefn defn -> bindInfo defn2bind defn
+    SysF.DExtn extn -> bindInfo SysF.extn2bind extn
 
 instance HasModuleInfo Core.Module where
   collectInfo (Core.MkModule types extns supcs) = fold
     [ foldMap tconDeclInfo types
-    , foldFor extns $ \(Core.ExtnDecl b _) -> bindInfo b
-    , foldFor supcs $ \(Core.SupCDecl z qvs t _ _) -> bindInfo (MkBind z (mkTUni qvs t))
+    , foldMap (bindInfo Core.func2bind) extns
+    , foldMap (bindInfo Core.func2bind) supcs
     ]
 
 foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m

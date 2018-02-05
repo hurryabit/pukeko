@@ -32,9 +32,8 @@ type family HasExtn (a :: DeclMode) where
 data FuncDecl (m :: DeclMode)
   = HasSupC m ~ True =>
     SupCDecl
-    { _supc2name  :: Lctd Id.EVar
+    { _supc2bind  :: Bind Void
     , _supc2tprms :: [QVar]
-    , _supc2type  :: Type (TScope Int Void)
     , _supc2eprms :: [Bind (TScope Int Void)]
     , _supc2expr  :: Expr (TScope Int Void) (EScope Int Void)
     }
@@ -59,19 +58,20 @@ makeLenses ''Module
 
 castAny :: FuncDecl m -> FuncDecl Any
 castAny = \case
-  SupCDecl z vs t xs e -> SupCDecl z vs t xs e
-  ExtnDecl z s         -> ExtnDecl z s
+  SupCDecl z vs xs e -> SupCDecl z vs xs e
+  ExtnDecl z s       -> ExtnDecl z s
+
+func2bind :: Lens' (FuncDecl m) (Bind Void)
+func2bind f = \case
+  SupCDecl z vs xs e -> fmap (\z' -> SupCDecl z' vs xs e) (f z)
+  ExtnDecl z s       -> fmap (\z' -> ExtnDecl z' s) (f z)
 
 func2name :: Lens' (FuncDecl m) Id.EVar
-func2name f = \case
-  SupCDecl (Lctd p z) qvs t xs e   ->
-    fmap (\z' -> SupCDecl (Lctd p z') qvs t xs e) (f z)
-  ExtnDecl (MkBind (Lctd p z) t) s ->
-    fmap (\z' -> ExtnDecl (MkBind (Lctd p z') t) s) (f z)
+func2name = func2bind . bind2evar . lctd
 
 func2expr :: Traversal' (FuncDecl m) (Expr (TScope Int Void) (EScope Int Void))
 func2expr f = \case
-  SupCDecl z qvs t xs e -> SupCDecl z qvs t xs <$> f e
+  SupCDecl z qvs xs e -> SupCDecl z qvs xs <$> f e
   ExtnDecl z s -> pure (ExtnDecl z s)
 
 mkDecl :: (Ord k) => Lens' Module (Map k v) -> (Lens' v k) -> v -> Module
@@ -82,8 +82,8 @@ mkTypeDecl = mkDecl mod2types (tcon2name.lctd)
 
 mkFuncDecl :: FuncDecl m -> Module
 mkFuncDecl = \case
-  SupCDecl z vs t xs e -> mkDecl mod2supcs func2name (SupCDecl z vs t xs e)
-  ExtnDecl z s         -> mkDecl mod2extns func2name (ExtnDecl z s)
+  SupCDecl z vs xs e -> mkDecl mod2supcs func2name (SupCDecl z vs xs e)
+  ExtnDecl z s       -> mkDecl mod2extns func2name (ExtnDecl z s)
 
 instance Semigroup Module where
   MkModule t1 e1 s1 <> MkModule t2 e2 s2 =
@@ -95,9 +95,8 @@ instance Monoid Module where
 
 instance Pretty (FuncDecl m) where
   pretty = \case
-    SupCDecl z qvs t bs e ->
-      hang (pretty z <+> ":" <+> prettyPrecType 0 (mkTUni qvs t) <+> "=") 2
-        (prettyETyAbs 0 qvs (prettyELam 0 bs e))
+    SupCDecl z qvs bs e ->
+      hang (pretty z <+> "=") 2 (prettyETyAbs 0 qvs (prettyELam 0 bs e))
     ExtnDecl b s ->
       hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
 

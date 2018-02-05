@@ -67,7 +67,7 @@ trDecl top = case top of
           for_ dconDecls $ here' $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
             for_ flds trType
             insertDCon tcon dcon
-  DSign (MkSignDecl _ t) -> trType t
+  DSign (MkBind _ t) -> trType t
   -- FIXME: Resolve types in class declarations and instance definitions.
   DClss _ -> pure ()
   DInst i -> traverseOf_ inst2defn trDefn i

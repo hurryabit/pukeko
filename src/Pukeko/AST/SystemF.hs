@@ -19,15 +19,10 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 
-data SignDecl tv = MkSignDecl
-  { _sign2func :: Lctd Id.EVar
-  , _sign2type :: Type tv
-  }
-
 data ClssDecl = MkClssDecl
   { _clss2name  :: Lctd Id.Clss
   , _clss2prm   :: Id.TVar
-  , _clss2mthds :: [SignDecl (TScope Int Void)]
+  , _clss2mthds :: [Bind Type (TScope Int Void)]
   }
 
 data InstDecl st = MkInstDecl
@@ -45,7 +40,7 @@ data ExtnDecl ty = MkExtnDecl
 
 data Decl lg
   =                          DType (NonEmpty TConDecl)
-  | IsPreTyped lg ~ False => DSign (SignDecl Void)
+  | IsPreTyped lg ~ False => DSign (Bind Type Void)
   | IsClassy   lg ~ True  => DClss ClssDecl
   | IsClassy   lg ~ True  => DInst (InstDecl lg)
   |                          DDefn (Defn lg Void Void)
@@ -55,7 +50,6 @@ data Module lg = MkModule
   { _module2decls :: [Decl lg]
   }
 
-makeLenses ''SignDecl
 makeLenses ''ClssDecl
 makeLenses ''InstDecl
 makeLenses ''ExtnDecl
@@ -90,9 +84,6 @@ decl2expr f top = case top of
   DDefn d -> DDefn <$> defn2expr f d
   DExtn p -> pure (DExtn p)
 
-instance HasPos (SignDecl tv) where
-  getPos = getPos . _sign2func
-
 instance HasPos (Decl st) where
   getPos = \case
     DType tcons -> getPos (NE.head tcons)
@@ -101,9 +92,6 @@ instance HasPos (Decl st) where
     DInst inst  -> getPos (_inst2clss inst)
     DDefn defn  -> getPos (_defn2bind defn)
     DExtn extn  -> getPos (_extn2bind extn)
-
-instance (BaseTVar tv) => Pretty (SignDecl tv) where
-  pretty (MkSignDecl x t) = pretty x <+> ":" <+> pretty t
 
 instance (PrettyStage st) => Pretty (Decl st) where
   pretty = \case
@@ -127,7 +115,6 @@ instance (PrettyStage st) => Pretty (Decl st) where
 instance (PrettyStage st) => Pretty (Module st) where
   pretty (MkModule decls) = vcatMap pretty decls
 
-deriving instance                   (Show tv)          => Show (SignDecl tv)
 deriving instance                                         Show  ClssDecl
 deriving instance (TypeOf st ~ Type)                   => Show (InstDecl st)
 deriving instance                                         Show (ExtnDecl Type)

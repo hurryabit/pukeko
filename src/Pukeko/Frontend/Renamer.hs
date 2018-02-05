@@ -72,7 +72,7 @@ rnDecl = \case
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
     let env = Map.singleton v (mkBound 0 v)
     ms1 <- traverse (rnSignDecl env) ms0
-    modifying funcs (<> setOf (traverse . sign2func . lctd) ms1)
+    modifying funcs (<> setOf (traverse . bind2evar . lctd) ms1)
     yield (DClss (MkClssDecl c v ms1))
   Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
     qvs <- rnTypeCstr vs0 qs
@@ -103,10 +103,10 @@ rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
   where
     env = finRenamer vs
 
-rnSignDecl :: Map Id.TVar tv -> Ps.SignDecl -> Rn ev (SignDecl tv)
+rnSignDecl :: Map Id.TVar tv -> Ps.SignDecl -> Rn ev (Bind Type tv)
 rnSignDecl env (Ps.MkSignDecl z t) = do
   modifying funcs (Set.insert (z^.lctd))
-  MkSignDecl z <$> rnTypeScheme env t
+  MkBind z <$> rnTypeScheme env t
 
 rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)
 rnType env = go

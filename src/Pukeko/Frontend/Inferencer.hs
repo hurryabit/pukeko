@@ -268,7 +268,7 @@ inferDecl = here' $ \case
   DClss c -> yield (DClss c)
   DInst (MkInstDecl clss tcon qvs ds0) -> do
     ds1 <- for ds0 $ \d0 -> do
-      (_, MkSignDecl _ t_decl0) <-
+      (_, MkBind _ t_decl0) <-
         findInfo info2mthds (d0^.defn2bind.bind2evar.lctd)
       let t_inst = mkTApp (TCon tcon) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
       let t_decl1 :: Type (TScope Int Void)

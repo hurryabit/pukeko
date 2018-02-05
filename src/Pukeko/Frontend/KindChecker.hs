@@ -109,7 +109,7 @@ kcVal = \case
 kcDecl :: Decl In -> KC n s ()
 kcDecl decl = case decl of
   DType tcons            -> kcTypDef tcons
-  DSign (MkSignDecl _ t) -> kcVal t
+  DSign (MkBind _ t) -> kcVal t
   -- FIXME: Check kinds in type class declarations and instance definitions.
   DClss{} -> pure ()
   DInst{} -> pure ()

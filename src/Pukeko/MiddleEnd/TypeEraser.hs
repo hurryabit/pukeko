@@ -35,7 +35,7 @@ bindName :: In.Bind tv -> Name
 bindName = name . unlctd . In._bind2evar
 
 ccSupCDecl :: In.FuncDecl 'In.SupC -> CC TopLevel
-ccSupCDecl (In.SupCDecl (unlctd -> z) _ _ bs e) =
+ccSupCDecl (In.SupCDecl (unlctd . In._bind2evar -> z) _ bs e) =
   Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
 
 ccExtnDecl :: In.FuncDecl 'In.Extn -> CC TopLevel

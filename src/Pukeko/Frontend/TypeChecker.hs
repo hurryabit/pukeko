@@ -181,7 +181,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
       let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
       -- FIXME: Ensure that the type in @b@ is correct as well.
       withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
-        (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)
+        (_, MkBind _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)
         let t_decl = renameType (instantiate' (const t_inst) t_mthd)
         checkExpr e t_decl
     SysF.DDefn d -> checkDefn d
@@ -189,8 +189,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
-    for_ supcs $ \(Core.SupCDecl z qvs t0 bs e0) -> do
-        t1 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
-        let t2 = fmap _bind2type bs *~> t1
-        match (mkTUni qvs t0) (mkTUni qvs t2)
+    for_ supcs $ \(Core.SupCDecl (MkBind z t_decl) qvs bs e0) -> do
+        t0 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
+        match t_decl (mkTUni qvs (fmap _bind2type bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

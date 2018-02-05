@@ -29,7 +29,7 @@ inEVal :: Id.EVar -> In (Expr tv ev)
 inEVal z0 = do
   fdecl_mb <- uses inlinables (Map.lookup z0)
   case fdecl_mb of
-    Just (SupCDecl _z0 [] _t [] (stripELoc -> EVal z1)) -> inEVal z1
+    Just (SupCDecl _z0 [] [] (stripELoc -> EVal z1)) -> inEVal z1
     _ -> pure (EVal z0)
 
 inExpr :: Expr tv ev -> In (Expr tv ev)
