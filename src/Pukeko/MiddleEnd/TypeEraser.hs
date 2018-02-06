@@ -49,7 +49,6 @@ ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
 ccExpr :: (BaseEVar ev) => In.Expr tv ev -> CC Expr
 ccExpr = \case
-  In.ELoc (unlctd -> e) -> ccExpr e
   In.EVar x -> pure (Local (name (baseEVar x)))
   In.EVal z -> do
     external <- gets (Map.lookup z)

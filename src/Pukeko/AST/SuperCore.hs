@@ -106,3 +106,6 @@ instance Pretty Module where
     , vcatMap pretty extns
     , vcatMap pretty supcs
     ]
+
+deriving instance Show (FuncDecl m)
+deriving instance Show Module

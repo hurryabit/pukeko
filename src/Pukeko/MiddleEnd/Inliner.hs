@@ -2,9 +2,14 @@ module Pukeko.MiddleEnd.Inliner where
 
 import Pukeko.Prelude
 
-import qualified Data.Map as Map
+import qualified Data.Map    as Map
+import qualified Data.Vector as Vec
+import           Debug.Trace
+
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.SuperCore
+import           Pukeko.AST.Expr.Optics
+import           Pukeko.AST.Type
 import           Pukeko.MiddleEnd.CallGraph
 import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
 
@@ -19,33 +24,78 @@ makeLenses ''InState
 makeInlinable :: FuncDecl 'SupC -> In ()
 makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name) supc)
 
-stripELoc :: Expr tv ev -> Expr tv ev
-stripELoc = \case
-  ELoc l -> stripELoc (unlctd l)
-  e      -> e
+unwind :: Expr tv ev -> (Expr tv ev, [Type tv], [Expr tv ev])
+unwind e0 =
+  let (e1, as) = goE [] e0
+      (e2, ts) = goT [] e1
+  in  (e2, ts, as)
+  where
+    goE :: [[Expr tv ev]] -> Expr tv ev -> (Expr tv ev, [Expr tv ev])
+    goE ass = \case
+      EApp e as -> goE (toList as:ass) e
+      e         -> (e, concat ass)
+    goT :: [[Type tv]] -> Expr tv ev -> (Expr tv ev, [Type tv])
+    goT tss = \case
+      ETyApp e ts -> goT (toList ts:tss) e
+      e           -> (e, concat tss)
 
 -- | Replace a reference to an alias by a reference to the target of the alias.
 inEVal :: Id.EVar -> In (Expr tv ev)
 inEVal z0 = do
   fdecl_mb <- uses inlinables (Map.lookup z0)
   case fdecl_mb of
-    Just (SupCDecl _z0 [] [] (stripELoc -> EVal z1)) -> inEVal z1
+    Just (SupCDecl _z0 [] [] (EVal z1)) -> inEVal z1
     _ -> pure (EVal z0)
 
-inExpr :: Expr tv ev -> In (Expr tv ev)
-inExpr = \case
-  ELoc e       -> ELoc <$> lctd inExpr e
-  EVar x       -> pure (EVar x)
-  EVal z       -> inEVal z
-  ECon c       -> pure (ECon c)
-  ENum n       -> pure (ENum n)
-  EApp t  us   -> EApp <$> inExpr t <*> traverse inExpr us
-  ECas t  cs   -> ECas <$> inExpr t <*> (traverse . case2expr) inExpr cs
-  ELet ds t    -> ELet <$> (traverse . defn2expr) inExpr ds <*> inExpr t
-  ERec ds t    -> ERec <$> (traverse . defn2expr) inExpr ds <*> inExpr t
-  ECoe d e     -> ECoe d <$> inExpr e
-  ETyAbs x e   -> ETyAbs x <$> inExpr e
-  ETyApp e t   -> ETyApp <$> inExpr e <*> pure t
+inRedex :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
+  Expr tv ev -> In (Expr tv ev)
+inRedex e0 = do
+  let (f, ts, as) = unwind e0
+  let continue = mkEApp (mkETyApp f ts) <$> traverse inExpr as
+  case f of
+    EVal z0 -> do
+      supc_mb <- uses inlinables (Map.lookup z0)
+      case supc_mb of
+        Just (SupCDecl _ [] [] (EVal z1)) ->
+          -- trace ("INLINING: " ++ render (pretty e0))
+            (inExpr (EVal z1 `mkETyApp` ts `mkEApp` as))
+        Just (SupCDecl _ vs xs e1)
+          -- NOTE: We don't want to inline CAFs. That's why we ensure @1 <= n@.
+          | length vs == length ts && 1 <= n && n <= length as -> do
+              let (as0, as1) = splitAt n as
+              let tsV = Vec.fromList ts
+              let defns = zipWith
+                          (MkDefn . over bind2type (instantiate' (tsV Vec.!)))
+                          xs as0
+              let e2 :: Expr (TScope Int tv) (EScope Int ev)
+                  e2 = bimap (over _Free absurd) (over _Free absurd) e1
+              let inst :: Traversable s => Type (s (TScope Int tv)) -> Type (s tv)
+                  inst t = t >>= traverse (scope pure (tsV Vec.!))
+              let body :: Expr tv (EScope Int ev)
+                  body = runIdentity (expr2type (Identity . inst) e2)
+              let let_ = ELet defns body
+              -- trace ("INLINING: " ++ render (pretty e0))
+              (inExpr (mkEApp let_ as1))
+          where n = length xs
+        Nothing -> continue
+        _ -> trace ("NOT INLINING: " ++ render (pretty e0)) continue
+    _ -> continue
+
+inExpr :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
+  Expr tv ev -> In (Expr tv ev)
+inExpr e0 = case e0 of
+  EVal{}     -> inRedex e0
+  EApp{}     -> inRedex e0
+  EVar x     -> pure (EVar x)
+  ECon c     -> pure (ECon c)
+  ENum n     -> pure (ENum n)
+  EApp t  us -> EApp <$> inExpr t <*> traverse inExpr us
+  ECas t  cs -> ECas <$> inExpr t <*> (traverse . case2expr) inExpr cs
+  ELet ds t  -> ELet <$> (traverse . defn2expr) inExpr ds <*> inExpr t
+  ERec ds t  -> ERec <$> (traverse . defn2expr) inExpr ds <*> inExpr t
+  ECoe d e   -> ECoe d <$> inExpr e
+  ETyAbs x e -> ETyAbs x <$> inExpr e
+  ETyApp{}   -> inRedex e0
 
 inSupCDecl :: FuncDecl 'SupC -> In (FuncDecl 'SupC)
 inSupCDecl = func2expr inExpr

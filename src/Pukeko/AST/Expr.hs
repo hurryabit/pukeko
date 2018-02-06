@@ -32,7 +32,7 @@ data Atom
   | ANum Int
 
 data Expr lg tv ev
-  = ELoc (Lctd (Expr lg tv ev))
+  = IsLambda lg ~ True => ELoc (Lctd (Expr lg tv ev))
   | EVar ev
   | EAtm Atom
   | EApp (Expr lg tv ev) (NonEmpty (Expr lg tv ev))

@@ -51,5 +51,4 @@ erSupCDecl = \case
         , length vs1 == n ->
             let e2 = first (over _Free strengthenScope0) e1
             in  erSupCDecl (SupCDecl z (toList vs1) [] e2)
-      ELoc e1 -> erSupCDecl (SupCDecl z vs0 bs0 (e1^.lctd))
       _ -> supc

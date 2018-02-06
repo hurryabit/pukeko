@@ -37,7 +37,7 @@ llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
   Expr In tv ev -> LL tv ev (Expr Out tv ev)
 llExpr = \case
-  ELoc le -> here le $ ELoc <$> lctd llExpr le
+  ELoc le -> here le $ llExpr (unlctd le)
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   EApp t  us -> EApp <$> llExpr t <*> traverse llExpr us
