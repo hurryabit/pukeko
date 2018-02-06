@@ -343,9 +343,6 @@ qualExpr = \case
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
   ETyCoe c  e0 -> ETyCoe <$> coercion2type qualType c <*> qualExpr e0
-  -- TODO: We can remove this by changing the constraint on 'ETyAbs' in 'Expr'
-  -- from @IsPreTyped lg@ to @TypeOf lg ~ Type@.
-  ETyAbs _  _  -> bug "type abstraction during quantification"
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
 

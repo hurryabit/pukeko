@@ -43,7 +43,7 @@ data Expr lg tv ev
   | IsNested lg ~ False => ECas (Expr lg tv ev) (NonEmpty (Case lg tv ev))
   | IsNested lg ~ True  => EMat (Expr lg tv ev) (NonEmpty (Altn lg tv ev))
   | ETyCoe (Coercion (TypeOf lg tv)) (Expr lg tv ev)
-  | IsPreTyped lg ~ True => ETyAbs (NonEmpty QVar) (Expr lg (TScope Int tv) ev)
+  | TypeOf lg ~ Type     => ETyAbs (NonEmpty QVar) (Expr lg (TScope Int tv) ev)
   | IsPreTyped lg ~ True => ETyApp (Expr lg tv ev) (NonEmpty (TypeOf lg tv))
   | (IsPreTyped lg ~ True, IsLambda lg ~ True) => ETyAnn (TypeOf lg tv) (Expr lg tv ev)
 
@@ -117,8 +117,8 @@ mkETyApp e0 = \case
   []    -> e0
   t1:ts -> ETyApp e0 (t1 :| ts)
 
-mkETyAbs :: (IsLang st, IsPreTyped st ~ True) =>
-  [QVar] -> Expr st (TScope Int tv) ev -> Expr st tv ev
+mkETyAbs :: (IsLang lg, TypeOf lg ~ Type) =>
+  [QVar] -> Expr lg (TScope Int tv) ev -> Expr lg tv ev
 mkETyAbs qvs0 e0 = case qvs0 of
   []     -> first strengthenScope0 e0
   qv:qvs -> ETyAbs (qv :| qvs) e0
