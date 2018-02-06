@@ -8,6 +8,8 @@ module Pukeko.AST.SuperCore
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import           Data.Aeson
+import           Data.Aeson.TH
 import qualified Data.Map as Map
 
 import qualified Pukeko.AST.Identifier as Id
@@ -109,3 +111,6 @@ instance Pretty Module where
 
 deriving instance Show (FuncDecl m)
 deriving instance Show Module
+
+deriveToJSON defaultOptions ''FuncDecl
+deriveToJSON defaultOptions ''Module

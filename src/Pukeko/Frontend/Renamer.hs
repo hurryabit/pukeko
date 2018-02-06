@@ -132,8 +132,8 @@ rnTypeScheme env (Ps.MkTypeScheme qs t) = do
   let vs0 = toList (setOf Ps.type2tvar t `Set.difference` Map.keysSet env)
   mkTUni <$> rnTypeCstr vs0 qs <*> rnType (fmap weakenScope env <> finRenamer vs0) t
 
-rnCoercion :: Ps.Coercion -> Coercion (NoType tv)
-rnCoercion (Ps.MkCoercion dir0 tcon) = MkCoercion dir1 tcon NoType NoType
+rnCoercion :: Ps.Coercion -> Coercion
+rnCoercion (Ps.MkCoercion dir0 tcon) = MkCoercion dir1 tcon
   where
     dir1 = case dir0 of
       Ps.Inject  -> Inject

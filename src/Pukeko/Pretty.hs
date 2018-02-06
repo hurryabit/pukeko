@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Pukeko.Pretty
   ( hsep

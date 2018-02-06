@@ -96,6 +96,7 @@ inExpr e0 = case e0 of
   ETyCoe d e -> ETyCoe d <$> inExpr e
   ETyAbs x e -> ETyAbs x <$> inExpr e
   ETyApp{}   -> inRedex e0
+  ETyAnn t e -> ETyAnn t <$> inExpr e
 
 inSupCDecl :: FuncDecl 'SupC -> In (FuncDecl 'SupC)
 inSupCDecl = func2expr inExpr

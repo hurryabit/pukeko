@@ -42,6 +42,7 @@ import           Control.Lens.Indexed
 import           Data.Forget
 import qualified Data.Map          as Map
 import qualified Data.Vector       as Vec
+import           Data.Aeson.TH
 
 import qualified Pukeko.AST.Identifier as Id
 
@@ -215,3 +216,5 @@ instance Bifunctor (Scope b) where
   bimap f g = \case
     Bound i b -> Bound (f i) b
     Free  x   -> Free  (g x)
+
+deriveToJSON defaultOptions ''Scope

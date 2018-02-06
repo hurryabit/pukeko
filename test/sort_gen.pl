@@ -80,19 +80,16 @@ dict$Monad$IO : Dict$Monad IO =
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a ->
-    fun (x : a) ->
-      coerce @((World -> Pair a World) -> IO a) (dict$Monad$IO$ll1 @a x)
+  fun @a -> fun (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
-      match coerce @(IO a -> World -> Pair a World) mx world0 with
-      | Pair @a @World x world1 ->
-        coerce @(IO b -> World -> Pair b World) (f x) world1
+      match coerce @(IO -> _) mx world0 with
+      | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) ->
-      coerce @((World -> Pair b World) -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
+      coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Ord$Int : Dict$Ord Int =
   let ge : Int -> Int -> Bool = ge_int
   and gt : Int -> Int -> Bool = gt_int
@@ -122,8 +119,7 @@ gen : ∀a. (a -> a) -> a -> List a =
 input : IO Int = io @Unit @Int geti Unit
 io : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
-    fun (f : a -> b) (x : a) ->
-      coerce @((World -> Pair b World) -> IO b) (io$ll1 @a @b f x)
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->

@@ -11,6 +11,8 @@ module Pukeko.AST.Expr
 import Pukeko.Prelude
 
 import           Control.Lens (makeLensesFor)
+import           Data.Aeson
+import           Data.Aeson.TH
 import           Data.Bifoldable
 import           Data.Bitraversable
 
@@ -31,6 +33,8 @@ data Atom
   | ACon Id.DCon
   | ANum Int
 
+-- NOTE: All constructors added here also NEED TO be added to the COMPLETE
+-- pragma below.
 data Expr lg tv ev
   = IsLambda lg ~ True => ELoc (Lctd (Expr lg tv ev))
   | EVar ev
@@ -42,10 +46,10 @@ data Expr lg tv ev
   | ERec [Defn lg tv (EScope Int ev)] (Expr lg tv (EScope Int ev))
   | IsNested lg ~ False => ECas (Expr lg tv ev) (NonEmpty (Case lg tv ev))
   | IsNested lg ~ True  => EMat (Expr lg tv ev) (NonEmpty (Altn lg tv ev))
-  | ETyCoe (Coercion (TypeOf lg tv)) (Expr lg tv ev)
+  | ETyCoe Coercion (Expr lg tv ev)
   | TypeOf lg ~ Type     => ETyAbs (NonEmpty QVar) (Expr lg (TScope Int tv) ev)
   | IsPreTyped lg ~ True => ETyApp (Expr lg tv ev) (NonEmpty (TypeOf lg tv))
-  | (IsPreTyped lg ~ True, IsLambda lg ~ True) => ETyAnn (TypeOf lg tv) (Expr lg tv ev)
+  | IsPreTyped lg ~ True => ETyAnn (TypeOf lg tv) (Expr lg tv ev)
 
 data Bind ty tv = MkBind
   { _bind2evar :: Lctd Id.EVar
@@ -78,8 +82,9 @@ pattern ECon c = EAtm (ACon c)
 pattern ENum :: Int -> Expr st tv ev
 pattern ENum n = EAtm (ANum n)
 
+-- NOTE: Do NOT forget to add new constructors here.
 {-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, ECas, EMat,
-             ETyCoe, ETyAbs, ETyApp #-}
+             ETyCoe, ETyAbs, ETyApp, ETyAnn #-}
 
 -- * Derived optics
 makeLenses ''Altn
@@ -103,13 +108,14 @@ mkEApp e0 es0 = case toList es0 of
   e1:es -> EApp e0 (e1 :| es)
 
 mkELam ::
-  (IsLambda st ~ True) =>
-  [Bind (TypeOf st) tv]      ->
-  Expr st tv (EScope Int ev) ->
-  Expr st tv ev
-mkELam bs0 e0 = case bs0 of
+  (IsLambda lg ~ True, IsPreTyped lg ~ True, TypeOf lg ~ Type) =>
+  [Bind (TypeOf lg) tv]      ->
+  (Type tv)                  ->
+  Expr lg tv (EScope Int ev) ->
+  Expr lg tv ev
+mkELam bs0 t0 e0 = case bs0 of
   []   -> strengthenE0 e0
-  b:bs -> ELam (b :| bs) e0
+  b:bs -> ELam (b :| bs) (ETyAnn t0 e0)
 
 mkETyApp ::
   (IsPreTyped st ~ True) => Expr st tv ev -> [TypeOf st tv] -> Expr st tv ev
@@ -219,9 +225,9 @@ instance IsLang st => Bitraversable (Expr st) where
       <*> bitraverse f (traverse g) e0
     ECas e0 cs -> ECas <$> bitraverse f g e0 <*> traverse (bitraverse f g) cs
     EMat e0 as -> EMat <$> bitraverse f g e0 <*> traverse (bitraverse f g) as
+    ETyCoe c e -> ETyCoe c <$> bitraverse f g e
     ETyAbs v e -> ETyAbs v <$> bitraverse (traverse f) g e
     ETyApp e t -> ETyApp <$> bitraverse f g e <*> traverse (traverse f) t
-    ETyCoe c e -> ETyCoe <$> coercion2type (traverse f) c <*> bitraverse f g e
     ETyAnn t e -> ETyAnn <$> traverse f t <*> bitraverse f g e
 
 instance IsLang st => Bifunctor     (Case st) where
@@ -317,16 +323,14 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
         $$ vcatMap pretty cs
-    ETyCoe (MkCoercion dir tcon t_from0 t_to0) e0 ->
+    ETyCoe (MkCoercion dir tcon) e0 ->
       maybeParens (prec > Op.aprec) $
         "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
         <+> prettyPrec (Op.aprec+1) e0
       where
-        (d_from, d_to) = case (,) <$> isType t_from0 <*> isType t_to0 of
-          Just (t_from, t_to) -> (prettyPrecType 2 t_from, prettyPrecType 1 t_to)
-          Nothing -> case dir of
-            Inject  -> ("_", pretty tcon)
-            Project -> (pretty tcon, "_")
+        (d_from, d_to) = case dir of
+          Inject  -> ("_", pretty tcon)
+          Project -> (pretty tcon, "_")
     ETyAbs vs e -> prettyETyAbs prec vs (pretty e)
     ETyApp e0 ts ->
       maybeParens (prec > Op.aprec)
@@ -394,3 +398,18 @@ deriving instance (TypeOf st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
 deriving instance                                         Show  Atom
 deriving instance                   (Show tv)          => Show (Patn Type tv)
 deriving instance                   (Show tv)          => Show (Bind Type tv)
+
+deriveToJSON defaultOptions ''Atom
+
+instance ToJSON tv => ToJSON (Patn Type tv) where
+  toJSON = $(mkToJSON defaultOptions ''Patn)
+instance ToJSON tv => ToJSON (Bind Type tv) where
+  toJSON = $(mkToJSON defaultOptions ''Bind)
+instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Altn lg tv ev) where
+  toJSON = $(mkToJSON defaultOptions ''Altn)
+instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Case lg tv ev) where
+  toJSON = $(mkToJSON defaultOptions ''Case)
+instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Defn lg tv ev) where
+  toJSON = $(mkToJSON defaultOptions ''Defn)
+instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Expr lg tv ev) where
+  toJSON = $(mkToJSON defaultOptions ''Expr)

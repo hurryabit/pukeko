@@ -222,7 +222,7 @@ infer = \case
         unify t_res t_rhs
         pure (MkAltn patn1 rhs1, cstrs1)
       pure (EMat expr1 altns1, t_res, cstrs0 <> fold cstrss1)
-    ETyCoe c@(MkCoercion dir tcon NoType NoType) e0 -> do
+    ETyCoe c@(MkCoercion dir tcon) e0 -> do
       MkTConDecl _ prms dcons <- findInfo info2tcons tcon
       t_rhs0 <- case dcons of
         Right _ -> throwHere ("type constructor" <+> pretty tcon <+> "is not coercible")
@@ -235,7 +235,7 @@ infer = \case
             Project -> (t_rhs, t_lhs)
       (e1, t1, cstrs) <- infer e0
       unify t_from t1
-      pure (ETyCoe c{_coeFrom = t_from, _coeTo = t_to} e1, t_to, cstrs)
+      pure (ETyAnn t_to (ETyCoe c e1), t_to, cstrs)
 
 inferTypedDefn ::
   (BaseTVar tv) =>
@@ -342,7 +342,7 @@ qualExpr = \case
   ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
-  ETyCoe c  e0 -> ETyCoe <$> coercion2type qualType c <*> qualExpr e0
+  ETyCoe c  e0 -> ETyCoe c <$> qualExpr e0
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
 

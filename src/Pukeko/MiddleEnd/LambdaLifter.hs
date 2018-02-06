@@ -80,7 +80,7 @@ llExpr = \case
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
-  ETyAnn _ e0 -> llExpr e0
+  ETyAnn c e0 -> ETyAnn c <$> llExpr e0
 
 llCase ::
   (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)

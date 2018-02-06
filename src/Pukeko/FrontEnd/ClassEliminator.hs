@@ -192,6 +192,8 @@ elimETyApp e0 t_e0 ts0 = do
 elimDefn :: (IsTVar tv, HasEnv ev) => Defn In tv ev -> CE tv ev (Defn Out tv ev)
 elimDefn = defn2expr (fmap fst . elimExpr)
 
+-- TODO: Figure out if we can remove the 'Type' component from the result.
+-- Adding type annotations is perhaps a better way to solve this problem.
 elimExpr ::
   (IsTVar tv, HasEnv ev) => Expr In tv ev -> CE tv ev (Expr Out tv ev, Type tv)
 elimExpr = \case
@@ -220,7 +222,11 @@ elimExpr = \case
     (c1, t1) <- elimCase c0
     cs1 <- traverse (fmap fst . elimCase) cs0
     pure (ECas e1 (c1 :| cs1), t1)
-  ETyCoe c e0 -> (,) <$> (ETyCoe c . fst <$> elimExpr e0) <*> pure (_coeTo c)
+  ETyAnn t_to (ETyCoe c e0) -> do
+    (e1, _) <- elimExpr e0
+    pure (ETyAnn t_to (ETyCoe c e1), t_to)
+  ETyCoe{} ->
+    bug "type coercion without surrounding type annotation during class elimination"
   ETyApp e0 ts0 -> do
     (e1, t_e1) <- elimExpr e0
     elimETyApp e1 t_e1 (toList ts0)
@@ -239,7 +245,7 @@ elimExpr = \case
     (e1, t1) <-
       withinXScope refs (Vec.fromList (fmap _bind2type bs)) (elimExpr (weakenE e0))
     let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
-    pure (ETyAbs qvs1 (mkELam bs (ETyAnn t1 e1)), TUni qvs0 t1)
+    pure (ETyAbs qvs1 (mkELam bs t1 e1), TUni qvs0 t1)
   ETyAnn t0 e0 -> do
     (e1, _) <- elimExpr e0
     pure (ETyAnn t0 e1, t0)

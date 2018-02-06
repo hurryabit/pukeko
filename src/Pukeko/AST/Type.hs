@@ -24,7 +24,6 @@ module Pukeko.AST.Type
   , vars
   , qvar2cstr
   , qvar2tvar
-  , coercion2type
   , type2tcon
   , type2tcon_
   , prettyTypeCstr
@@ -38,6 +37,7 @@ import Pukeko.Prelude
 
 import           Control.Lens.Indexed (FunctorWithIndex)
 import           Control.Monad.Freer.Supply
+import           Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
@@ -76,11 +76,9 @@ data QVar = MkQVar
 
 data CoercionDir = Inject | Project
 
-data Coercion ty = MkCoercion
+data Coercion = MkCoercion
   { _coeDir  :: CoercionDir
   , _coeTCon :: Id.TCon
-  , _coeFrom :: ty
-  , _coeTo   :: ty
   }
 
 strengthenT0 :: Type (TScope Int tv) -> Type tv
@@ -127,9 +125,6 @@ typeInt  = TCon (Id.tcon "Int")
 
 vars :: Ord tv => Type tv -> Set tv
 vars = setOf traverse
-
-coercion2type :: Traversal (Coercion ty1) (Coercion ty2) ty1 ty2
-coercion2type f (MkCoercion dir tcon from to) = MkCoercion dir tcon <$> f from <*> f to
 
 -- * Deep traversals
 type2tcon :: forall m tv. Monad m => (Id.TCon -> m Id.TCon) -> Type tv -> m (Type tv)
@@ -224,7 +219,7 @@ deriving instance Traversable NoType
 deriving instance Show QVar
 deriving instance Show tv => Show (Type tv)
 deriving instance Show CoercionDir
-deriving instance Show ty => Show (Coercion ty)
+deriving instance Show Coercion
 
 newtype Boxed tv = Box{unBox :: tv}
   deriving (Eq, Ord)
@@ -293,3 +288,8 @@ renameType t0 =
         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
         local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
           TUni qvs1 <$> go tq
+
+deriveToJSON defaultOptions ''QVar
+deriveToJSON defaultOptions ''Type
+deriveToJSON defaultOptions ''CoercionDir
+deriveToJSON defaultOptions ''Coercion

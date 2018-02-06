@@ -7,6 +7,7 @@ where
 
 import Prelude
 import Control.Lens (Iso, iso)
+import Data.Aeson.TH
 
 newtype Forget a = Forget{_remember :: a}
 
@@ -21,3 +22,5 @@ instance Ord (Forget a) where
 
 instance Show a => Show (Forget a) where
   showsPrec lvl (Forget x) = showsPrec lvl x
+
+deriveJSON defaultOptions ''Forget

@@ -20,6 +20,9 @@ module Pukeko.AST.Identifier
 where
 
 import Pukeko.Prelude
+
+import Data.Aeson
+import Data.Aeson.TH
 import Data.Char (isLower, isUpper)
 
 class Named a where
@@ -107,3 +110,12 @@ type Clss = XCon ClssTag
 
 clss :: String -> Clss
 clss = xcon
+
+deriveToJSON defaultOptions ''EVar
+deriveToJSON defaultOptions ''TVar
+
+instance ToJSON (XCon tag) where
+  toJSON = $(mkToJSON defaultOptions ''XCon)
+instance ToJSONKey EVar
+instance ToJSONKey TVar
+instance ToJSONKey (XCon tag)

@@ -78,10 +78,13 @@ import Data.Traversable      as X
 import Data.Vector           as X (Vector)
 import Data.Void             as X (Void, absurd)
 
+import           Data.Aeson
 import           Data.Functor.Compose           (Compose (..))
 import qualified Text.PrettyPrint.Annotated     as PP
 import           Text.PrettyPrint.Annotated     (Doc, render)
 import           Text.Megaparsec.Pos            (SourcePos, initialPos, sourcePosPretty)
+
+import           Pukeko.Orphans ()
 
 type Failure = Doc ()
 
@@ -181,3 +184,6 @@ instance Pretty a => Pretty (Lctd a) where
 
 instance PrettyPrec a => PrettyPrec (Lctd a) where
   prettyPrec prec = prettyPrec prec . unlctd
+
+instance ToJSON a => ToJSON (Lctd a) where
+  toJSON = toJSON . unlctd

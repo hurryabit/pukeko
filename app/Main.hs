@@ -3,9 +3,12 @@ module Main where
 import Pukeko.Prelude
 
 import Options.Applicative
-import System.FilePath ((-<.>))
+import System.FilePath ((<.>), (-<.>))
 import System.Exit
-import qualified Data.Text.Lazy.IO as T
+import qualified Data.Aeson               as Aeson
+import qualified Data.Aeson.Encode.Pretty as Aeson
+import qualified Data.ByteString.Lazy     as BS
+import qualified Data.Text.Lazy.IO        as T
 
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
@@ -16,8 +19,8 @@ import qualified Pukeko.BackEnd         as BackEnd
 unlift :: (Monad m) => Either e a -> Eff [Error e, m] a
 unlift = either throwError pure
 
-compile :: Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()
-compile write_pl stop_tc unsafe graph opts file = do
+compile :: Bool -> Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()
+compile write_pl stop_tc unsafe json graph opts file = do
   ok_or_error <- runM . runError $ do
     package <- Parser.parsePackage file
     module_sf <- unlift (FrontEnd.run unsafe package)
@@ -31,8 +34,11 @@ compile write_pl stop_tc unsafe graph opts file = do
         nasm <- unlift (BackEnd.run module_lm)
         sendM $ do
           when write_pl $ do
-            writeFile (file -<.> "pl") $
-              render (pretty module_pl) ++ "\n"
+            writeFile (file -<.> "pl") $ render (pretty module_pl) ++ "\n"
+          when json $ do
+            let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
+            BS.writeFile (file -<.> "pl" <.> "json")
+              (Aeson.encodePretty' config (Aeson.toJSON module_pl))
           when graph $ do
             T.writeFile (file -<.> "dot") $
               G.renderCallGraph (G.makeCallGraph module_pl)
@@ -62,7 +68,8 @@ options =
     <$> switch (short 'l' <> help "Write result of lambda lifter")
     <*> switch (short 't' <> help "Stop after type checking")
     <*> switch (short 'u' <> help "Don't run the type checker")
-    <*> switch (short 'g' <> help "Save dependencay graph of last stage")
+    <*> switch (short 'j' <> help "Write .pl.json file")
+    <*> switch (short 'g' <> help "Save dependency graph of last stage")
     <*> optimizations
     <*> argument str (metavar "FILE")
 

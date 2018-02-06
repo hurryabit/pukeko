@@ -39,8 +39,7 @@ g : Int -> Int -> Int -> Int -> Int =
   fun (a : Int) (b : Int) (c : Int) (d : Int) -> a
 io : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
-    fun (f : a -> b) (x : a) ->
-      coerce @((World -> Pair b World) -> IO b) (io$ll1 @a @b f x)
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->

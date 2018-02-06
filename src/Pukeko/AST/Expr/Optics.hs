@@ -7,7 +7,6 @@ import           Data.Functor.Compose
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Language
-import           Pukeko.AST.Type
 
 -- | Traverse over all the atoms on the RHS of a definition.
 defn2atom :: Traversal' (Defn st tv ev) Atom
@@ -61,7 +60,7 @@ expr2type f = \case
   ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
-  ETyCoe c e   -> ETyCoe <$> coercion2type (simplify f) c <*> expr2type f e
+  ETyCoe c e   -> ETyCoe c <$> expr2type f e
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type (scoped f) e0
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse (simplify f) ts
   ETyAnn t  e0 -> ETyAnn <$> simplify f t <*> expr2type f e0

@@ -130,19 +130,16 @@ dict$Monad$IO : Dict$Monad IO =
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a ->
-    fun (x : a) ->
-      coerce @((World -> Pair a World) -> IO a) (dict$Monad$IO$ll1 @a x)
+  fun @a -> fun (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
-      match coerce @(IO a -> World -> Pair a World) mx world0 with
-      | Pair @a @World x world1 ->
-        coerce @(IO b -> World -> Pair b World) (f x) world1
+      match coerce @(IO -> _) mx world0 with
+      | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) ->
-      coerce @((World -> Pair b World) -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
+      coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Ord$Int : Dict$Ord Int =
   let ge : Int -> Int -> Bool = ge_int
   and gt : Int -> Int -> Bool = gt_int
@@ -158,10 +155,9 @@ dict$Ring$Int : Dict$Ring Int =
   in
   Dict$Ring @Int neg add sub mul
 fix : ∀f. f (Fix f) -> Fix f =
-  fun @f -> fun (x : f (Fix f)) -> coerce @(f (Fix f) -> Fix f) x
+  fun @f -> fun (x : f (Fix f)) -> coerce @(_ -> Fix) x
 fix2 : ∀a p. p a (Fix2 p a) -> Fix2 p a =
-  fun @a @p ->
-    fun (x : p a (Fix2 p a)) -> coerce @(p a (Fix2 p a) -> Fix2 p a) x
+  fun @a @p -> fun (x : p a (Fix2 p a)) -> coerce @(_ -> Fix2) x
 foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
@@ -185,8 +181,7 @@ id : ∀a. a -> a = fun @a -> fun (x : a) -> x
 input : IO Int = io @Unit @Int geti Unit
 io : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
-    fun (f : a -> b) (x : a) ->
-      coerce @((World -> Pair b World) -> IO b) (io$ll1 @a @b f x)
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
@@ -279,7 +274,6 @@ traverse_$ll1 : ∀a m. Dict$Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
     fun (dict$Monad$m : Dict$Monad m) (f : a -> m Unit) (x : a) (m : m Unit) ->
       semi @Unit @m dict$Monad$m (f x) m
 unFix : ∀f. Fix f -> f (Fix f) =
-  fun @f -> fun (x : Fix f) -> coerce @(Fix f -> f (Fix f)) x
+  fun @f -> fun (x : Fix f) -> coerce @(Fix -> _) x
 unFix2 : ∀a p. Fix2 p a -> p a (Fix2 p a) =
-  fun @a @p ->
-    fun (x : Fix2 p a) -> coerce @(Fix2 p a -> p a (Fix2 p a)) x
+  fun @a @p -> fun (x : Fix2 p a) -> coerce @(Fix2 -> _) x

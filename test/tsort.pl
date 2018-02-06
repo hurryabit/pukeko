@@ -48,15 +48,14 @@ external neg_int : Int -> Int = "neg"
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
 external sub_int : Int -> Int -> Int = "sub"
-bag_empty : ∀a. Bag a =
-  fun @a -> coerce @(BinTree a -> Bag a) (Leaf @a)
+bag_empty : ∀a. Bag a = fun @a -> coerce @(_ -> Bag) (Leaf @a)
 bag_insert : ∀a. Dict$Ord a -> a -> Bag a -> Bag a =
   fun @a ->
     fun (dict$Ord$a : Dict$Ord a) (x : a) (s : Bag a) ->
       let rec insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
                 fun @_12 -> bag_insert$ll1 @_12 insert
       in
-      coerce @(BinTree a -> Bag a) (insert @a dict$Ord$a x (coerce @(Bag a -> BinTree a) s))
+      coerce @(_ -> Bag) (insert @a dict$Ord$a x (coerce @(Bag -> _) s))
 bag_insert$ll1 : ∀_12. (∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12) -> Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
   fun @_12 ->
     fun (insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12) (dict$Ord$_12 : Dict$Ord _12) (x : _12) (t : BinTree _12) ->
@@ -81,11 +80,11 @@ dict$Foldable$Bag : Dict$Foldable Bag =
 dict$Foldable$Bag$ll1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
   fun @a @b ->
     fun (f : a -> b -> b) (y0 : b) (bag : Bag a) ->
-      foldr @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag a -> BinTree a) bag)
+      foldr @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
 dict$Foldable$Bag$ll2 : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
   fun @a @b ->
     fun (f : b -> a -> b) (y0 : b) (bag : Bag a) ->
-      foldl @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag a -> BinTree a) bag)
+      foldl @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
 dict$Foldable$BinTree : Dict$Foldable BinTree =
   let foldr : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
         fun @a @b -> dict$Foldable$BinTree$ll1 @a @b
@@ -137,19 +136,16 @@ dict$Monad$IO : Dict$Monad IO =
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a ->
-    fun (x : a) ->
-      coerce @((World -> Pair a World) -> IO a) (dict$Monad$IO$ll1 @a x)
+  fun @a -> fun (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
-      match coerce @(IO a -> World -> Pair a World) mx world0 with
-      | Pair @a @World x world1 ->
-        coerce @(IO b -> World -> Pair b World) (f x) world1
+      match coerce @(IO -> _) mx world0 with
+      | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) ->
-      coerce @((World -> Pair b World) -> IO b) (dict$Monad$IO$ll3 @a @b mx f)
+      coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 dict$Ord$Int : Dict$Ord Int =
   let ge : Int -> Int -> Bool = ge_int
   and gt : Int -> Int -> Bool = gt_int
@@ -177,8 +173,7 @@ foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
 input : IO Int = io @Unit @Int geti Unit
 io : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
-    fun (f : a -> b) (x : a) ->
-      coerce @((World -> Pair b World) -> IO b) (io$ll1 @a @b f x)
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->

@@ -36,8 +36,8 @@ check :: TypeCheckable m => m -> Either Failure ()
 check m = runTC m (checkModule m)
 
 
-checkCoercion :: Coercion (Type tv) -> TC tv ev ()
-checkCoercion _ = -- (MkCoercion dir tcon t_from t_to) =
+checkCoercion :: Coercion -> Type tv -> Type tv -> TC tv ev ()
+checkCoercion (MkCoercion _dir _tcon) _from _to =
   -- FIXME: Implement the actual check.
   pure ()
 
@@ -67,10 +67,12 @@ typeOf = \case
       typeOf e0
   EMat e0 as -> typeOfBranching typeOfAltn e0 as
   ECas e0 cs -> typeOfBranching typeOfCase e0 cs
-  ETyCoe c e0 -> do
-    checkCoercion c
-    checkExpr e0 (_coeFrom c)
-    pure (_coeTo c)
+  ETyAnn t_to (ETyCoe c e0) -> do
+    t_from <- typeOf e0
+    checkCoercion c t_from t_to
+    pure t_to
+  ETyCoe{} ->
+    bug "type coercion without surrounding type annotation durch type checking"
   ETyAbs qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0

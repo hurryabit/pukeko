@@ -12,6 +12,8 @@ module Pukeko.AST.ConDecl
 
 import Pukeko.Prelude
 
+import           Data.Aeson.TH
+
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 import           Pukeko.AST.Scope
@@ -63,3 +65,6 @@ deriving instance Show DConDecl
 
 makeLenses ''TConDecl
 makeLenses ''DConDecl
+
+deriveToJSON defaultOptions ''TConDecl
+deriveToJSON defaultOptions ''DConDecl

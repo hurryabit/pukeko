@@ -39,6 +39,7 @@ ghc-options:
 - -Werror
 - -Wno-name-shadowing
 - -Wno-partial-type-signatures
+- -O0
 
 library:
   source-dirs: src
@@ -51,6 +52,7 @@ library:
   - Pukeko.Prelude
   - Pukeko.Pretty
   dependencies:
+  - aeson
   - array
   - call-stack
   - containers
@@ -83,6 +85,9 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - aeson
+    - aeson-pretty
+    - bytestring
     - pukeko
     - filepath
     - graphviz
