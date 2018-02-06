@@ -84,6 +84,7 @@ typeOf = \case
       TFun{} ->
         throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
+  ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
 
 satisfiesCstrs :: (IsTVar tv) => Type tv -> QVar -> TC tv ev ()
 satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q

@@ -45,6 +45,7 @@ data Expr lg tv ev
   | ETyCoe (Coercion (TypeOf lg tv)) (Expr lg tv ev)
   | IsPreTyped lg ~ True => ETyAbs (NonEmpty QVar) (Expr lg (TScope Int tv) ev)
   | IsPreTyped lg ~ True => ETyApp (Expr lg tv ev) (NonEmpty (TypeOf lg tv))
+  | (IsPreTyped lg ~ True, IsLambda lg ~ True) => ETyAnn (TypeOf lg tv) (Expr lg tv ev)
 
 data Bind ty tv = MkBind
   { _bind2evar :: Lctd Id.EVar
@@ -157,6 +158,7 @@ instance Monad (Expr st tv) where
     ETyCoe c e   -> ETyCoe c (e >>= f)
     ETyAbs _ _   -> error "FIXME: THIS IS NOT IMPLEMENTED"
     ETyApp e t   -> ETyApp (e >>= f) t
+    ETyAnn t e   -> ETyAnn t (e >>= f)
 
 
 -- * Instances
@@ -222,6 +224,7 @@ instance IsLang st => Bitraversable (Expr st) where
     ETyAbs v e -> ETyAbs v <$> bitraverse (traverse f) g e
     ETyApp e t -> ETyApp <$> bitraverse f g e <*> traverse (traverse f) t
     ETyCoe c e -> ETyCoe <$> coercion2type (traverse f) c <*> bitraverse f g e
+    ETyAnn t e -> ETyAnn <$> traverse f t <*> bitraverse f g e
 
 instance IsLang st => Bifunctor     (Case st) where
   bimap = bimapDefault
@@ -330,6 +333,10 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
     ETyApp e0 ts ->
       maybeParens (prec > Op.aprec)
       $ prettyPrec Op.aprec e0 <+> prettyAtType (prettyPrecType 3) ts
+    -- TODO: Decide if it's a good idea to swallow type annotations. Probably,
+    -- make a distinction between those given by the user and those generated
+    -- during type inference.
+    ETyAnn _ e -> prettyPrec prec e
 
 prettyELam ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev) =>

@@ -28,6 +28,7 @@ expr2atom f = \case
   ETyCoe d e   -> ETyCoe d <$> expr2atom f e
   ETyAbs x e   -> ETyAbs x <$> expr2atom f e
   ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
+  ETyAnn t e   -> ETyAnn t <$> expr2atom f e
 
 simplify :: (Applicative f, Functor ty) =>
   (forall s. Traversable s => ty (s tv1) -> f (ty (s tv2))) ->
@@ -64,6 +65,7 @@ expr2type f = \case
   ETyCoe c e   -> ETyCoe <$> coercion2type (simplify f) c <*> expr2type f e
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type (scoped f) e0
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse (simplify f) ts
+  ETyAnn t  e0 -> ETyAnn <$> simplify f t <*> expr2type f e0
 
 -- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a case alternative, i.e., the type arguments to

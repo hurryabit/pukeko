@@ -47,6 +47,7 @@ pmExpr = \case
   ETyCoe c e0  -> ETyCoe c <$> pmExpr e0
   ETyAbs xs e0 -> ETyAbs xs <$> pmExpr e0
   ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
+  ETyAnn t  e  -> ETyAnn t <$> pmExpr e
 
 pmDefn :: Defn In tv ev -> PM (Defn Out tv ev)
 pmDefn (MkDefn b e) = do

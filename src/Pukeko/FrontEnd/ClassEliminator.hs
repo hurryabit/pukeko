@@ -240,6 +240,9 @@ elimExpr = \case
       withinXScope refs (Vec.fromList (fmap _bind2type bs)) (elimExpr (weakenE e0))
     let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
     pure (ETyAbs qvs1 (mkELam bs e1 t1), TUni qvs0 t1)
+  ETyAnn t0 e0 -> do
+    (e1, _) <- elimExpr e0
+    pure (ETyAnn t0 e1, t0)
 
 elimCase ::
   (IsTVar tv, HasEnv ev) =>

@@ -348,6 +348,7 @@ qualExpr = \case
   ETyCoe c  e0 -> ETyCoe <$> coercion2type qualType c <*> qualExpr e0
   ETyAbs _  _  -> bug "type abstraction during quantification"
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
+  ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
 
 qualAltn :: Altn (Aux s) tv' ev -> TQ tv s (Altn Out tv ev)
 qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e
