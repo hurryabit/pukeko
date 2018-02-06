@@ -168,7 +168,7 @@ rnExpr = \case
     ELet <$> traverse rnDefn ds0 <*> localizeDefns ds0 (rnExpr e0)
   Ps.ERec (toList -> ds0) e0 ->
     localizeDefns ds0 $ ERec <$> traverse rnDefn ds0 <*> rnExpr e0
-  Ps.ECoe c e -> ECoe (rnCoercion c) <$> rnExpr e
+  Ps.ECoe c e -> ETyCoe (rnCoercion c) <$> rnExpr e
 
 rnBind :: Lctd Id.EVar -> Bind NoType tv
 rnBind x = MkBind x NoType

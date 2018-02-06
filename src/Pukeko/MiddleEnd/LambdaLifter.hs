@@ -76,7 +76,7 @@ llExpr = \case
     let supc = SupCDecl (MkBind (Lctd noPos lhs) t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @'SupC supc)
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
-  ECoe c e0 -> ECoe c <$> llExpr e0
+  ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
 

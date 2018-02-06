@@ -42,7 +42,7 @@ data Expr lg tv ev
   | ERec [Defn lg tv (EScope Int ev)] (Expr lg tv (EScope Int ev))
   | IsNested lg ~ False => ECas (Expr lg tv ev) (NonEmpty (Case lg tv ev))
   | IsNested lg ~ True  => EMat (Expr lg tv ev) (NonEmpty (Altn lg tv ev))
-  | ECoe (Coercion (TypeOf lg tv)) (Expr lg tv ev)
+  | ETyCoe (Coercion (TypeOf lg tv)) (Expr lg tv ev)
   | IsPreTyped lg ~ True => ETyAbs (NonEmpty QVar) (Expr lg (TScope Int tv) ev)
   | IsPreTyped lg ~ True => ETyApp (Expr lg tv ev) (NonEmpty (TypeOf lg tv))
 
@@ -77,8 +77,8 @@ pattern ECon c = EAtm (ACon c)
 pattern ENum :: Int -> Expr st tv ev
 pattern ENum n = EAtm (ANum n)
 
-{-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, ECas, EMat, ECoe,
-             ETyAbs, ETyApp #-}
+{-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, ECas, EMat,
+             ETyCoe, ETyAbs, ETyApp #-}
 
 -- * Derived optics
 makeLenses ''Altn
@@ -154,7 +154,7 @@ instance Monad (Expr st tv) where
     ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
     ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
     EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
-    ECoe c e     -> ECoe c (e >>= f)
+    ETyCoe c e   -> ETyCoe c (e >>= f)
     ETyAbs _ _   -> error "FIXME: THIS IS NOT IMPLEMENTED"
     ETyApp e t   -> ETyApp (e >>= f) t
 
@@ -221,7 +221,7 @@ instance IsLang st => Bitraversable (Expr st) where
     EMat e0 as -> EMat <$> bitraverse f g e0 <*> traverse (bitraverse f g) as
     ETyAbs v e -> ETyAbs v <$> bitraverse (traverse f) g e
     ETyApp e t -> ETyApp <$> bitraverse f g e <*> traverse (traverse f) t
-    ECoe c e   -> ECoe <$> coercion2type (traverse f) c <*> bitraverse f g e
+    ETyCoe c e -> ETyCoe <$> coercion2type (traverse f) c <*> bitraverse f g e
 
 instance IsLang st => Bifunctor     (Case st) where
   bimap = bimapDefault
@@ -316,7 +316,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
         $$ vcatMap pretty cs
-    ECoe (MkCoercion dir tcon t_from0 t_to0) e0 ->
+    ETyCoe (MkCoercion dir tcon t_from0 t_to0) e0 ->
       maybeParens (prec > Op.aprec) $
         "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
         <+> prettyPrec (Op.aprec+1) e0

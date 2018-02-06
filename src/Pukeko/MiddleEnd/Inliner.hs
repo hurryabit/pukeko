@@ -93,7 +93,7 @@ inExpr e0 = case e0 of
   ECas t  cs -> ECas <$> inExpr t <*> (traverse . case2expr) inExpr cs
   ELet ds t  -> ELet <$> (traverse . defn2expr) inExpr ds <*> inExpr t
   ERec ds t  -> ERec <$> (traverse . defn2expr) inExpr ds <*> inExpr t
-  ECoe d e   -> ECoe d <$> inExpr e
+  ETyCoe d e -> ETyCoe d <$> inExpr e
   ETyAbs x e -> ETyAbs x <$> inExpr e
   ETyApp{}   -> inRedex e0
 

@@ -220,7 +220,7 @@ elimExpr = \case
     (c1, t1) <- elimCase c0
     cs1 <- traverse (fmap fst . elimCase) cs0
     pure (ECas e1 (c1 :| cs1), t1)
-  ECoe c e0 -> (,) <$> (ECoe c . fst <$> elimExpr e0) <*> pure (_coeTo c)
+  ETyCoe c e0 -> (,) <$> (ETyCoe c . fst <$> elimExpr e0) <*> pure (_coeTo c)
   ETyApp e0 ts0 -> do
     (e1, t_e1) <- elimExpr e0
     elimETyApp e1 t_e1 (toList ts0)

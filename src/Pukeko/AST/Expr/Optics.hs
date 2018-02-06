@@ -25,7 +25,7 @@ expr2atom f = \case
   ELet ds t    -> ELet <$> (traverse . defn2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . defn2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
-  ECoe d e     -> ECoe d <$> expr2atom f e
+  ETyCoe d e   -> ETyCoe d <$> expr2atom f e
   ETyAbs x e   -> ETyAbs x <$> expr2atom f e
   ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
 
@@ -61,7 +61,7 @@ expr2type f = \case
   ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
-  ECoe c e     -> ECoe <$> coercion2type (simplify f) c <*> expr2type f e
+  ETyCoe c e   -> ETyCoe <$> coercion2type (simplify f) c <*> expr2type f e
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type (scoped f) e0
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse (simplify f) ts
 

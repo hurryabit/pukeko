@@ -67,7 +67,7 @@ typeOf = \case
       typeOf e0
   EMat e0 as -> typeOfBranching typeOfAltn e0 as
   ECas e0 cs -> typeOfBranching typeOfCase e0 cs
-  ECoe c e0 -> do
+  ETyCoe c e0 -> do
     checkCoercion c
     checkExpr e0 (_coeFrom c)
     pure (_coeTo c)
