@@ -54,9 +54,9 @@ typeOf = \case
         TFun tx ty -> checkExpr ek tx *> pure ty
         TUni{}     -> throwHere "expected type argument, but found value argument"
         _          -> throwHere "unexpected value argument"
-  ELam bs e0 t0 -> do
+  ELam bs e0 -> do
     let ts = fmap _bind2type bs
-    withinEScope' id ts (checkExpr e0 t0)
+    t0 <- withinEScope' id ts (typeOf e0)
     pure (ts *~> t0)
   ELet ds e0 -> do
     traverse_ checkDefn ds

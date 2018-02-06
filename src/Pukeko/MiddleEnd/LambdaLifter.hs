@@ -50,7 +50,7 @@ llExpr = \case
     withinEScope' (_bind2type . _defn2bind) ds $
       ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
   -- TODO: It might be nice to use Liquid Haskell here.
-  ELam oldBinds rhs0 t_rhs -> do
+  ELam oldBinds (ETyAnn t_rhs rhs0) -> do
     rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
     let evCaptured = Set.toList (setOf (traverse . _Free) rhs1)
     let n0 = length evCaptured
@@ -76,6 +76,7 @@ llExpr = \case
     let supc = SupCDecl (MkBind (Lctd noPos lhs) t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @'SupC supc)
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
+  ELam{} -> bug "lambda without type annotation around body during lambda lifting"
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)

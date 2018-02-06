@@ -163,7 +163,7 @@ rnExpr = \case
   Ps.ELam bs0 e0 -> do
     let bs1 = fmap rnBind bs0
     let bs2 = ifoldMap (\i (MkBind (unlctd -> x) NoType) -> Map.singleton x i) bs1
-    ELam bs1 <$> localize bs2 (rnExpr e0) <*> pure NoType
+    ELam bs1 <$> localize bs2 (rnExpr e0)
   Ps.ELet (toList -> ds0) e0 ->
     ELet <$> traverse rnDefn ds0 <*> localizeDefns ds0 (rnExpr e0)
   Ps.ERec (toList -> ds0) e0 ->

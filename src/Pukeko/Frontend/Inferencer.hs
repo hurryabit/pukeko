@@ -200,11 +200,11 @@ infer = \case
       t_res <- freshUVar
       unify t_fun (t_args *~> t_res)
       pure (EApp fun1 args1, t_res, cstrs_fun <> fold cstrs_args)
-    ELam binds0 rhs0 NoType -> do
+    ELam binds0 rhs0 -> do
       t_binds <- traverse (const freshUVar) binds0
       (rhs1, t_rhs, cstrs) <- withinEScope (NE.toVector t_binds) (infer rhs0)
       let binds1 = NE.zipWith (\(MkBind x NoType) -> MkBind x) binds0 t_binds
-      pure (ELam binds1 rhs1 t_rhs, t_binds *~> t_rhs, cstrs)
+      pure (ELam binds1 (ETyAnn t_rhs rhs1), t_binds *~> t_rhs, cstrs)
     ELet defns0 rhs0 -> do
       (defns1, t_defns, cstrs_defns) <- unzip3 <$> traverse inferLet defns0
       (rhs1, t_rhs, cstrs_rhs) <- withinEScope (Vec.fromList t_defns) (infer rhs0)
@@ -338,14 +338,13 @@ qualExpr = \case
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   EApp e0 es -> EApp <$> qualExpr e0 <*> traverse qualExpr es
-  ELam bs0 e0 t -> do
-    bs1 <- for bs0 $ \(MkBind x ts) -> do
-      MkBind x <$> qualType ts
-    ELam bs1 <$> qualExpr e0 <*> qualType t
+  ELam bs0 e0 -> ELam <$> (traverse . bind2type) qualType bs0 <*> qualExpr e0
   ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
   ETyCoe c  e0 -> ETyCoe <$> coercion2type qualType c <*> qualExpr e0
+  -- TODO: We can remove this by changing the constraint on 'ETyAbs' in 'Expr'
+  -- from @IsPreTyped lg@ to @TypeOf lg ~ Type@.
   ETyAbs _  _  -> bug "type abstraction during quantification"
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e

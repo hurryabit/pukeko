@@ -21,7 +21,7 @@ expr2atom f = \case
   EAtm a       -> EAtm <$> f a
   EApp t  us   -> EApp <$> expr2atom f t <*> (traverse . expr2atom) f us
   ECas t  cs   -> ECas <$> expr2atom f t <*> (traverse . case2expr . expr2atom) f cs
-  ELam bs e t  -> ELam bs <$> expr2atom f e <*> pure t
+  ELam bs e    -> ELam bs <$> expr2atom f e
   ELet ds t    -> ELet <$> (traverse . defn2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . defn2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
@@ -57,8 +57,7 @@ expr2type f = \case
   EAtm a       -> pure (EAtm a)
   EApp e0 es   -> EApp <$> expr2type f e0 <*> traverse (expr2type f) es
   ECas e0 cs   -> ECas <$> expr2type f e0 <*> traverse (case2type f ) cs
-  ELam bs e t  ->
-    ELam <$> traverse (bind2type (simplify f)) bs <*> expr2type f e <*> simplify f t
+  ELam bs e    -> ELam <$> traverse (bind2type (simplify f)) bs <*> expr2type f e
   ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as

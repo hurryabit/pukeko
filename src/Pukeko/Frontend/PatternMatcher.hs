@@ -38,7 +38,7 @@ pmExpr = \case
   EVar x          -> pure (EVar x)
   EAtm a          -> pure (EAtm a)
   EApp t  us      -> EApp <$> pmExpr t <*> traverse pmExpr us
-  ELam bs e t     -> ELam bs <$> pmExpr e <*> pure t
+  ELam bs e       -> ELam bs <$> pmExpr e
   ELet ds t       -> ELet <$> traverse (defn2expr pmExpr) ds <*> pmExpr t
   ERec ds t       -> ERec <$> traverse (defn2expr pmExpr) ds <*> pmExpr t
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do

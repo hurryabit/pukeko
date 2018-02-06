@@ -37,7 +37,7 @@ data Expr lg tv ev
   | EAtm Atom
   | EApp (Expr lg tv ev) (NonEmpty (Expr lg tv ev))
   | IsLambda lg ~ True =>
-    ELam (NonEmpty (Bind (TypeOf lg) tv)) (Expr lg tv (EScope Int ev)) (TypeOf lg tv)
+    ELam (NonEmpty (Bind (TypeOf lg) tv)) (Expr lg tv (EScope Int ev))
   | ELet [Defn lg tv             ev ] (Expr lg tv (EScope Int ev))
   | ERec [Defn lg tv (EScope Int ev)] (Expr lg tv (EScope Int ev))
   | IsNested lg ~ False => ECas (Expr lg tv ev) (NonEmpty (Case lg tv ev))
@@ -106,11 +106,10 @@ mkELam ::
   (IsLambda st ~ True) =>
   [Bind (TypeOf st) tv]      ->
   Expr st tv (EScope Int ev) ->
-  TypeOf st tv               ->
   Expr st tv ev
-mkELam bs0 e0 t0 = case bs0 of
+mkELam bs0 e0 = case bs0 of
   []   -> strengthenE0 e0
-  b:bs -> ELam (b :| bs) e0 t0
+  b:bs -> ELam (b :| bs) e0
 
 mkETyApp ::
   (IsPreTyped st ~ True) => Expr st tv ev -> [TypeOf st tv] -> Expr st tv ev
@@ -151,7 +150,7 @@ instance Monad (Expr st tv) where
     EAtm a       -> EAtm a
     EApp t  us   -> EApp (t >>= f) (fmap (>>= f) us)
     ECas t  cs   -> ECas (t >>= f) (fmap (over case2expr (>>>= f)) cs)
-    ELam ps e t  -> ELam ps (e >>>= f) t
+    ELam ps e    -> ELam ps (e >>>= f)
     ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
     ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
     EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
@@ -206,11 +205,10 @@ instance IsLang st => Bitraversable (Expr st) where
     EVar x -> EVar <$> g x
     EAtm a -> pure (EAtm a)
     EApp e0 es -> EApp <$> bitraverse f g e0 <*> traverse (bitraverse f g) es
-    ELam bs e0 t ->
+    ELam bs e0 ->
       ELam
       <$> traverse (traverse f) bs
       <*> bitraverse f (traverse g) e0
-      <*> traverse f t
     ELet ds e0 ->
       ELet
       <$> traverse (bitraverse f g) ds
@@ -303,7 +301,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
     --         prettyPrec prec1 _arg1 <> text _sym <> prettyPrec prec2 _arg2
     ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
     ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
-    ELam bs e t -> prettyELamT prec bs e t
+    ELam bs e -> prettyELam prec bs e
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
     --     [ "if"  <+> pretty _cond <+> "then"
@@ -339,21 +337,13 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
     ETyAnn _ e -> prettyPrec prec e
 
 prettyELam ::
-  (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  Int -> [Bind (TypeOf st) tv] -> Expr st tv (EScope Int ev) -> Doc ann
+  (PrettyStage st, BaseTVar tv, BaseEVar ev, Foldable t) =>
+  Int -> t (Bind (TypeOf st) tv) -> Expr st tv (EScope Int ev) -> Doc ann
 prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
       maybeParens (prec > 0)
       $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> "->") 2 (pretty e)
-
-prettyELamT ::
-  (PrettyStage st, BaseTVar tv, BaseEVar ev) =>
-  Int ->
-  NonEmpty (Bind (TypeOf st) tv) -> Expr st tv (EScope Int ev) -> TypeOf st tv -> Doc ann
-prettyELamT prec bs e t =
-  maybeParens (prec > 0)
-  $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> ":" <+> prettyPrecType 3 t <+> "->") 2 (pretty e)
 
 prettyETyAbs :: (Foldable t) => Int -> t QVar -> Doc ann -> Doc ann
 prettyETyAbs prec qvs d

@@ -111,7 +111,7 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
         let c_one = MkCase (clssDCon clss) [prmType] c_binds e_rhs
         let e_cas = ECas (EVar (mkBound 0 dictPrm)) (c_one :| [])
         let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
-        let e_lam = ELam (NE.singleton b_lam) e_cas t0
+        let e_lam = ELam (NE.singleton b_lam) (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
         pure (DDefn (MkDefn (MkBind (Lctd mpos z) t1) e_tyabs))
   pure (DType (NE.singleton tcon) : sels)
@@ -202,10 +202,10 @@ elimExpr = \case
     (e1, t1) <- elimExpr e0
     (es1, ts1) <- NE.unzip <$> traverse elimExpr es0
     pure (EApp e1 es1, unTFun t1 (toList ts1))
-  ELam bs e0 t0 -> do
+  ELam bs e0 -> do
     let ts = fmap _bind2type bs
     (e1, t1) <- withinEScope' id ts (elimExpr e0)
-    pure (ELam bs e1 t0, ts *~> t1)
+    pure (ELam bs e1, ts *~> t1)
   ELet ds0 e0 -> do
     ds1 <- traverse elimDefn ds0
     (e1, t1) <- withinEScope' (_bind2type . _defn2bind) ds1 (elimExpr e0)
@@ -239,7 +239,7 @@ elimExpr = \case
     (e1, t1) <-
       withinXScope refs (Vec.fromList (fmap _bind2type bs)) (elimExpr (weakenE e0))
     let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
-    pure (ETyAbs qvs1 (mkELam bs e1 t1), TUni qvs0 t1)
+    pure (ETyAbs qvs1 (mkELam bs (ETyAnn t1 e1)), TUni qvs0 t1)
   ETyAnn t0 e0 -> do
     (e1, _) <- elimExpr e0
     pure (ETyAnn t0 e1, t0)
