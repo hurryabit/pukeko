@@ -33,25 +33,45 @@ execLL :: Module In -> LL Void Void () -> Core.Module
 execLL m0 =
   snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
 
-llExpr ::
+-- NOTE: It might be interesting to proof some stuff about indices here using
+-- Liquid Haskell.
+-- | Lift a value abstraction to the top level.
+--
+-- Let's say we're in some environment Γ and have an expression
+--
+-- > F = λ(x₁:τ₁) … (xₙ:τₙ). E
+--
+-- Let y₁, …, yₘ be the value variables captured by F, i.e., the free value
+-- variables of E which are not among the xᵢ. Suppose Γ contains the typings
+-- (y₁:σ₁), …, (yₘ:σₘ). Let a₁, …, aₖ be the type variables captured by F, i.e.,
+-- the type variables which are free in E or one of the σᵢ or one of the τⱼ.
+-- Finally, assume the type of E is υ, i.e.,
+--
+-- > Γ, (x₁:τ₁), …, (xₙ:τₙ) ⊢ E : υ
+--
+-- and
+--
+-- > Γ ⊢ F : τ₁ → ⋯ τₙ → υ
+--
+-- In this situation, we create a new top level declaration
+--
+-- > f : ∀a₁ … aₖ. σ₁ → ⋯ → σₘ → τ₁ → ⋯ τₙ → υ =
+-- >   Λa₁ … aₖ. λ(y₁:σ₁) … (yₘ:σₘ) (x₁:τ₁) … (xₙ:τₙ). E
+--
+-- and replace F with the partial application
+--
+-- > F' = f @a₁ … @aₖ y₁ … yₘ
+--
+-- Last but not least, not that if we sort the aᵢ and yⱼ by /decreasing/ de
+-- Bruijn indices, we create more opportunities for η-reduction, which is good
+-- for inlining.
+llELam ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
-  Expr In tv ev -> LL tv ev (Expr Out tv ev)
-llExpr = \case
-  ELoc le -> here le $ llExpr (unlctd le)
-  EVar x -> pure (EVar x)
-  EAtm a -> pure (EAtm a)
-  EApp t  us -> EApp <$> llExpr t <*> traverse llExpr us
-  ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
-  ELet ds e0 ->
-    ELet
-    <$> (traverse . defn2expr) llExpr ds
-    <*> withinEScope' (_bind2type . _defn2bind) ds (llExpr e0)
-  ERec ds e0 ->
-    withinEScope' (_bind2type . _defn2bind) ds $
-      ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
-  -- TODO: It might be nice to use Liquid Haskell here.
-  ELam oldBinds (ETyAnn t_rhs rhs0) -> do
-    rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
+  NonEmpty (Bind Type tv) ->
+  Type tv ->
+  Expr Out tv (EScope Int ev) ->
+  LL tv ev (Expr Out tv ev)
+llELam oldBinds t_rhs rhs1 = do
     let evCaptured = Set.toList (setOf (traverse . _Free) rhs1)
     let n0 = length evCaptured
     -- TODO: We should figure out a location for @x@.
@@ -76,6 +96,26 @@ llExpr = \case
     let supc = SupCDecl (MkBind (Lctd noPos lhs) t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @'SupC supc)
     pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
+
+llExpr ::
+  forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
+  Expr In tv ev -> LL tv ev (Expr Out tv ev)
+llExpr = \case
+  ELoc le -> here le $ llExpr (unlctd le)
+  EVar x -> pure (EVar x)
+  EAtm a -> pure (EAtm a)
+  EApp t  us -> EApp <$> llExpr t <*> traverse llExpr us
+  ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
+  ELet ds e0 ->
+    ELet
+    <$> (traverse . defn2expr) llExpr ds
+    <*> withinEScope' (_bind2type . _defn2bind) ds (llExpr e0)
+  ERec ds e0 ->
+    withinEScope' (_bind2type . _defn2bind) ds $
+      ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
+  ELam oldBinds (ETyAnn t_rhs rhs0) -> do
+    rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
+    llELam oldBinds t_rhs rhs1
   ELam{} -> bug "lambda without type annotation around body during lambda lifting"
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
