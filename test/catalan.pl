@@ -46,14 +46,14 @@ external neg_int : Int -> Int = "neg"
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
 external sub_int : Int -> Int -> Int = "sub"
-add : ∀a. Dict$Ring a -> a -> a -> a =
+add$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ add _ _ -> add
-add_p : Int -> Int -> Int =
-  fun (x : Int) (y : Int) -> mod (add @Int dict$Ring$Int x y) p
-bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+add_p$ll1 : Int -> Int -> Int =
+  fun (x : Int) (y : Int) -> mod (add$ll1 @Int dict$Ring$Int x y) p
+bind$ll1 : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
@@ -71,14 +71,14 @@ dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
       match xs with
       | Nil @a -> y0
       | Cons @a x xs ->
-        f x (foldr @List dict$Foldable$List @a @b f y0 xs)
+        f x (foldr$ll1 @List dict$Foldable$List @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b ->
     fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
       match xs with
       | Nil @a -> y0
       | Cons @a x xs ->
-        foldl @List dict$Foldable$List @a @b f (f y0 x) xs
+        foldl$ll1 @List dict$Foldable$List @a @b f (f y0 x) xs
 dict$Functor$List : Dict$Functor List =
   let map : ∀a b. (a -> b) -> List a -> List b =
         fun @a @b -> dict$Functor$List$ll1 @a @b
@@ -90,7 +90,7 @@ dict$Functor$List$ll1 : ∀a b. (a -> b) -> List a -> List b =
       match xs with
       | Nil @a -> Nil @b
       | Cons @a x xs ->
-        Cons @b (f x) (map @List dict$Functor$List @a @b f xs)
+        Cons @b (f x) (map$ll1 @List dict$Functor$List @a @b f xs)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
@@ -124,62 +124,58 @@ dict$Ring$Int : Dict$Ring Int =
   and mul : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg add sub mul
-foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
+foldl$ll1 : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t _ foldl -> foldl
-foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
+foldr$ll1 : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t foldr _ -> foldr
-input : IO Int = io @Unit @Int geti Unit
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+input : IO Int = io$ll2 @Unit @Int geti Unit
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-le : ∀a. Dict$Ord a -> a -> a -> Bool =
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+le$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ le _ -> le
-main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll1
+main : IO Unit =
+  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll1
 main$ll1 : Int -> IO Unit =
-  fun (n : Int) -> print (nth_exn @Int sols n)
-map : ∀f. Dict$Functor f -> (∀a b. (a -> b) -> f a -> f b) =
+  fun (n : Int) -> print$ll1 (nth_exn$ll1 @Int sols n)
+map$ll1 : ∀f. Dict$Functor f -> (∀a b. (a -> b) -> f a -> f b) =
   fun @f ->
     fun (dict : Dict$Functor f) ->
       match dict with
       | Dict$Functor @f map -> map
-mul : ∀a. Dict$Ring a -> a -> a -> a =
+mul$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ _ mul -> mul
-mul_p : Int -> Int -> Int =
-  fun (x : Int) (y : Int) -> mod (mul @Int dict$Ring$Int x y) p
-nth_exn : ∀a. List a -> Int -> a =
+mul_p$ll1 : Int -> Int -> Int =
+  fun (x : Int) (y : Int) -> mod (mul$ll1 @Int dict$Ring$Int x y) p
+nth_exn$ll1 : ∀a. List a -> Int -> a =
   fun @a ->
     fun (xs : List a) (n : Int) ->
       match xs with
       | Nil @a -> abort @a
       | Cons @a x xs ->
-        match le @Int dict$Ord$Int n 0 with
-        | False -> nth_exn @a xs (sub @Int dict$Ring$Int n 1)
+        match le$ll1 @Int dict$Ord$Int n 0 with
+        | False -> nth_exn$ll1 @a xs (sub$ll1 @Int dict$Ring$Int n 1)
         | True -> x
 p : Int = 100000007
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
-scanl : ∀a b. (b -> a -> b) -> b -> List a -> List b =
-  fun @a @b ->
-    fun (f : b -> a -> b) ->
-      let rec scanl_f : b -> List a -> List b = scanl$ll1 @a @b f scanl_f
-      in
-      scanl_f
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n
 scanl$ll1 : ∀a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a -> List b =
   fun @a @b ->
     fun (f : b -> a -> b) (scanl_f : b -> List a -> List b) (y0 : b) (xs : List a) ->
@@ -188,21 +184,27 @@ scanl$ll1 : ∀a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a -> L
       | Cons @a x xs ->
         let y0 : b = f y0 x in
         Cons @b y0 (scanl_f y0 xs)
+scanl$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> List b =
+  fun @a @b ->
+    fun (f : b -> a -> b) ->
+      let rec scanl_f : b -> List a -> List b = scanl$ll1 @a @b f scanl_f
+      in
+      scanl_f
 sols : List Int =
-  Cons @Int 1 (map @List dict$Functor$List @(List Int) @Int sols$ll1 (scanl @Int @(List Int) sols$ll2 (Nil @Int) sols))
+  Cons @Int 1 (map$ll1 @List dict$Functor$List @(List Int) @Int sols$ll1 (scanl$ll2 @Int @(List Int) sols$ll2 (Nil @Int) sols))
 sols$ll1 : List Int -> Int =
   fun (xs : List Int) ->
-    sum_p (zip_with @Int @Int @Int mul_p sols xs)
+    sum_p (zip_with$ll1 @Int @Int @Int mul_p$ll1 sols xs)
 sols$ll2 : List Int -> Int -> List Int =
   fun (xs : List Int) (x : Int) -> Cons @Int x xs
-sub : ∀a. Dict$Ring a -> a -> a -> a =
+sub$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ sub _ -> sub
 sum_p : List Int -> Int =
-  foldl @List dict$Foldable$List @Int @Int add_p 0
-zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+  foldl$ll1 @List dict$Foldable$List @Int @Int add_p$ll1 0
+zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c ->
     fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
       match xs with
@@ -210,4 +212,4 @@ zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Cons @a x xs ->
         match ys with
         | Nil @b -> Nil @c
-        | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+        | Cons @b y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)

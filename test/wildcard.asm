@@ -27,7 +27,7 @@ g_pop 1
 g_update 1
 g_unwind
 
-g_globstart bind, 1
+g_globstart bind$ll1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -77,7 +77,7 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart fst, 1
+g_globstart fst$ll1, 1
 g_push 0
 g_eval
 g_proj 0
@@ -88,16 +88,8 @@ g_unwind
 g_globstart input, 0
 g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$geti, 1
-g_pushglobal io, 2
+g_pushglobal io$ll2, 2
 g_updap 2, 1
-g_unwind
-
-g_globstart io, 2
-g_push 1
-g_push 1
-g_pushglobal io$ll1, 3
-g_updap 2, 3
-g_pop 2
 g_unwind
 
 g_globstart io$ll1, 3
@@ -113,11 +105,19 @@ g_updap 2, 5
 g_pop 4
 g_unwind
 
+g_globstart io$ll2, 2
+g_push 1
+g_push 1
+g_pushglobal io$ll1, 3
+g_updap 2, 3
+g_pop 2
+g_unwind
+
 g_globstart main, 0
 g_pushglobal main$ll2, 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
-g_pushglobal bind, 1
+g_pushglobal bind$ll1, 1
 g_updap 3, 1
 g_unwind
 
@@ -126,17 +126,17 @@ g_push 1
 g_push 1
 g_cons 0, 2
 g_push 0
-g_pushglobal snd, 1
+g_pushglobal snd$ll1, 1
 g_mkap 1
-g_pushglobal print, 1
+g_pushglobal print$ll1, 1
 g_mkap 1
 g_push 1
-g_pushglobal fst, 1
+g_pushglobal fst$ll1, 1
 g_mkap 1
-g_pushglobal print, 1
+g_pushglobal print$ll1, 1
 g_mkap 1
 g_pushglobal dict$Monad$IO, 0
-g_pushglobal semi, 3
+g_pushglobal semi$ll2, 3
 g_updap 3, 4
 g_pop 3
 g_unwind
@@ -147,28 +147,17 @@ g_pushglobal main$ll1, 2
 g_mkap 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
-g_pushglobal bind, 1
+g_pushglobal bind$ll1, 1
 g_updap 3, 2
 g_pop 1
 g_unwind
 
-g_globstart print, 1
+g_globstart print$ll1, 1
 g_push 0
 g_pushglobal gm$puti, 1
-g_pushglobal io, 2
+g_pushglobal io$ll2, 2
 g_updap 2, 2
 g_pop 1
-g_unwind
-
-g_globstart semi, 3
-g_push 2
-g_pushglobal semi$ll1, 2
-g_mkap 1
-g_push 2
-g_push 2
-g_pushglobal bind, 1
-g_updap 3, 4
-g_pop 3
 g_unwind
 
 g_globstart semi$ll1, 2
@@ -176,7 +165,18 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart snd, 1
+g_globstart semi$ll2, 3
+g_push 2
+g_pushglobal semi$ll1, 2
+g_mkap 1
+g_push 2
+g_push 2
+g_pushglobal bind$ll1, 1
+g_updap 3, 4
+g_pop 3
+g_unwind
+
+g_globstart snd$ll1, 1
 g_push 0
 g_eval
 g_proj 1

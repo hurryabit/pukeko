@@ -52,10 +52,10 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) ->
       coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
-h : ∀c. c -> c = fun @c -> fun (u : c) -> u
+h$ll1 : ∀c. c -> c = fun @c -> fun (u : c) -> u
 main : IO Unit =
-  pure @IO dict$Monad$IO @Unit (h @Unit (h @Unit Unit))
-pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
+  pure$ll1 @IO dict$Monad$IO @Unit (h$ll1 @Unit (h$ll1 @Unit Unit))
+pure$ll1 : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with

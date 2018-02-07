@@ -36,7 +36,7 @@ data World =
 external geti : Unit -> Int = "geti"
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
-bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind$ll1 : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
@@ -60,36 +60,38 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b ->
     fun (mx : IO a) (f : a -> IO b) ->
       coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
-fst : ∀a b. Pair a b -> a =
+fst$ll1 : ∀a b. Pair a b -> a =
   fun @a @b ->
     fun (p : Pair a b) ->
       match p with
       | Pair @a @b x _ -> x
-input : IO Int = io @Unit @Int geti Unit
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+input : IO Int = io$ll2 @Unit @Int geti Unit
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll2
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+main : IO Unit =
+  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll2
 main$ll1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in
-    semi @Unit @IO dict$Monad$IO (print (fst @Int @Int p)) (print (snd @Int @Int p))
+    semi$ll2 @Unit @IO dict$Monad$IO (print$ll1 (fst$ll1 @Int @Int p)) (print$ll1 (snd$ll1 @Int @Int p))
 main$ll2 : Int -> IO Unit =
   fun (x : Int) ->
-    bind @IO dict$Monad$IO @Int @Unit input (main$ll1 x)
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
-semi : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
-  fun @a @m ->
-    fun (dict$Monad$m : Dict$Monad m) (m1 : m Unit) (m2 : m a) ->
-      bind @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
+    bind$ll1 @IO dict$Monad$IO @Int @Unit input (main$ll1 x)
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
-snd : ∀a b. Pair a b -> b =
+semi$ll2 : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
+  fun @a @m ->
+    fun (dict$Monad$m : Dict$Monad m) (m1 : m Unit) (m2 : m a) ->
+      bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
+snd$ll1 : ∀a b. Pair a b -> b =
   fun @a @b ->
     fun (p : Pair a b) ->
       match p with

@@ -49,23 +49,23 @@ external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
 external sub_int : Int -> Int -> Int = "sub"
 bag_empty : ∀a. Bag a = fun @a -> coerce @(_ -> Bag) (Leaf @a)
-bag_insert : ∀a. Dict$Ord a -> a -> Bag a -> Bag a =
-  fun @a ->
-    fun (dict$Ord$a : Dict$Ord a) (x : a) (s : Bag a) ->
-      let rec insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
-                fun @_12 -> bag_insert$ll1 @_12 insert
-      in
-      coerce @(_ -> Bag) (insert @a dict$Ord$a x (coerce @(Bag -> _) s))
 bag_insert$ll1 : ∀_12. (∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12) -> Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
   fun @_12 ->
     fun (insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12) (dict$Ord$_12 : Dict$Ord _12) (x : _12) (t : BinTree _12) ->
       match t with
       | Leaf @_12 -> Branch @_12 (Leaf @_12) x (Leaf @_12)
       | Branch @_12 l y r ->
-        match lt @_12 dict$Ord$_12 x y with
+        match lt$ll1 @_12 dict$Ord$_12 x y with
         | False -> Branch @_12 l y (insert @_12 dict$Ord$_12 x r)
         | True -> Branch @_12 (insert @_12 dict$Ord$_12 x l) y r
-bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bag_insert$ll3 : ∀a. Dict$Ord a -> a -> Bag a -> Bag a =
+  fun @a ->
+    fun (dict$Ord$a : Dict$Ord a) (x : a) (s : Bag a) ->
+      let rec insert : ∀_12. Dict$Ord _12 -> _12 -> BinTree _12 -> BinTree _12 =
+                fun @_12 -> bag_insert$ll1 @_12 insert
+      in
+      coerce @(_ -> Bag) (insert @a dict$Ord$a x (coerce @(Bag -> _) s))
+bind$ll1 : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
@@ -80,11 +80,11 @@ dict$Foldable$Bag : Dict$Foldable Bag =
 dict$Foldable$Bag$ll1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
   fun @a @b ->
     fun (f : a -> b -> b) (y0 : b) (bag : Bag a) ->
-      foldr @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
+      foldr$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
 dict$Foldable$Bag$ll2 : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
   fun @a @b ->
     fun (f : b -> a -> b) (y0 : b) (bag : Bag a) ->
-      foldl @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
+      foldl$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
 dict$Foldable$BinTree : Dict$Foldable BinTree =
   let foldr : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
         fun @a @b -> dict$Foldable$BinTree$ll1 @a @b
@@ -98,14 +98,14 @@ dict$Foldable$BinTree$ll1 : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
       match t with
       | Leaf @a -> y0
       | Branch @a l x r ->
-        foldr @BinTree dict$Foldable$BinTree @a @b f (f x (foldr @BinTree dict$Foldable$BinTree @a @b f y0 r)) l
+        foldr$ll1 @BinTree dict$Foldable$BinTree @a @b f (f x (foldr$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 r)) l
 dict$Foldable$BinTree$ll2 : ∀a b. (b -> a -> b) -> b -> BinTree a -> b =
   fun @a @b ->
     fun (f : b -> a -> b) (y0 : b) (t : BinTree a) ->
       match t with
       | Leaf @a -> y0
       | Branch @a l x r ->
-        foldl @BinTree dict$Foldable$BinTree @a @b f (f (foldl @BinTree dict$Foldable$BinTree @a @b f y0 l) x) r
+        foldl$ll1 @BinTree dict$Foldable$BinTree @a @b f (f (foldl$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 l) x) r
 dict$Foldable$List : Dict$Foldable List =
   let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
         fun @a @b -> dict$Foldable$List$ll1 @a @b
@@ -119,14 +119,14 @@ dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
       match xs with
       | Nil @a -> y0
       | Cons @a x xs ->
-        f x (foldr @List dict$Foldable$List @a @b f y0 xs)
+        f x (foldr$ll1 @List dict$Foldable$List @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b ->
     fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
       match xs with
       | Nil @a -> y0
       | Cons @a x xs ->
-        foldl @List dict$Foldable$List @a @b f (f y0 x) xs
+        foldl$ll1 @List dict$Foldable$List @a @b f (f y0 x) xs
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
@@ -160,94 +160,97 @@ dict$Ring$Int : Dict$Ring Int =
   and mul : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg add sub mul
-foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
+foldl$ll1 : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t _ foldl -> foldl
-foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
+foldr$ll1 : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t foldr _ -> foldr
-input : IO Int = io @Unit @Int geti Unit
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+input : IO Int = io$ll2 @Unit @Int geti Unit
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-le : ∀a. Dict$Ord a -> a -> a -> Bool =
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+le$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ le _ -> le
-lt : ∀a. Dict$Ord a -> a -> a -> Bool =
+lt$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ _ lt -> lt
-main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll2
+main : IO Unit =
+  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll2
 main$ll1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    traverse_ @Int @IO @List dict$Monad$IO dict$Foldable$List print (tsort xs)
+    traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 (tsort$ll2 xs)
 main$ll2 : Int -> IO Unit =
   fun (n : Int) ->
-    bind @IO dict$Monad$IO @(List Int) @Unit (sequence @Int @IO dict$Monad$IO (replicate @(IO Int) n input)) main$ll1
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
-pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
+    bind$ll1 @IO dict$Monad$IO @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll1
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n
+pure$ll1 : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure _ -> pure
-replicate : ∀a. Int -> a -> List a =
+replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a ->
     fun (n : Int) (x : a) ->
-      match le @Int dict$Ord$Int n 0 with
-      | False -> Cons @a x (replicate @a (sub @Int dict$Ring$Int n 1) x)
+      match le$ll1 @Int dict$Ord$Int n 0 with
+      | False ->
+        Cons @a x (replicate$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) x)
       | True -> Nil @a
-semi : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
-  fun @a @m ->
-    fun (dict$Monad$m : Dict$Monad m) (m1 : m Unit) (m2 : m a) ->
-      bind @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
-sequence : ∀a m. Dict$Monad m -> List (m a) -> m (List a) =
+semi$ll2 : ∀a m. Dict$Monad m -> m Unit -> m a -> m a =
   fun @a @m ->
-    fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) ->
-      match ms with
-      | Nil @(m a) -> pure @m dict$Monad$m @(List a) (Nil @a)
-      | Cons @(m a) m ms ->
-        bind @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
+    fun (dict$Monad$m : Dict$Monad m) (m1 : m Unit) (m2 : m a) ->
+      bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 sequence$ll1 : ∀a m. Dict$Monad m -> a -> List a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (x : a) (xs : List a) ->
-      pure @m dict$Monad$m @(List a) (Cons @a x xs)
+      pure$ll1 @m dict$Monad$m @(List a) (Cons @a x xs)
 sequence$ll2 : ∀a m. Dict$Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) (x : a) ->
-      bind @m dict$Monad$m @(List a) @(List a) (sequence @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
-sub : ∀a. Dict$Ring a -> a -> a -> a =
+      bind$ll1 @m dict$Monad$m @(List a) @(List a) (sequence$ll3 @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
+sequence$ll3 : ∀a m. Dict$Monad m -> List (m a) -> m (List a) =
+  fun @a @m ->
+    fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) ->
+      match ms with
+      | Nil @(m a) -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
+      | Cons @(m a) m ms ->
+        bind$ll1 @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
+sub$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ sub _ -> sub
-to_list : ∀a t. Dict$Foldable t -> t a -> List a =
+to_list$ll1 : ∀a t. Dict$Foldable t -> t a -> List a =
   fun @a @t ->
     fun (dict$Foldable$t : Dict$Foldable t) ->
-      foldr @t dict$Foldable$t @a @(List a) (Cons @a) (Nil @a)
-traverse_ : ∀a m t. Dict$Monad m -> Dict$Foldable t -> (a -> m Unit) -> t a -> m Unit =
-  fun @a @m @t ->
-    fun (dict$Monad$m : Dict$Monad m) (dict$Foldable$t : Dict$Foldable t) (f : a -> m Unit) ->
-      foldr @t dict$Foldable$t @a @(m Unit) (traverse_$ll1 @a @m dict$Monad$m f) (pure @m dict$Monad$m @Unit Unit)
+      foldr$ll1 @t dict$Foldable$t @a @(List a) (Cons @a) (Nil @a)
 traverse_$ll1 : ∀a m. Dict$Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (f : a -> m Unit) (x : a) (m : m Unit) ->
-      semi @Unit @m dict$Monad$m (f x) m
-tsort : List Int -> List Int =
-  fun (xs : List Int) ->
-    to_list @Int @Bag dict$Foldable$Bag (foldl @List dict$Foldable$List @Int @(Bag Int) tsort$ll1 (bag_empty @Int) xs)
+      semi$ll2 @Unit @m dict$Monad$m (f x) m
+traverse_$ll2 : ∀a m t. Dict$Monad m -> Dict$Foldable t -> (a -> m Unit) -> t a -> m Unit =
+  fun @a @m @t ->
+    fun (dict$Monad$m : Dict$Monad m) (dict$Foldable$t : Dict$Foldable t) (f : a -> m Unit) ->
+      foldr$ll1 @t dict$Foldable$t @a @(m Unit) (traverse_$ll1 @a @m dict$Monad$m f) (pure$ll1 @m dict$Monad$m @Unit Unit)
 tsort$ll1 : Bag Int -> Int -> Bag Int =
-  fun (s : Bag Int) (x : Int) -> bag_insert @Int dict$Ord$Int x s
+  fun (s : Bag Int) (x : Int) -> bag_insert$ll3 @Int dict$Ord$Int x s
+tsort$ll2 : List Int -> List Int =
+  fun (xs : List Int) ->
+    to_list$ll1 @Int @Bag dict$Foldable$Bag (foldl$ll1 @List dict$Foldable$List @Int @(Bag Int) tsort$ll1 (bag_empty @Int) xs)

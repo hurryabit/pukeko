@@ -48,22 +48,16 @@ external neg_int : Int -> Int = "neg"
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
 external sub_int : Int -> Int -> Int = "sub"
-add : ∀a. Dict$Ring a -> a -> a -> a =
+add$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ add _ _ -> add
-bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind$ll1 : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m _ bind -> bind
-build : ∀a. (a -> a -> a) -> List a -> RmqTree a =
-  fun @a ->
-    fun (op : a -> a -> a) (xs : List a) ->
-      let rec run : List (RmqTree a) -> RmqTree a = build$ll1 @a op run
-      in
-      run (zip_with @Int @a @(RmqTree a) (single @a) nats xs)
 build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
   fun @a ->
     fun (op : a -> a -> a) (run : List (RmqTree a) -> RmqTree a) (ts : List (RmqTree a)) ->
@@ -73,8 +67,14 @@ build$ll1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqT
         match build$pm2 with
         | Nil @(RmqTree a) -> build$pm1
         | Cons @(RmqTree a) _ _ ->
-          run (pair @(RmqTree a) (combine @a op) ts)
-combine : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
+          run (pair$ll1 @(RmqTree a) (combine$ll1 @a op) ts)
+build$ll2 : ∀a. (a -> a -> a) -> List a -> RmqTree a =
+  fun @a ->
+    fun (op : a -> a -> a) (xs : List a) ->
+      let rec run : List (RmqTree a) -> RmqTree a = build$ll1 @a op run
+      in
+      run (zip_with$ll1 @Int @a @(RmqTree a) (single$ll1 @a) nats xs)
+combine$ll1 : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
   fun @a ->
     fun (op : a -> a -> a) (t1 : RmqTree a) (t2 : RmqTree a) ->
       match t1 with
@@ -83,7 +83,7 @@ combine : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
         match t2 with
         | RmqEmpty @a -> abort @(RmqTree a)
         | RmqNode @a _ e2 v2 _ _ -> RmqNode @a s1 e2 (op v1 v2) t1 t2
-conj : Bool -> Bool -> Bool =
+conj$ll1 : Bool -> Bool -> Bool =
   fun (x : Bool) (y : Bool) ->
     match x with
     | False -> False
@@ -121,59 +121,60 @@ dict$Ring$Int : Dict$Ring Int =
   and mul : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg add sub mul
-disj : Bool -> Bool -> Bool =
+disj$ll1 : Bool -> Bool -> Bool =
   fun (x : Bool) (y : Bool) ->
     match x with
     | False -> y
     | True -> True
-gt : ∀a. Dict$Ord a -> a -> a -> Bool =
+gt$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ gt _ _ -> gt
 infinity : Int = 1000000000
-input : IO Int = io @Unit @Int geti Unit
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+input : IO Int = io$ll2 @Unit @Int geti Unit
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-le : ∀a. Dict$Ord a -> a -> a -> Bool =
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+le$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ le _ -> le
-lt : ∀a. Dict$Ord a -> a -> a -> Bool =
+lt$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ _ lt -> lt
-main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll6
+main : IO Unit =
+  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll6
 main$ll1 : RmqTree Int -> Int -> Int -> IO Unit =
   fun (t : RmqTree Int) (lo : Int) (hi : Int) ->
-    let res : Int = query @Int infinity min lo hi t in
-    print res
+    let res : Int = query$ll2 @Int infinity min$ll1 lo hi t in
+    print$ll1 res
 main$ll2 : RmqTree Int -> Int -> IO Unit =
   fun (t : RmqTree Int) (lo : Int) ->
-    bind @IO dict$Monad$IO @Int @Unit input (main$ll1 t lo)
+    bind$ll1 @IO dict$Monad$IO @Int @Unit input (main$ll1 t lo)
 main$ll3 : List Unit -> IO Unit =
-  fun (x : List Unit) -> pure @IO dict$Monad$IO @Unit Unit
+  fun (x : List Unit) -> pure$ll1 @IO dict$Monad$IO @Unit Unit
 main$ll4 : Int -> List Int -> IO Unit =
   fun (m : Int) (xs : List Int) ->
-    let t : RmqTree Int = build @Int min xs in
-    bind @IO dict$Monad$IO @(List Unit) @Unit (replicate_io @Unit m (bind @IO dict$Monad$IO @Int @Unit input (main$ll2 t))) main$ll3
+    let t : RmqTree Int = build$ll2 @Int min$ll1 xs in
+    bind$ll1 @IO dict$Monad$IO @(List Unit) @Unit (replicate_io$ll1 @Unit m (bind$ll1 @IO dict$Monad$IO @Int @Unit input (main$ll2 t))) main$ll3
 main$ll5 : Int -> Int -> IO Unit =
   fun (n : Int) (m : Int) ->
-    bind @IO dict$Monad$IO @(List Int) @Unit (replicate_io @Int n input) (main$ll4 m)
+    bind$ll1 @IO dict$Monad$IO @(List Int) @Unit (replicate_io$ll1 @Int n input) (main$ll4 m)
 main$ll6 : Int -> IO Unit =
   fun (n : Int) ->
-    bind @IO dict$Monad$IO @Int @Unit input (main$ll5 n)
-min : Int -> Int -> Int =
+    bind$ll1 @IO dict$Monad$IO @Int @Unit input (main$ll5 n)
+min$ll1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    match le @Int dict$Ord$Int x y with
+    match le$ll1 @Int dict$Ord$Int x y with
     | False -> y
     | True -> x
 nats : List Int =
@@ -181,8 +182,8 @@ nats : List Int =
   nats_from 0
 nats$ll1 : (Int -> List Int) -> Int -> List Int =
   fun (nats_from : Int -> List Int) (n : Int) ->
-    Cons @Int n (nats_from (add @Int dict$Ring$Int n 1))
-pair : ∀a. (a -> a -> a) -> List a -> List a =
+    Cons @Int n (nats_from (add$ll1 @Int dict$Ring$Int n 1))
+pair$ll1 : ∀a. (a -> a -> a) -> List a -> List a =
   fun @a ->
     fun (op : a -> a -> a) (xs1 : List a) ->
       match xs1 with
@@ -190,65 +191,67 @@ pair : ∀a. (a -> a -> a) -> List a -> List a =
       | Cons @a pair$pm1 pair$pm2 ->
         match pair$pm2 with
         | Nil @a -> xs1
-        | Cons @a x2 xs3 -> Cons @a (op pair$pm1 x2) (pair @a op xs3)
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
-pure : ∀m. Dict$Monad m -> (∀a. a -> m a) =
+        | Cons @a x2 xs3 -> Cons @a (op pair$pm1 x2) (pair$ll1 @a op xs3)
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n
+pure$ll1 : ∀m. Dict$Monad m -> (∀a. a -> m a) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
       | Dict$Monad @m pure _ -> pure
-query : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
-  fun @a ->
-    fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) ->
-      let rec aux : RmqTree a -> a = query$ll1 @a one op q_lo q_hi aux in
-      aux
 query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
   fun @a ->
     fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) (aux : RmqTree a -> a) (t : RmqTree a) ->
       match t with
       | RmqEmpty @a -> one
       | RmqNode @a t_lo t_hi value left right ->
-        match disj (lt @Int dict$Ord$Int q_hi t_lo) (gt @Int dict$Ord$Int q_lo t_hi) with
+        match disj$ll1 (lt$ll1 @Int dict$Ord$Int q_hi t_lo) (gt$ll1 @Int dict$Ord$Int q_lo t_hi) with
         | False ->
-          match conj (le @Int dict$Ord$Int q_lo t_lo) (le @Int dict$Ord$Int t_hi q_hi) with
+          match conj$ll1 (le$ll1 @Int dict$Ord$Int q_lo t_lo) (le$ll1 @Int dict$Ord$Int t_hi q_hi) with
           | False -> op (aux left) (aux right)
           | True -> value
         | True -> one
-replicate : ∀a. Int -> a -> List a =
+query$ll2 : ∀a. a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a =
+  fun @a ->
+    fun (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) ->
+      let rec aux : RmqTree a -> a = query$ll1 @a one op q_lo q_hi aux in
+      aux
+replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a ->
     fun (n : Int) (x : a) ->
-      match le @Int dict$Ord$Int n 0 with
-      | False -> Cons @a x (replicate @a (sub @Int dict$Ring$Int n 1) x)
+      match le$ll1 @Int dict$Ord$Int n 0 with
+      | False ->
+        Cons @a x (replicate$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) x)
       | True -> Nil @a
-replicate_io : ∀a. Int -> IO a -> IO (List a) =
+replicate_io$ll1 : ∀a. Int -> IO a -> IO (List a) =
   fun @a ->
     fun (n : Int) (act : IO a) ->
-      sequence @a @IO dict$Monad$IO (replicate @(IO a) n act)
-sequence : ∀a m. Dict$Monad m -> List (m a) -> m (List a) =
-  fun @a @m ->
-    fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) ->
-      match ms with
-      | Nil @(m a) -> pure @m dict$Monad$m @(List a) (Nil @a)
-      | Cons @(m a) m ms ->
-        bind @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
+      sequence$ll3 @a @IO dict$Monad$IO (replicate$ll1 @(IO a) n act)
 sequence$ll1 : ∀a m. Dict$Monad m -> a -> List a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (x : a) (xs : List a) ->
-      pure @m dict$Monad$m @(List a) (Cons @a x xs)
+      pure$ll1 @m dict$Monad$m @(List a) (Cons @a x xs)
 sequence$ll2 : ∀a m. Dict$Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m ->
     fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) (x : a) ->
-      bind @m dict$Monad$m @(List a) @(List a) (sequence @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
-single : ∀a. Int -> a -> RmqTree a =
+      bind$ll1 @m dict$Monad$m @(List a) @(List a) (sequence$ll3 @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
+sequence$ll3 : ∀a m. Dict$Monad m -> List (m a) -> m (List a) =
+  fun @a @m ->
+    fun (dict$Monad$m : Dict$Monad m) (ms : List (m a)) ->
+      match ms with
+      | Nil @(m a) -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
+      | Cons @(m a) m ms ->
+        bind$ll1 @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
+single$ll1 : ∀a. Int -> a -> RmqTree a =
   fun @a ->
     fun (i : Int) (x : a) ->
       RmqNode @a i i x (RmqEmpty @a) (RmqEmpty @a)
-sub : ∀a. Dict$Ring a -> a -> a -> a =
+sub$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ sub _ -> sub
-zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c ->
     fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
       match xs with
@@ -256,4 +259,4 @@ zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Cons @a x xs ->
         match ys with
         | Nil @b -> Nil @c
-        | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+        | Cons @b y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)

@@ -45,18 +45,18 @@ external neg_int : Int -> Int = "neg"
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
 external sub_int : Int -> Int -> Int = "sub"
-add : ∀a. Dict$Ring a -> a -> a -> a =
+add$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ add _ _ -> add
-add_mod_prime : Int -> Int -> Int =
+add_mod_prime$ll1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    let z : Int = add @Int dict$Ring$Int x y in
-    match lt @Int dict$Ord$Int z prime with
-    | False -> sub @Int dict$Ring$Int z prime
+    let z : Int = add$ll1 @Int dict$Ring$Int x y in
+    match lt$ll1 @Int dict$Ord$Int z prime with
+    | False -> sub$ll1 @Int dict$Ring$Int z prime
     | True -> z
-bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind$ll1 : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
@@ -96,52 +96,54 @@ dict$Ring$Int : Dict$Ring Int =
   Dict$Ring @Int neg add sub mul
 fibs0 : List Int = Cons @Int 0 fibs1
 fibs1 : List Int =
-  Cons @Int 1 (zip_with @Int @Int @Int add_mod_prime fibs0 fibs1)
-input : IO Int = io @Unit @Int geti Unit
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+  Cons @Int 1 (zip_with$ll1 @Int @Int @Int add_mod_prime$ll1 fibs0 fibs1)
+input : IO Int = io$ll2 @Unit @Int geti Unit
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-le : ∀a. Dict$Ord a -> a -> a -> Bool =
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+le$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ le _ -> le
-lt : ∀a. Dict$Ord a -> a -> a -> Bool =
+lt$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ _ lt -> lt
-main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll1
+main : IO Unit =
+  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll1
 main$ll1 : Int -> IO Unit =
-  fun (n : Int) -> print (nth_exn @Int fibs0 n)
-mul : ∀a. Dict$Ring a -> a -> a -> a =
+  fun (n : Int) -> print$ll1 (nth_exn$ll1 @Int fibs0 n)
+mul$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ _ mul -> mul
-nth_exn : ∀a. List a -> Int -> a =
+nth_exn$ll1 : ∀a. List a -> Int -> a =
   fun @a ->
     fun (xs : List a) (n : Int) ->
       match xs with
       | Nil @a -> abort @a
       | Cons @a x xs ->
-        match le @Int dict$Ord$Int n 0 with
-        | False -> nth_exn @a xs (sub @Int dict$Ring$Int n 1)
+        match le$ll1 @Int dict$Ord$Int n 0 with
+        | False -> nth_exn$ll1 @a xs (sub$ll1 @Int dict$Ring$Int n 1)
         | True -> x
 prime : Int =
-  add @Int dict$Ring$Int (mul @Int dict$Ring$Int 1000000 1000000) 39
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
-sub : ∀a. Dict$Ring a -> a -> a -> a =
+  add$ll1 @Int dict$Ring$Int (mul$ll1 @Int dict$Ring$Int 1000000 1000000) 39
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n
+sub$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ sub _ -> sub
-zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c ->
     fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
       match xs with
@@ -149,4 +151,4 @@ zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Cons @a x xs ->
         match ys with
         | Nil @b -> Nil @c
-        | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+        | Cons @b y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)

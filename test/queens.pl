@@ -45,17 +45,17 @@ external neg_int : Int -> Int = "neg"
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
 external sub_int : Int -> Int -> Int = "sub"
-add : ∀a. Dict$Ring a -> a -> a -> a =
+add$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ add _ _ -> add
-append : ∀m. Dict$Monoid m -> m -> m -> m =
+append$ll1 : ∀m. Dict$Monoid m -> m -> m -> m =
   fun @m ->
     fun (dict : Dict$Monoid m) ->
       match dict with
       | Dict$Monoid @m _ append -> append
-bind : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+bind$ll1 : ∀m. Dict$Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m ->
     fun (dict : Dict$Monad m) ->
       match dict with
@@ -76,14 +76,14 @@ dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
       match xs with
       | Nil @a -> y0
       | Cons @a x xs ->
-        f x (foldr @List dict$Foldable$List @a @b f y0 xs)
+        f x (foldr$ll1 @List dict$Foldable$List @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b ->
     fun (f : b -> a -> b) (y0 : b) (xs : List a) ->
       match xs with
       | Nil @a -> y0
       | Cons @a x xs ->
-        foldl @List dict$Foldable$List @a @b f (f y0 x) xs
+        foldl$ll1 @List dict$Foldable$List @a @b f (f y0 x) xs
 dict$Functor$List : Dict$Functor List =
   let map : ∀a b. (a -> b) -> List a -> List b =
         fun @a @b -> dict$Functor$List$ll1 @a @b
@@ -95,7 +95,7 @@ dict$Functor$List$ll1 : ∀a b. (a -> b) -> List a -> List b =
       match xs with
       | Nil @a -> Nil @b
       | Cons @a x xs ->
-        Cons @b (f x) (map @List dict$Functor$List @a @b f xs)
+        Cons @b (f x) (map$ll1 @List dict$Functor$List @a @b f xs)
 dict$Monad$IO : Dict$Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
@@ -129,7 +129,7 @@ dict$Monoid$List : ∀a. Dict$Monoid (List a) =
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
   fun @a ->
     fun (xs : List a) (ys : List a) ->
-      foldr @List dict$Foldable$List @a @(List a) (Cons @a) ys xs
+      foldr$ll1 @List dict$Foldable$List @a @(List a) (Cons @a) ys xs
 dict$Ord$Int : Dict$Ord Int =
   let ge : Int -> Int -> Bool = ge_int
   and gt : Int -> Int -> Bool = gt_int
@@ -144,7 +144,7 @@ dict$Ring$Int : Dict$Ring Int =
   and mul : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg add sub mul
-diff : List Int -> List Int -> List Int =
+diff$ll1 : List Int -> List Int -> List Int =
   fun (xs : List Int) (ys : List Int) ->
     match xs with
     | Nil @Int -> Nil @Int
@@ -152,117 +152,120 @@ diff : List Int -> List Int -> List Int =
       match ys with
       | Nil @Int -> xs
       | Cons @Int y ys' ->
-        match lt @Int dict$Ord$Int x y with
+        match lt$ll1 @Int dict$Ord$Int x y with
         | False ->
-          match eq @Int dict$Eq$Int x y with
-          | False -> diff xs ys'
-          | True -> diff xs' ys'
-        | True -> Cons @Int x (diff xs' ys)
-empty : ∀m. Dict$Monoid m -> m =
+          match eq$ll1 @Int dict$Eq$Int x y with
+          | False -> diff$ll1 xs ys'
+          | True -> diff$ll1 xs' ys'
+        | True -> Cons @Int x (diff$ll1 xs' ys)
+empty$ll1 : ∀m. Dict$Monoid m -> m =
   fun @m ->
     fun (dict : Dict$Monoid m) ->
       match dict with
       | Dict$Monoid @m empty _ -> empty
-eq : ∀a. Dict$Eq a -> a -> a -> Bool =
+eq$ll1 : ∀a. Dict$Eq a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Eq a) ->
       match dict with
       | Dict$Eq @a eq -> eq
-foldMap : ∀a m t. Dict$Monoid m -> Dict$Foldable t -> (a -> m) -> t a -> m =
-  fun @a @m @t ->
-    fun (dict$Monoid$m : Dict$Monoid m) (dict$Foldable$t : Dict$Foldable t) (f : a -> m) ->
-      foldr @t dict$Foldable$t @a @m (foldMap$ll1 @a @m dict$Monoid$m f) (empty @m dict$Monoid$m)
 foldMap$ll1 : ∀a m. Dict$Monoid m -> (a -> m) -> a -> m -> m =
   fun @a @m ->
     fun (dict$Monoid$m : Dict$Monoid m) (f : a -> m) (x : a) (m : m) ->
-      append @m dict$Monoid$m (f x) m
-foldl : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
+      append$ll1 @m dict$Monoid$m (f x) m
+foldMap$ll2 : ∀a m t. Dict$Monoid m -> Dict$Foldable t -> (a -> m) -> t a -> m =
+  fun @a @m @t ->
+    fun (dict$Monoid$m : Dict$Monoid m) (dict$Foldable$t : Dict$Foldable t) (f : a -> m) ->
+      foldr$ll1 @t dict$Foldable$t @a @m (foldMap$ll1 @a @m dict$Monoid$m f) (empty$ll1 @m dict$Monoid$m)
+foldl$ll1 : ∀t. Dict$Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t _ foldl -> foldl
-foldr : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
+foldr$ll1 : ∀t. Dict$Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t ->
     fun (dict : Dict$Foldable t) ->
       match dict with
       | Dict$Foldable @t foldr _ -> foldr
-input : IO Int = io @Unit @Int geti Unit
+input : IO Int = io$ll2 @Unit @Int geti Unit
 ints : List Int =
   let rec go : Int -> List Int = ints$ll1 go in
   go 1
 ints$ll1 : (Int -> List Int) -> Int -> List Int =
   fun (go : Int -> List Int) (k : Int) ->
-    Cons @Int k (go (add @Int dict$Ring$Int k 1))
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+    Cons @Int k (go (add$ll1 @Int dict$Ring$Int k 1))
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-le : ∀a. Dict$Ord a -> a -> a -> Bool =
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+le$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ le _ -> le
-length : ∀a t. Dict$Foldable t -> t a -> Int =
+length$ll1 : ∀a. a -> Int = fun @a -> fun (x : a) -> 1
+length$ll2 : ∀a t. Dict$Foldable t -> t a -> Int =
   fun @a @t ->
     fun (dict$Foldable$t : Dict$Foldable t) ->
-      foldMap @a @Int @t dict$Monoid$Int dict$Foldable$t (length$ll1 @a)
-length$ll1 : ∀a. a -> Int = fun @a -> fun (x : a) -> 1
-lt : ∀a. Dict$Ord a -> a -> a -> Bool =
+      foldMap$ll2 @a @Int @t dict$Monoid$Int dict$Foldable$t (length$ll1 @a)
+lt$ll1 : ∀a. Dict$Ord a -> a -> a -> Bool =
   fun @a ->
     fun (dict : Dict$Ord a) ->
       match dict with
       | Dict$Ord @a _ _ _ lt -> lt
-main : IO Unit = bind @IO dict$Monad$IO @Int @Unit input main$ll1
+main : IO Unit =
+  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll1
 main$ll1 : Int -> IO Unit =
   fun (n : Int) ->
-    print (length @(List Int) @List dict$Foldable$List (solve n))
-map : ∀f. Dict$Functor f -> (∀a b. (a -> b) -> f a -> f b) =
+    print$ll1 (length$ll2 @(List Int) @List dict$Foldable$List (solve$ll1 n))
+map$ll1 : ∀f. Dict$Functor f -> (∀a b. (a -> b) -> f a -> f b) =
   fun @f ->
     fun (dict : Dict$Functor f) ->
       match dict with
       | Dict$Functor @f map -> map
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
-replicate : ∀a. Int -> a -> List a =
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n
+replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a ->
     fun (n : Int) (x : a) ->
-      match le @Int dict$Ord$Int n 0 with
-      | False -> Cons @a x (replicate @a (sub @Int dict$Ring$Int n 1) x)
+      match le$ll1 @Int dict$Ord$Int n 0 with
+      | False ->
+        Cons @a x (replicate$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) x)
       | True -> Nil @a
-solve : Int -> List (List Int) =
+solve$ll1 : Int -> List (List Int) =
   fun (n : Int) ->
-    solve_aux (replicate @(List Int) n (take @Int n ints))
-solve_aux : List (List Int) -> List (List Int) =
+    solve_aux$ll3 (replicate$ll1 @(List Int) n (take$ll1 @Int n ints))
+solve_aux$ll1 : Int -> List Int -> Int -> List Int =
+  fun (k : Int) (ls : List Int) (i : Int) ->
+    diff$ll1 ls (Cons @Int (sub$ll1 @Int dict$Ring$Int k i) (Cons @Int k (Cons @Int (add$ll1 @Int dict$Ring$Int k i) (Nil @Int))))
+solve_aux$ll2 : List (List Int) -> Int -> List (List Int) =
+  fun (kss : List (List Int)) (k : Int) ->
+    map$ll1 @List dict$Functor$List @(List Int) @(List Int) (Cons @Int k) (solve_aux$ll3 (zip_with$ll1 @(List Int) @Int @(List Int) (solve_aux$ll1 k) kss ints))
+solve_aux$ll3 : List (List Int) -> List (List Int) =
   fun (kss : List (List Int)) ->
     match kss with
     | Nil @(List Int) -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
     | Cons @(List Int) ks kss ->
-      foldMap @Int @(List (List Int)) @List (dict$Monoid$List @(List Int)) dict$Foldable$List (solve_aux$ll2 kss) ks
-solve_aux$ll1 : Int -> List Int -> Int -> List Int =
-  fun (k : Int) (ls : List Int) (i : Int) ->
-    diff ls (Cons @Int (sub @Int dict$Ring$Int k i) (Cons @Int k (Cons @Int (add @Int dict$Ring$Int k i) (Nil @Int))))
-solve_aux$ll2 : List (List Int) -> Int -> List (List Int) =
-  fun (kss : List (List Int)) (k : Int) ->
-    map @List dict$Functor$List @(List Int) @(List Int) (Cons @Int k) (solve_aux (zip_with @(List Int) @Int @(List Int) (solve_aux$ll1 k) kss ints))
-sub : ∀a. Dict$Ring a -> a -> a -> a =
+      foldMap$ll2 @Int @(List (List Int)) @List (dict$Monoid$List @(List Int)) dict$Foldable$List (solve_aux$ll2 kss) ks
+sub$ll1 : ∀a. Dict$Ring a -> a -> a -> a =
   fun @a ->
     fun (dict : Dict$Ring a) ->
       match dict with
       | Dict$Ring @a _ _ sub _ -> sub
-take : ∀a. Int -> List a -> List a =
+take$ll1 : ∀a. Int -> List a -> List a =
   fun @a ->
     fun (n : Int) (xs : List a) ->
-      match le @Int dict$Ord$Int n 0 with
+      match le$ll1 @Int dict$Ord$Int n 0 with
       | False ->
         match xs with
         | Nil @a -> Nil @a
         | Cons @a x xs ->
-          Cons @a x (take @a (sub @Int dict$Ring$Int n 1) xs)
+          Cons @a x (take$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) xs)
       | True -> Nil @a
-zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c ->
     fun (f : a -> b -> c) (xs : List a) (ys : List b) ->
       match xs with
@@ -270,4 +273,4 @@ zip_with : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Cons @a x xs ->
         match ys with
         | Nil @b -> Nil @c
-        | Cons @b y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+        | Cons @b y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)

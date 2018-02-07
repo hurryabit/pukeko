@@ -35,15 +35,16 @@ data World =
        | World
 external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
-g : Int -> Int -> Int -> Int -> Int =
+g$ll1 : Int -> Int -> Int -> Int -> Int =
   fun (a : Int) (b : Int) (c : Int) (d : Int) -> a
-io : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
       let y : b = f x in
       seq @b @(Pair b World) y (Pair @b @World y world)
-main : IO Unit = print (g 1 2 3 4)
-print : Int -> IO Unit = fun (n : Int) -> io @Int @Unit puti n
+io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+  fun @a @b ->
+    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+main : IO Unit = print$ll1 (g$ll1 1 2 3 4)
+print$ll1 : Int -> IO Unit =
+  fun (n : Int) -> io$ll2 @Int @Unit puti n

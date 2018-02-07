@@ -29,7 +29,7 @@ runCC :: In.Module -> CC a -> a
 runCC mod0 = run . evalState mempty . runInfo mod0
 
 name :: Id.EVar -> Name
-name = MkName . Id.mangled
+name = MkName . Id.name
 
 bindName :: In.Bind tv -> Name
 bindName = name . unlctd . In._bind2evar

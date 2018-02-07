@@ -142,7 +142,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart add, 1
+g_globstart add$ll1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -150,7 +150,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart append, 1
+g_globstart append$ll1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -158,7 +158,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart bind, 1
+g_globstart bind$ll1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -197,7 +197,7 @@ g_push 1
 g_push 4
 g_push 4
 g_pushglobal dict$Foldable$List, 0
-g_pushglobal foldr, 1
+g_pushglobal foldr$ll1, 1
 g_mkap 4
 g_push 1
 g_push 4
@@ -224,7 +224,7 @@ g_push 5
 g_mkap 2
 g_push 4
 g_pushglobal dict$Foldable$List, 0
-g_pushglobal foldl, 1
+g_pushglobal foldl$ll1, 1
 g_updap 4, 6
 g_pop 5
 g_unwind
@@ -286,7 +286,7 @@ g_push 0
 g_push 2
 g_pushglobal gm$cons_1_2, 2
 g_pushglobal dict$Foldable$List, 0
-g_pushglobal foldr, 1
+g_pushglobal foldr$ll1, 1
 g_updap 4, 3
 g_pop 2
 g_unwind
@@ -317,20 +317,10 @@ g_updcons 0, 4, 5
 g_pop 4
 g_return
 
-g_globstart eq, 1
+g_globstart eq$ll1, 1
 g_push 0
 g_eval
 g_proj 0
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart filter, 1
-g_alloc 1
-g_push 0
-g_push 2
-g_pushglobal filter$ll1, 3
-g_updap 2, 1
 g_update 2
 g_pop 1
 g_unwind
@@ -372,7 +362,17 @@ g_label .5
 g_jump .2
 g_label .2
 
-g_globstart foldl, 1
+g_globstart filter$ll2, 1
+g_alloc 1
+g_push 0
+g_push 2
+g_pushglobal filter$ll1, 3
+g_updap 2, 1
+g_update 2
+g_pop 1
+g_unwind
+
+g_globstart foldl$ll1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -380,7 +380,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart foldr, 1
+g_globstart foldr$ll1, 1
 g_push 0
 g_eval
 g_proj 0
@@ -391,16 +391,8 @@ g_unwind
 g_globstart input, 0
 g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$geti, 1
-g_pushglobal io, 2
+g_pushglobal io$ll2, 2
 g_updap 2, 1
-g_unwind
-
-g_globstart io, 2
-g_push 1
-g_push 1
-g_pushglobal io$ll1, 3
-g_updap 2, 3
-g_pop 2
 g_unwind
 
 g_globstart io$ll1, 3
@@ -416,7 +408,15 @@ g_updap 2, 5
 g_pop 4
 g_unwind
 
-g_globstart le, 1
+g_globstart io$ll2, 2
+g_push 1
+g_push 1
+g_pushglobal io$ll1, 3
+g_updap 2, 3
+g_pop 2
+g_unwind
+
+g_globstart le$ll1, 1
 g_push 0
 g_eval
 g_proj 2
@@ -428,25 +428,25 @@ g_globstart main, 0
 g_pushglobal main$ll1, 1
 g_pushglobal input, 0
 g_pushglobal dict$Monad$IO, 0
-g_pushglobal bind, 1
+g_pushglobal bind$ll1, 1
 g_updap 3, 1
 g_unwind
 
 g_globstart main$ll1, 1
 g_push 0
 g_pushglobal primes, 0
-g_pushglobal nth_exn, 2
+g_pushglobal nth_exn$ll1, 2
 g_mkap 2
-g_pushglobal print, 1
+g_pushglobal print$ll1, 1
 g_updap 1, 2
 g_pop 1
 g_unwind
 
-g_globstart neq, 3
+g_globstart neq$ll1, 3
 g_push 2
 g_push 2
 g_push 2
-g_pushglobal eq, 1
+g_pushglobal eq$ll1, 1
 g_mkap 3
 g_eval
 g_jumpcase .0, .1
@@ -464,7 +464,7 @@ g_pop 3
 g_unwind
 g_label .2
 
-g_globstart nth_exn, 2
+g_globstart nth_exn$ll1, 2
 g_push 0
 g_eval
 g_jumpcase .0, .1
@@ -479,7 +479,7 @@ g_uncons 2
 g_pushint 0
 g_push 4
 g_pushglobal dict$Ord$Int, 0
-g_pushglobal le, 1
+g_pushglobal le$ll1, 1
 g_mkap 3
 g_eval
 g_jumpcase .3, .4
@@ -488,10 +488,10 @@ g_pop 1
 g_pushint 1
 g_push 4
 g_pushglobal dict$Ring$Int, 0
-g_pushglobal sub, 1
+g_pushglobal sub$ll1, 1
 g_mkap 3
 g_push 2
-g_pushglobal nth_exn, 2
+g_pushglobal nth_exn$ll1, 2
 g_updap 2, 5
 g_pop 4
 g_unwind
@@ -510,13 +510,13 @@ g_pushint 4
 g_cons 1, 2
 g_pushint 2
 g_cons 1, 2
-g_pushglobal repeat, 1
+g_pushglobal repeat$ll1, 1
 g_mkap 1
 g_pushint 5
 g_cons 1, 2
 g_pushglobal psums, 0
 g_mkap 1
-g_pushglobal sieve, 1
+g_pushglobal sieve$ll2, 1
 g_mkap 1
 g_pushint 3
 g_cons 1, 2
@@ -524,10 +524,10 @@ g_pushint 2
 g_updcons 1, 2, 1
 g_return
 
-g_globstart print, 1
+g_globstart print$ll1, 1
 g_push 0
 g_pushglobal gm$puti, 1
-g_pushglobal io, 2
+g_pushglobal io$ll2, 2
 g_updap 2, 2
 g_pop 1
 g_unwind
@@ -559,7 +559,7 @@ g_uncons 2
 g_push 4
 g_push 1
 g_push 5
-g_pushglobal add, 1
+g_pushglobal add$ll1, 1
 g_mkap 3
 g_push 2
 g_push 1
@@ -573,18 +573,30 @@ g_return
 g_jump .2
 g_label .2
 
-g_globstart repeat, 1
+g_globstart repeat$ll1, 1
 g_alloc 1
 g_push 0
 g_push 2
 g_pushglobal dict$Monoid$List, 0
-g_pushglobal append, 1
+g_pushglobal append$ll1, 1
 g_updap 3, 1
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart sieve, 1
+g_globstart sieve$ll1, 2
+g_pushint 0
+g_push 1
+g_push 3
+g_pushglobal gm$mod, 2
+g_mkap 2
+g_pushglobal dict$Eq$Int, 0
+g_pushglobal neq$ll1, 3
+g_updap 3, 3
+g_pop 2
+g_unwind
+
+g_globstart sieve$ll2, 1
 g_push 0
 g_eval
 g_jumpcase .0, .1
@@ -600,9 +612,9 @@ g_push 1
 g_push 1
 g_pushglobal sieve$ll1, 2
 g_mkap 1
-g_pushglobal filter, 1
+g_pushglobal filter$ll2, 1
 g_mkap 2
-g_pushglobal sieve, 1
+g_pushglobal sieve$ll2, 1
 g_mkap 1
 g_push 1
 g_updcons 1, 2, 4
@@ -611,19 +623,7 @@ g_return
 g_jump .2
 g_label .2
 
-g_globstart sieve$ll1, 2
-g_pushint 0
-g_push 1
-g_push 3
-g_pushglobal gm$mod, 2
-g_mkap 2
-g_pushglobal dict$Eq$Int, 0
-g_pushglobal neq, 3
-g_updap 3, 3
-g_pop 2
-g_unwind
-
-g_globstart sub, 1
+g_globstart sub$ll1, 1
 g_push 0
 g_eval
 g_proj 2

@@ -39,7 +39,7 @@ data Config = Config
 
 defaultConfig :: Config
 defaultConfig = Config
-  { optimizations = [EtaReduction, Inlining, DeadCodeElimination, Prettification]
+  { optimizations = [EtaReduction, AliasInlining, DeadCodeElimination, Prettification]
   , typeChecking  = True
   }
 

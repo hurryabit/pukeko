@@ -29,7 +29,7 @@ cluster :: Set Id.EVar -> Map Id.EVar Id.EVar
 cluster xs0 =
   let mp =
         foldl
-          (\acc x -> Map.insertWith Set.union (Id.stripPart x) (Set.singleton x) acc)
+          (\acc x -> Map.insertWith Set.union x (Set.singleton x) acc)
           Map.empty xs0
       f y xs1
         | not (y `Set.member` xs1) = Map.singleton (Set.findMax xs1) y

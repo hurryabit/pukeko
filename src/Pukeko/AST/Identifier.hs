@@ -3,9 +3,7 @@ module Pukeko.AST.Identifier
   , EVar
   , evar
   , main
-  , stripPart
   , freshEVars
-  , mangled
   , TVar
   , tvar
   , freshTVars
@@ -28,32 +26,24 @@ import Data.Char (isLower, isUpper)
 class Named a where
   name :: a -> String
 
-data EVar = EVar{_name :: String, _part :: Maybe (String, Int)}
+data EVar = EVar String
   deriving (Show, Eq, Ord)
 
 evar :: String -> EVar
-evar _name@(first:_)
-  | isLower first = EVar{_name, _part = Nothing}
-evar _name = bugWith "invalid variable name" _name
+evar x@((isLower -> True):_) = EVar x
+evar x = bugWith "invalid variable name" x
 
 main :: EVar
 main = evar "main"
 
-stripPart :: EVar -> EVar
-stripPart x = x{_part = Nothing}
-
 freshEVars :: String -> EVar -> [EVar]
-freshEVars comp var = map (\n -> var{_part = Just (comp, n)}) [1 ..]
-
-mangled :: EVar -> String
-mangled var = (_name :: EVar -> _) var ++ maybe "" (\(comp, n) -> '$':comp ++ show n) (_part var)
+freshEVars comp (EVar x) = map (\n -> EVar (x ++ '$':comp ++ show n)) [1::Int ..]
 
 instance Named EVar where
-  name = render . pretty
+  name (EVar x) = x
 
 instance Pretty EVar where
-  pretty EVar{_name, _part} =
-    pretty _name <> maybe mempty (\(comp, n) -> "$" <> pretty comp <> pretty n) _part
+  pretty = pretty . name
 
 data TVar
   = TVar{_name :: String}
