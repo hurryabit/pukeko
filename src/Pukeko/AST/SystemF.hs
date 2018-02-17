@@ -9,8 +9,6 @@ module Pukeko.AST.SystemF
 
 import Pukeko.Prelude
 
-import qualified Data.List.NE as NE
-
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Expr
@@ -38,7 +36,7 @@ data ExtnDecl ty = MkExtnDecl
   }
 
 data Decl lg
-  =                          DType (NonEmpty TConDecl)
+  =                          DType TConDecl
   | IsPreTyped lg ~ False => DSign (Bind Type Void)
   | IsClassy   lg ~ True  => DClss ClssDecl
   | IsClassy   lg ~ True  => DInst (InstDecl lg)
@@ -85,7 +83,7 @@ decl2expr f top = case top of
 
 instance HasPos (Decl st) where
   getPos = \case
-    DType tcons -> getPos (NE.head tcons)
+    DType tcon  -> getPos tcon
     DSign sign  -> getPos sign
     DClss clss  -> getPos (_clss2name clss)
     DInst inst  -> getPos (_inst2clss inst)
@@ -94,9 +92,8 @@ instance HasPos (Decl st) where
 
 instance (PrettyStage st) => Pretty (Decl st) where
   pretty = \case
-    DType (dcon0 :| dcons) ->
-      "data" <+> pretty dcon0
-      $$ vcatMap (\dcon -> "and " <+> pretty dcon) dcons
+    DType tcon ->
+      "data" <+> pretty tcon
     DSign s -> pretty s
     DClss (MkClssDecl c v ms) ->
       "class" <+> pretty c <+> pretty v <+> "where"

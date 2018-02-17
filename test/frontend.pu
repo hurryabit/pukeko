@@ -14,7 +14,7 @@ bad : Typ
 -- TEST duplicate in one type definition
 -- FAILURE 2:6: duplicate type constructor: Typ
 data Typ = | A
-and  Typ = | B
+data Typ = | B
 
 -- TEST duplicate in two type definitions
 -- FAILURE 1:6: duplicate type constructor: Bool
@@ -42,7 +42,7 @@ data Typ =
 -- FAILURE 4:5: duplicate data constructor: Con
 data Typ1 =
   | Con
-and Typ2 =
+data Typ2 =
   | Con
 
 -- TEST duplicate in two types
@@ -56,9 +56,9 @@ data Typ =
 -- SUBSECTION type definition
 
 -- TEST underapplication in one definition
--- FAILURE 3:5: cannot unify kinds _3 -> * and *
+-- FAILURE 3:5: cannot unify kinds * -> * and *
 data Typ1 a = | A
-and Typ2 =
+data Typ2 =
   | Con Typ1
 
 -- TEST underapplication in recursive definition
@@ -72,9 +72,9 @@ data Typ =
   | Con List
 
 -- TEST overapplication in one definition
--- FAILURE 3:5: cannot unify kinds * and _6 -> *
+-- FAILURE 3:5: cannot unify kinds * and * -> *
 data Typ1 a = | A
-and Typ2 a =
+data Typ2 a =
   | Con (Typ1 a a)
 
 -- TEST overapplication in recursive definition
@@ -116,7 +116,7 @@ data Typ f a b =
 -- FAILURE 6:5: cannot unify kinds * -> * and *
 data Typ1 a =
   | Con1
-and Typ2 a b =
+data Typ2 a b =
   | Con2 (a b)
 data Typ3 f a =
   | Con3 (Typ1 f) (Typ2 f a)

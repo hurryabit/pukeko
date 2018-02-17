@@ -56,7 +56,7 @@ data Module = MkModule
   }
 
 data Decl
-  = DType (NonEmpty TConDecl)
+  = DType TConDecl
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl

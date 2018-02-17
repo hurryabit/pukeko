@@ -283,11 +283,8 @@ expr =
           Op.AssocRight -> InfixR
           Op.AssocNone  -> InfixN
 
-dataDecl :: Parser (NonEmpty TConDecl)
-dataDecl =
-    (:|)
-    <$> indented_ (reserved "data") tconDecl
-    <*> many (indented_ (reserved "and") tconDecl)
+dataDecl :: Parser TConDecl
+dataDecl = indented_ (reserved "data") tconDecl
 
 typeDecl :: Parser TConDecl
 typeDecl = indented_ (reserved "type") $
@@ -341,7 +338,7 @@ module_ file = do
   space
   imps <- many import_
   decls <- many $ choice
-    [ DType <$> (NE.singleton <$> typeDecl <|> dataDecl)
+    [ DType <$> (typeDecl <|> dataDecl)
     , DClss <$> indented_ (reserved "class") clssDecl
     , DInst <$> indented_ (reserved "instance") instDecl
     , DExtn <$> indented_ (reserved "external") extnDecl

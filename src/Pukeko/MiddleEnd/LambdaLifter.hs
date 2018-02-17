@@ -138,7 +138,7 @@ llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
 
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
-  DType ds -> tell (foldMap mkTypeDecl ds)
+  DType t -> tell (mkTypeDecl t)
   DDefn (MkDefn (MkBind lhs t) rhs) -> do
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs

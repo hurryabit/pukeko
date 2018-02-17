@@ -10,7 +10,6 @@ import Pukeko.Prelude
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
 import           Data.Forget      (Forget (..))
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map           as Map
 import           Data.STRef
 import qualified Data.Vector        as Vec
@@ -80,23 +79,19 @@ kcType k = \case
     kcType (Arrow ktp k) tf
   TUni _ _ -> bug "universal quantificatio"
 
-kcTypDef :: NonEmpty TConDecl -> KC n s ()
-kcTypDef tcons = do
-  kinds <- for tcons $ \MkTConDecl{_tcon2name = unlctd -> tname} -> do
-    kind <- freshUVar
-    modify (Map.insert tname kind)
-    pure kind
-  for_ (NE.zip tcons kinds) $
-    \(MkTConDecl tname prms dcons0, tconKind) -> here tname $ do
-        paramKinds <- traverse (const freshUVar) prms
-        unify tconKind (foldr Arrow Star paramKinds)
-        localize paramKinds $
-          case dcons0 of
-            Left typ -> kcType Star typ
-            Right dcons ->
-              for_ dcons $ here' $ \MkDConDecl{_dcon2flds = flds} ->
-                traverse_ (kcType Star) flds
-  traverse_ close kinds
+kcTConDecl :: TConDecl -> KC n s ()
+kcTConDecl (MkTConDecl tname prms dcons0) = here tname $ do
+  kind <- freshUVar
+  modify (Map.insert (unlctd tname) kind)
+  paramKinds <- traverse (const freshUVar) prms
+  unify kind (foldr Arrow Star paramKinds)
+  localize paramKinds $
+    case dcons0 of
+      Left typ -> kcType Star typ
+      Right dcons ->
+        for_ dcons $ here' $ \MkDConDecl{_dcon2flds = flds} ->
+          traverse_ (kcType Star) flds
+  close kind
 
 kcVal :: Type Void -> KC n s ()
 kcVal = \case
@@ -109,7 +104,7 @@ kcVal = \case
 
 kcDecl :: Decl In -> KC n s ()
 kcDecl decl = case decl of
-  DType tcons            -> kcTypDef tcons
+  DType tcon         -> kcTConDecl tcon
   DSign (MkBind _ t) -> kcVal t
   -- FIXME: Check kinds in type class declarations and instance definitions.
   DClss{} -> pure ()

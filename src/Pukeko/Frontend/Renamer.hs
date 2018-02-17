@@ -70,7 +70,7 @@ findBinop op = do
 
 rnDecl :: Ps.Decl -> Rn Void (Maybe (Decl Out))
 rnDecl = \case
-  Ps.DType ts -> Just . DType <$> traverse rnTConDecl ts
+  Ps.DType t -> Just . DType <$> rnTConDecl t
   Ps.DSign s -> Just . DSign <$> rnSignDecl mempty s
   Ps.DClss (Ps.MkClssDecl c v ms0) -> do
     let env = Map.singleton v (mkBound 0 v)

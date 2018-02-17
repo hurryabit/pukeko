@@ -58,10 +58,9 @@ trDefn = traverseOf_ (defn2expr . expr2atom . _ACon) findDCon
 
 trDecl :: Decl In -> TR ()
 trDecl top = case top of
-  DType tconDecls -> do
-    for_ tconDecls insertTCon
-    for_ tconDecls $ \tcon@MkTConDecl{_tcon2dcons = dconDecls0} ->
-      case dconDecls0 of
+  DType tcon@MkTConDecl{_tcon2dcons = dconDecls0} -> do
+    insertTCon tcon
+    case dconDecls0 of
         Left typ -> trType typ
         Right dconDecls ->
           for_ dconDecls $ here' $ \dcon@MkDConDecl{_dcon2flds = flds} -> do

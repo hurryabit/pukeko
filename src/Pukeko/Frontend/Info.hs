@@ -94,7 +94,7 @@ bindInfo l ((^.l) -> MkBind z t) =
 
 instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
   collectInfo (SysF.MkModule decls) = foldFor decls $ \case
-    SysF.DType tcons -> foldMap tconDeclInfo tcons
+    SysF.DType tcon -> tconDeclInfo tcon
     SysF.DSign (MkBind z t) -> bindInfo id (MkBind z t)
     SysF.DClss clss@(SysF.MkClssDecl (unlctd -> c) v ms) ->
       let mthds_info = foldFor ms $ \mthd@(MkBind z t0) ->

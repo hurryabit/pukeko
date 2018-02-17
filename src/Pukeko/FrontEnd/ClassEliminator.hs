@@ -116,7 +116,7 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
         let e_lam = ELam b_lam (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
         pure (DDefn (MkDefn (MkBind (Lctd mpos z) t1) e_tyabs))
-  pure (DType (NE.singleton tcon) : sels)
+  pure (DType tcon : sels)
 
 -- | Transform a class instance definition into a dictionary definition.
 --
@@ -288,10 +288,10 @@ unclssType = \case
 
 unclssDecl :: Decl Out -> Decl Out
 unclssDecl = \case
-  DType tcons ->
+  DType tcon ->
     -- TODO: We're making the asusmption that type synonyms don't contain class
     -- constraints. This might change in the future.
     let tcon2type = tcon2dcons . _Right . traverse . dcon2flds . traverse
-    in  DType (fmap (over tcon2type unclssType) tcons)
+    in  DType (over tcon2type unclssType tcon)
   DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
   DExtn extn -> DExtn (over (extn2bind . bind2type) unclssType extn)

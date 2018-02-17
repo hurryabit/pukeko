@@ -132,7 +132,9 @@ here = here_ . getPos
 here' :: (Where f, HasPos a) => (a -> f b) -> a -> f b
 here' f x = here x (f x)
 
-throwHere :: (Members [Reader SourcePos, Error Failure] effs) => Failure -> Eff effs a
+type CanThrowHere effs = Members [Reader SourcePos, Error Failure] effs
+
+throwHere :: CanThrowHere effs => Failure -> Eff effs a
 throwHere msg = do
   pos <- where_
   throwFailure (pretty pos <> ":" <+> msg)
