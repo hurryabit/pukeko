@@ -3,12 +3,12 @@
 -- SUBSECTION type cons
 
 -- TEST unknown in type definition
--- FAILURE 2:5: unknown type constructor: Bad
+-- FAILURE 2:9: unknown type constructor: Bad
 data Typ =
   | Con Bad
 
 -- TEST unknown in function declaration
--- FAILURE 1:1: unknown type constructor: Typ
+-- FAILURE 1:7: unknown type constructor: Typ
 bad : Typ
 
 -- TEST duplicate in one type definition

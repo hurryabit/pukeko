@@ -58,7 +58,7 @@ frDecl = \case
   -- FIXME: Check that classes are declared only once and before their first
   -- instantiation. Check that no class/type constructor pair is instantiated
   -- twice.
-  DClss c -> for_ (_clss2mthds c) $ \m -> declareFun m *> defineFun (m^.bind2evar)
+  DClss c -> for_ (_clss2methods c) $ \m -> declareFun m *> defineFun (m^.bind2evar)
   DInst _ -> pure ()
   DDefn d -> defineFun (d^.defn2bind.bind2evar)
   DExtn p -> defineFun (p^.extn2bind.bind2evar)

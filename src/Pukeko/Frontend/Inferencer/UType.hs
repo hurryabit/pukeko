@@ -21,6 +21,7 @@ module Pukeko.FrontEnd.Inferencer.UType
   where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
 import           Control.Monad.ST
 import           Data.Coerce        (coerce)
@@ -28,8 +29,8 @@ import           Data.STRef
 import qualified Data.Map           as Map
 import qualified Data.Vector        as Vec
 
-import           Pukeko.Pretty
-import           Pukeko.AST.Type       (TypeAtom (..), Type (..), QVar (..), prettyTUni)
+import           Pukeko.AST.Name
+import           Pukeko.AST.Type       hiding ((~>), (*~>))
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
@@ -77,7 +78,7 @@ t_args *~> t_res = foldr (~>) t_res t_args
 appN :: UType s tv -> [UType s tv] -> UType s tv
 appN = foldl UTApp
 
-appTCon :: Id.TCon -> [UType s tv] -> UType s tv
+appTCon :: Name TCon -> [UType s tv] -> UType s tv
 appTCon = appN . UTAtm . TACon
 
 unUTApp :: UType s tv -> ST s (UType s tv, [UType s tv])

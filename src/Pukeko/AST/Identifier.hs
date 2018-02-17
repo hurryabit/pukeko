@@ -7,12 +7,12 @@ module Pukeko.AST.Identifier
   , TVar
   , tvar
   , freshTVars
-  , TCon
-  , tcon
+  -- , TCon
+  -- , tcon
   , DCon
   , dcon
-  , Clss
-  , clss
+  -- , Clss
+  -- , clss
   , annot
   )
 where
@@ -83,23 +83,11 @@ instance Named (XCon tag) where
 instance Pretty (XCon tag) where
   pretty = pretty . name
 
-data TConTag
-type TCon = XCon TConTag
-
-tcon :: String -> TCon
-tcon = xcon
-
 data DConTag
 type DCon = XCon DConTag
 
 dcon :: String -> DCon
 dcon = xcon
-
-data ClssTag
-type Clss = XCon ClssTag
-
-clss :: String -> Clss
-clss = xcon
 
 deriveToJSON defaultOptions ''EVar
 deriveToJSON defaultOptions ''TVar

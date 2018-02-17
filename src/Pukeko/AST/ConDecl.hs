@@ -6,45 +6,43 @@ module Pukeko.AST.ConDecl
   , tcon2name
   , tcon2dcons
   , dcon2name
-  , dcon2flds
+  , dcon2fields
   , typeOfDCon
   ) where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
 import           Data.Aeson.TH
 
+import           Pukeko.AST.Name
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 import           Pukeko.AST.Scope
-import           Pukeko.Pretty
 
 data TConDecl = MkTConDecl
-  { _tcon2name  :: Lctd Id.TCon
+  { _tcon2name  :: Name TCon
   , _tcon2prms  :: [Id.TVar]
   , _tcon2dcons :: Either (Type (TScope Int Void)) [DConDecl]
   }
 
 data DConDecl = MkDConDecl
-  { _dcon2tcon :: Id.TCon
-  , _dcon2name :: Lctd Id.DCon
-  , _dcon2tag  :: Int
-  , _dcon2flds :: [Type (TScope Int Void)]
+  { _dcon2tcon   :: Name TCon
+  , _dcon2name   :: Lctd Id.DCon
+  , _dcon2tag    :: Int
+  , _dcon2fields :: [Type (TScope Int Void)]
   }
 
 typeOfDCon :: TConDecl -> DConDecl -> Type Void
-typeOfDCon
-  (MkTConDecl (unlctd -> tname) prms _) (MkDConDecl tcon dname _ flds)
-  | tname /= tcon = bugWith "type and data constructor do not match" (tname, dname)
-  | otherwise     =
-      let res = mkTApp (TCon tcon) (mkTVars prms)
-      in  mkTUni (map (MkQVar mempty) prms) (flds *~> res)
+typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
+  assert (tcon == tconRef) $
+  let res = mkTApp (TCon tcon) (mkTVars tparams)
+  in  mkTUni (map (MkQVar mempty) tparams) (fields *~> res)
 
-instance HasPos TConDecl where
-  getPos = getPos . _tcon2name
-
-instance HasPos DConDecl where
-  getPos = getPos . _dcon2name
+type instance NameSpaceOf TConDecl = TCon
+instance HasName   TConDecl where nameOf = _tcon2name
+instance HasPos    TConDecl where getPos = getPos . nameOf
+instance HasPos    DConDecl where getPos = getPos . _dcon2name
 
 instance Pretty TConDecl where
   pretty (MkTConDecl tname prms dcons0) =

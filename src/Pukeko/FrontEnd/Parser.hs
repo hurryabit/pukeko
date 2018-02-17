@@ -23,6 +23,7 @@ import           Text.Megaparsec.Char       hiding (space)
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Text.Megaparsec.Expr
 
+import           Pukeko.AST.Name       hiding (Name)
 import           Pukeko.AST.Operator   (Spec (..))
 import           Pukeko.AST.Surface
 import qualified Pukeko.AST.Identifier as Id
@@ -163,20 +164,23 @@ darrow  = reservedOp "=>"
 colon   = reservedOp ":"
 bar     = reservedOp "|"
 
+name :: Parser String -> Parser (LctdName nsp)
+name p = lctd (Tagged <$> p)
+
 evar :: Parser Id.EVar
 evar = Id.evar <$> lIdent <?> "expression variable"
 
 tvar :: Parser Id.TVar
 tvar = Id.tvar <$> lIdent <?> "type variable"
 
-tcon :: Parser Id.TCon
-tcon = Id.tcon <$> uIdent <?> "type constructor"
+tcon :: Parser (LctdName TCon)
+tcon = name uIdent <?> "type constructor"
 
 dcon :: Parser Id.DCon
 dcon = Id.dcon <$> uIdent <?> "data constructor"
 
-clss :: Parser Id.Clss
-clss = Id.clss <$> uIdent <?> "class name"
+clss :: Parser (LctdName Clss)
+clss = name uIdent <?> "class name"
 
 -- TODO: Make 'TAArr' a potential result as well.
 typeAtom :: Parser TypeAtom
@@ -289,13 +293,13 @@ dataDecl = indented_ (reserved "data") tconDecl
 typeDecl :: Parser TConDecl
 typeDecl = indented_ (reserved "type") $
   MkTConDecl
-  <$> lctd tcon
+  <$> tcon
   <*> (many tvar <* equals)
   <*> (reserved "external" *> pure (Right []) <|> Left <$> type_)
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
-  <$> lctd tcon
+  <$> tcon
   <*> (many tvar <* equals)
   <*> (Right <$> aligned (some dconDecl))
 
@@ -309,12 +313,12 @@ signDecl = indented
 
 clssDecl :: Parser ClssDecl
 clssDecl =
-  MkClssDecl <$> lctd clss <*> tvar <*> (reserved "where" *> aligned (many signDecl))
+  MkClssDecl <$> clss <*> tvar <*> (reserved "where" *> aligned (many signDecl))
 
 instDecl :: Parser InstDecl
 instDecl = do
   q       <- typeCstr
-  c       <- lctd clss
+  c       <- clss
   (t, vs) <- (,) <$> typeAtom <*> pure [] <|>
              parens ((,) <$> typeAtom <*> many tvar)
   ds      <- reserved "where" *> aligned (many defn)

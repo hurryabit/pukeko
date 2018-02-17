@@ -17,6 +17,7 @@ import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Language
 import           Pukeko.AST.Expr hiding (Defn, Expr, Bind, Altn)
 import qualified Pukeko.AST.Expr as Expr
+import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
 data DeclMode = SupC | Extn | Any
@@ -46,7 +47,7 @@ data FuncDecl (m :: DeclMode)
     }
 
 data Module = MkModule
-  { _mod2types :: Map Id.TCon TConDecl
+  { _mod2types :: Map (Name TCon) TConDecl
   , _mod2extns :: Map Id.EVar (FuncDecl Extn)
   , _mod2supcs :: Map Id.EVar (FuncDecl SupC)
   }
@@ -80,7 +81,7 @@ mkDecl :: (Ord k) => Lens' Module (Map k v) -> (Lens' v k) -> v -> Module
 mkDecl l k v = over l (Map.insert (v^.k) v) mempty
 
 mkTypeDecl :: TConDecl -> Module
-mkTypeDecl = mkDecl mod2types (tcon2name.lctd)
+mkTypeDecl = mkDecl mod2types tcon2name
 
 mkFuncDecl :: FuncDecl m -> Module
 mkFuncDecl = \case

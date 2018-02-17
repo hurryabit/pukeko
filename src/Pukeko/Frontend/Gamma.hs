@@ -4,9 +4,9 @@ import Pukeko.Prelude
 
 import qualified Data.Vector as Vec
 
+import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Type
-import qualified Pukeko.AST.Identifier as Id
 
 data Gamma tf ef tv ev = Gamma
   { _tenv :: EnvOf ev (ef tv)
@@ -16,7 +16,7 @@ makeLenses ''Gamma
 
 type EffXGamma tf ef tv ev effs = Eff (Reader (Gamma tf ef tv ev) : effs)
 
-type EffGamma tv ev effs = EffXGamma (Const (Set Id.Clss)) Type tv ev effs
+type EffGamma tv ev effs = EffXGamma (Const (Set (Name Clss))) Type tv ev effs
 
 runGamma :: EffXGamma tf ef Void Void effs a -> Eff effs a
 runGamma = runReader (Gamma voidEnv voidEnv)
@@ -75,7 +75,7 @@ lookupTVar ::
   forall tf ef tv ev effs. (HasEnv tv) => tv -> EffXGamma tf ef tv ev effs (tf ev)
 lookupTVar = views (kenv @tf @ef @tv @ev) . lookupEnv
 
-lookupQual :: (HasEnv tv) => tv -> EffGamma tv ev effs (Set Id.Clss)
+lookupQual :: (HasEnv tv) => tv -> EffGamma tv ev effs (Set (Name Clss))
 lookupQual = fmap getConst . lookupTVar
 
 localX ::

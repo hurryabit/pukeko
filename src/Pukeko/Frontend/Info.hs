@@ -28,6 +28,7 @@ import qualified Data.Set                    as Set
 import qualified Pukeko.AST.SystemF    as SysF
 import qualified Pukeko.AST.SuperCore  as Core
 import           Pukeko.AST.Language
+import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Expr
@@ -35,12 +36,12 @@ import           Pukeko.AST.Type
 
 
 data ModuleInfo = MkModuleInfo
-  { _info2tcons :: Map Id.TCon TConDecl
+  { _info2tcons :: Map (Name TCon) TConDecl
   , _info2dcons :: Map Id.DCon (TConDecl, DConDecl)
   , _info2signs :: Map Id.EVar (Type Void)
-  , _info2clsss :: Map Id.Clss SysF.ClssDecl
+  , _info2clsss :: Map (Name Clss) SysF.ClssDecl
   , _info2mthds :: Map Id.EVar (SysF.ClssDecl, Bind Type (TScope Int Void))
-  , _info2insts :: Map (Id.Clss, TypeAtom) SomeInstDecl
+  , _info2insts :: Map (Name Clss, TypeAtom) SomeInstDecl
   }
 
 data SomeInstDecl = forall st. SomeInstDecl (SysF.InstDecl st)
@@ -85,7 +86,7 @@ tconDeclInfo tcon =
         (tcon2dcons . _Right . traverse)
         (\dcon -> itemInfo info2dcons (dcon^.dcon2name.lctd) (tcon, dcon))
         tcon
-  in  itemInfo info2tcons (tcon^.tcon2name.lctd) tcon <> dis
+  in  itemInfo info2tcons (nameOf tcon) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
 bindInfo :: IsType ty => Lens' decl (Bind ty Void) -> decl -> ModuleInfo
@@ -96,14 +97,14 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
   collectInfo (SysF.MkModule decls) = foldFor decls $ \case
     SysF.DType tcon -> tconDeclInfo tcon
     SysF.DSign (MkBind z t) -> bindInfo id (MkBind z t)
-    SysF.DClss clss@(SysF.MkClssDecl (unlctd -> c) v ms) ->
+    SysF.DClss clssDecl@(SysF.MkClssDecl clss v ms) ->
       let mthds_info = foldFor ms $ \mthd@(MkBind z t0) ->
-            let t1 = mkTUni [MkQVar (Set.singleton c) v] t0
+            let t1 = mkTUni [MkQVar (Set.singleton clss) v] t0
             in  bindInfo id (MkBind z t1)
-                <> itemInfo info2mthds (z^.lctd) (clss, mthd)
-      in  itemInfo info2clsss c clss <> mthds_info
-    SysF.DInst inst@(SysF.MkInstDecl (unlctd -> c) t _ _) ->
-      itemInfo info2insts (c, t) (SomeInstDecl inst)
+                <> itemInfo info2mthds (z^.lctd) (clssDecl, mthd)
+      in  itemInfo info2clsss clss clssDecl <> mthds_info
+    SysF.DInst inst@(SysF.MkInstDecl clss t _ _) ->
+      itemInfo info2insts (clss, t) (SomeInstDecl inst)
     SysF.DDefn defn -> bindInfo defn2bind defn
     SysF.DExtn extn -> bindInfo SysF.extn2bind extn
 

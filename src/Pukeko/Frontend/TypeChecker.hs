@@ -3,16 +3,17 @@ module Pukeko.FrontEnd.TypeChecker
   ) where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
 import qualified Data.List.NE as NE
 import qualified Data.Map     as Map
 import qualified Data.Set     as Set
 
-import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Expr
+import           Pukeko.AST.Name
 import qualified Pukeko.AST.SystemF   as SysF
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
@@ -90,7 +91,7 @@ typeOf = \case
 satisfiesCstrs :: (IsTVar tv) => Type tv -> QVar -> TC tv ev ()
 satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
 
-satisfiesCstr :: (IsTVar tv) => Type tv -> Id.Clss -> TC tv ev ()
+satisfiesCstr :: (IsTVar tv) => Type tv -> Name Clss -> TC tv ev ()
 satisfiesCstr t0 clss = do
   let (t1, tps) = gatherTApp t0
   let throwNoInst = throwHere ("no instance for" <+> pretty clss <+> parens (pretty t1))

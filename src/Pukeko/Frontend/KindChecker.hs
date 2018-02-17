@@ -6,6 +6,7 @@ module Pukeko.FrontEnd.KindChecker
   ) where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
@@ -14,9 +15,9 @@ import qualified Data.Map           as Map
 import           Data.STRef
 import qualified Data.Vector        as Vec
 
-import           Pukeko.Pretty
 import           Pukeko.AST.SystemF    hiding (Free)
 import           Pukeko.AST.Language
+import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
@@ -36,7 +37,7 @@ data Kind a where
 
 type KCEnv n s = Vector (Kind (Open s))
 
-type KCState s = Map Id.TCon (Kind (Open s))
+type KCState s = Map (Name TCon) (Kind (Open s))
 
 type KC n s =
   Eff
@@ -71,16 +72,16 @@ kcType k = \case
   TUni _ _ -> bug "universal quantificatio"
 
 kcTConDecl :: TConDecl -> KC n s ()
-kcTConDecl (MkTConDecl tname prms dcons0) = here tname $ do
+kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
   kind <- freshUVar
-  modify (Map.insert (unlctd tname) kind)
+  modify (Map.insert tcon kind)
   paramKinds <- traverse (const freshUVar) prms
   unify kind (foldr Arrow Star paramKinds)
   localize paramKinds $
     case dcons0 of
       Left typ -> kcType Star typ
       Right dcons ->
-        for_ dcons $ here' $ \MkDConDecl{_dcon2flds = flds} ->
+        for_ dcons $ here' $ \MkDConDecl{_dcon2fields = flds} ->
           traverse_ (kcType Star) flds
   close kind
 

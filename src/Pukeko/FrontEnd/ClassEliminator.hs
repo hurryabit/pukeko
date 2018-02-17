@@ -4,6 +4,7 @@ module Pukeko.FrontEnd.ClassEliminator
 
 import Pukeko.Prelude
 
+import           Data.Coerce       (coerce)
 import qualified Data.List.NE      as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
@@ -12,6 +13,7 @@ import qualified Safe.Exact        as Safe
 
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
+import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.Type
@@ -24,7 +26,7 @@ type Out = Unclassy
 type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
 
 type CE tv ev =
-  EffXGamma (Map Id.Clss) Type tv ev [Reader ModuleInfo, Reader SourcePos]
+  EffXGamma (Map (Name Clss)) Type tv ev [Reader ModuleInfo, Reader SourcePos]
 
 runCE :: Module In -> CE Void Void a -> a
 runCE m0 = run . runReader noPos . runInfo m0 . runGamma
@@ -35,28 +37,29 @@ elimModule m0@(MkModule decls) = runCE m0 $
 
 -- | Name of the dictionary type constructor of a type class, e.g., @Dict$Eq@
 -- for type class @Eq@.
-clssTCon :: Id.Clss -> Id.TCon
-clssTCon clss = Id.tcon ("Dict$" ++ Id.name clss)
+clssTCon :: Name Clss -> Name TCon
+clssTCon = coerce
 
 -- | Name of the dictionary data constructor of a type class, e.g., @Dict$Eq@
 -- for type class @Eq@. This is currently the same as the dictionary type
 -- constructor.
-clssDCon :: Id.Clss -> Id.DCon
-clssDCon clss = Id.dcon ("Dict$" ++ Id.name clss)
+clssDCon :: Name Clss -> Id.DCon
+clssDCon clss = Id.dcon ("Dict$" ++ untag (nameText clss))
 
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: Id.Clss -> Either TypeAtom Id.TVar -> Id.EVar
+dictEVar :: Name Clss -> Either TypeAtom Id.TVar -> Id.EVar
 dictEVar clss tcon =
   -- FIXME: @render . pretty@ is an awful hack.
-  Id.evar ("dict$" ++ Id.name clss ++ "$" ++ either (render . pretty) Id.name tcon)
+  Id.evar ("dict$" ++ untag (nameText clss) ++ "$"
+           ++ either (render . pretty) Id.name tcon)
 
 -- | Apply the dictionary type constructor of a type class to a type. For the
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
 --
 -- > TApp (TCon "Dict$Traversable") [TCon "List"]
-mkTDict :: Id.Clss -> Type tv -> Type tv
+mkTDict :: Name Clss -> Type tv -> Type tv
 mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 
 -- | Get the name of the dictionary for a type class instance and its type.
@@ -69,17 +72,18 @@ mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 --
 -- > dict$Eq$List : ∀a. (Eq a) => Dict$Eq (List a)
 instDictInfo :: InstDecl st -> (Id.EVar, Type Void)
-instDictInfo (MkInstDecl (unlctd -> clss) tatom qvs _) =
+instDictInfo (MkInstDecl clss tatom qvs _) =
     let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TAtm tatom) (mkTVarsQ qvs)))
     in  (dictEVar clss (Left tatom), t_dict)
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
 dictTConDecl :: ClssDecl -> TConDecl
-dictTConDecl (MkClssDecl (Lctd pos clss) prm mthds) =
-    let flds = map _bind2type mthds
-        dcon = MkDConDecl (clssTCon clss) (Lctd pos (clssDCon clss)) 0 flds
-    in  MkTConDecl (Lctd pos (clssTCon clss)) [prm] (Right [dcon])
+dictTConDecl (MkClssDecl clss prm mthds) =
+    let tcon = coerce clss
+        flds = map _bind2type mthds
+        dcon = MkDConDecl tcon (Lctd (getPos clss) (clssDCon clss)) 0 flds
+    in  MkTConDecl tcon [prm] (Right [dcon])
 
 -- | Transform a type class declaration into a data type declaration for the
 -- dictionary and projections from the dictionary to each class method.
@@ -100,7 +104,7 @@ dictTConDecl (MkClssDecl (Lctd pos clss) prm mthds) =
 -- >       match dict with
 -- >       | Dict$Traversable @t traverse -> traverse
 elimClssDecl :: ClssDecl -> CE Void Void [Decl Out]
-elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
+elimClssDecl clssDecl@(MkClssDecl clss prm mthds) = do
   let tcon = dictTConDecl clssDecl
   let qprm = NE.singleton (MkQVar mempty prm)
       prmType = TVar (mkBound 0 prm)
@@ -135,10 +139,10 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
 -- >   in
 -- >   Dict$Traversable @List traverse
 elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
-elimInstDecl clssDecl inst@(MkInstDecl (Lctd ipos clss) tatom qvs defns0) = do
+elimInstDecl clssDecl inst@(MkInstDecl clss tatom qvs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
-  defns1 <- for (clssDecl^.clss2mthds) $ \(MkBind (unlctd -> mthd) _) -> do
+  defns1 <- for (clssDecl^.clss2methods) $ \(MkBind (unlctd -> mthd) _) -> do
     case find (\defn -> defn^.defn2func == mthd) defns0 of
       Nothing -> bugWith "missing method" (clss, tatom, mthd)
       Just defn -> pure defn
@@ -149,7 +153,7 @@ elimInstDecl clssDecl inst@(MkInstDecl (Lctd ipos clss) tatom qvs defns0) = do
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In _ _
       e_rhs = mkETyAbs qvs e_let
-  pure [DDefn (MkDefn (MkBind (Lctd ipos z_dict) t_dict) e_rhs)]
+  pure [DDefn (MkDefn (MkBind (Lctd (getPos clss) z_dict) t_dict) e_rhs)]
 
 elimDecl :: Decl In -> CE Void Void [Decl Out]
 elimDecl = here' $ \case
@@ -157,7 +161,7 @@ elimDecl = here' $ \case
   DInst inst  -> do
     -- TODO: Constructing the declaration of the dictionary type again and
     -- putting it in the environment locally is a bit a of a hack.
-    clss <- findInfo info2clsss (inst^.inst2clss.lctd)
+    clss <- findInfo info2clsss (inst^.inst2clss)
     local (<> tconDeclInfo (dictTConDecl clss)) $ do
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
@@ -165,12 +169,13 @@ elimDecl = here' $ \case
   DType tcons -> pure [DType tcons]
   DExtn extn  -> pure [DExtn extn]
 
-buildDict :: (IsTVar tv) => Id.Clss -> Type tv -> CE tv ev (Expr Out tv ev)
+buildDict :: (IsTVar tv) => Name Clss -> Type tv -> CE tv ev (Expr Out tv ev)
 buildDict clss t0 = do
   let (t1, tps) = gatherTApp t0
   case t1 of
     TVar v
-      | null tps -> lookupTVar v >>= maybe bugNoDict (pure . EVar) . Map.lookup clss
+      | null tps ->
+          lookupTVar v >>= maybe bugNoDict (pure . EVar) . Map.lookup clss
     TAtm tatom -> do
       SomeInstDecl inst <- findInfo info2insts (clss, tatom)
       let (z_dict, t_dict) = instDictInfo inst
@@ -204,7 +209,7 @@ elimETyAbs qvs0 e0 = do
           pure ((i, clss, x), MkBind (Lctd pos x) (mkTDict clss (TVar (mkBound i v))))
     let (ixs, bs) = unzip ixbs
     let refs = Vec.accum Map.union (Vec.replicate (length qvs0) mempty)
-               [ (i, Map.singleton clss (mkBound j x))
+               [ (i, Map.singleton (clss) (mkBound j x))
                | (j, (i, clss, x)) <- itoList ixs
                ]
     (e1, t1) <-
@@ -291,7 +296,7 @@ unclssDecl = \case
   DType tcon ->
     -- TODO: We're making the asusmption that type synonyms don't contain class
     -- constraints. This might change in the future.
-    let tcon2type = tcon2dcons . _Right . traverse . dcon2flds . traverse
+    let tcon2type = tcon2dcons . _Right . traverse . dcon2fields . traverse
     in  DType (over tcon2type unclssType tcon)
   DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
   DExtn extn -> DExtn (over (extn2bind . bind2type) unclssType extn)

@@ -8,23 +8,24 @@ module Pukeko.AST.SystemF
   ) where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
-import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Expr.Optics
+import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 
 data ClssDecl = MkClssDecl
-  { _clss2name  :: Lctd Id.Clss
-  , _clss2prm   :: Id.TVar
-  , _clss2mthds :: [Bind Type (TScope Int Void)]
+  { _clss2name    :: Name Clss
+  , _clss2param   :: Id.TVar
+  , _clss2methods :: [Bind Type (TScope Int Void)]
   }
 
 data InstDecl st = MkInstDecl
-  { _inst2clss  :: Lctd Id.Clss
+  { _inst2clss  :: Name Clss
   , _inst2atom  :: TypeAtom
   , _inst2qvars :: [QVar]
   , _inst2defns :: [Defn st (TScope Int Void) Void]
@@ -81,11 +82,15 @@ decl2expr f top = case top of
   DDefn d -> DDefn <$> defn2expr f d
   DExtn p -> pure (DExtn p)
 
+type instance NameSpaceOf ClssDecl = Clss
+instance HasName   ClssDecl where nameOf = _clss2name
+instance HasPos    ClssDecl where getPos = getPos . nameOf
+
 instance HasPos (Decl st) where
   getPos = \case
     DType tcon  -> getPos tcon
     DSign sign  -> getPos sign
-    DClss clss  -> getPos (_clss2name clss)
+    DClss clss  -> getPos clss
     DInst inst  -> getPos (_inst2clss inst)
     DDefn defn  -> getPos (_defn2bind defn)
     DExtn extn  -> getPos (_extn2bind extn)

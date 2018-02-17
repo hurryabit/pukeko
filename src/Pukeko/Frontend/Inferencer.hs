@@ -6,6 +6,7 @@ module Pukeko.FrontEnd.Inferencer
 where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
 import           Control.Lens.Indexed
 import           Control.Monad.Freer.Supply
@@ -17,8 +18,8 @@ import qualified Data.Set         as Set
 import           Data.STRef
 import qualified Data.Vector      as Vec
 
-import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Info
+import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF    hiding (instantiate)
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
@@ -32,10 +33,10 @@ type In    = Surface
 type Out   = Typed
 type Aux s = PreTyped (UType s)
 
-type Cstrs s tv = Seq (UType s tv, Id.Clss)
+type Cstrs s tv = Seq (UType s tv, Name Clss)
 
 data SplitCstrs s tv = MkSplitCstrs
-  { _retained :: Map Id.TVar (Set Id.Clss)
+  { _retained :: Map Id.TVar (Set (Name Clss))
   , _deferred :: Cstrs s tv
   }
 
@@ -74,7 +75,7 @@ generalize = go
       where
         pureDefault = pure (t0, mempty)
 
-splitCstr :: UType s tv -> Id.Clss -> TI ev s (SplitCstrs s tv)
+splitCstr :: UType s tv -> Name Clss -> TI ev s (SplitCstrs s tv)
 splitCstr t0 clss = do
   (t1, tps) <- sendM (unUTApp t0)
   case t1 of
@@ -108,10 +109,8 @@ splitCstr t0 clss = do
       p0 <- sendM (prettyUType 1 t0)
       throwHere ("no instance for" <+> pretty clss <+> p0)
 
-
 splitCstrs :: Cstrs s tv -> TI ev s (SplitCstrs s tv)
 splitCstrs cstrs = fold <$> traverse (uncurry splitCstr) cstrs
-
 
 instantiate ::
   Expr (Aux s) tv ev -> UType s tv ->
@@ -132,15 +131,15 @@ inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
   PVar x -> pure (PVar x, Map.singleton x t_expr)
   PCon dcon (_ :: [NoType _]) ps0 -> do
-    (MkTConDecl (unlctd -> tcon) params _dcons, MkDConDecl{_dcon2flds = flds})
+    (MkTConDecl tcon params _dcons, MkDConDecl{_dcon2fields = fields})
       <- findInfo info2dcons dcon
-    when (length ps0 /= length flds) $
+    when (length ps0 /= length fields) $
       throwHere ("data constructor" <+> quotes (pretty dcon) <+>
-                 "expects" <+> pretty (length flds) <+> "arguments")
+                 "expects" <+> pretty (length fields) <+> "arguments")
     t_params <- traverse (const freshUVar) params
     let t_inst = appTCon tcon (toList t_params)
     unify t_expr t_inst
-    let t_fields = map (open1 . fmap (scope absurd (Vec.fromList t_params Vec.!))) flds
+    let t_fields = map (open1 . fmap (scope absurd (Vec.fromList t_params Vec.!))) fields
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
     pure (PCon dcon (toList t_params) ps1, Map.unions binds)
 

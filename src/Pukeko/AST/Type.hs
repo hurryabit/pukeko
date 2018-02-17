@@ -28,6 +28,7 @@ module Pukeko.AST.Type
   , qvar2tvar
   , type2tcon
   , type2tcon_
+  , applyConstraints
   , prettyTypeCstr
   , prettyTUni
   , prettyQVar
@@ -36,15 +37,17 @@ module Pukeko.AST.Type
   where
 
 import Pukeko.Prelude
+import Pukeko.Pretty
 
 import           Control.Lens.Indexed (FunctorWithIndex)
+import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
 import           Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 
-import           Pukeko.Pretty
+import           Pukeko.AST.Name
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Functor2
 import           Pukeko.AST.Scope
@@ -59,7 +62,7 @@ data NoType tv = NoType
 data TypeAtom
   = TAArr
   | TAInt
-  | TACon Id.TCon
+  | TACon (Name TCon)
 
 data Type tv
   = TVar tv
@@ -70,7 +73,7 @@ data Type tv
 pattern TArr :: Type tv
 pattern TArr = TAtm TAArr
 
-pattern TCon :: Id.TCon -> Type tv
+pattern TCon :: Name TCon -> Type tv
 pattern TCon tcon = TAtm (TACon tcon)
 
 pattern TFun :: Type tv -> Type tv -> Type tv
@@ -81,7 +84,7 @@ pattern TFun tx ty = TApp (TApp TArr tx) ty
 --
 -- The set of constraints is not considered in comparison operations.
 data QVar = MkQVar
-  { _qvar2cstr :: Set Id.Clss
+  { _qvar2cstr :: Set (Name Clss)
     -- ^ The set of type class constraints on the type variable.
   , _qvar2tvar :: Id.TVar
   }
@@ -90,7 +93,7 @@ data CoercionDir = Inject | Project
 
 data Coercion = MkCoercion
   { _coeDir  :: CoercionDir
-  , _coeTCon :: Id.TCon
+  , _coeTCon :: Name TCon
   }
 
 strengthenT0 :: Type (TScope Int tv) -> Type tv
@@ -136,7 +139,8 @@ vars :: Ord tv => Type tv -> Set tv
 vars = setOf traverse
 
 -- * Deep traversals
-type2tcon :: forall m tv. Monad m => (Id.TCon -> m Id.TCon) -> Type tv -> m (Type tv)
+type2tcon :: forall m tv. Monad m =>
+  (Name TCon -> m (Name TCon)) -> Type tv -> m (Type tv)
 type2tcon f = cataM2 (fmap embed2 . step)
   where
     step :: TypeF Type tv' -> m (TypeF Type tv')
@@ -144,22 +148,29 @@ type2tcon f = cataM2 (fmap embed2 . step)
       TAtmF (TACon c) -> TAtmF . TACon <$> f c
       x               -> pure x
 
-type2tcon_ :: forall m tv. Monad m => (Id.TCon -> m ()) -> Type tv -> m ()
+type2tcon_ :: forall m tv. Monad m => (Name TCon -> m ()) -> Type tv -> m ()
 type2tcon_ f = fmap getConst . cataM2 (fmap Const . step)
   where
     step :: TypeF _ _ -> m ()
     step = \case
       TAtmF (TACon c) -> f c
       _               -> pure ()
+-- | Apply a bunch of constraints to a list of 'Binder's.
+applyConstraints :: CanThrowHere effs =>
+  [Id.TVar] -> Map Id.TVar (Set (Name Clss)) -> Eff effs [QVar]
+applyConstraints binders constraints = do
+  let badNames = Map.keysSet constraints `Set.difference` Set.fromList binders
+  whenJust (Set.lookupMin badNames) $ \name ->
+    throwHere ("constraints on unbound type variable" <:~> pretty name)
+  let qualBinder binder =
+        MkQVar (Map.findWithDefault mempty binder constraints) binder
+  pure (map qualBinder binders)
 
 instance IsType NoType where
   isType = const Nothing
 
 instance IsType Type where
   isType = Just
-
-deriving instance Eq  TypeAtom
-deriving instance Ord TypeAtom
 
 instance (Eq tv) => Eq (Type tv) where
   t1 == t2 = case (t1, t2) of
@@ -298,6 +309,9 @@ renameType t0 =
         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
         local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
           TUni qvs1 <$> go tq
+
+deriving instance Eq  TypeAtom
+deriving instance Ord TypeAtom
 
 deriveToJSON defaultOptions ''QVar
 deriveToJSON defaultOptions ''TypeAtom

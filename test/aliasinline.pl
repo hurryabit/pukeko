@@ -1,38 +1,38 @@
+data Unit =
+       | Unit
 data Bool =
        | False
        | True
-data Char
-data Choice a b =
-       | First a
-       | Second b
-data Dict$Eq a =
-       | Dict$Eq (a -> a -> Bool)
-data Dict$Foldable t =
-       | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
-data Dict$Functor f =
-       | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
-data Dict$Monad m =
-       | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
-data Dict$Monoid m =
-       | Dict$Monoid m (m -> m -> m)
-data Dict$Ord a =
-       | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
-data Dict$Ring a =
-       | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
-data IO a = World -> Pair a World
-data List a =
-       | Nil
-       | Cons a (List a)
+data Pair a b =
+       | Pair a b
 data Option a =
        | None
        | Some a
-data Pair a b =
-       | Pair a b
-data Unit =
-       | Unit
+data Choice a b =
+       | First a
+       | Second b
+data Eq a =
+       | Dict$Eq (a -> a -> Bool)
+data Ord a =
+       | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
+data Monoid m =
+       | Dict$Monoid m (m -> m -> m)
+data Ring a =
+       | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
+data Char
+data Foldable t =
+       | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+data Functor f =
+       | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
+data List a =
+       | Nil
+       | Cons a (List a)
+data Monad m =
+       | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 data World =
        | World
-dict$Monad$IO : Dict$Monad IO =
+data IO a = World -> Pair a World
+dict$Monad$IO : Monad IO =
   let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
   and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
         fun @a @b -> dict$Monad$IO$ll4 @a @b
@@ -54,8 +54,8 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
 h$ll1 : ∀c. c -> c = fun @c -> fun (u : c) -> u
 main : IO Unit =
   pure$ll1 @IO dict$Monad$IO @Unit (h$ll1 @Unit (h$ll1 @Unit Unit))
-pure$ll1 : ∀m. Dict$Monad m -> (∀a. a -> m a) =
+pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
   fun @m ->
-    fun (dict : Dict$Monad m) ->
+    fun (dict : Monad m) ->
       match dict with
       | Dict$Monad @m pure _ -> pure

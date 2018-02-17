@@ -7,6 +7,7 @@ import Pukeko.Prelude
 
 import qualified Data.Map     as Map
 
+import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
@@ -16,7 +17,7 @@ import qualified Pukeko.AST.Identifier as Id
 type In = Surface
 
 data TRState = MkTRState
-  { _st2tcons :: Map Id.TCon TConDecl
+  { _st2tcons :: Map (Name TCon) TConDecl
   , _st2dcons :: Map Id.DCon (TConDecl, DConDecl)
   }
 makeLenses ''TRState
@@ -30,7 +31,7 @@ trType = type2tcon_ $ \tcon -> do
   unless ex (throwHere ("unknown type constructor:" <+> pretty tcon))
 
 insertTCon :: CanTR effs => TConDecl -> Eff effs ()
-insertTCon = here' $ \tcon@MkTConDecl{_tcon2name = unlctd -> tname} -> do
+insertTCon = here' $ \tcon@(nameOf -> tname) -> do
   old <- uses st2tcons (Map.lookup tname)
   when (isJust old) $ throwHere ("duplicate type constructor:" <+> pretty tname)
   modifying st2tcons (Map.insert tname tcon)
@@ -58,7 +59,7 @@ trDecl top = case top of
     case dconDecls0 of
         Left typ -> trType typ
         Right dconDecls ->
-          for_ dconDecls $ here' $ \dcon@MkDConDecl{_dcon2flds = flds} -> do
+          for_ dconDecls $ here' $ \dcon@MkDConDecl{_dcon2fields = flds} -> do
             for_ flds trType
             insertDCon tcon dcon
   DSign (MkBind _ t) -> trType t

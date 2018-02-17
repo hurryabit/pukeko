@@ -1,4 +1,5 @@
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Prelude
   ( module X
@@ -7,6 +8,7 @@ module Pukeko.Prelude
   , Pretty (..)
   , PrettyPrec (..)
   , (<+>)
+  , (<:~>)
   -- , shown
   -- , text
   , render
@@ -17,6 +19,7 @@ module Pukeko.Prelude
   , noPos
 
   , Failure
+  , CanThrowHere
   , throwFailure
   , renderFailure
 
@@ -24,6 +27,7 @@ module Pukeko.Prelude
   , Where (..)
   , here
   , here'
+  , throwAt
   , throwHere
   , WhereLens
   , WhereLens'
@@ -40,6 +44,7 @@ module Pukeko.Prelude
 import Prelude               as X
 
 import Control.Applicative   as X
+import Control.Exception     as X (assert)
 import Control.Lens          as X
        ( Iso, Lens, Lens', Traversal, Traversal', Prism, Prism'
        , (^.), (.~), (%~)
@@ -96,11 +101,13 @@ throwFailure = throwError
 renderFailure :: Failure -> String
 renderFailure = render
 
-infixr 6 <+>
+infixr 6 <+>, <:~>
 
-(<+>) :: Doc ann -> Doc ann -> Doc ann
+(<+>), (<:~>) :: Doc ann -> Doc ann -> Doc ann
 (<+>) = (PP.<+>)
+x <:~> y = x <> ":" <+> y
 {-# INLINE (<+>) #-}
+{-# INLINE (<:~>) #-}
 
 class Pretty a where
   pretty :: a -> Doc ann
@@ -115,8 +122,12 @@ class Pretty a => PrettyPrec a where
 
 noPos :: SourcePos
 noPos = initialPos ""
+
 class HasPos a where
   getPos :: a -> SourcePos
+
+instance HasPos SourcePos where
+  getPos = id
 
 class Where f where
   where_ :: f SourcePos
@@ -136,12 +147,15 @@ here = here_ . getPos
 here' :: (Where f, HasPos a) => (a -> f b) -> a -> f b
 here' f x = here x (f x)
 
+throwAt :: (Member (Error Failure) effs, HasPos x) => x -> Failure -> Eff effs a
+throwAt x msg = throwFailure (pretty (getPos x) <:~> msg)
+
 type CanThrowHere effs = Members [Reader SourcePos, Error Failure] effs
 
 throwHere :: CanThrowHere effs => Failure -> Eff effs a
 throwHere msg = do
   pos <- where_
-  throwFailure (pretty pos <> ":" <+> msg)
+  throwAt pos msg
 
 type WhereLens s t a b =
   forall f. (Functor f, Where f) => (a -> f b) -> s -> f t

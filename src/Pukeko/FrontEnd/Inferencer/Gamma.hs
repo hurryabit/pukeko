@@ -18,6 +18,7 @@ import           Data.Coerce (coerce)
 import qualified Data.Map     as Map
 
 import qualified Pukeko.AST.Identifier as Id
+import           Pukeko.AST.Name
 import           Pukeko.AST.Scope
 import           Pukeko.AST.Type
 import           Pukeko.FrontEnd.Inferencer.UType
@@ -25,7 +26,7 @@ import           Pukeko.FrontEnd.Inferencer.UType
 data Gamma s ev = Gamma
   { _tenv  :: EnvOf ev (UType s Void)
   , _level :: Int
-  , _qenv  :: Map Id.TVar (Set Id.Clss)
+  , _qenv  :: Map Id.TVar (Set (Name Clss))
   }
 makeLenses ''Gamma
 
@@ -63,5 +64,5 @@ getTLevel = view (level @s @ev)
 lookupEVar :: forall s ev effs tv. (HasEnv ev) => ev -> EffGamma s ev effs (UType s tv)
 lookupEVar x = fmap absurd <$> views (tenv @s @ev) (lookupEnv x)
 
-lookupTVar :: forall s ev effs. Id.TVar -> EffGamma s ev effs (Set Id.Clss)
+lookupTVar :: forall s ev effs. Id.TVar -> EffGamma s ev effs (Set (Name Clss))
 lookupTVar x = views (qenv @s @ev) (Map.findWithDefault (bugWith "lookupTVar" x) x)
