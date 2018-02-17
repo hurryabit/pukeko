@@ -89,7 +89,7 @@ data ClssDecl = MkClssDecl
 
 data InstDecl = MkInstDecl
   { _inst2clss  :: Lctd Id.Clss
-  , _inst2tcon  :: Id.TCon
+  , _inst2atom  :: TypeAtom
   , _inst2tvars :: [Id.TVar]
   , _inst2cstr  :: TypeCstr
   , _inst2defns :: [Defn Id.EVar]
@@ -107,6 +107,7 @@ data InfxDecl = MkInfxDecl
 
 data TypeAtom
   = TAArr
+  | TAInt
   | TACon Id.TCon
 
 data Type

@@ -94,13 +94,13 @@ splitCstr t0 clss = do
           | otherwise -> pure (MkSplitCstrs mempty (Seq.singleton (t0, clss)))
         ULink{} -> bug "ULink after unUTApp"
     UTVar v -> pure (MkSplitCstrs (Map.singleton v (Set.singleton clss)) mempty)
-    UTAtm (TACon tcon) -> do
-      inst_mb <- lookupInfo info2insts (clss, tcon)
+    UTAtm atom -> do
+      inst_mb <- lookupInfo info2insts (clss, atom)
       case inst_mb of
         Nothing -> throwNoInst
         Just (SomeInstDecl MkInstDecl{_inst2qvars = qvs})
           | length qual /= length tps ->
-              bugWith "mitmatching number of type arguments for instance" (clss, tcon)
+              bugWith "mitmatching number of type arguments for instance" (clss, atom)
           | otherwise -> do
               let cstrs = Seq.fromList
                     [ (tp, c) | (tp, MkQVar q _) <- zip tps qual, c <- toList q ]
@@ -108,7 +108,6 @@ splitCstr t0 clss = do
           where qual = toList qvs
     UTApp{} -> bug "UTApp after unUTApp"
     UTUni{} -> bug "UTUni during constraint splitting"
-    UTAtm TAArr -> throwNoInst
   where
     throwNoInst = do
       p0 <- sendM (prettyUType 1 t0)
@@ -265,15 +264,15 @@ inferDecl = here' $ \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
   DClss c -> yield (DClss c)
-  DInst (MkInstDecl clss tcon qvs ds0) -> do
+  DInst (MkInstDecl clss atom qvs ds0) -> do
     ds1 <- for ds0 $ \d0 -> do
       (_, MkBind _ t_decl0) <-
         findInfo info2mthds (d0^.defn2bind.bind2evar.lctd)
-      let t_inst = mkTApp (TCon tcon) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
+      let t_inst = mkTApp (TAtm atom) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
       let t_decl1 :: Type (TScope Int Void)
           t_decl1 = renameType (instantiate' (const t_inst) t_decl0)
       withQVars qvs (inferTypedDefn d0 (open t_decl1))
-    yield (DInst (MkInstDecl clss tcon qvs ds1))
+    yield (DInst (MkInstDecl clss atom qvs ds1))
   DDefn d0 -> do
     reset @Id.TVar
     t_decl <- open <$> typeOfFunc (d0^.defn2bind.bind2evar.lctd)

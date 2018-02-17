@@ -23,7 +23,6 @@ module Pukeko.AST.Type
   , (*~>)
   , mkTApp
   , gatherTApp
-  , typeInt
   , vars
   , qvar2cstr
   , qvar2tvar
@@ -59,6 +58,7 @@ data NoType tv = NoType
 
 data TypeAtom
   = TAArr
+  | TAInt
   | TACon Id.TCon
 
 data Type tv
@@ -132,9 +132,6 @@ gatherTApp = go []
       TApp t u -> go (u:us) t
       t        -> (t, us)
 
-typeInt :: Type tv
-typeInt  = TCon (Id.tcon "Int")
-
 vars :: Ord tv => Type tv -> Set tv
 vars = setOf traverse
 
@@ -161,7 +158,8 @@ instance IsType NoType where
 instance IsType Type where
   isType = Just
 
-deriving instance Eq TypeAtom
+deriving instance Eq  TypeAtom
+deriving instance Ord TypeAtom
 
 instance (Eq tv) => Eq (Type tv) where
   t1 == t2 = case (t1, t2) of
@@ -191,8 +189,9 @@ instance Monad Type where
 
 instance Pretty TypeAtom where
   pretty = \case
-    TACon c -> pretty c
     TAArr   -> "(->)"
+    TAInt   -> "Int"
+    TACon c -> pretty c
 
 instance BaseTVar tv => Pretty (Type tv)
 

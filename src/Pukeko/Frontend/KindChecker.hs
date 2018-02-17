@@ -68,6 +68,7 @@ kcType k = \case
     kv <- asks (Vec.! scope absurd id v)
     unify kv k
   TAtm TAArr -> unify (Arrow Star (Arrow Star Star)) k
+  TAtm TAInt -> unify Star k
   TAtm (TACon tcon) -> do
     kcon_opt <- gets (tcon `Map.lookup`)
     case kcon_opt of

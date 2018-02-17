@@ -77,10 +77,11 @@ rnDecl = \case
     ms1 <- traverse (rnSignDecl env) ms0
     modifying funcs (<> setOf (traverse . bind2evar . lctd) ms1)
     yield (DClss (MkClssDecl c v ms1))
-  Ps.DInst (Ps.MkInstDecl c t vs0 qs ds0) -> do
+  Ps.DInst (Ps.MkInstDecl c atom0 vs0 qs ds0) -> do
+    atom1 <- rnTypeAtom atom0
     qvs <- rnTypeCstr vs0 qs
     ds1 <- traverse rnDefn ds0
-    yield (DInst (MkInstDecl c t qvs ds1))
+    yield (DInst (MkInstDecl c atom1 qvs ds1))
   Ps.DDefn d -> Just . DDefn <$> rnDefn d
   Ps.DExtn (Ps.MkExtnDecl z s) -> do
     modifying funcs (<> Set.singleton (z^.lctd))
@@ -114,6 +115,7 @@ rnSignDecl env (Ps.MkSignDecl z t) = do
 rnTypeAtom :: Ps.TypeAtom -> Rn ev TypeAtom
 rnTypeAtom = \case
   Ps.TAArr   -> pure TAArr
+  Ps.TAInt   -> pure TAInt
   Ps.TACon c -> pure (TACon c)
 
 rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)

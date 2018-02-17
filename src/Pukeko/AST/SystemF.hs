@@ -27,8 +27,7 @@ data ClssDecl = MkClssDecl
 
 data InstDecl st = MkInstDecl
   { _inst2clss  :: Lctd Id.Clss
-    -- TODO: Allow type instances for (->).
-  , _inst2tcon  :: Id.TCon
+  , _inst2atom  :: TypeAtom
   , _inst2qvars :: [QVar]
   , _inst2defns :: [Defn st (TScope Int Void) Void]
   }
@@ -107,7 +106,7 @@ instance (PrettyStage st) => Pretty (Decl st) where
       $$ nest 2 (vcatMap pretty ds)
       where
         t1 :: Type (TScope Int Void)
-        t1 = mkTApp (TCon t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
+        t1 = mkTApp (TAtm t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
     DDefn d -> pretty d
     DExtn (MkExtnDecl b s) ->
       hsep ["external", pretty b, "=", doubleQuotes (pretty s)]

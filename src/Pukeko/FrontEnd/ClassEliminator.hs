@@ -47,9 +47,10 @@ clssDCon clss = Id.dcon ("Dict$" ++ Id.name clss)
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: Id.Clss -> Either Id.TCon Id.TVar -> Id.EVar
+dictEVar :: Id.Clss -> Either TypeAtom Id.TVar -> Id.EVar
 dictEVar clss tcon =
-  Id.evar ("dict$" ++ Id.name clss ++ "$" ++ either Id.name Id.name tcon)
+  -- FIXME: @render . pretty@ is an awful hack.
+  Id.evar ("dict$" ++ Id.name clss ++ "$" ++ either (render . pretty) Id.name tcon)
 
 -- | Apply the dictionary type constructor of a type class to a type. For the
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
@@ -68,9 +69,9 @@ mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 --
 -- > dict$Eq$List : ∀a. (Eq a) => Dict$Eq (List a)
 instDictInfo :: InstDecl st -> (Id.EVar, Type Void)
-instDictInfo (MkInstDecl (unlctd -> clss) tcon qvs _) =
-    let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TCon tcon) (mkTVarsQ qvs)))
-    in  (dictEVar clss (Left tcon), t_dict)
+instDictInfo (MkInstDecl (unlctd -> clss) tatom qvs _) =
+    let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TAtm tatom) (mkTVarsQ qvs)))
+    in  (dictEVar clss (Left tatom), t_dict)
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
@@ -134,12 +135,12 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
 -- >   in
 -- >   Dict$Traversable @List traverse
 elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
-elimInstDecl clssDecl inst@(MkInstDecl (Lctd ipos clss) tcon qvs defns0) = do
-  let t_inst = mkTApp (TCon tcon) (mkTVarsQ qvs)
+elimInstDecl clssDecl inst@(MkInstDecl (Lctd ipos clss) tatom qvs defns0) = do
+  let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
   defns1 <- for (clssDecl^.clss2mthds) $ \(MkBind (unlctd -> mthd) _) -> do
     case find (\defn -> defn^.defn2func == mthd) defns0 of
-      Nothing -> bugWith "missing method" (clss, tcon, mthd)
+      Nothing -> bugWith "missing method" (clss, tatom, mthd)
       Just defn -> pure defn
   let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
   let e_body =
@@ -170,8 +171,8 @@ buildDict clss t0 = do
   case t1 of
     TVar v
       | null tps -> lookupTVar v >>= maybe bugNoDict (pure . EVar) . Map.lookup clss
-    TCon tcon -> do
-      SomeInstDecl inst <- findInfo info2insts (clss, tcon)
+    TAtm tatom -> do
+      SomeInstDecl inst <- findInfo info2insts (clss, tatom)
       let (z_dict, t_dict) = instDictInfo inst
       fst <$> elimETyApp (EVal z_dict) (fmap absurd t_dict) tps
     _ -> bugNoDict

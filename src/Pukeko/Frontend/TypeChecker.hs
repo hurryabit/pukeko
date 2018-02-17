@@ -98,15 +98,15 @@ satisfiesCstr t0 clss = do
   let (t1, tps) = gatherTApp t0
   let throwNoInst = throwHere ("no instance for" <+> pretty clss <+> parens (pretty t1))
   case t1 of
-    TCon tcon -> do
-      inst_mb <- lookupInfo info2insts (clss, tcon)
+    TAtm atom -> do
+      inst_mb <- lookupInfo info2insts (clss, atom)
       case inst_mb of
         Nothing -> throwNoInst
         Just (SomeInstDecl SysF.MkInstDecl{_inst2qvars = qvsV}) -> do
           let qvs = toList qvsV
           unless (length tps == length qvs) $
             -- NOTE: This should be caught by the kind checker.
-            bugWith "mitmatching number of type arguments for instance" (clss, tcon)
+            bugWith "mitmatching number of type arguments for instance" (clss, atom)
           zipWithM_ satisfiesCstrs tps qvs
     TVar v
       | null tps -> do
@@ -159,8 +159,8 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DType{} -> pure ()
     SysF.DSign{} -> pure ()
     SysF.DClss{} -> pure ()
-    SysF.DInst (SysF.MkInstDecl _ tcon qvs ds) -> do
-      let t_inst = mkTApp (TCon tcon) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
+    SysF.DInst (SysF.MkInstDecl _ atom qvs ds) -> do
+      let t_inst = mkTApp (TAtm atom) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
       -- FIXME: Ensure that the type in @b@ is correct as well.
       withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
         (_, MkBind _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)

@@ -24,7 +24,6 @@ data Dict$Ord a =
 data Dict$Ring a =
        | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data IO a = World -> Pair a World
-data Int
 data List a =
        | Nil
        | Cons a (List a)

@@ -105,6 +105,7 @@ reservedIdents = Set.fromList
       , "external"
       , "import"
       , "coerce", "infix"
+      , "Int"
       ]
 
 lIdentStart :: Parser Char
@@ -177,9 +178,11 @@ dcon = Id.dcon <$> uIdent <?> "data constructor"
 clss :: Parser Id.Clss
 clss = Id.clss <$> uIdent <?> "class name"
 
+-- TODO: Make 'TAArr' a potential result as well.
 typeAtom :: Parser TypeAtom
 typeAtom = choice
-  [ TACon <$> tcon
+  [ reserved "Int" $> TAInt
+  , TACon <$> tcon
   ]
 
 type_, atype :: Parser Type
@@ -315,7 +318,8 @@ instDecl :: Parser InstDecl
 instDecl = do
   q       <- typeCstr
   c       <- lctd clss
-  (t, vs) <- (,) <$> tcon <*> pure [] <|> parens ((,) <$> tcon <*> many tvar)
+  (t, vs) <- (,) <$> typeAtom <*> pure [] <|>
+             parens ((,) <$> typeAtom <*> many tvar)
   ds      <- reserved "where" *> aligned (many defn)
   pure (MkInstDecl c t vs q ds)
 

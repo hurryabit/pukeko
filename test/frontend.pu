@@ -17,8 +17,8 @@ data Typ = | A
 and  Typ = | B
 
 -- TEST duplicate in two type definitions
--- FAILURE 1:6: duplicate type constructor: Int
-data Int = | A
+-- FAILURE 1:6: duplicate type constructor: Bool
+data Bool = | A
 
 -- SUBSECTION data constructor
 

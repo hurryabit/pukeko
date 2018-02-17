@@ -40,7 +40,7 @@ data ModuleInfo = MkModuleInfo
   , _info2signs :: Map Id.EVar (Type Void)
   , _info2clsss :: Map Id.Clss SysF.ClssDecl
   , _info2mthds :: Map Id.EVar (SysF.ClssDecl, Bind Type (TScope Int Void))
-  , _info2insts :: Map (Id.Clss, Id.TCon) SomeInstDecl
+  , _info2insts :: Map (Id.Clss, TypeAtom) SomeInstDecl
   }
 
 data SomeInstDecl = forall st. SomeInstDecl (SysF.InstDecl st)
@@ -74,7 +74,7 @@ typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
 typeOfAtom = \case
   AVal z -> typeOfFunc z
   ACon c -> fmap absurd <$> uncurry typeOfDCon <$> findInfo info2dcons c
-  ANum _ -> pure typeInt
+  ANum _ -> pure (TAtm TAInt)
 
 itemInfo :: (Ord k) => Lens' ModuleInfo (Map k v) -> k -> v -> ModuleInfo
 itemInfo l k v = set l (Map.singleton k v) mempty

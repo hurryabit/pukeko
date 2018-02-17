@@ -25,7 +25,6 @@ data Fix f = f (Fix f)
 data Fix2 p a = p a (Fix2 p a)
 data FixPoly p a = Fix (p a)
 data IO a = World -> Pair a World
-data Int
 data List a =
        | Nil
        | Cons a (List a)
