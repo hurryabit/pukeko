@@ -45,18 +45,15 @@ typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
   EAtm a -> typeOfAtom a
-  EApp e0 es -> do
-    t0 <- typeOf e0
-    foldlM app t0 es
-    where
-      app tf ek = case tf of
-        TFun tx ty -> checkExpr ek tx *> pure ty
-        TUni{}     -> throwHere "expected type argument, but found value argument"
-        _          -> throwHere "unexpected value argument"
-  ELam bs e0 -> do
-    let ts = fmap _bind2type bs
-    t0 <- withinEScope' id ts (typeOf e0)
-    pure (ts *~> t0)
+  EApp fun arg -> do
+    t_fun <- typeOf fun
+    case t_fun of
+      TFun tx ty -> checkExpr arg tx $> ty
+      TUni{}     -> throwHere "expected type argument, but found value argument"
+      _          -> throwHere "unexpected value argument"
+  ELam (MkBind _ t_param) body -> do
+    t_body <- withinEScope1 id t_param (typeOf body)
+    pure (t_param ~> t_body)
   ELet ds e0 -> do
     traverse_ checkDefn ds
     withinEScope' (_bind2type . _defn2bind) ds (typeOf e0)

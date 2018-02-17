@@ -59,7 +59,8 @@ ccExpr = \case
     (_tcon, MkDConDecl{_dcon2tag = tag, _dcon2flds = flds}) <- findInfo info2dcons dcon
     pure $ Pack tag (length flds)
   In.ENum n     -> pure $ Num n
-  In.EApp t us  -> Ap <$> ccExpr t <*> traverse ccExpr (toList us)
+  e0@In.EApp{}
+    | (e1, as) <- In.unwindEApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
   In.ELet ds t  -> Let False <$> traverse ccDefn ds <*> ccExpr t
   In.ERec ds t  -> Let True  <$> traverse ccDefn ds <*> ccExpr t
   In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)

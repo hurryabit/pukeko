@@ -28,8 +28,10 @@ erSupCDecl = \case
   supc@(SupCDecl z vs0 bs0 e0) ->
     case e0 of
       -- Reduce expression parameters:
-      EApp (traverse strengthenScope -> Just e1) (traverse _EVar -> Just xs1)
-        | length bs0 == length xs1
+      EApp{}
+        | (traverse strengthenScope -> Just e1, traverse _EVar -> Just xs1) <-
+            unwindEApp e0
+        , length bs0 == length xs1
         , iall (\i -> scope absurd (== i)) xs1 ->
           erSupCDecl (SupCDecl z vs0 [] (weakenE e1))
       -- Reduce type paramaters:

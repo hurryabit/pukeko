@@ -286,7 +286,7 @@ f : (a -> b) -> (a -> c)
 f x = x
 
 -- TEST occurs check
--- FAILURE 2:7: '_3' occurs in List _3
+-- FAILURE 2:7: '_4' occurs in List _4
 bad : List a
 bad = let rec x = Cons x Nil in x
 

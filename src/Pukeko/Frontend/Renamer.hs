@@ -47,6 +47,9 @@ localize bs = local' upd
   where
     upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
+localize1 :: Id.EVar -> Rn (EScope () ev) a -> Rn ev a
+localize1 x = localize (Map.singleton x ())
+
 -- TODO: Make @\(Ps.MkDefn x _) -> x@ a function and use it.
 localizeDefns :: FoldableWithIndex Int t =>
   t (Ps.Defn _) -> Rn (EScope Int ev) a -> Rn ev a
@@ -142,6 +145,12 @@ rnCoercion (Ps.MkCoercion dir0 tcon) = MkCoercion dir1 tcon
 rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out tv ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
+rnELam :: [Lctd Id.EVar] -> Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
+rnELam [] e0 = rnExpr e0
+rnELam (b0:bs) e0 = do
+  let b1@(MkBind (unlctd -> x) NoType) = rnBind b0
+  ELam b1 <$> localize1 x (rnELam bs e0)
+
 rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
 rnExpr = \case
   Ps.ELoc le -> here le $ ELoc <$> lctd rnExpr le
@@ -154,16 +163,14 @@ rnExpr = \case
         pure (EVal x)
   Ps.ECon c -> pure (ECon c)
   Ps.ENum n -> pure (ENum n)
-  Ps.EApp e0 es -> EApp <$> rnExpr e0 <*> traverse rnExpr es
-  Ps.EOpp op e1 e2 -> mkEApp . EVal <$> findBinop op <*> sequence [rnExpr e1, rnExpr e2]
+  Ps.EApp e0 es -> foldl EApp <$> rnExpr e0 <*> traverse rnExpr es
+  Ps.EOpp op e1 e2 ->
+    EApp <$> (EApp <$> (EVal <$> findBinop op) <*> rnExpr e1) <*> rnExpr e2
   Ps.EMat e0 as0 ->
     case as0 of
       []   -> throwHere "pattern match without alternatives"
       a:as -> EMat <$> rnExpr e0 <*> traverse rnAltn (a :| as)
-  Ps.ELam bs0 e0 -> do
-    let bs1 = fmap rnBind bs0
-    let bs2 = ifoldMap (\i (MkBind (unlctd -> x) NoType) -> Map.singleton x i) bs1
-    ELam bs1 <$> localize bs2 (rnExpr e0)
+  Ps.ELam (toList -> bs0) e0 -> rnELam bs0 e0
   Ps.ELet (toList -> ds0) e0 ->
     ELet <$> traverse rnDefn ds0 <*> localizeDefns ds0 (rnExpr e0)
   Ps.ERec (toList -> ds0) e0 ->

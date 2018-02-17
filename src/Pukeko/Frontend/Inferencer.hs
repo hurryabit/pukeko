@@ -23,7 +23,7 @@ import           Pukeko.AST.SystemF    hiding (instantiate)
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
-import           Pukeko.AST.Type       hiding ((*~>))
+import           Pukeko.AST.Type       hiding ((~>), (*~>))
 import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.Unify
@@ -193,17 +193,17 @@ infer = \case
       pure (ELoc (Lctd pos e1), t1, cstrs)
     EVar x -> lookupEVar x >>= instantiate (EVar x)
     EAtm a -> typeOfAtom a >>= instantiate (EAtm a) . open
-    EApp fun0 args0 -> do
+    EApp fun0 arg0 -> do
       (fun1, t_fun, cstrs_fun) <- infer fun0
-      (args1, t_args, cstrs_args) <- NE.unzip3 <$> traverse infer args0
+      (arg1, t_arg, cstrs_arg) <- infer arg0
       t_res <- freshUVar
-      unify t_fun (t_args *~> t_res)
-      pure (EApp fun1 args1, t_res, cstrs_fun <> fold cstrs_args)
-    ELam binds0 rhs0 -> do
-      t_binds <- traverse (const freshUVar) binds0
-      (rhs1, t_rhs, cstrs) <- withinEScope (NE.toVector t_binds) (infer rhs0)
-      let binds1 = NE.zipWith (\(MkBind x NoType) -> MkBind x) binds0 t_binds
-      pure (ELam binds1 (ETyAnn t_rhs rhs1), t_binds *~> t_rhs, cstrs)
+      unify t_fun (t_arg ~> t_res)
+      pure (EApp fun1 arg1, t_res, cstrs_fun <> cstrs_arg)
+    ELam (MkBind param NoType) body0 -> do
+      t_param <- freshUVar
+      (body1, t_body, cstrs) <- withinEScope1 t_param (infer body0)
+      let binder = MkBind param t_param
+      pure (ELam binder (ETyAnn t_body body1), t_param ~> t_body, cstrs)
     ELet defns0 rhs0 -> do
       (defns1, t_defns, cstrs_defns) <- unzip3 <$> traverse inferLet defns0
       (rhs1, t_rhs, cstrs_rhs) <- withinEScope (Vec.fromList t_defns) (infer rhs0)
@@ -335,8 +335,8 @@ qualExpr = \case
   ELoc le -> here le $ ELoc <$> lctd qualExpr le
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
-  EApp e0 es -> EApp <$> qualExpr e0 <*> traverse qualExpr es
-  ELam bs0 e0 -> ELam <$> (traverse . bind2type) qualType bs0 <*> qualExpr e0
+  EApp fun arg -> EApp <$> qualExpr fun <*> qualExpr arg
+  ELam param body -> ELam <$> bind2type qualType param <*> qualExpr body
   ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as

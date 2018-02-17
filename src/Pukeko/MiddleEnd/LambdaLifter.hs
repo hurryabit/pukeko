@@ -6,6 +6,7 @@ where
 import Pukeko.Prelude
 
 import           Control.Monad.Freer.Supply
+import qualified Data.List.NE      as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Safe.Exact        as Safe
@@ -96,7 +97,7 @@ llELam oldBinds t_rhs rhs1 = do
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl (MkBind (Lctd noPos lhs) t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @'SupC supc)
-    pure (mkEApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
+    pure (foldl EApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
 
 llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
@@ -105,7 +106,7 @@ llExpr = \case
   ELoc le -> here le $ llExpr (unlctd le)
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
-  EApp t  us -> EApp <$> llExpr t <*> traverse llExpr us
+  EApp fun arg -> EApp <$> llExpr fun <*> llExpr arg
   EMat t  cs -> EMat <$> llExpr t <*> traverse llAltn cs
   ELet ds e0 ->
     ELet
@@ -114,9 +115,10 @@ llExpr = \case
   ERec ds e0 ->
     withinEScope' (_bind2type . _defn2bind) ds $
       ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
-  ELam oldBinds (ETyAnn t_rhs rhs0) -> do
-    rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
-    llELam oldBinds t_rhs rhs1
+  elam@ELam{}
+    | (oldBinds, ETyAnn t_rhs rhs0) <- unwindELam elam -> do
+        rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
+        llELam (NE.fromList oldBinds) t_rhs rhs1
   ELam{} -> bug "lambda without type annotation around body during lambda lifting"
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts

@@ -19,7 +19,7 @@ expr2atom f = \case
   ELoc e       -> ELoc <$> lctd (expr2atom f) e
   EVar x       -> pure (EVar x)
   EAtm a       -> EAtm <$> f a
-  EApp t  us   -> EApp <$> expr2atom f t <*> (traverse . expr2atom) f us
+  EApp e  a    -> EApp <$> expr2atom f e <*> expr2atom f a
   ELam bs e    -> ELam bs <$> expr2atom f e
   ELet ds t    -> ELet <$> (traverse . defn2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . defn2atom) f ds <*> expr2atom f t
@@ -54,8 +54,8 @@ expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
   EVar x       -> pure (EVar x)
   EAtm a       -> pure (EAtm a)
-  EApp e0 es   -> EApp <$> expr2type f e0 <*> traverse (expr2type f) es
-  ELam bs e    -> ELam <$> traverse (bind2type (simplify f)) bs <*> expr2type f e
+  EApp e a     -> EApp <$> expr2type f e <*> expr2type f a
+  ELam b e     -> ELam <$> bind2type (simplify f) b <*> expr2type f e
   ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as

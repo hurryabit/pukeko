@@ -3,6 +3,7 @@ module Pukeko.FrontEnd.Inferencer.Gamma
   , EffGamma
   , runGamma
   , withinEScope
+  , withinEScope1
   , withinTScope
   , withQVars
   , getTLevel
@@ -39,6 +40,11 @@ withinEScope ::
   EffGamma s (EScope i ev) effs a ->
   EffGamma s           ev  effs a
 withinEScope ts = local' (tenv %~ extendEnv @i @ev (fmap coerce ts))
+
+withinEScope1 ::
+  forall s tv ev effs a. (HasEnv ev) =>
+  UType s tv -> EffGamma s (EScope () ev) effs a -> EffGamma s ev effs a
+withinEScope1 = withinEScope . Identity
 
 withinTScope :: forall s ev effs a. EffGamma s ev effs a -> EffGamma s ev effs a
 withinTScope = local (level @s @ev +~ 1)

@@ -197,18 +197,18 @@ primes : List Int =
 print$ll1 : Int -> IO Unit =
   fun (n : Int) -> io$ll2 @Int @Unit puti n
 psums : List Int -> List Int =
-  let rec psums0 : ∀_9. Dict$Ring _9 -> _9 -> List _9 -> List _9 =
-            fun @_9 -> psums$ll1 @_9 psums0
+  let rec psums0 : ∀_10. Dict$Ring _10 -> _10 -> List _10 -> List _10 =
+            fun @_10 -> psums$ll1 @_10 psums0
   in
   psums0 @Int dict$Ring$Int 0
-psums$ll1 : ∀_9. (∀_9. Dict$Ring _9 -> _9 -> List _9 -> List _9) -> Dict$Ring _9 -> _9 -> List _9 -> List _9 =
-  fun @_9 ->
-    fun (psums0 : ∀_9. Dict$Ring _9 -> _9 -> List _9 -> List _9) (dict$Ring$_9 : Dict$Ring _9) (n : _9) (xs : List _9) ->
+psums$ll1 : ∀_10. (∀_10. Dict$Ring _10 -> _10 -> List _10 -> List _10) -> Dict$Ring _10 -> _10 -> List _10 -> List _10 =
+  fun @_10 ->
+    fun (psums0 : ∀_10. Dict$Ring _10 -> _10 -> List _10 -> List _10) (dict$Ring$_10 : Dict$Ring _10) (n : _10) (xs : List _10) ->
       match xs with
-      | Nil @_9 -> Nil @_9
-      | Cons @_9 x xs ->
-        let y : _9 = add$ll1 @_9 dict$Ring$_9 x n in
-        Cons @_9 y (psums0 @_9 dict$Ring$_9 y xs)
+      | Nil @_10 -> Nil @_10
+      | Cons @_10 x xs ->
+        let y : _10 = add$ll1 @_10 dict$Ring$_10 x n in
+        Cons @_10 y (psums0 @_10 dict$Ring$_10 y xs)
 repeat$ll1 : ∀a. List a -> List a =
   fun @a ->
     fun (xs : List a) ->

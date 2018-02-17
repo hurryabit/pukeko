@@ -37,6 +37,14 @@ withinEScope' ::
   EffXGamma tf ef tv ev effs a
 withinEScope' f = withinEScope f . Vec.fromList . toList
 
+withinEScope1 ::
+  forall tf ef tv ev effs a x. (HasEnv tv, HasEnv ev, Functor tf) =>
+  (x -> ef tv) ->
+  x ->
+  EffXGamma tf ef tv (EScope () ev) effs a ->
+  EffXGamma tf ef tv ev effs a
+withinEScope1 f = withinEScope f . Identity
+
 withinTScope ::
   forall i tf ef tv ev effs a.
   (HasEnvLevel i, HasEnv tv, HasEnv ev, Functor ef) =>

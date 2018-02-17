@@ -110,9 +110,9 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
         let e_rhs = EVar (mkBound z z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
         let c_one = MkAltn (PSimple (clssDCon clss) [prmType] c_binds) e_rhs
-        let e_cas = EMat (EVar (mkBound 0 dictPrm)) (c_one :| [])
+        let e_cas = EMat (EVar (mkBound () dictPrm)) (c_one :| [])
         let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
-        let e_lam = ELam (NE.singleton b_lam) (ETyAnn t0 e_cas)
+        let e_lam = ELam b_lam (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
         pure (DDefn (MkDefn (MkBind (Lctd mpos z) t1) e_tyabs))
   pure (DType (NE.singleton tcon) : sels)
@@ -143,7 +143,7 @@ elimInstDecl clssDecl inst@(MkInstDecl (Lctd ipos clss) tcon qvs defns0) = do
       Just defn -> pure defn
   let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
   let e_body =
-        mkEApp e_dcon (imap (\i -> EVar . mkBound i . (^.defn2func)) defns1)
+        foldl EApp e_dcon (imap (\i -> EVar . mkBound i . (^.defn2func)) defns1)
   let e_let :: Expr In _ _
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In _ _
@@ -188,7 +188,28 @@ elimETyApp e0 t_e0 ts0 = do
           clss <- toList qual
           pure (buildDict clss t1)
     dicts <- sequence dictBldrs
-    pure (mkEApp (mkETyApp e0 ts0) dicts, instantiateN ts0 t_e1)
+    pure (foldl EApp (mkETyApp e0 ts0) dicts, instantiateN ts0 t_e1)
+
+-- | Enrich a type abstraction with value abstractions for type class
+-- dictionaries.
+elimETyAbs :: (IsTVar tv, HasEnv ev) =>
+  NonEmpty QVar -> Expr In (TScope Int tv) ev -> CE tv ev (Expr Out tv ev, Type tv)
+elimETyAbs qvs0 e0 = do
+    pos <- where_
+    let ixbs = do
+          (i, MkQVar qual v) <- itoList qvs0
+          clss <- toList qual
+          let x = dictEVar clss (Right v)
+          pure ((i, clss, x), MkBind (Lctd pos x) (mkTDict clss (TVar (mkBound i v))))
+    let (ixs, bs) = unzip ixbs
+    let refs = Vec.accum Map.union (Vec.replicate (length qvs0) mempty)
+               [ (i, Map.singleton clss (mkBound j x))
+               | (j, (i, clss, x)) <- itoList ixs
+               ]
+    (e1, t1) <-
+      withinXScope refs (Vec.fromList (fmap _bind2type bs)) (elimExpr (weakenE e0))
+    let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
+    pure (ETyAbs qvs1 (mkELam bs t1 e1), TUni qvs0 t1)
 
 elimDefn :: (IsTVar tv, HasEnv ev) => Defn In tv ev -> CE tv ev (Defn Out tv ev)
 elimDefn = defn2expr (fmap fst . elimExpr)
@@ -201,14 +222,16 @@ elimExpr = \case
   ELoc (Lctd pos e0) -> here_ pos $ first (ELoc . Lctd pos) <$> elimExpr e0
   EVar x -> (,) <$> pure (EVar x) <*> lookupEVar x
   EAtm a -> (,) <$> pure (EAtm a) <*> typeOfAtom a
-  EApp e0 es0 -> do
-    (e1, t1) <- elimExpr e0
-    (es1, ts1) <- NE.unzip <$> traverse elimExpr es0
-    pure (EApp e1 es1, unTFun t1 (toList ts1))
-  ELam bs e0 -> do
-    let ts = fmap _bind2type bs
-    (e1, t1) <- withinEScope' id ts (elimExpr e0)
-    pure (ELam bs e1, ts *~> t1)
+  EApp fun0 arg0 -> do
+    (fun1,  t_fun) <- elimExpr fun0
+    (arg1, _t_arg) <- elimExpr arg0
+    case t_fun of
+      TFun _ t_res -> pure (EApp fun1 arg1, t_res)
+      _            -> bug "too many arguments"
+  ELam param body0 -> do
+    let t_param = _bind2type param
+    (body1, t_body) <- withinEScope1 id t_param (elimExpr body0)
+    pure (ELam param body1, t_param ~> t_body)
   ELet ds0 e0 -> do
     ds1 <- traverse elimDefn ds0
     (e1, t1) <- withinEScope' (_bind2type . _defn2bind) ds1 (elimExpr e0)
@@ -231,22 +254,7 @@ elimExpr = \case
   ETyApp e0 ts0 -> do
     (e1, t_e1) <- elimExpr e0
     elimETyApp e1 t_e1 (toList ts0)
-  ETyAbs qvs0 e0 -> do
-    pos <- where_
-    let ixbs = do
-          (i, MkQVar qual v) <- itoList qvs0
-          clss <- toList qual
-          let x = dictEVar clss (Right v)
-          pure ((i, clss, x), MkBind (Lctd pos x) (mkTDict clss (TVar (mkBound i v))))
-    let (ixs, bs) = unzip ixbs
-    let refs = Vec.accum Map.union (Vec.replicate (length qvs0) mempty)
-               [ (i, Map.singleton clss (mkBound j x))
-               | (j, (i, clss, x)) <- itoList ixs
-               ]
-    (e1, t1) <-
-      withinXScope refs (Vec.fromList (fmap _bind2type bs)) (elimExpr (weakenE e0))
-    let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
-    pure (ETyAbs qvs1 (mkELam bs t1 e1), TUni qvs0 t1)
+  ETyAbs qvs0 e0 -> elimETyAbs qvs0 e0
   ETyAnn t0 e0 -> do
     (e1, _) <- elimExpr e0
     pure (ETyAnn t0 e1, t0)
@@ -262,12 +270,6 @@ elimAltn (MkAltn (PSimple dcon targs0 bnds) e0) = do
   withinEScope id env $ do
     (e1, t1) <- elimExpr e0
     pure (MkAltn (PSimple dcon targs0 bnds) e1, t1)
-
-unTFun :: Type tv -> [Type tv] -> Type tv
-unTFun = curry $ \case
-  (t        , []  ) -> t
-  (TFun _ ty, _:ts) -> unTFun ty ts
-  _                 -> bug "too many arguments"
 
 unclssType :: Type tv -> Type tv
 unclssType = \case

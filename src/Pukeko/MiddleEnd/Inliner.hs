@@ -26,14 +26,10 @@ makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name) supc)
 
 unwind :: Expr tv ev -> (Expr tv ev, [Type tv], [Expr tv ev])
 unwind e0 =
-  let (e1, as) = goE [] e0
+  let (e1, as) = unwindEApp e0
       (e2, ts) = goT [] e1
   in  (e2, ts, as)
   where
-    goE :: [[Expr tv ev]] -> Expr tv ev -> (Expr tv ev, [Expr tv ev])
-    goE ass = \case
-      EApp e as -> goE (toList as:ass) e
-      e         -> (e, concat ass)
     goT :: [[Type tv]] -> Expr tv ev -> (Expr tv ev, [Type tv])
     goT tss = \case
       ETyApp e ts -> goT (toList ts:tss) e
@@ -51,14 +47,14 @@ inRedex :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
   Expr tv ev -> In (Expr tv ev)
 inRedex e0 = do
   let (f, ts, as) = unwind e0
-  let continue = mkEApp (mkETyApp f ts) <$> traverse inExpr as
+  let continue = foldl EApp (mkETyApp f ts) <$> traverse inExpr as
   case f of
     EVal z0 -> do
       supc_mb <- uses inlinables (Map.lookup z0)
       case supc_mb of
         Just (SupCDecl _ [] [] (EVal z1)) ->
           -- trace ("INLINING: " ++ render (pretty e0))
-            (inExpr (EVal z1 `mkETyApp` ts `mkEApp` as))
+            (inExpr (foldl EApp (EVal z1 `mkETyApp` ts) as))
         Just (SupCDecl _ vs xs e1)
           -- NOTE: We don't want to inline CAFs. That's why we ensure @1 <= n@.
           | length vs == length ts && 1 <= n && n <= length as -> do
@@ -75,7 +71,7 @@ inRedex e0 = do
                   body = runIdentity (expr2type (Identity . inst) e2)
               let let_ = ELet defns body
               -- trace ("INLINING: " ++ render (pretty e0))
-              (inExpr (mkEApp let_ as1))
+              (inExpr (foldl EApp let_ as1))
           where n = length xs
         Nothing -> continue
         _ -> trace ("NOT INLINING: " ++ render (pretty e0)) continue
@@ -89,7 +85,7 @@ inExpr e0 = case e0 of
   EVar x     -> pure (EVar x)
   ECon c     -> pure (ECon c)
   ENum n     -> pure (ENum n)
-  EApp t  us -> EApp <$> inExpr t <*> traverse inExpr us
+  EApp e  a  -> EApp <$> inExpr e <*> inExpr a
   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
   ELet ds t  -> ELet <$> (traverse . defn2expr) inExpr ds <*> inExpr t
   ERec ds t  -> ERec <$> (traverse . defn2expr) inExpr ds <*> inExpr t

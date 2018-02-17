@@ -10,7 +10,7 @@ module Pukeko.AST.Expr
 
 import Pukeko.Prelude
 
-import           Control.Lens (makeLensesFor)
+import           Control.Lens (ifoldr, makeLensesFor)
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Bifoldable
@@ -39,9 +39,8 @@ data Expr lg tv ev
   = IsLambda lg ~ True => ELoc (Lctd (Expr lg tv ev))
   | EVar ev
   | EAtm Atom
-  | EApp (Expr lg tv ev) (NonEmpty (Expr lg tv ev))
-  | IsLambda lg ~ True =>
-    ELam (NonEmpty (Bind (TypeOf lg) tv)) (Expr lg tv (EScope Int ev))
+  | EApp (Expr lg tv ev) (Expr lg tv ev)
+  | IsLambda lg ~ True => ELam (Bind (TypeOf lg) tv) (Expr lg tv (EScope () ev))
   | ELet [Defn lg tv             ev ] (Expr lg tv (EScope Int ev))
   | ERec [Defn lg tv (EScope Int ev)] (Expr lg tv (EScope Int ev))
   | EMat (Expr lg tv ev) (NonEmpty (Altn lg tv ev))
@@ -93,12 +92,6 @@ defn2expr f (MkDefn b e) = MkDefn b <$> f e
 
 -- * Smart constructors
 
--- TODO: Fuse nested applications.
-mkEApp :: (Foldable t) => Expr st tv ev -> t (Expr st tv ev) -> Expr st tv ev
-mkEApp e0 es0 = case toList es0 of
-  []    -> e0
-  e1:es -> EApp e0 (e1 :| es)
-
 mkELam ::
   (IsLambda lg ~ True, IsPreTyped lg ~ True, TypeOf lg ~ Type) =>
   [Bind (TypeOf lg) tv]      ->
@@ -106,8 +99,39 @@ mkELam ::
   Expr lg tv (EScope Int ev) ->
   Expr lg tv ev
 mkELam bs0 t0 e0 = case bs0 of
-  []   -> strengthenE0 e0
-  b:bs -> ELam (b :| bs) (ETyAnn t0 e0)
+  [] -> strengthenE0 e0
+  _  -> strengthenE0 (ifoldr (\i b1 -> ELam b1 . fmap (abstr i)) (ETyAnn t0 e0) bs0)
+    where
+      abstr :: Int -> Scope b Int ev -> Scope b () (Scope b Int ev)
+      abstr i = \case
+        Bound j b | i == j -> Bound () b
+        s                  -> Free s
+
+unwindELam :: (IsLambda lg ~ True) =>
+  Expr lg tv ev -> ([Bind (TypeOf lg) tv], Expr lg tv (EScope Int ev))
+unwindELam = go 0 [] . weakenE
+  where
+    inst :: Int -> Scope b () (Scope b Int v) -> Scope b Int v
+    inst i = \case
+      Bound () b -> Bound i b
+      Free s     -> s
+    go ::
+      Int -> [Bind (TypeOf lg) tv] -> Expr lg tv (EScope Int ev) ->
+      ([Bind (TypeOf lg) tv], Expr lg tv (EScope Int ev))
+    go lvl params = \case
+      ELam param body -> go (lvl+1) (param:params) (fmap (inst lvl) body)
+      -- NOTE: We do this only conditional on the inner expression being a
+      -- lambda to not strip the very last type annotation in a chain of
+      -- lambdas.
+      ETyAnn _ e@ELam{} -> go lvl params e
+      body -> (reverse params, body)
+
+unwindEApp :: Expr lg tv ev -> (Expr lg tv ev, [Expr lg tv ev])
+unwindEApp = go []
+  where
+    go args = \case
+      EApp fun arg -> go (arg:args) fun
+      fun          -> (fun, args)
 
 mkETyApp ::
   (IsPreTyped st ~ True) => Expr st tv ev -> [TypeOf st tv] -> Expr st tv ev
@@ -146,8 +170,8 @@ instance Monad (Expr st tv) where
     ELoc l       -> ELoc (fmap (>>= f) l)
     EVar x       -> f x
     EAtm a       -> EAtm a
-    EApp t  us   -> EApp (t >>= f) (fmap (>>= f) us)
-    ELam ps e    -> ELam ps (e >>>= f)
+    EApp e  a    -> EApp (e >>= f) (a >>= f)
+    ELam b  e    -> ELam b (e >>>= f)
     ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
     ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
     EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
@@ -197,11 +221,8 @@ instance IsLang st => Bitraversable (Expr st) where
     ELoc l -> ELoc <$> traverse (bitraverse f g) l
     EVar x -> EVar <$> g x
     EAtm a -> pure (EAtm a)
-    EApp e0 es -> EApp <$> bitraverse f g e0 <*> traverse (bitraverse f g) es
-    ELam bs e0 ->
-      ELam
-      <$> traverse (traverse f) bs
-      <*> bitraverse f (traverse g) e0
+    EApp e a -> EApp <$> bitraverse f g e <*> bitraverse f g a
+    ELam b e -> ELam <$> traverse f b <*> bitraverse f (traverse g) e
     ELet ds e0 ->
       ELet
       <$> traverse (bitraverse f g) ds
@@ -267,9 +288,9 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
     ELoc l -> prettyPrec prec l
     EVar x -> pretty (baseEVar x)
     EAtm a -> pretty a
-    EApp t us ->
+    EApp e a ->
       maybeParens (prec > Op.aprec)
-      $ prettyPrec Op.aprec t <+> hsepMap (prettyPrec (Op.aprec+1)) us
+      $ prettyPrec Op.aprec e <+> prettyPrec (Op.aprec+1) a
     -- This could be brought back in @EApp@ when @t@ is an operator.
     -- ApOp   { _op, _arg1, _arg2 } ->
     --   let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op
@@ -282,7 +303,8 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
     --         prettyPrec prec1 _arg1 <> text _sym <> prettyPrec prec2 _arg2
     ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
     ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
-    ELam bs e -> prettyELam prec bs e
+    -- FIXME: Collect lambdas.
+    ELam b e -> prettyELam prec [b] e
     -- If { _cond, _then, _else } ->
     --   maybeParens (prec > 0) $ sep
     --     [ "if"  <+> pretty _cond <+> "then"
@@ -313,7 +335,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
 
 prettyELam ::
   (PrettyStage st, BaseTVar tv, BaseEVar ev, Foldable t) =>
-  Int -> t (Bind (TypeOf st) tv) -> Expr st tv (EScope Int ev) -> Doc ann
+  Int -> t (Bind (TypeOf st) tv) -> Expr st tv (EScope i ev) -> Doc ann
 prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =

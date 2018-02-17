@@ -172,7 +172,7 @@ g_label .5
 g_jump .2
 g_label .2
 
-g_globstart bag_insert$ll3, 3
+g_globstart bag_insert$ll2, 3
 g_alloc 1
 g_push 0
 g_pushglobal bag_insert$ll1, 4
@@ -670,7 +670,7 @@ g_globstart tsort$ll1, 2
 g_push 0
 g_push 2
 g_pushglobal dict$Ord$Int, 0
-g_pushglobal bag_insert$ll3, 3
+g_pushglobal bag_insert$ll2, 3
 g_updap 3, 3
 g_pop 2
 g_unwind
