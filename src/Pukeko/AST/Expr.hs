@@ -44,8 +44,7 @@ data Expr lg tv ev
     ELam (NonEmpty (Bind (TypeOf lg) tv)) (Expr lg tv (EScope Int ev))
   | ELet [Defn lg tv             ev ] (Expr lg tv (EScope Int ev))
   | ERec [Defn lg tv (EScope Int ev)] (Expr lg tv (EScope Int ev))
-  | IsNested lg ~ False => ECas (Expr lg tv ev) (NonEmpty (Case lg tv ev))
-  | IsNested lg ~ True  => EMat (Expr lg tv ev) (NonEmpty (Altn lg tv ev))
+  | EMat (Expr lg tv ev) (NonEmpty (Altn lg tv ev))
   | ETyCoe Coercion (Expr lg tv ev)
   | TypeOf lg ~ Type     => ETyAbs (NonEmpty QVar) (Expr lg (TScope Int tv) ev)
   | IsPreTyped lg ~ True => ETyApp (Expr lg tv ev) (NonEmpty (TypeOf lg tv))
@@ -56,22 +55,16 @@ data Bind ty tv = MkBind
   , _bind2type :: ty tv
   }
 
-data Case st tv ev = MkCase
-  { _case2dcon  :: Id.DCon
-  , _case2targs :: [TypeOf st tv]
-  , _case2binds :: [Maybe Id.EVar]
-  , _case2expr  :: Expr st tv (EScope Int ev)
+data Altn lg tv ev = MkAltn
+  { _altn2patn :: Patn lg tv
+  , _altn2expr :: Expr lg tv (EScope Id.EVar ev)
   }
 
-data Altn st tv ev = MkAltn
-  { _altn2patn :: Patn (TypeOf st) tv
-  , _altn2expr :: Expr st tv (EScope Id.EVar ev)
-  }
-
-data Patn ty tv
-  = PWld
-  | PVar Id.EVar
-  | PCon Id.DCon [ty tv] [Patn ty tv]
+data Patn lg tv
+  = IsNested lg ~ True  => PWld
+  | IsNested lg ~ True  => PVar    Id.EVar
+  | IsNested lg ~ True  => PCon    Id.DCon [TypeOf lg tv] [Patn lg tv]
+  | IsNested lg ~ False => PSimple Id.DCon [TypeOf lg tv] [Maybe Id.EVar]
 
 pattern EVal :: Id.EVar -> Expr st tv ev
 pattern EVal z = EAtm (AVal z)
@@ -83,14 +76,13 @@ pattern ENum :: Int -> Expr st tv ev
 pattern ENum n = EAtm (ANum n)
 
 -- NOTE: Do NOT forget to add new constructors here.
-{-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, ECas, EMat,
+{-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, EMat,
              ETyCoe, ETyAbs, ETyApp, ETyAnn #-}
 
 -- * Derived optics
 makeLenses ''Altn
 makePrisms ''Atom
 makeLenses ''Bind
-makeLenses ''Case
 makeLensesFor [("_defn2bind", "defn2bind")] ''Defn
 
 -- NOTE: The generated lens would not be ploymorphic enough for our use cases.
@@ -155,7 +147,6 @@ instance Monad (Expr st tv) where
     EVar x       -> f x
     EAtm a       -> EAtm a
     EApp t  us   -> EApp (t >>= f) (fmap (>>= f) us)
-    ECas t  cs   -> ECas (t >>= f) (fmap (over case2expr (>>>= f)) cs)
     ELam ps e    -> ELam ps (e >>>= f)
     ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
     ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
@@ -177,17 +168,13 @@ deriving instance Functor     (Expr st tv)
 deriving instance Foldable    (Expr st tv)
 deriving instance Traversable (Expr st tv)
 
-deriving instance Functor     (Case st tv)
-deriving instance Foldable    (Case st tv)
-deriving instance Traversable (Case st tv)
-
 deriving instance Functor     (Altn st tv)
 deriving instance Foldable    (Altn st tv)
 deriving instance Traversable (Altn st tv)
 
-deriving instance Functor     ty => Functor     (Patn ty)
-deriving instance Foldable    ty => Foldable    (Patn ty)
-deriving instance Traversable ty => Traversable (Patn ty)
+deriving instance IsLang lg => Functor     (Patn lg)
+deriving instance IsLang lg => Foldable    (Patn lg)
+deriving instance IsLang lg => Traversable (Patn lg)
 
 deriving instance Functor     ty => Functor     (Bind ty)
 deriving instance Foldable    ty => Foldable    (Bind ty)
@@ -223,23 +210,11 @@ instance IsLang st => Bitraversable (Expr st) where
       ERec
       <$> traverse (bitraverse f (traverse g)) ds
       <*> bitraverse f (traverse g) e0
-    ECas e0 cs -> ECas <$> bitraverse f g e0 <*> traverse (bitraverse f g) cs
     EMat e0 as -> EMat <$> bitraverse f g e0 <*> traverse (bitraverse f g) as
     ETyCoe c e -> ETyCoe c <$> bitraverse f g e
     ETyAbs v e -> ETyAbs v <$> bitraverse (traverse f) g e
     ETyApp e t -> ETyApp <$> bitraverse f g e <*> traverse (traverse f) t
     ETyAnn t e -> ETyAnn <$> traverse f t <*> bitraverse f g e
-
-instance IsLang st => Bifunctor     (Case st) where
-  bimap = bimapDefault
-instance IsLang st => Bifoldable    (Case st) where
-  bifoldMap = bifoldMapDefault
-instance IsLang st => Bitraversable (Case st) where
-  bitraverse f g (MkCase c ts bs e) =
-    MkCase c
-    <$> traverse (traverse f) ts
-    <*> pure bs
-    <*> bitraverse f (traverse g) e
 
 instance IsLang st => Bifunctor     (Altn st) where
   bimap = bimapDefault
@@ -319,10 +294,6 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => PrettyPrec (Expr st tv ev
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
         $$ vcatMap pretty as
-    ECas t cs ->
-      maybeParens (prec > 0) $
-        "match" <+> pretty t <+> "with"
-        $$ vcatMap pretty cs
     ETyCoe (MkCoercion dir tcon) e0 ->
       maybeParens (prec > Op.aprec) $
         "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
@@ -366,22 +337,12 @@ instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Bind ty tv) where
     Just t  -> maybeParens (prec > 0) (pretty z <+> ":" <+> prettyPrecType 0 t)
     Nothing -> pretty z
 
-instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Case st tv ev) where
-  pretty (MkCase c ts bs e) =
-    hang
-      ( "|"
-        <+> pretty c
-        <+> prettyAtType (prettyPrecType 3) ts
-        <+> hsepMap (maybe "_" pretty) bs <+> "->"
-      )
-      2 (pretty e)
-
 instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Altn st tv ev) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)
 
-instance (BaseTVar tv, PrettyType ty) => Pretty (Patn ty tv)
+instance (BaseTVar tv, PrettyStage lg) => Pretty (Patn lg tv)
 
-instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Patn ty tv) where
+instance (BaseTVar tv, PrettyStage lg) => PrettyPrec (Patn lg tv) where
   prettyPrec prec = \case
     PWld -> "_"
     PVar x    -> pretty x
@@ -390,25 +351,27 @@ instance (BaseTVar tv, PrettyType ty) => PrettyPrec (Patn ty tv) where
       $ pretty c
         <+> prettyAtType (prettyPrecType 3) ts
         <+> hsep (map (prettyPrec 1) ps)
+    PSimple c ts bs ->
+      maybeParens (prec > 0 && (not (null ts) || not (null bs)))
+      $ pretty c
+        <+> prettyAtType (prettyPrecType 3) ts
+        <+> hsep (map (maybe "_" pretty) bs)
 
 deriving instance (TypeOf st ~ Type, Show tv, Show ev) => Show (Defn st tv ev)
 deriving instance (TypeOf st ~ Type, Show tv, Show ev) => Show (Expr st tv ev)
-deriving instance (TypeOf st ~ Type, Show tv, Show ev) => Show (Case st tv ev)
 deriving instance (TypeOf st ~ Type, Show tv, Show ev) => Show (Altn st tv ev)
 deriving instance                                         Show  Atom
-deriving instance                   (Show tv)          => Show (Patn Type tv)
+deriving instance (TypeOf lg ~ Type, Show tv)          => Show (Patn lg tv)
 deriving instance                   (Show tv)          => Show (Bind Type tv)
 
 deriveToJSON defaultOptions ''Atom
 
-instance ToJSON tv => ToJSON (Patn Type tv) where
+instance (TypeOf lg ~ Type, ToJSON tv) => ToJSON (Patn lg tv) where
   toJSON = $(mkToJSON defaultOptions ''Patn)
 instance ToJSON tv => ToJSON (Bind Type tv) where
   toJSON = $(mkToJSON defaultOptions ''Bind)
 instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Altn lg tv ev) where
   toJSON = $(mkToJSON defaultOptions ''Altn)
-instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Case lg tv ev) where
-  toJSON = $(mkToJSON defaultOptions ''Case)
 instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Defn lg tv ev) where
   toJSON = $(mkToJSON defaultOptions ''Defn)
 instance (ToJSON tv, ToJSON ev, TypeOf lg ~ Type) => ToJSON (Expr lg tv ev) where

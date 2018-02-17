@@ -15,7 +15,7 @@ import qualified Data.Map as Map
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Language
-import           Pukeko.AST.Expr hiding (Defn, Expr, Bind, Case)
+import           Pukeko.AST.Expr hiding (Defn, Expr, Bind, Altn)
 import qualified Pukeko.AST.Expr as Expr
 import           Pukeko.AST.Type
 
@@ -54,7 +54,7 @@ data Module = MkModule
 type Defn = Expr.Defn SuperCore
 type Expr = Expr.Expr SuperCore
 type Bind = Expr.Bind Type
-type Case = Expr.Case SuperCore
+type Altn = Expr.Altn SuperCore
 
 makeLenses ''Module
 

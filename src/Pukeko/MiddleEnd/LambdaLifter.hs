@@ -8,9 +8,10 @@ import Pukeko.Prelude
 import           Control.Monad.Freer.Supply
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
+import qualified Safe.Exact        as Safe
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Case, Bind)
+import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Altn, Bind)
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
@@ -105,7 +106,7 @@ llExpr = \case
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   EApp t  us -> EApp <$> llExpr t <*> traverse llExpr us
-  ECas t  cs -> ECas <$> llExpr t <*> traverse llCase cs
+  EMat t  cs -> EMat <$> llExpr t <*> traverse llAltn cs
   ELet ds e0 ->
     ELet
     <$> (traverse . defn2expr) llExpr ds
@@ -122,15 +123,16 @@ llExpr = \case
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
   ETyAnn c e0 -> ETyAnn c <$> llExpr e0
 
-llCase ::
-  (HasEnv tv, IsTVar tv, IsEVar ev) => Case In tv ev -> LL tv ev (Case Out tv ev)
-llCase (MkCase dcon ts0 bs e) = do
+llAltn ::
+  (HasEnv tv, IsTVar tv, IsEVar ev) => Altn In tv ev -> LL tv ev (Altn Out tv ev)
+llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
   (MkTConDecl _ vs _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
   unless (length vs == length ts0)
     (bug "wrong number of type arguments for type constructor")
-  unless (length bs == length flds0) (bug "wrong number of binds in pattern")
   let t_flds = fmap (instantiateN' ts0) flds0
-  MkCase dcon ts0 bs <$> withinEScope' id t_flds (llExpr e)
+  let env = Map.fromList
+            (catMaybes (Safe.zipWithExact (\b t -> (,) <$> b <*> pure t) bs t_flds))
+  MkAltn (PSimple dcon ts0 bs) <$> withinEScope id env (llExpr e)
 
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case

@@ -8,6 +8,7 @@ import qualified Data.List.NE      as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.Vector       as Vec
+import qualified Safe.Exact        as Safe
 
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
@@ -106,10 +107,10 @@ elimClssDecl clssDecl@(MkClssDecl (unlctd -> clss) prm mthds) = do
       sels = do
         (i, MkBind (Lctd mpos z) t0) <- itoList mthds
         let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
-        let e_rhs = EVar (mkBound i z)
+        let e_rhs = EVar (mkBound z z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
-        let c_one = MkCase (clssDCon clss) [prmType] c_binds e_rhs
-        let e_cas = ECas (EVar (mkBound 0 dictPrm)) (c_one :| [])
+        let c_one = MkAltn (PSimple (clssDCon clss) [prmType] c_binds) e_rhs
+        let e_cas = EMat (EVar (mkBound 0 dictPrm)) (c_one :| [])
         let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
         let e_lam = ELam (NE.singleton b_lam) (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
@@ -217,11 +218,11 @@ elimExpr = \case
       ds1 <- traverse elimDefn ds0
       (e1, t1) <- elimExpr e0
       pure (ERec ds1 e1, t1)
-  ECas e0 (c0 :| cs0) -> do
+  EMat e0 (a0 :| as0) -> do
     (e1, _) <- elimExpr e0
-    (c1, t1) <- elimCase c0
-    cs1 <- traverse (fmap fst . elimCase) cs0
-    pure (ECas e1 (c1 :| cs1), t1)
+    (a1, t1) <- elimAltn a0
+    as1 <- traverse (fmap fst . elimAltn) as0
+    pure (EMat e1 (a1 :| as1), t1)
   ETyAnn t_to (ETyCoe c e0) -> do
     (e1, _) <- elimExpr e0
     pure (ETyAnn t_to (ETyCoe c e1), t_to)
@@ -250,15 +251,17 @@ elimExpr = \case
     (e1, _) <- elimExpr e0
     pure (ETyAnn t0 e1, t0)
 
-elimCase ::
+elimAltn ::
   (IsTVar tv, HasEnv ev) =>
-  Case In tv ev -> CE tv ev (Case Out tv ev, Type tv)
-elimCase (MkCase dcon targs0 bnds e0) = do
+  Altn In tv ev -> CE tv ev (Altn Out tv ev, Type tv)
+elimAltn (MkAltn (PSimple dcon targs0 bnds) e0) = do
   (_, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
   let flds1 = map (instantiateN' targs0) flds0
-  withinEScope' id flds1 $ do
+  let env = Map.fromList
+            (catMaybes (Safe.zipWithExact (\b t -> (,) <$> b <*> pure t) bnds flds1))
+  withinEScope id env $ do
     (e1, t1) <- elimExpr e0
-    pure (MkCase dcon targs0 bnds e1, t1)
+    pure (MkAltn (PSimple dcon targs0 bnds) e1, t1)
 
 unTFun :: Type tv -> [Type tv] -> Type tv
 unTFun = curry $ \case

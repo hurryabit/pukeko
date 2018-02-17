@@ -2,6 +2,7 @@ module Pukeko.AST.Expr.Optics where
 
 import Pukeko.Prelude
 
+import           Control.Lens (_Just)
 import           Data.Functor.Compose
 
 import qualified Pukeko.AST.Identifier as Id
@@ -19,7 +20,6 @@ expr2atom f = \case
   EVar x       -> pure (EVar x)
   EAtm a       -> EAtm <$> f a
   EApp t  us   -> EApp <$> expr2atom f t <*> (traverse . expr2atom) f us
-  ECas t  cs   -> ECas <$> expr2atom f t <*> (traverse . case2expr . expr2atom) f cs
   ELam bs e    -> ELam bs <$> expr2atom f e
   ELet ds t    -> ELet <$> (traverse . defn2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . defn2atom) f ds <*> expr2atom f t
@@ -55,7 +55,6 @@ expr2type f = \case
   EVar x       -> pure (EVar x)
   EAtm a       -> pure (EAtm a)
   EApp e0 es   -> EApp <$> expr2type f e0 <*> traverse (expr2type f) es
-  ECas e0 cs   -> ECas <$> expr2type f e0 <*> traverse (case2type f ) cs
   ELam bs e    -> ELam <$> traverse (bind2type (simplify f)) bs <*> expr2type f e
   ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
@@ -66,14 +65,6 @@ expr2type f = \case
   ETyAnn t  e0 -> ETyAnn <$> simplify f t <*> expr2type f e0
 
 -- TODO: If the binders become typed, we need to traverse them as well.
--- | Traverse over all types in a case alternative, i.e., the type arguments to
--- the data constructor and the types mentioned on the RHS.
-case2type :: (Applicative f, Functor (TypeOf lg)) =>
-  (forall s. Traversable s => TypeOf lg (s tv1) -> f (TypeOf lg (s tv2))) ->
-  Case lg tv1 ev -> f (Case lg tv2 ev)
-case2type f (MkCase dcon targs bnds e0) =
-  MkCase dcon <$> traverse (simplify f) targs <*> pure bnds <*> expr2type f e0
-
 -- | Traverse over all types in a pattern matching alternative, i.e., the types
 -- in the pattern and the types on the RHS.
 altn2type :: (Applicative f, Functor (TypeOf lg)) =>
@@ -84,20 +75,23 @@ altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0
 -- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a pattern, i.e., the type arguments to the data
 -- constructors in the pattern.
-patn2type :: (Applicative f, Functor ty) =>
-  (forall s. Traversable s => ty (s tv1) -> f (ty (s tv2))) ->
-  Patn ty tv1 -> f (Patn ty tv2)
+patn2type :: (Applicative f, Functor (TypeOf lg)) =>
+  (forall s. Traversable s => TypeOf lg (s tv1) -> f (TypeOf lg (s tv2))) ->
+  Patn lg tv1 -> f (Patn lg tv2)
 patn2type f = \case
   PWld -> pure PWld
   PVar x -> pure (PVar x)
   PCon dcon targs patns ->
     PCon dcon <$> traverse (simplify f) targs <*> traverse (patn2type f) patns
+  PSimple dcon targs binds ->
+    PSimple dcon <$> traverse (simplify f) targs <*> pure binds
 
 patn2dcon :: Traversal (Patn ty tv) (Patn ty tv) Id.DCon Id.DCon
 patn2dcon f = \case
   PWld      -> pure PWld
   PVar x    -> pure (PVar x)
   PCon c ts ps -> PCon <$> f c <*> pure ts <*> (traverse . patn2dcon) f ps
+  PSimple c ts bs -> PSimple <$> f c <*> pure ts <*> pure bs
 
 -- | Traverse over all binders in a pattern.
 patn2evar :: Traversal' (Patn st tv) Id.EVar
@@ -105,6 +99,7 @@ patn2evar f = \case
   PWld      -> pure PWld
   PVar x    -> PVar <$> f x
   PCon c ts ps -> PCon c ts <$> (traverse . patn2evar) f ps
+  PSimple c ts bs -> PSimple c ts <$> (traverse . _Just) f bs
 
 defn2func :: Lens' (Defn st tv ev) Id.EVar
 defn2func = defn2bind . bind2evar . lctd

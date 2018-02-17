@@ -133,7 +133,7 @@ instantiate e0 t0 = do
   pure (e1, t2, foldMap fold cstrs)
 
 inferPatn ::
-  Patn NoType tv -> UType s tv -> IT s ev (Patn (UType s) tv, Map Id.EVar (UType s tv))
+  Patn In tv -> UType s tv -> IT s ev (Patn (Aux s) tv, Map Id.EVar (UType s tv))
 inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
   PVar x -> pure (PVar x, Map.singleton x t_expr)
@@ -347,7 +347,7 @@ qualExpr = \case
 qualAltn :: Altn (Aux s) tv' ev -> TQ tv s (Altn Out tv ev)
 qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e
 
-qualPatn :: Patn (UType s) tv' -> TQ tv s (Patn Type tv)
+qualPatn :: Patn (Aux s) tv' -> TQ tv s (Patn Out tv)
 qualPatn = \case
   PWld -> pure PWld
   PVar x -> pure (PVar x)

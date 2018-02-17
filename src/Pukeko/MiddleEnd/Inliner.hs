@@ -90,7 +90,7 @@ inExpr e0 = case e0 of
   ECon c     -> pure (ECon c)
   ENum n     -> pure (ENum n)
   EApp t  us -> EApp <$> inExpr t <*> traverse inExpr us
-  ECas t  cs -> ECas <$> inExpr t <*> (traverse . case2expr) inExpr cs
+  EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
   ELet ds t  -> ELet <$> (traverse . defn2expr) inExpr ds <*> inExpr t
   ERec ds t  -> ERec <$> (traverse . defn2expr) inExpr ds <*> inExpr t
   ETyCoe d e -> ETyCoe d <$> inExpr e

@@ -63,6 +63,7 @@ import Data.DList            as X (DList)
 import Data.Either           as X (partitionEithers)
 import Data.Foldable         as X
 import Data.Function         as X
+import Data.Functor          as X
 import Data.Functor.Identity as X
 import Data.List             as X (sort)
 import Data.Map              as X (Map)

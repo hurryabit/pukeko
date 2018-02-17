@@ -7,7 +7,6 @@ import Pukeko.Prelude
 import qualified Data.List.NE as NE
 import qualified Data.Map     as Map
 import qualified Data.Set     as Set
-import qualified Data.Vector  as Vec
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Identifier as Id
@@ -65,8 +64,14 @@ typeOf = \case
     withinEScope' (_bind2type . _defn2bind) ds $ do
       traverse_ checkDefn ds
       typeOf e0
-  EMat e0 as -> typeOfBranching typeOfAltn e0 as
-  ECas e0 cs -> typeOfBranching typeOfCase e0 cs
+  EMat e0 (a1 :| as) -> do
+    t0 <- typeOf e0
+    t1 <- typeOfAltn t0 a1
+    for_ as $ \a2 -> do
+      t2 <- typeOfAltn t0 a2
+      unless (t1 == t2) $
+        throwHere ("expected type" <+> pretty t1 <> ", but found type" <+> pretty t2)
+    pure t1
   ETyAnn t_to (ETyCoe c e0) -> do
     t_from <- typeOf e0
     checkCoercion c t_from t_to
@@ -112,20 +117,6 @@ satisfiesCstr t0 clss = do
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
-
-typeOfBranching ::
-  (IsTyped st, IsTVar tv, IsEVar ev) =>
-  (Type tv -> branch -> TC tv ev (Type tv)) ->
-  Expr st tv ev -> NonEmpty branch -> TC tv ev (Type tv)
-typeOfBranching typeOfBranch e0 (b1 :| bs) = do
-  t0 <- typeOf e0
-  t1 <- typeOfBranch t0 b1
-  for_ bs $ \b2 -> do
-    t2 <- typeOfBranch t0 b2
-    unless (t1 == t2) $
-      throwHere ("expected type" <+> pretty t1 <> ", but found type" <+> pretty t2)
-  pure t1
-
 typeOfAltn ::
   (IsTyped st, IsTVar tv, IsEVar ev) =>
   Type tv -> Altn st tv ev -> TC tv ev (Type tv)
@@ -133,18 +124,8 @@ typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
   withinEScope id env (typeOf e)
 
-typeOfCase ::
-  (IsTyped st, IsTVar tv, IsEVar ev) =>
-  Type tv -> Case st tv ev -> TC tv ev (Type tv)
-typeOfCase t (MkCase c ts bs e0) = do
-  let ps = map (maybe PWld PVar) (toList bs)
-      bs1 = Vec.fromList bs
-      lk i = maybe (bug "reference to wildcard pattern") id  (bs1 Vec.! i)
-      e1 = fmap (first lk) e0
-  typeOfAltn t (MkAltn (PCon c ts ps) e1)
-
-patnEnvLevel ::
-  (IsTVar tv) => Patn Type tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
+patnEnvLevel :: forall lg tv ev. (TypeOf lg ~ Type, IsTVar tv) =>
+  Patn lg tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
 patnEnvLevel p t0 = case p of
   PWld -> pure Map.empty
   PVar x -> pure (Map.singleton x t0)
@@ -162,6 +143,7 @@ patnEnvLevel p t0 = case p of
     -- The renamer should have caught this.
     let t_ps = map (instantiateN' ts1) flds1
     Map.unions <$> zipWithM patnEnvLevel ps t_ps
+  PSimple c ts1 bs -> patnEnvLevel @Typed (PCon c ts1 (map (maybe PWld PVar) bs)) t0
 
 match :: (IsTVar tv) => Type tv -> Type tv -> TC tv ev ()
 match t0 t1 =
