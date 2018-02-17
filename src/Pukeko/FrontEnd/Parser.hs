@@ -135,15 +135,19 @@ lIdent = lexeme $ try $ do
     unexpected (Label (NE.fromList ("reserved " ++ x)))
   pure x
 
+uIdent :: Parser String
+uIdent = lexeme $ try $ do
+  x <- (:) <$> uIdentStart <*> many identLetter
+  when (x `Set.member` reservedIdents) $
+    unexpected (Label (NE.fromList ("reserved " ++ x)))
+  pure x
+
 binOp :: Parser Op.Binary
 binOp = lexeme $ try $ do
   op <- some opLetter
   when (op `Set.member` reservedOperators) $
     unexpected (Label (NE.fromList ("reserved op " ++ op)))
   pure (Op.binary op)
-
-uIdent :: Parser String
-uIdent = lexeme $ (:) <$> uIdentStart <*> many identLetter
 
 decimal :: Parser Int
 decimal = lexeme L.decimal
@@ -173,6 +177,11 @@ dcon = Id.dcon <$> uIdent <?> "data constructor"
 clss :: Parser Id.Clss
 clss = Id.clss <$> uIdent <?> "class name"
 
+typeAtom :: Parser TypeAtom
+typeAtom = choice
+  [ TACon <$> tcon
+  ]
+
 type_, atype :: Parser Type
 type_ =
   makeExprParser
@@ -181,7 +190,7 @@ type_ =
   <?> "data"
 atype = choice
   [ TVar <$> tvar
-  , TCon <$> tcon
+  , TAtm <$> typeAtom
   , parens type_
   ]
 

@@ -111,6 +111,11 @@ rnSignDecl env (Ps.MkSignDecl z t) = do
   modifying funcs (Set.insert (z^.lctd))
   MkBind z <$> rnTypeScheme env t
 
+rnTypeAtom :: Ps.TypeAtom -> Rn ev TypeAtom
+rnTypeAtom = \case
+  Ps.TAArr   -> pure TAArr
+  Ps.TACon c -> pure (TACon c)
+
 rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)
 rnType env = go
   where
@@ -118,8 +123,7 @@ rnType env = go
       Ps.TVar x
         | Just v <- x `Map.lookup` env -> pure (TVar v)
         | otherwise -> throwHere ("unknown type variable:" <+> pretty x)
-      Ps.TCon c -> pure (TCon c)
-      Ps.TArr   -> pure TArr
+      Ps.TAtm a -> TAtm <$> rnTypeAtom a
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
 rnTypeCstr :: [Id.TVar] -> Ps.TypeCstr -> Rn ev [QVar]

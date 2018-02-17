@@ -13,6 +13,7 @@ module Pukeko.AST.Surface
   , InstDecl (..)
   , ExtnDecl (..)
   , InfxDecl (..)
+  , TypeAtom (..)
   , Type (..)
   , TypeCstr (..)
   , TypeScheme (..)
@@ -104,10 +105,13 @@ data InfxDecl = MkInfxDecl
   , _infx2func :: Id.EVar
   }
 
+data TypeAtom
+  = TAArr
+  | TACon Id.TCon
+
 data Type
   = TVar Id.TVar
-  | TCon Id.TCon
-  | TArr
+  | TAtm TypeAtom
   | TApp Type Type
 
 data TypeCstr = MkTypeCstr [(Id.Clss, Id.TVar)]
@@ -163,13 +167,12 @@ mkTApp :: Type -> [Type] -> Type
 mkTApp = foldl TApp
 
 mkTFun :: Type -> Type -> Type
-mkTFun tx ty = mkTApp TArr [tx, ty]
+mkTFun tx ty = mkTApp (TAtm TAArr) [tx, ty]
 
 type2tvar :: Traversal' Type Id.TVar
 type2tvar f = \case
   TVar v     -> TVar <$> f v
-  TCon c     -> pure (TCon c)
-  TArr       -> pure TArr
+  TAtm a     -> pure (TAtm a)
   TApp tf tp -> TApp <$> type2tvar f tf <*> type2tvar f tp
 
 
@@ -182,6 +185,7 @@ deriving instance Show ClssDecl
 deriving instance Show InstDecl
 deriving instance Show ExtnDecl
 deriving instance Show InfxDecl
+deriving instance Show TypeAtom
 deriving instance Show Type
 deriving instance Show TypeCstr
 deriving instance Show TypeScheme
