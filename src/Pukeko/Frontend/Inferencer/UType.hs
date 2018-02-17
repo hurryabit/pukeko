@@ -29,7 +29,7 @@ import qualified Data.Map           as Map
 import qualified Data.Vector        as Vec
 
 import           Pukeko.Pretty
-import           Pukeko.AST.Type       (Type (..), QVar (..), prettyTUni)
+import           Pukeko.AST.Type       (TypeAtom (..), Type (..), QVar (..), prettyTUni)
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
@@ -42,14 +42,13 @@ data UVar s tv
 
 data UType s tv
   = UTVar Id.TVar
-  | UTArr
-  | UTCon Id.TCon
+  | UTAtm TypeAtom
   | UTApp (UType s tv) (UType s tv)
   | UTUni (NonEmpty QVar) (UType s tv)
   | UVar (STRef s (UVar s tv))
 
 pattern UTFun :: UType s tv -> UType s tv -> UType s tv
-pattern UTFun tx ty = UTApp (UTApp UTArr tx) ty
+pattern UTFun tx ty = UTApp (UTApp (UTAtm TAArr) tx) ty
 
 mkUTUni :: [QVar] -> UType s tv -> UType s tv
 mkUTUni xs0 t0 = case xs0 of
@@ -79,7 +78,7 @@ appN :: UType s tv -> [UType s tv] -> UType s tv
 appN = foldl UTApp
 
 appTCon :: Id.TCon -> [UType s tv] -> UType s tv
-appTCon = appN . UTCon
+appTCon = appN . UTAtm . TACon
 
 unUTApp :: UType s tv -> ST s (UType s tv, [UType s tv])
 unUTApp = go []
@@ -99,8 +98,7 @@ open = open1 . fmap (UTVar . baseTVar)
 open1 :: Type (UType s tv) -> UType s tv
 open1 = \case
   TVar t -> t
-  TArr -> UTArr
-  TCon c -> UTCon c
+  TAtm a -> UTAtm a
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
   TUni xs tq -> UTUni xs (open1 (fmap (scope id utvar) tq))
     where
@@ -113,8 +111,7 @@ subst env = go
       UTVar x -> do
         let e = bugWith "unknown type variable in instantiation" x
         pure (Map.findWithDefault e x env)
-      t@UTArr     -> pure t
-      t@(UTCon _) -> pure t
+      t@UTAtm{}   -> pure t
       UTApp tf tp -> UTApp <$> go tf <*> go tp
       t0@(UTUni _qvs _t1) -> do
         p0 <- prettyUType 0 t0
@@ -136,8 +133,7 @@ prettyUVar prec = \case
 prettyUType :: Int -> UType s tv -> ST s (Doc ann)
 prettyUType prec = \case
   UTVar v -> pure (pretty v)
-  UTArr   -> pure "(->)"
-  UTCon c -> pure (pretty c)
+  UTAtm a -> pure (pretty a)
   UTFun tx ty -> do
     px <- prettyUType 2 tx
     py <- prettyUType 1 ty

@@ -37,12 +37,16 @@ resolver: nightly-2018-01-29
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - '.'
+- location:
+    git: https://github.com/ivan-m/graphviz.git
+    commit: 8abdf4dc5b8812a437a5ff01cb35b267422320e2
+  extra-dep: true
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps:
-- graphviz-2999.19.0.0
+# extra-deps:
+# - graphviz-2999.19.0.0
 
-allow-newer: true
+# allow-newer: true
 # Override default flag values for local packages and extra-deps
 flags: {}
 

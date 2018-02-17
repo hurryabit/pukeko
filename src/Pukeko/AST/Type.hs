@@ -5,10 +5,13 @@
 module Pukeko.AST.Type
   ( IsType (..)
   , NoType (..)
+  , TypeAtom (..)
   , Type (..)
   , QVar (..)
   , CoercionDir (..)
   , Coercion (..)
+  , pattern TArr
+  , pattern TCon
   , weakenT
   , strengthenT0
   , mkTVars
@@ -54,12 +57,21 @@ class IsType t where
 
 data NoType tv = NoType
 
+data TypeAtom
+  = TAArr
+  | TACon Id.TCon
+
 data Type tv
   = TVar tv
-  | TArr
-  | TCon Id.TCon
+  | TAtm TypeAtom
   | TApp (Type tv) (Type tv)
   | TUni (NonEmpty QVar) (Type (TScope Int tv))
+
+pattern TArr :: Type tv
+pattern TArr = TAtm TAArr
+
+pattern TCon :: Id.TCon -> Type tv
+pattern TCon tcon = TAtm (TACon tcon)
 
 pattern TFun :: Type tv -> Type tv -> Type tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
@@ -132,16 +144,16 @@ type2tcon f = cataM2 (fmap embed2 . step)
   where
     step :: TypeF Type tv' -> m (TypeF Type tv')
     step = \case
-      TConF c -> TConF <$> f c
-      x       -> pure x
+      TAtmF (TACon c) -> TAtmF . TACon <$> f c
+      x               -> pure x
 
 type2tcon_ :: forall m tv. Monad m => (Id.TCon -> m ()) -> Type tv -> m ()
 type2tcon_ f = fmap getConst . cataM2 (fmap Const . step)
   where
     step :: TypeF _ _ -> m ()
     step = \case
-      TConF c -> f c
-      _       -> pure ()
+      TAtmF (TACon c) -> f c
+      _               -> pure ()
 
 instance IsType NoType where
   isType = const Nothing
@@ -149,19 +161,19 @@ instance IsType NoType where
 instance IsType Type where
   isType = Just
 
+deriving instance Eq TypeAtom
+
 instance (Eq tv) => Eq (Type tv) where
   t1 == t2 = case (t1, t2) of
     (TVar x1, TVar x2) -> x1 == x2
-    (TArr   , TArr   ) -> True
-    (TCon c1, TCon c2) -> c1 == c2
+    (TAtm a1, TAtm a2) -> a1 == a2
     (TApp tf1 tp1, TApp tf2 tp2) -> tf1 == tf2 && tp1 == tp2
     (TUni xs1 tq1, TUni xs2 tq2) ->
       length xs1 == length xs2
       && and (NE.zipWith ((==) `on` _qvar2cstr) xs1 xs2)
       && tq1 == tq2
     (TVar{}, _) -> False
-    (TArr{}, _) -> False
-    (TCon{}, _) -> False
+    (TAtm{}, _) -> False
     (TApp{}, _) -> False
     (TUni{}, _) -> False
 
@@ -173,22 +185,25 @@ instance Monad Type where
   return = pure
   t >>= f = case t of
     TVar x -> f x
-    TArr   -> TArr
-    TCon c -> TCon c
+    TAtm a -> TAtm a
     TApp tf tp -> TApp (tf >>= f) (tp >>= f)
     TUni xs tq -> TUni xs (tq >>>= f)
+
+instance Pretty TypeAtom where
+  pretty = \case
+    TACon c -> pretty c
+    TAArr   -> "(->)"
 
 instance BaseTVar tv => Pretty (Type tv)
 
 instance BaseTVar tv => PrettyPrec (Type tv) where
   prettyPrec prec = \case
     TVar x -> pretty (baseTVar x)
-    TArr   -> "(->)"
-    TCon c -> pretty c
+    TAtm a -> pretty a
     TFun tx ty ->
       maybeParens (prec > 1) (prettyPrec 2 tx <+> "->" <+> prettyPrec 1 ty)
-    TApp tf tx ->
-      maybeParens (prec > 2) (prettyPrec 2 tf <+> prettyPrec 3 tx)
+    TApp tf ta ->
+      maybeParens (prec > 2) (prettyPrec 2 tf <+> prettyPrec 3 ta)
     TUni qvs tq -> prettyTUni prec qvs (pretty tq)
 
 prettyTypeCstr :: Foldable t => t QVar -> Doc ann
@@ -217,6 +232,7 @@ deriving instance Foldable    NoType
 deriving instance Traversable NoType
 
 deriving instance Show QVar
+deriving instance Show TypeAtom
 deriving instance Show tv => Show (Type tv)
 deriving instance Show CoercionDir
 deriving instance Show Coercion
@@ -230,8 +246,7 @@ instance (BaseTVar tv, Ord tv) => HasEnv (Boxed tv) where
 
 data TypeF typ tv
   = TVarF tv
-  | TArrF
-  | TConF Id.TCon
+  | TAtmF TypeAtom
   | TAppF (typ tv) (typ tv)
   | TUniF (NonEmpty QVar) (typ (TScope Int tv))
 
@@ -241,24 +256,21 @@ instance Functor2 TypeF
 instance Traversable2 TypeF where
   traverse2 f = \case
     TVarF v      -> pure (TVarF v)
-    TArrF        -> pure TArrF
-    TConF c      -> pure (TConF c)
+    TAtmF a      -> pure (TAtmF a)
     TAppF t1 t2  -> TAppF <$> f t1 <*> f t2
     TUniF qvs t1 -> TUniF qvs <$> f t1
 
 instance Recursive2 Type where
   project2 = \case
     TVar v      -> TVarF v
-    TArr        -> TArrF
-    TCon c      -> TConF c
+    TAtm a      -> TAtmF a
     TApp t1 t2  -> TAppF t1 t2
     TUni qvs t1 -> TUniF qvs t1
 
 instance Corecursive2 Type where
   embed2 = \case
     TVarF v      -> TVar v
-    TArrF        -> TArr
-    TConF c      -> TCon c
+    TAtmF a      -> TAtm a
     TAppF t1 t2  -> TApp t1 t2
     TUniF qvs t1 -> TUni qvs t1
 
@@ -280,8 +292,7 @@ renameType t0 =
       Type tv -> Eff [Reader (EnvOf tv tv), Supply Id.TVar] (Type tv)
     go = \case
       TVar v -> TVar <$> asks (lookupEnv v)
-      TArr -> pure TArr
-      TCon c -> pure (TCon c)
+      TAtm a -> pure (TAtm a)
       TApp tf tp -> TApp <$> go tf <*> go tp
       TUni qvs0 tq -> do
         qvs1 <- traverse (qvar2tvar (const fresh)) qvs0
@@ -290,6 +301,7 @@ renameType t0 =
           TUni qvs1 <$> go tq
 
 deriveToJSON defaultOptions ''QVar
+deriveToJSON defaultOptions ''TypeAtom
 deriveToJSON defaultOptions ''Type
 deriveToJSON defaultOptions ''CoercionDir
 deriveToJSON defaultOptions ''Coercion

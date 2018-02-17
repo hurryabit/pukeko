@@ -70,8 +70,7 @@ generalize = go
             | otherwise     -> pureDefault
           ULink t1 -> go t1
       UTVar{} -> pureDefault
-      UTArr{} -> pureDefault
-      UTCon{} -> pureDefault
+      UTAtm{} -> pureDefault
       UTUni{} -> bug "quantification during generalization"
       UTApp tf0 tp0 -> do
         (tf1, vsf) <- go tf0
@@ -95,7 +94,7 @@ splitCstr t0 clss = do
           | otherwise -> pure (MkSplitCstrs mempty (Seq.singleton (t0, clss)))
         ULink{} -> bug "ULink after unUTApp"
     UTVar v -> pure (MkSplitCstrs (Map.singleton v (Set.singleton clss)) mempty)
-    UTCon tcon -> do
+    UTAtm (TACon tcon) -> do
       inst_mb <- lookupInfo info2insts (clss, tcon)
       case inst_mb of
         Nothing -> throwNoInst
@@ -109,7 +108,7 @@ splitCstr t0 clss = do
           where qual = toList qvs
     UTApp{} -> bug "UTApp after unUTApp"
     UTUni{} -> bug "UTUni during constraint splitting"
-    UTArr{} -> throwNoInst
+    UTAtm TAArr -> throwNoInst
   where
     throwNoInst = do
       p0 <- sendM (prettyUType 1 t0)
@@ -314,8 +313,7 @@ qualType = \case
     case y_mb of
       Nothing -> bugWith "unknown type variable during quantification" x
       Just y  -> pure (TVar y)
-  UTArr -> pure TArr
-  UTCon c -> pure (TCon c)
+  UTAtm a -> pure (TAtm a)
   UTApp t1 t2 -> TApp <$> qualType t1 <*> qualType t2
   UTUni{} -> bug "quantification during quantification"
   UVar uref -> do

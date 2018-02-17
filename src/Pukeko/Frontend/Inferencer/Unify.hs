@@ -52,8 +52,7 @@ occursCheck uref1 t2 = case t2 of
   UTVar v -> do
     !_ <- lookupTVar v  -- NOTE: This is a sanity check.
     pure ()
-  UTCon _ -> pure ()
-  UTArr   -> pure ()
+  UTAtm _ -> pure ()
   UTUni{} -> bug "universal quantification in occurs check"
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
@@ -72,9 +71,8 @@ unify t1 t2 = do
     (_, UVar _) -> unify t2 t1
     (UTVar x1, UTVar x2)
       | x1 == x2 -> pure ()
-    (UTArr, UTArr) -> pure ()
-    (UTCon tcon1, UTCon tcon2)
-      | tcon1 == tcon2 -> pure ()
+    (UTAtm atom1, UTAtm atom2)
+      | atom1 == atom2 -> pure ()
     (UTApp tf1 tp1, UTApp tf2 tp2) -> unify tf1 tf2 *> unify tp1 tp2
     _ -> do
       p1 <- sendM $ prettyUType 0 t1

@@ -269,8 +269,7 @@ unTFun = curry $ \case
 unclssType :: Type tv -> Type tv
 unclssType = \case
   TVar v -> TVar v
-  TArr -> TArr
-  TCon c -> TCon c
+  TAtm a -> TAtm a
   TApp tf tp -> TApp (unclssType tf) (unclssType tp)
   TUni qvs0 tq0 ->
     let qvs1 = fmap (qvar2cstr .~ mempty) qvs0

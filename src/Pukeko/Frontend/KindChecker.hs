@@ -67,8 +67,8 @@ kcType k = \case
   TVar v -> do
     kv <- asks (Vec.! scope absurd id v)
     unify kv k
-  TArr -> unify (Arrow Star (Arrow Star Star)) k
-  TCon tcon -> do
+  TAtm TAArr -> unify (Arrow Star (Arrow Star Star)) k
+  TAtm (TACon tcon) -> do
     kcon_opt <- gets (tcon `Map.lookup`)
     case kcon_opt of
       Nothing -> bugWith "unknown type constructor" tcon
