@@ -25,15 +25,12 @@ type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
 
 type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
-runTC :: HasModuleInfo m => m -> TC Void Void a -> Either Failure a
-runTC m0 = run . runError . runReader noPos . runInfo m0 . runGamma
-
 class HasModuleInfo m => TypeCheckable m where
   checkModule :: m -> TC Void Void ()
 
-check :: TypeCheckable m => m -> Either Failure ()
-check m = runTC m (checkModule m)
-
+check :: (Member (Error Failure) effs, TypeCheckable m) => m -> Eff effs ()
+check m0 = either throwError pure .
+  run . runError . runReader noPos . runInfo m0 . runGamma $ checkModule m0
 
 checkCoercion :: Coercion -> Type tv -> Type tv -> TC tv ev ()
 checkCoercion (MkCoercion _dir _tcon) _from _to =

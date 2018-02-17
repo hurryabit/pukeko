@@ -24,29 +24,26 @@ data FRState = MkFRState
   }
 makeLenses ''FRState
 
-type FR = Eff [State FRState, Reader SourcePos, Error Failure]
+type CanFR effs = Members [State FRState, Reader SourcePos, Error Failure] effs
 
-runFR :: FR a -> Either Failure a
-runFR = run . runError . runReader noPos . evalState st0
-  where
-    st0 = MkFRState mempty mempty
-
-resolveModule :: Module In -> Either Failure ()
-resolveModule (MkModule decls) = runFR $ do
+resolveModule :: Member (Error Failure) effs => Module In -> Eff effs ()
+resolveModule (MkModule decls) = runReader noPos . evalState st0 $ do
   traverse_ frDecl decls
   MkFRState decld defnd <- get
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   whenJust (Map.minViewWithKey undefnd) $ \((fun, pos), _) ->
     here_ pos (throwHere ("declared but undefined function:" <+> pretty fun))
+  where
+    st0 = MkFRState mempty mempty
 
-declareFun :: Bind Type tv -> FR ()
+declareFun :: CanFR effs => Bind Type tv -> Eff effs ()
 declareFun = here' $ \(MkBind (unlctd -> fun) _) -> do
   whenM (uses declared (Map.member fun)) $
     throwHere ("duplicate declaration of function:" <+> pretty fun)
   pos <- where_
   modifying declared (Map.insert fun pos)
 
-defineFun :: Lctd Id.EVar -> FR ()
+defineFun :: CanFR effs => Lctd Id.EVar -> Eff effs ()
 defineFun = here' $ \(unlctd -> fun) -> do
   unlessM (uses declared (Map.member fun)) $
     throwHere ("undeclared function:" <+> pretty fun)
@@ -54,7 +51,7 @@ defineFun = here' $ \(unlctd -> fun) -> do
     throwHere ("duplicate definition of function:" <+> pretty fun)
   modifying defined (Set.insert fun)
 
-frDecl :: Decl In -> FR ()
+frDecl :: CanFR effs => Decl In -> Eff effs ()
 frDecl = \case
   DType _ -> pure ()
   DSign s -> declareFun s

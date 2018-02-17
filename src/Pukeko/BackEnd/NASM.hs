@@ -10,8 +10,8 @@ import qualified Data.Map as Map
 
 import Pukeko.BackEnd.GCode
 
-assemble :: Program -> Either Failure String
-assemble MkProgram { _globals, _main } = run . runError $ do
+assemble :: Member (Error Failure) effs => Program -> Eff effs String
+assemble MkProgram { _globals, _main } = do
   let arities = Map.fromList $
         map (\MkGlobal{ _name, _arity } -> (_name, _arity)) _globals
       cafs = [ _name | MkGlobal{ _name, _arity = 0 } <- _globals ]

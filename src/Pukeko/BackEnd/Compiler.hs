@@ -30,8 +30,8 @@ freshLabel = MkName . ('.' :) . show <$> fresh
 output :: [Inst] -> CC ()
 output = tell
 
-compile :: Module -> Either Failure Program
-compile module_ = do
+compile :: Member (Error Failure) effs => Module -> Eff effs Program
+compile module_ = either throwError pure $ do
   let MkInfo{_constructors} = info module_
   let constructors =
         map (uncurry Builtins.constructor) (Set.toList _constructors)

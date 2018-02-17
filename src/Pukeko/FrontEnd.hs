@@ -20,7 +20,7 @@ import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
 
 type Module = SystemF.Module SystemF
 
-run :: Bool -> Parser.Package -> Either Failure Module
+run :: Member (Error Failure) effs => Bool -> Parser.Package -> Eff effs Module
 run unsafe pkg = do
   surface <- Renamer.renameModule pkg
   TypeResolver.resolveModule surface

@@ -16,24 +16,24 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 
 shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do
-  let result = do
-        module_ <- run . runError $ Parser.parseInput "" code
+  let result = run . runError $ do
+        module_ <- Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> expectationFailure "should fail, but succeeded"
-    Left actual -> render actual `shouldBe` expect
+    Left actual -> renderFailure actual `shouldBe` expect
 
 shouldSucceed :: Parser.Package -> String -> Expectation
 shouldSucceed prelude code = do
-  let result = do
-        module_ <- run . runError $ Parser.parseInput "" code
+  let result = run . runError $ do
+        module_ <- Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
   case result of
     Right _ -> return ()
     Left error ->
-      expectationFailure $ "should succeed, but failed: " ++ render error
+      expectationFailure $ "should succeed, but failed: " ++ renderFailure error
 
 type Parser a = Parsec [String] Parser.Package a
 

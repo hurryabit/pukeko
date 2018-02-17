@@ -51,13 +51,11 @@ runOptimization = \case
   DeadCodeElimination -> DeadCode.cleanModule
   Prettification      -> Prettifier.prettifyModule
 
-run
-  :: Config
-  -> SysF.Module SystemF
-  -> Either Failure (Core.Module, NoLambda.Module)
+run :: forall effs. Member (Error Failure) effs =>
+  Config -> SysF.Module SystemF -> Eff effs (Core.Module, NoLambda.Module)
 run cfg module_sf = do
   let typeChecked ::
-        (Core.Module -> Core.Module) -> (Core.Module -> Either Failure Core.Module)
+        (Core.Module -> Core.Module) -> (Core.Module -> Eff effs Core.Module)
       typeChecked f m0 = do
         let m1 = f m0
         when (typeChecking cfg) (TypeChecker.check m1)

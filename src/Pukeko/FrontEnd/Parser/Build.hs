@@ -17,16 +17,15 @@ build parse file = do
     evalState @(Set FilePath) mempty
     $ runWriter @(DList Module)
     $ runReader @(Set FilePath) mempty
-    $ go parse file
+    $ go (raise . raise . raise . parse) file
   pure (MkPackage file (toList mdls))
   where
     go parse file = do
       cyc <- asks (file `Set.member`)
-      when cyc $ raise3 (throwFailure ("detected import cycle at file" <+> pretty file))
+      when cyc $ throwFailure ("detected import cycle at file" <+> pretty file)
       done <- gets (file `Set.member`)
       unless done $ do
-        mdl <- raise3 (parse file)
+        mdl <- parse file
         modify (file `Set.insert`)
         local (file `Set.insert`) $ for_ (_mod2imports mdl) (go parse)
         tell (DL.singleton mdl)
-    raise3 = raise . raise . raise

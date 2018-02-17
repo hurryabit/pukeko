@@ -44,15 +44,6 @@ type KC n s =
   , Reader SourcePos, Supply Id.TVar, Error Failure, ST s
   ]
 
-runKC :: (forall n s. KC n s a) -> Either Failure a
-runKC kc =
-  runST
-  $ runM . runError . evalSupply sup0 . runReader noPos . evalState mempty . runReader env0
-  $ kc
-  where
-    sup0 = Id.freshTVars
-    env0 = Vec.empty
-
 freshUVar :: KC n s (Kind (Open s))
 freshUVar = do
   v <- fresh
@@ -115,8 +106,16 @@ kcDecl decl = case decl of
 kcModule ::Module In -> KC n s ()
 kcModule (MkModule decls)= traverse_ (\top -> reset @Id.TVar *> kcDecl top) decls
 
-checkModule :: Module In -> Either Failure ()
-checkModule module_ = runKC (kcModule module_)
+checkModule :: Member (Error Failure) effs => Module In -> Eff effs ()
+checkModule module0 = either throwError pure $ runST $
+  kcModule module0
+  & runReader Vec.empty
+  & evalState mempty
+  & runReader noPos
+  & evalSupply Id.freshTVars
+  & runError
+  & runM
+
 
 unwind :: Kind (Open s) -> KC n s (Kind (Open s))
 unwind = \case

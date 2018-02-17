@@ -42,11 +42,6 @@ data SplitCstrs s tv = MkSplitCstrs
 type TI ev s = TU s ev
 type IT s ev = TU s ev
 
-runTI :: Module In -> TI Void s a -> Eff [Error Failure, ST s] a
-runTI m0 = evalSupply sup0 . runReader noPos . runInfo m0 . runGamma
-  where
-    sup0 = Id.freshTVars
-
 freshUVar :: TI v s (UType s tv)
 freshUVar = do
   v <- fresh
@@ -292,12 +287,6 @@ type TQEnv tv = Map Id.TVar tv
 type TQ tv s =
   Eff [Reader (TQEnv tv), Reader SourcePos, Supply Id.TVar, Error Failure, ST s]
 
-runTQ :: TQ Void s a -> Eff [Error Failure, ST s] a
-runTQ = evalSupply sup0 . runReader noPos . runReader env0
-  where
-    env0 = mempty
-    sup0 = map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars
-
 localizeTQ :: (TraversableWithIndex Int t) =>
   t QVar -> TQ (TScope Int tv) s a -> TQ tv s a
 localizeTQ qvs =
@@ -369,10 +358,18 @@ qualDecl = \case
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule = module2decls (traverse (\decl -> reset @Id.TVar *> qualDecl decl))
 
-inferModule :: Module In -> Either Failure (Module Out)
-inferModule m0 = runST $ runM . runError $ do
-  m1 <- runTI m0 (inferModule' m0)
-  runTQ (qualModule m1)
+inferModule :: Member (Error Failure) effs => Module In -> Eff effs (Module Out)
+inferModule m0 = either throwError pure $ runST $ runM $ runError $ do
+  m1 <- inferModule' m0
+        & runGamma
+        & runInfo m0
+        & runReader noPos
+        & evalSupply Id.freshTVars
+  m2 <- qualModule m1
+        & runReader mempty
+        & runReader noPos
+        & evalSupply (map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars)
+  pure m2
 
 instance Monoid (SplitCstrs s tv) where
   mempty = MkSplitCstrs mempty mempty

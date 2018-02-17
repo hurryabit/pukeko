@@ -18,6 +18,7 @@ module Pukeko.Prelude
 
   , Failure
   , throwFailure
+  , renderFailure
 
   , HasPos (..)
   , Where (..)
@@ -91,6 +92,9 @@ type Failure = Doc ()
 
 throwFailure :: (Member (Error Failure) effs) => Failure -> Eff effs a
 throwFailure = throwError
+
+renderFailure :: Failure -> String
+renderFailure = render
 
 infixr 6 <+>
 

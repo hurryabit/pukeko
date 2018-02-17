@@ -21,54 +21,54 @@ import           Pukeko.AST.Type
 
 type Out = Surface
 
-type RnEnv ev = Map Id.EVar ev
 data RnState = MkRnState
   { _funcs  :: Set Id.EVar
   , _binops :: Map Op.Binary Id.EVar
   }
 
-type Rn ev = Eff [Reader (RnEnv ev), State RnState, Reader SourcePos, Error Failure]
+type Env ev = Reader (Map Id.EVar ev)
+
+type CanRn effs = Members [State RnState, Reader SourcePos, Error Failure] effs
 
 makeLenses ''RnState
 
-renameModule :: Ps.Package -> Either Failure (Module Out)
-renameModule (Ps.MkPackage _ modules) = runRn $ do
-  let ldecls = concatMap Ps._mod2decls modules
-  MkModule . catMaybes <$> traverse rnDecl ldecls
-
-runRn :: Rn Void a -> Either Failure a
-runRn = run . runError . runReader noPos . evalState st0 . runReader env0
+renameModule :: Member (Error Failure) effs => Ps.Package -> Eff effs (Module Out)
+renameModule (Ps.MkPackage _ modules) =
+  runReader noPos . evalState st0 $ do
+    let ldecls = concatMap Ps._mod2decls modules
+    MkModule . catMaybes <$> traverse rnDecl ldecls
   where
     st0 = MkRnState mempty mempty
-    env0 = mempty
 
-localize :: Map Id.EVar i -> Rn (EScope i ev) a -> Rn ev a
+localize :: CanRn effs =>
+  Map Id.EVar i -> Eff (Env (EScope i ev) : effs) a -> Eff (Env ev : effs) a
 localize bs = local' upd
   where
     upd env = Map.mapWithKey (flip mkBound) bs `Map.union` Map.map Free env
 
-localize1 :: Id.EVar -> Rn (EScope () ev) a -> Rn ev a
+localize1 :: CanRn effs =>
+  Id.EVar -> Eff (Env (EScope () ev) : effs) a -> Eff (Env ev : effs) a
 localize1 x = localize (Map.singleton x ())
 
 -- TODO: Make @\(Ps.MkDefn x _) -> x@ a function and use it.
-localizeDefns :: FoldableWithIndex Int t =>
-  t (Ps.Defn _) -> Rn (EScope Int ev) a -> Rn ev a
+localizeDefns :: (CanRn effs, FoldableWithIndex Int t) =>
+  t (Ps.Defn _) -> Eff (Env (EScope Int ev) : effs) a -> Eff (Env ev : effs) a
 localizeDefns =
   localize . ifoldMap (\i (Ps.MkDefn (unlctd -> x) _) -> Map.singleton x i)
 
-checkFunc :: Id.EVar -> Rn ev ()
+checkFunc :: CanRn effs => Id.EVar -> Eff effs ()
 checkFunc z = do
   global <- uses funcs (Set.member z)
   unless global (throwHere ("unknown variable:" <+> pretty z))
 
-findBinop :: Op.Binary -> Rn ev Id.EVar
+findBinop :: CanRn effs => Op.Binary -> Eff effs Id.EVar
 findBinop op = do
   fun_mb <- uses binops (Map.lookup op)
   case fun_mb of
     Just fun -> pure fun
     Nothing  -> throwHere ("unknown operator:" <+> pretty op)
 
-rnDecl :: Ps.Decl -> Rn Void (Maybe (Decl Out))
+rnDecl :: CanRn effs => Ps.Decl -> Eff effs (Maybe (Decl Out))
 rnDecl = \case
   Ps.DType t -> Just . DType <$> rnTConDecl t
   Ps.DSign s -> Just . DSign <$> rnSignDecl mempty s
@@ -80,9 +80,9 @@ rnDecl = \case
   Ps.DInst (Ps.MkInstDecl c atom0 vs0 qs ds0) -> do
     atom1 <- rnTypeAtom atom0
     qvs <- rnTypeCstr vs0 qs
-    ds1 <- traverse rnDefn ds0
+    ds1 <- traverse (runReader mempty . rnDefn) ds0
     yield (DInst (MkInstDecl c atom1 qvs ds1))
-  Ps.DDefn d -> Just . DDefn <$> rnDefn d
+  Ps.DDefn d -> Just . DDefn <$> runReader mempty (rnDefn d)
   Ps.DExtn (Ps.MkExtnDecl z s) -> do
     modifying funcs (<> Set.singleton (z^.lctd))
     yield (DExtn (MkExtnDecl (MkBind z NoType) s))
@@ -93,7 +93,7 @@ rnDecl = \case
   where
     yield = pure . Just
 
-rnTConDecl :: Ps.TConDecl -> Rn ev TConDecl
+rnTConDecl :: CanRn effs => Ps.TConDecl -> Eff effs TConDecl
 rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = do
   MkTConDecl tcon prms0 <$>
     bitraverse
@@ -101,24 +101,25 @@ rnTConDecl (Ps.MkTConDecl tcon prms0 dcons) = do
       (zipWithM (\tag -> rnDConDecl (tcon^.lctd) prms0 tag) [0..])
       dcons
 
-rnDConDecl :: Id.TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Rn ev DConDecl
+rnDConDecl :: CanRn effs =>
+  Id.TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
 rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
   MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
   where
     env = finRenamer vs
 
-rnSignDecl :: Map Id.TVar tv -> Ps.SignDecl -> Rn ev (Bind Type tv)
+rnSignDecl :: CanRn effs => Map Id.TVar tv -> Ps.SignDecl -> Eff effs (Bind Type tv)
 rnSignDecl env (Ps.MkSignDecl z t) = do
   modifying funcs (Set.insert (z^.lctd))
   MkBind z <$> rnTypeScheme env t
 
-rnTypeAtom :: Ps.TypeAtom -> Rn ev TypeAtom
+rnTypeAtom :: Ps.TypeAtom -> Eff effs TypeAtom
 rnTypeAtom = \case
   Ps.TAArr   -> pure TAArr
   Ps.TAInt   -> pure TAInt
   Ps.TACon c -> pure (TACon c)
 
-rnType :: Map Id.TVar tv -> Ps.Type -> Rn ev (Type tv)
+rnType :: CanRn effs => Map Id.TVar tv -> Ps.Type -> Eff effs (Type tv)
 rnType env = go
   where
     go = \case
@@ -128,7 +129,7 @@ rnType env = go
       Ps.TAtm a -> TAtm <$> rnTypeAtom a
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
-rnTypeCstr :: [Id.TVar] -> Ps.TypeCstr -> Rn ev [QVar]
+rnTypeCstr :: [Id.TVar] -> Ps.TypeCstr -> Eff effs [QVar]
 rnTypeCstr vs (Ps.MkTypeCstr qs) = do
   -- FIXME: Fail if there are constraints on variables that are not in @vs0@. In
   -- the worst case they could constrain the type variable of a class
@@ -136,7 +137,7 @@ rnTypeCstr vs (Ps.MkTypeCstr qs) = do
   let mp = foldl (\acc (c, v) -> Map.insertWith (<>) v (Set.singleton c) acc) mempty qs
   pure (fmap (\v -> MkQVar (Map.findWithDefault mempty v mp) v) vs)
 
-rnTypeScheme :: Map Id.TVar tv -> Ps.TypeScheme -> Rn ev (Type tv)
+rnTypeScheme :: CanRn effs => Map Id.TVar tv -> Ps.TypeScheme -> Eff effs (Type tv)
 rnTypeScheme env (Ps.MkTypeScheme qs t) = do
   let vs0 = toList (setOf Ps.type2tvar t `Set.difference` Map.keysSet env)
   mkTUni <$> rnTypeCstr vs0 qs <*> rnType (fmap weakenScope env <> finRenamer vs0) t
@@ -148,16 +149,17 @@ rnCoercion (Ps.MkCoercion dir0 tcon) = MkCoercion dir1 tcon
       Ps.Inject  -> Inject
       Ps.Project -> Project
 
-rnDefn :: Ps.Defn Id.EVar -> Rn ev (Defn Out tv ev)
+rnDefn :: CanRn effs => Ps.Defn Id.EVar -> Eff (Env ev : effs) (Defn Out tv ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
-rnELam :: [Lctd Id.EVar] -> Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
+rnELam :: CanRn effs =>
+  [Lctd Id.EVar] -> Ps.Expr Id.EVar -> Eff (Env ev : effs) (Expr Out tv ev)
 rnELam [] e0 = rnExpr e0
 rnELam (b0:bs) e0 = do
   let b1@(MkBind (unlctd -> x) NoType) = rnBind b0
   ELam b1 <$> localize1 x (rnELam bs e0)
 
-rnExpr :: Ps.Expr Id.EVar -> Rn ev (Expr Out tv ev)
+rnExpr :: CanRn effs => Ps.Expr Id.EVar -> Eff (Env ev : effs) (Expr Out tv ev)
 rnExpr = \case
   Ps.ELoc le -> here le $ ELoc <$> lctd rnExpr le
   Ps.EVar x -> do
@@ -186,7 +188,7 @@ rnExpr = \case
 rnBind :: Lctd Id.EVar -> Bind NoType tv
 rnBind x = MkBind x NoType
 
-rnAltn :: Ps.Altn Id.EVar -> Rn ev (Altn Out tv ev)
+rnAltn :: CanRn effs => Ps.Altn Id.EVar -> Eff (Env ev : effs) (Altn Out tv ev)
 rnAltn (Ps.MkAltn p0 e) = do
   let p1 = rnPatn p0
   let bs = Map.fromSet id (setOf patn2evar p1)

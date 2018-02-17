@@ -13,6 +13,10 @@ import Text.Parsec hiding (Error)
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 
+type HIO = Eff [Reader Handle, IO]
+
+type Parser = ParsecT [String] Parser.Package HIO
+
 out :: String -> HIO ()
 out s = do
   h <- ask
@@ -20,18 +24,13 @@ out s = do
 
 runSnippet :: Parser.Package -> String -> HIO ()
 runSnippet prelude code = do
-  let result = do
-        module_ <- run . runError $ Parser.parseInput "" code
-        FrontEnd.run False (module_ `Parser.extend` prelude)
+  result <- runError $ do
+    module_ <- Parser.parseInput "" code
+    FrontEnd.run False (module_ `Parser.extend` prelude)
   case result of
-    Right _ ->
-      out "-- SUCCESS\n"
-    Left actual -> out ("-- FAILURE " ++ render actual ++ "\n")
+    Right _     -> out "-- SUCCESS\n"
+    Left actual -> out ("-- FAILURE " ++ renderFailure actual ++ "\n")
   out code
-
-type HIO = Eff [Reader Handle, IO]
-
-type Parser = ParsecT [String] Parser.Package HIO
 
 line :: (String -> Bool) -> Parser String
 line p = tokenPrim id (\pos _ _ -> incSourceLine pos 1) (onlyIf p)

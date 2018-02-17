@@ -2,7 +2,7 @@ module Main where
 
 import Pukeko.Prelude
 
-import Options.Applicative
+import Options.Applicative hiding (renderFailure)
 import System.FilePath ((<.>), (-<.>))
 import System.Exit
 import qualified Data.Aeson               as Aeson
@@ -16,22 +16,19 @@ import qualified Pukeko.MiddleEnd       as MiddleEnd
 import qualified Pukeko.MiddleEnd.CallGraph as G
 import qualified Pukeko.BackEnd         as BackEnd
 
-unlift :: (Monad m) => Either e a -> Eff [Error e, m] a
-unlift = either throwError pure
-
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()
 compile write_pl stop_tc unsafe json graph opts file = do
   ok_or_error <- runM . runError $ do
     package <- Parser.parsePackage file
-    module_sf <- unlift (FrontEnd.run unsafe package)
+    module_sf <- FrontEnd.run unsafe package
     if stop_tc
       then do
         sendM $ writeFile (file -<.> "ti")
           (render (pretty module_sf) ++ "\n")
       else do
         let cfg = MiddleEnd.Config opts (not unsafe)
-        (module_pl, module_lm) <- unlift (MiddleEnd.run cfg module_sf)
-        nasm <- unlift (BackEnd.run module_lm)
+        (module_pl, module_lm) <- MiddleEnd.run cfg module_sf
+        nasm <- BackEnd.run module_lm
         sendM $ do
           when write_pl $ do
             writeFile (file -<.> "pl") $ render (pretty module_pl) ++ "\n"
@@ -45,7 +42,7 @@ compile write_pl stop_tc unsafe json graph opts file = do
           writeFile (file -<.> "asm") nasm
   case ok_or_error of
     Left err -> do
-      putStrLn $ "Error: " ++ render err
+      putStrLn $ "Error: " ++ renderFailure err
       exitWith (ExitFailure 1)
     Right () -> exitWith ExitSuccess
 

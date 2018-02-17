@@ -25,9 +25,6 @@ type Out = Unnested
 
 type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader SourcePos, Error Failure]
 
-evalPM :: Module In -> PM a -> Either Failure a
-evalPM m0 = run . runError . runReader noPos . evalState [] . runInfo m0
-
 -- TODO: Use 'Supply' rather than state.
 freshEVar :: PM Id.EVar
 freshEVar = get >>= \(x:xs) -> put xs >> return x
@@ -62,8 +59,16 @@ pmDecl = \case
   DDefn d -> DDefn <$> pmDefn d
   DExtn p -> pure (DExtn p)
 
-compileModule :: Module In -> Either Failure (Module Out)
-compileModule m0 = evalPM m0 (module2decls (traverse pmDecl) m0)
+compileModule :: Member (Error Failure) effs => Module In -> Eff effs (Module Out)
+compileModule m0 =
+  module2decls (traverse pmDecl) m0
+  & runInfo m0
+  & evalState []
+  & runReader noPos
+  & runError
+  & run
+  & either throwError pure
+
 
 pmMatch ::
   forall m m' n tv ev. m ~ 'LS.Succ m' =>
