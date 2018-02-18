@@ -7,6 +7,7 @@ import Pukeko.Prelude
 
 import           Data.Bitraversable
 
+import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Type
 
@@ -23,7 +24,7 @@ _TVar = \case
   TVar v -> Just v
   _      -> Nothing
 
-erSupCDecl :: FuncDecl 'SupC -> FuncDecl 'SupC
+erSupCDecl :: FuncDecl (Only SupC) -> FuncDecl (Only SupC)
 erSupCDecl = \case
   supc@(SupCDecl z tz vs0 bs0 e0) ->
     case e0 of

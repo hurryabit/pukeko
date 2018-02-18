@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeOperators #-}
 module Pukeko.AST.SuperCore
   ( module Pukeko.AST.SuperCore
   , module Pukeko.AST.Expr
@@ -20,20 +20,12 @@ import qualified Pukeko.AST.Expr as Expr
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
-data DeclMode = SupC | Extn | Any
+data DeclMode = SupC | Extn
+type SupC = 'SupC
+type Extn = 'Extn
 
-type family HasSupC (a :: DeclMode) where
-  HasSupC SupC = True
-  HasSupC Extn = False
-  HasSupC Any  = True
-
-type family HasExtn (a :: DeclMode) where
-  HasExtn SupC = False
-  HasExtn Extn = True
-  HasExtn Any  = True
-
-data FuncDecl (m :: DeclMode)
-  = HasSupC m ~ True =>
+data FuncDecl (m :: Super DeclMode)
+  = (m ?:> SupC) =>
     SupCDecl
     { _supc2name  :: Lctd Id.EVar
     , _supc2type  :: Type Void
@@ -41,7 +33,7 @@ data FuncDecl (m :: DeclMode)
     , _supc2eprms :: [Bind (TScope Int Void)]
     , _supc2expr  :: Expr (TScope Int Void) (EScope Int Void)
     }
-  | HasExtn m ~ True =>
+  | (m ?:> Extn) =>
     ExtnDecl
     { _extn2name :: Lctd Id.EVar
     , _extn2type :: Type Void
@@ -50,8 +42,8 @@ data FuncDecl (m :: DeclMode)
 
 data Module = MkModule
   { _mod2types :: Map (Name TCon) TConDecl
-  , _mod2extns :: Map Id.EVar (FuncDecl Extn)
-  , _mod2supcs :: Map Id.EVar (FuncDecl SupC)
+  , _mod2extns :: Map Id.EVar (FuncDecl (Only Extn))
+  , _mod2supcs :: Map Id.EVar (FuncDecl (Only SupC))
   }
 
 type Defn = Expr.Defn SuperCore

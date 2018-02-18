@@ -9,19 +9,20 @@ import           Debug.Trace
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
+import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.MiddleEnd.CallGraph
 import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
 
 data InState = InState
-  { _inlinables :: Map Id.EVar (FuncDecl 'SupC)
+  { _inlinables :: Map Id.EVar (FuncDecl (Only SupC))
   }
 
 type In = Eff '[State InState]
 
 makeLenses ''InState
 
-makeInlinable :: FuncDecl 'SupC -> In ()
+makeInlinable :: FuncDecl (Only SupC) -> In ()
 makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name.lctd) supc)
 
 unwind :: Expr tv ev -> (Expr tv ev, [Type tv], [Expr tv ev])
@@ -94,10 +95,10 @@ inExpr e0 = case e0 of
   ETyApp{}   -> inRedex e0
   ETyAnn t e -> ETyAnn t <$> inExpr e
 
-inSupCDecl :: FuncDecl 'SupC -> In (FuncDecl 'SupC)
+inSupCDecl :: FuncDecl (Only SupC) -> In (FuncDecl (Only SupC))
 inSupCDecl = func2expr inExpr
 
-inSCC :: SCC (FuncDecl 'SupC) -> In Module
+inSCC :: SCC (FuncDecl (Only SupC)) -> In Module
 inSCC = \case
   CyclicSCC supcs0 -> do
     supcs1 <- traverse inSupCDecl supcs0

@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import           Pukeko.AST.NoLambda
 import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
+import qualified Pukeko.AST.Name       as In
 import qualified Pukeko.AST.SuperCore  as In
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Info
@@ -34,11 +35,11 @@ name = MkName . Id.name
 bindName :: In.Bind tv -> Name
 bindName = name . unlctd . In._bind2evar
 
-ccSupCDecl :: In.FuncDecl 'In.SupC -> CC TopLevel
+ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel
 ccSupCDecl (In.SupCDecl (unlctd -> z) _ _ bs e) =
   Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
 
-ccExtnDecl :: In.FuncDecl 'In.Extn -> CC TopLevel
+ccExtnDecl :: In.FuncDecl (In.Only In.Extn) -> CC TopLevel
 ccExtnDecl (In.ExtnDecl (unlctd -> z) _ s) = do
     let n = MkName s
     modify (Map.insert z n)

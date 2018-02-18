@@ -6,10 +6,10 @@ module Pukeko.FrontEnd.Renamer
 
 import Pukeko.Prelude
 
+import           Control.Lens.Extras (is)
 import           Control.Lens.Indexed
 import           Control.Monad.Extra
 import           Data.Bitraversable
-import           Data.Either       (isLeft, isRight)
 import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
@@ -27,7 +27,7 @@ type Out = Surface
 data Tabs = Tabs
   { _funcs  :: Set Id.EVar
   , _binops :: Map Op.Binary Id.EVar
-  , _tconTab :: Map (Ps.Name TCon) (Either TConDecl ClssDecl)
+  , _tconTab :: Map (Ps.Name TCon) (GenDecl (Only TCon) Out)
   }
 
 type Env ev = Reader (Map Id.EVar ev)
@@ -110,7 +110,7 @@ rnTypeAtom :: GlobalEffs effs => Ps.TypeAtom -> Eff effs TypeAtom
 rnTypeAtom = \case
   Ps.TAArr -> pure TAArr
   Ps.TAInt -> pure TAInt
-  Ps.TACon name -> TACon <$> lookupGlobal tconTab isLeft "type constructor" name
+  Ps.TACon name -> TACon <$> lookupGlobal tconTab (is _DType) "type constructor" name
 
 -- | Rename a type under the assumption that all its free variables are
 -- contained in the map. All references to type constructors are renamed as
@@ -131,7 +131,7 @@ rnConstraints :: GlobalEffs effs =>
   Ps.TypeCstr -> Eff effs (Map Id.TVar (Set (Name Clss)))
 rnConstraints (Ps.MkTypeCstr constraints) =
   fmap (fmap Set.fromList . Map.fromMultiList) . for constraints $ \(clss, tvar) ->
-    (,) tvar <$> lookupGlobal tconTab isRight "type class" clss
+    (,) tvar <$> lookupGlobal tconTab (is _DClss) "type class" clss
 
 -- | Rename a type scheme. Fails if there are constraints on type variables
 -- which are contained in the map or not in the type.
@@ -148,7 +148,7 @@ rnCoercion (Ps.MkCoercion dir0 tname) = do
   let dir1 = case dir0 of
         Ps.Inject  -> Inject
         Ps.Project -> Project
-  MkCoercion dir1 <$> lookupGlobal tconTab isLeft "type constructor" tname
+  MkCoercion dir1 <$> lookupGlobal tconTab (is _DType) "type constructor" tname
 
 
 -- * Renaming of expressions
@@ -228,7 +228,7 @@ rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TConDecl
 rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
   -- NOTE: Since the type definition might be recursive, we need to introduce a
   -- dummy version of the type constructor first and overwrite it in the end.
-  let mkDummy binder = Left (MkTConDecl binder [] (Right []))
+  let mkDummy binder = DType (MkTConDecl binder [] (Right []))
   binder <- introGlobal tconTab "type constructor" name mkDummy pure
   -- (dcons1, params1) <- runReader @(Env TVar) mempty $
   --   introMany (introLocal "type parameter") params0 $
@@ -238,7 +238,7 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
             (zipWithM (\tag -> rnDConDecl binder params0 tag) [0..])
             dcons0
   let tcon = MkTConDecl binder params0 dcons1
-  modifying tconTab (Map.insert (unlctd name) (Left tcon))
+  modifying tconTab (Map.insert (unlctd name) (DType tcon))
   pure tcon
 
 -- | Rename a signature declaration. For signatures of top level functions, we
@@ -265,7 +265,7 @@ rnExtnDecl (Ps.MkExtnDecl func extn) = pure (MkExtnDecl func NoType extn)
 -- dropped on the floor.
 rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClssDecl
 rnClssDecl (Ps.MkClssDecl name param methods0) =
-  introGlobal tconTab "type constructor" name Right $ \binder -> do
+  introGlobal tconTab "type constructor" name DClss $ \binder -> do
     let env = Map.singleton param (mkBound 0 param)
     methods1 <- for methods0 $ \mthd@(Ps.MkSignDecl z _) -> do
       modifying funcs (Set.insert (z^.lctd))
@@ -278,7 +278,7 @@ rnInstDecl :: GlobalEffs effs => Ps.InstDecl -> Eff effs (InstDecl Out)
 rnInstDecl (Ps.MkInstDecl clss0 tatm0 params0 cstrs0 methods0) = do
   cstrs1 <- rnConstraints cstrs0
   MkInstDecl
-    <$> lookupGlobal tconTab isRight "class" clss0
+    <$> lookupGlobal tconTab (is _DClss) "class" clss0
     <*> rnTypeAtom tatm0
     <*> applyConstraints params0 cstrs1
     <*> traverse rnFuncDecl methods0

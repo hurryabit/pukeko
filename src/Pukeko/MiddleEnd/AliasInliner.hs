@@ -22,6 +22,7 @@ import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.UnionFind.ST as UF
 
+import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
 import qualified Pukeko.AST.Identifier as Id
@@ -32,7 +33,7 @@ inlineModule = over mod2supcs inlineSupCDecls
 
 -- | Follow all chains of links in a group of declarations and adjust all call
 -- sites within this group.
-inlineSupCDecls :: Traversable t => t (FuncDecl 'SupC) -> t (FuncDecl 'SupC)
+inlineSupCDecls :: Traversable t => t (FuncDecl (Only SupC)) -> t (FuncDecl (Only SupC))
 inlineSupCDecls decls0 =
   let ls = mapMaybe isLink (toList decls0)
       uf = unionFind ls
@@ -44,7 +45,7 @@ inlineSupCDecls decls0 =
 -- > f = g
 --
 -- If it is, return the pair @(f, g)@.
-isLink :: FuncDecl 'SupC -> Maybe (Id.EVar, Id.EVar)
+isLink :: FuncDecl (Only SupC) -> Maybe (Id.EVar, Id.EVar)
 isLink = \case
   SupCDecl (unlctd -> z) _t vs xs (EVal x)
     | null vs && null xs -> Just (z, x)

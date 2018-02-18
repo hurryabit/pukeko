@@ -15,6 +15,7 @@ import           Pukeko.AST.SystemF
 import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Altn, Bind)
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
+import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
@@ -96,7 +97,7 @@ llELam oldBinds t_rhs rhs1 = do
     let t_lhs = mkTUni tyBinds (map _bind2type allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl (Lctd noPos lhs) t_lhs tyBinds allBinds1 rhs2
-    tell (mkFuncDecl @'SupC supc)
+    tell (mkFuncDecl @Any supc)
     pure (foldl EApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
 
 llExpr ::
@@ -143,8 +144,8 @@ llDecl = \case
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
     let supc = SupCDecl lhs (fmap absurd t) [] [] (bimap absurd absurd rhs)
-    tell (mkFuncDecl @'SupC supc)
-  DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @'Extn (ExtnDecl z t s))
+    tell (mkFuncDecl @Any supc)
+  DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @Any (ExtnDecl z t s))
 
 liftModule :: Module In -> Core.Module
 liftModule m0@(MkModule decls) = execLL m0 (traverse_ llDecl decls)

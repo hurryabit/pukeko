@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 module Pukeko.AST.Name
   ( NameSpace
   , EVar
@@ -7,6 +8,10 @@ module Pukeko.AST.Name
   , DCon
   , TCon
   , Clss
+  , type (?:>)
+  , Super (..)
+  , Any
+  , Only
   , Name
   , NameSource
   , nameText
@@ -38,6 +43,14 @@ type TVar = 'TVar
 type DCon = 'DCon
 type TCon = 'TCon
 type Clss = 'TCon
+
+data Super s = Any | Only s
+type Any  = 'Any
+type Only = 'Only
+
+type family (?:>) (nsp1 :: Super k) (nsp2 :: k) :: Constraint where
+  Any       ?:> nsp2 = ()
+  Only nsp1 ?:> nsp2 = nsp1 ~ nsp2
 
 -- | A name which shall be unique across one run of the compiler.
 data Name (nsp :: NameSpace) = Name

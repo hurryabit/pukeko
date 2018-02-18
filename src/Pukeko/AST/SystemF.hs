@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.SystemF
   ( module Pukeko.AST.SystemF
@@ -60,13 +61,15 @@ data InstDecl lg = MkInstDecl
   , _inst2methods :: [FuncDecl lg (TScope Int Void)]
   }
 
-data Decl lg
-  =                          DType  TConDecl
-  | IsPreTyped lg ~ False => DSign (SignDecl Void)
-  |                          DFunc (FuncDecl lg Void)
-  |                          DExtn (ExtnDecl lg)
-  | IsClassy   lg ~ True  => DClss  ClssDecl
-  | IsClassy   lg ~ True  => DInst (InstDecl lg)
+data GenDecl (nsp :: Super NameSpace) lg
+  = (nsp ?:> TCon)                        => DType  TConDecl
+  | (nsp ?:> EVar, IsPreTyped lg ~ False) => DSign (SignDecl Void)
+  | (nsp ?:> EVar)                        => DFunc (FuncDecl lg Void)
+  | (nsp ?:> EVar)                        => DExtn (ExtnDecl lg)
+  | (nsp ?:> Clss, IsClassy   lg ~ True ) => DClss  ClssDecl
+  | (nsp ?:> Inst, IsClassy   lg ~ True ) => DInst (InstDecl lg)
+
+type Decl = GenDecl Any
 
 data Module lg = MkModule
   { _module2decls :: [Decl lg]
@@ -77,17 +80,24 @@ makeLenses ''FuncDecl
 makeLenses ''ExtnDecl
 makeLenses ''ClssDecl
 makeLenses ''InstDecl
--- makePrisms ''Decl
+makePrisms ''GenDecl
 makeLenses ''Module
 
 
 type instance NameSpaceOf ClssDecl = Clss
+type instance NameSpaceOf (GenDecl (Only nsp) lg) = nsp
+
 instance HasName  ClssDecl where nameOf = _clss2name
+-- FIXME: Replace 'TCon' by 'nsp'.
+instance HasName (GenDecl (Only TCon) lg) where
+  nameOf = \case
+    DType tcon -> nameOf tcon
+    DClss clss -> nameOf clss
 
 instance HasPos (SignDecl tv) where getPos = getPos . _sign2name
 instance HasPos  ClssDecl     where getPos = getPos . nameOf
 
-instance HasPos (Decl st) where
+instance HasPos (GenDecl nsp st) where
   getPos = \case
     DType tcon  -> getPos tcon
     DSign sign  -> getPos sign
@@ -103,7 +113,7 @@ instance (TypeOf lg ~ Type, BaseTVar tv) => Pretty (FuncDecl lg tv) where
   pretty (MkFuncDecl name typ_ body) =
     hang (pretty (name ::: typ_) <+> "=") 2 (pretty body)
 
-instance (TypeOf lg ~ Type) => Pretty (Decl lg) where
+instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
   pretty = \case
     DType tcon -> "data" <+> pretty tcon
     DSign sign -> pretty sign
@@ -128,4 +138,4 @@ deriving instance (TypeOf lg ~ Type, Show tv) => Show (FuncDecl lg tv)
 deriving instance (TypeOf lg ~ Type)          => Show (ExtnDecl lg)
 deriving instance                                Show  ClssDecl
 deriving instance (TypeOf lg ~ Type)          => Show (InstDecl lg)
-deriving instance (TypeOf lg ~ Type)          => Show (Decl lg)
+deriving instance (TypeOf lg ~ Type)          => Show (GenDecl nsp lg)

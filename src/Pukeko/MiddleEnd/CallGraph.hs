@@ -19,6 +19,7 @@ import           Data.Tuple.Extra (fst3)
 
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Language
+import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Type
@@ -36,7 +37,7 @@ makeCallGraph' decls = CallGraph g (fst3 . f) n
     deps decl =
       (decl, decl^.func2name.lctd, toList (setOf (func2expr . expr2atom . _AVal) decl))
 
-makeCallGraph :: Module -> CallGraph 'Any
+makeCallGraph :: Module -> CallGraph Any
 makeCallGraph (MkModule _types extns supcs) =
   makeCallGraph' (fmap castAny extns <> fmap castAny supcs)
 
