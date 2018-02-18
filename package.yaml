@@ -44,6 +44,7 @@ ghc-options:
 library:
   source-dirs: src
   exposed-modules:
+  - Pukeko.AST.Name
   - Pukeko.BackEnd
   - Pukeko.FrontEnd
   - Pukeko.FrontEnd.Parser
@@ -53,7 +54,9 @@ library:
   - Pukeko.Pretty
   dependencies:
   - aeson
+  - aeson-pretty
   - array
+  - bytestring
   - call-stack
   - containers
   - deriving-compat

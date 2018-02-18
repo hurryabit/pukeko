@@ -25,7 +25,6 @@ import qualified Data.UnionFind.ST as UF
 import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
-import qualified Pukeko.AST.Identifier as Id
 
 -- | Follow all chains of links in a module and adjust all call sites accordingly.
 inlineModule :: Module -> Module
@@ -45,9 +44,9 @@ inlineSupCDecls decls0 =
 -- > f = g
 --
 -- If it is, return the pair @(f, g)@.
-isLink :: FuncDecl (Only SupC) -> Maybe (Id.EVar, Id.EVar)
+isLink :: FuncDecl (Only SupC) -> Maybe (Name EVar, Name EVar)
 isLink = \case
-  SupCDecl (unlctd -> z) _t vs xs (EVal x)
+  SupCDecl z _t vs xs (EVal x)
     | null vs && null xs -> Just (z, x)
   _                      -> Nothing
 

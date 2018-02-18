@@ -18,7 +18,6 @@ import           Data.Bitraversable
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.AST.Language
@@ -30,7 +29,7 @@ data Defn st tv ev = MkDefn
   }
 
 data Atom
-  = AVal Id.EVar
+  = AVal (Name EVar)
   | ACon (Name DCon)
   | ANum Int
 
@@ -51,22 +50,22 @@ data Expr lg tv ev
   | IsPreTyped lg ~ True => ETyAnn (TypeOf lg tv) (Expr lg tv ev)
 
 data Bind ty tv = MkBind
-  { _bind2evar :: Lctd Id.EVar
+  { _bind2evar :: Name EVar
   , _bind2type :: ty tv
   }
 
 data Altn lg tv ev = MkAltn
   { _altn2patn :: Patn lg tv
-  , _altn2expr :: Expr lg tv (EScope Id.EVar ev)
+  , _altn2expr :: Expr lg tv (EScope (Name EVar) ev)
   }
 
 data Patn lg tv
   = IsNested lg ~ True  => PWld
-  | IsNested lg ~ True  => PVar    Id.EVar
+  | IsNested lg ~ True  => PVar    (Name EVar)
   | IsNested lg ~ True  => PCon    (Name DCon) [TypeOf lg tv] [Patn lg tv]
-  | IsNested lg ~ False => PSimple (Name DCon) [TypeOf lg tv] [Maybe Id.EVar]
+  | IsNested lg ~ False => PSimple (Name DCon) [TypeOf lg tv] [Maybe (Name EVar)]
 
-pattern EVal :: Id.EVar -> Expr st tv ev
+pattern EVal :: Name EVar -> Expr st tv ev
 pattern EVal z = EAtm (AVal z)
 
 pattern ECon :: Name DCon -> Expr st tv ev
@@ -149,10 +148,10 @@ mkETyAbs qvs0 e0 = case qvs0 of
 -- * Abstraction and substition
 
 -- | Abstract all variables which are mapped to @Just@.
-abstract :: (ev -> Maybe (i, Id.EVar)) -> Expr st tv ev -> Expr st tv (EScope i ev)
+abstract :: (ev -> Maybe (i, Name EVar)) -> Expr st tv ev -> Expr st tv (EScope i ev)
 abstract f = fmap (match f)
   where
-    match :: (v -> Maybe (i, Id.EVar)) -> v -> EScope i v
+    match :: (v -> Maybe (i, Name EVar)) -> v -> EScope i v
     match f v = maybe (Free v) (uncurry mkBound) (f v)
 
 weakenE :: Expr st tv ev -> Expr st tv (EScope i ev)
@@ -245,8 +244,12 @@ instance IsLang st => Bifoldable    (Altn st) where
 instance IsLang st => Bitraversable (Altn st) where
   bitraverse f g (MkAltn p e) = MkAltn <$> traverse f p <*> bitraverse f (traverse g) e
 
-instance HasPos (Bind ty tv) where
-  getPos = getPos . _bind2evar
+type instance NameSpaceOf (Bind ty tv   ) = EVar
+type instance NameSpaceOf (Defn lg tv ev) = EVar
+instance HasName (Bind ty tv   ) where nameOf = _bind2evar
+instance HasName (Defn lg tv ev) where nameOf = nameOf . _defn2bind
+instance HasPos  (Bind ty tv   ) where getPos = getPos . nameOf
+instance HasPos  (Defn lg tv ev) where getPos = getPos . nameOf
 
 
 -- * Pretty printing

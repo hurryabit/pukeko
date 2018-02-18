@@ -44,6 +44,7 @@ import qualified Data.Map          as Map
 import qualified Data.Vector       as Vec
 import           Data.Aeson.TH
 
+import           Pukeko.AST.Name
 import qualified Pukeko.AST.Identifier as Id
 
 -- NOTE: The order of the constructors is chosen such that the derived @Ord@
@@ -54,7 +55,7 @@ data Scope b i v
   | Bound i (Forget b)
   deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
 
-type EScope = Scope Id.EVar
+type EScope = Scope (Name EVar)
 
 type TScope = Scope Id.TVar
 
@@ -159,8 +160,8 @@ class (Functor (EnvLevelOf i)) => HasEnvLevel i where
   type EnvLevelOf i :: * -> *
   lookupEnvLevel :: i -> EnvLevelOf i a -> a
 
-instance HasEnvLevel Id.EVar where
-  type EnvLevelOf Id.EVar = Map Id.EVar
+instance HasEnvLevel (Name nsp) where
+  type EnvLevelOf (Name nsp) = Map (Name nsp)
   lookupEnvLevel = lookupMap
 
 instance HasEnvLevel Int where
@@ -191,11 +192,11 @@ class BaseName b v where
 baseName :: BaseName b v => v -> b
 baseName = fst . baseNameIx
 
-type BaseEVar ev = (BaseName Id.EVar ev)
+type BaseEVar ev = (BaseName (Name EVar) ev)
 
 type BaseTVar tv = (BaseName Id.TVar tv)
 
-baseEVar :: BaseEVar ev => ev -> Id.EVar
+baseEVar :: BaseEVar ev => ev -> Name EVar
 baseEVar = baseName
 
 baseTVarIx :: BaseTVar tv => tv -> (Id.TVar, Int)

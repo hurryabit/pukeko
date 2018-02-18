@@ -10,10 +10,11 @@ module Pukeko.MiddleEnd
 
 import Pukeko.Prelude hiding (run)
 
+import           Pukeko.AST.Language
+import           Pukeko.AST.Name
 import qualified Pukeko.AST.NoLambda           as NoLambda
 import qualified Pukeko.AST.SuperCore          as Core
 import qualified Pukeko.AST.SystemF            as SysF
-import           Pukeko.AST.Language
 import qualified Pukeko.FrontEnd.TypeChecker   as TypeChecker
 import qualified Pukeko.MiddleEnd.AliasInliner as AliasInliner
 import qualified Pukeko.MiddleEnd.Inliner      as Inliner
@@ -51,7 +52,7 @@ runOptimization = \case
   DeadCodeElimination -> DeadCode.cleanModule
   Prettification      -> Prettifier.prettifyModule
 
-run :: forall effs. Member (Error Failure) effs =>
+run :: forall effs. Members [NameSource, Error Failure] effs =>
   Config -> SysF.Module SystemF -> Eff effs (Core.Module, NoLambda.Module)
 run cfg module_sf = do
   let typeChecked ::
@@ -60,7 +61,7 @@ run cfg module_sf = do
         let m1 = f m0
         when (typeChecking cfg) (TypeChecker.check m1)
         pure m1
-  let module_ll = LambdaLifter.liftModule module_sf
+  module_ll <- LambdaLifter.liftModule module_sf
   when (typeChecking cfg) (TypeChecker.check module_ll)
   module_opt <-
     foldlM (\m opt -> typeChecked (runOptimization opt) m) module_ll (optimizations cfg)

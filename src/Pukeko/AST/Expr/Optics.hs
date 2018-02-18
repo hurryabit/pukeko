@@ -5,8 +5,8 @@ import Pukeko.Prelude
 import           Control.Lens (_Just)
 import           Data.Functor.Compose
 
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Expr
+import           Pukeko.AST.Name
 import           Pukeko.AST.Language
 
 -- | Traverse over all the atoms on the RHS of a definition.
@@ -87,12 +87,9 @@ patn2type f = \case
     PSimple dcon <$> traverse (simplify f) targs <*> pure binds
 
 -- | Traverse over all binders in a pattern.
-patn2evar :: Traversal' (Patn st tv) Id.EVar
+patn2evar :: Traversal' (Patn st tv) (Name EVar)
 patn2evar f = \case
   PWld      -> pure PWld
   PVar x    -> PVar <$> f x
   PCon c ts ps -> PCon c ts <$> (traverse . patn2evar) f ps
   PSimple c ts bs -> PSimple c ts <$> (traverse . _Just) f bs
-
-defn2func :: Lens' (Defn st tv ev) Id.EVar
-defn2func = defn2bind . bind2evar . lctd

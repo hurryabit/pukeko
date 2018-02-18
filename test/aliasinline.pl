@@ -38,6 +38,13 @@ dict$Monad$IO : Monad IO =
         fun @a @b -> dict$Monad$IO$ll4 @a @b
   in
   Dict$Monad @IO pure bind
+main : IO Unit =
+  pure$ll1 @IO dict$Monad$IO @Unit (h$ll1 @Unit (h$ll1 @Unit Unit))
+pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
+  fun @m ->
+    fun (dict : Monad m) ->
+      match dict with
+      | Dict$Monad @m pure _ -> pure
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
@@ -52,10 +59,3 @@ dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
     fun (mx : IO a) (f : a -> IO b) ->
       coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 h$ll1 : ∀c. c -> c = fun @c -> fun (u : c) -> u
-main : IO Unit =
-  pure$ll1 @IO dict$Monad$IO @Unit (h$ll1 @Unit (h$ll1 @Unit Unit))
-pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
-  fun @m ->
-    fun (dict : Monad m) ->
-      match dict with
-      | Dict$Monad @m pure _ -> pure

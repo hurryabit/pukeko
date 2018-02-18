@@ -39,6 +39,7 @@ module Pukeko.Prelude
 
   , bug
   , bugWith
+  , traceJSON
   ) where
 
 import Prelude               as X
@@ -74,6 +75,7 @@ import Data.Functor.Identity as X
 import Data.List             as X (sort)
 import Data.Map              as X (Map)
 import Data.Maybe            as X (catMaybes, isJust, isNothing, mapMaybe)
+import Data.List.Extra       as X (zipFrom)
 import Data.List.NonEmpty    as X (NonEmpty (..))
 import Data.Proxy            as X (Proxy (..))
 import Data.Sequence         as X (Seq)
@@ -84,9 +86,13 @@ import Data.Tagged           as X
 import Data.Traversable      as X
 import Data.Vector           as X (Vector)
 import Data.Void             as X (Void, absurd)
+import Safe.Exact            as X (zipExact, zipWithExact)
 
 import           Data.Aeson
+import qualified Data.Aeson.Encode.Pretty as Aeson
+import qualified Data.ByteString.Lazy.Char8 as BSL
 import           Data.Functor.Compose           (Compose (..))
+import           Debug.Trace
 import qualified Text.PrettyPrint.Annotated     as PP
 import           Text.PrettyPrint.Annotated     (Doc, render)
 import           Text.Megaparsec.Pos            (SourcePos, initialPos, sourcePosPretty)
@@ -178,6 +184,11 @@ bug msg = error ("BUG! " ++ msg)
 
 bugWith :: (HasCallStack, Show b) => String -> b -> a
 bugWith msg x = bug (msg ++ " (" ++ show x ++ ")")
+
+traceJSON :: ToJSON a => a -> b -> b
+traceJSON =
+  let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
+  in  trace . BSL.unpack . Aeson.encodePretty' config . toJSON
 
 local' :: (r1 -> r2) -> Eff (Reader r2 : effs) a -> Eff (Reader r1 : effs) a
 local' f = reinterpret (\Ask -> asks f)

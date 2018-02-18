@@ -10,6 +10,7 @@ import Test.Tasty
 import Test.Tasty.Golden
 import Text.Parsec hiding (Error)
 
+import           Pukeko.AST.Name
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 
@@ -24,7 +25,7 @@ out s = do
 
 runSnippet :: Parser.Package -> String -> HIO ()
 runSnippet prelude code = do
-  result <- runError $ do
+  result <- runNameSource . runError $ do
     module_ <- Parser.parseInput "" code
     FrontEnd.run False (module_ `Parser.extend` prelude)
   case result of

@@ -9,6 +9,7 @@ where
 
 import Pukeko.Prelude
 
+import           Control.Monad.Freer.Supply
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Sized  as LS
 import qualified Data.Set         as Set
@@ -19,18 +20,20 @@ import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Identifier as Id
 
 type In  = Typed
 type Out = Unnested
 
-type PM = Eff [Reader ModuleInfo, State [Id.EVar], Reader SourcePos, Error Failure]
+type CanPM effs = Members
+  [Reader ModuleInfo, Supply Int, Reader SourcePos, NameSource, Error Failure]
+  effs
 
--- TODO: Use 'Supply' rather than state.
-freshEVar :: PM Id.EVar
-freshEVar = get >>= \(x:xs) -> put xs >> return x
+freshEVar :: CanPM effs => Eff effs (Name EVar)
+freshEVar = do
+  n <- fresh @Int
+  mkName (Lctd noPos (Tagged ("pm$" ++ show n)))
 
-pmExpr :: Expr In tv ev -> PM (Expr Out tv ev)
+pmExpr :: CanPM effs => Expr In tv ev -> Eff effs (Expr Out tv ev)
 pmExpr = \case
   ELoc le         -> here le $ ELoc <$> lctd pmExpr le
   EVar x          -> pure (EVar x)
@@ -47,12 +50,12 @@ pmExpr = \case
   ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
   ETyAnn t  e  -> ETyAnn t <$> pmExpr e
 
-pmFuncDecl :: FuncDecl In tv -> PM (FuncDecl Out tv)
+pmFuncDecl :: CanPM effs => FuncDecl In tv -> Eff effs (FuncDecl Out tv)
 pmFuncDecl (MkFuncDecl name typ_ body) = do
-  put (Id.freshEVars "pm" (unlctd name))
+  reset @Int
   MkFuncDecl name typ_ <$> pmExpr body
 
-pmDecl :: Decl In -> PM (Decl Out)
+pmDecl :: CanPM effs => Decl In -> Eff effs (Decl Out)
 pmDecl = \case
   DType ds -> pure (DType ds)
   DFunc func -> DFunc <$> pmFuncDecl func
@@ -60,20 +63,19 @@ pmDecl = \case
   DClss c -> pure (DClss c)
   DInst i -> DInst <$> (inst2methods . traverse) pmFuncDecl i
 
-compileModule :: Member (Error Failure) effs => Module In -> Eff effs (Module Out)
+compileModule :: Members [NameSource, Error Failure] effs =>
+  Module In -> Eff effs (Module Out)
 compileModule m0 =
   module2decls (traverse pmDecl) m0
   & runInfo m0
   & evalState []
   & runReader noPos
-  & runError
-  & run
-  & either throwError pure
+  & evalSupply @Int [1 ..]
 
 
 pmMatch ::
-  forall m m' n tv ev. m ~ 'LS.Succ m' =>
-  RowMatch m n tv ev -> PM (Expr Out tv ev)
+  forall m m' n tv ev effs. (CanPM effs, m ~ 'LS.Succ m') =>
+  RowMatch m n tv ev -> Eff effs (Expr Out tv ev)
 pmMatch rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBPatnCols colMatch1 $ \case
@@ -89,9 +91,9 @@ pmMatch rowMatch0 = do
 -- | A binding pattern, i.e., not a constructor pattern.
 data BPatn
   = BWild
-  | BName Id.EVar
+  | BName (Name EVar)
 
-bindName :: BPatn -> Maybe Id.EVar
+bindName :: BPatn -> Maybe (Name EVar)
 bindName = \case
   BWild   -> Nothing
   BName x -> Just x
@@ -103,7 +105,7 @@ patnToBPatn = \case
   PCon{} -> Nothing
 
 -- | The expression on the RHS of a pattern match alternative.
-type RhsExpr tv ev = Expr In tv (EScope Id.EVar ev)
+type RhsExpr tv ev = Expr In tv (EScope (Name EVar) ev)
 
 -- | A row of a pattern match, i.e., an alternative.
 data Row n tv ev = MkRow (LS.List n (Patn In tv)) (RhsExpr tv ev)
@@ -164,7 +166,8 @@ colToRow (MkColMatch cs us) =
 -- > | LT -> e[p/x]
 -- > | EQ -> f[p/y]
 -- > | GT -> g
-elimBPatnCols :: ColMatch m n tv ev -> (forall n'. ColMatch m n' tv ev -> PM a) -> PM a
+elimBPatnCols :: CanPM effs =>
+  ColMatch m n tv ev -> (forall n'. ColMatch m n' tv ev -> Eff effs a) -> Eff effs a
 elimBPatnCols (MkColMatch cs0 us0) k = do
   let (cs1, bcs) = partitionEithers (map isBPatnCol (toList cs0))
   us1 <- foldlM applyBPatnCol us0 bcs
@@ -176,8 +179,10 @@ elimBPatnCols (MkColMatch cs0 us0) k = do
       case traverse patnToBPatn ps of
         Just bs -> Right (MkCol t bs)
         Nothing -> Left  (MkCol t ps)
-    applyBPatnCol ::
-      LS.List m (RhsExpr tv ev) -> Col m tv ev BPatn -> PM (LS.List m (RhsExpr tv ev))
+    applyBPatnCol :: CanPM effs =>
+      LS.List m (RhsExpr tv ev) ->
+      Col m tv ev BPatn ->
+      Eff effs (LS.List m (RhsExpr tv ev))
     applyBPatnCol rhss (MkCol t bs) = case t of
       EVar x ->
         let replacePatnWithX rhs = \case
@@ -201,8 +206,8 @@ patnToCPatn = \case
 
 -- | Find the first column of a pattern match which consists entirely of
 -- constructor patterns.
-findCPatnCol ::
-  ColMatch m ('LS.Succ n) tv ev -> PM (Col m tv ev (CPatn tv), ColMatch m n tv ev)
+findCPatnCol :: CanPM effs =>
+  ColMatch m ('LS.Succ n) tv ev -> Eff effs (Col m tv ev (CPatn tv), ColMatch m n tv ev)
 findCPatnCol (MkColMatch cs0 us) =
   case find (colPatn patnToCPatn) cs0 of
     Nothing       -> throwHere "cannot apply constructor rule"
@@ -217,7 +222,7 @@ findCPatnCol (MkColMatch cs0 us) =
 -- | A single group of a grouped pattern match.
 data GrpMatchItem tv ev =
   forall m m' n. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem (Name DCon) [Type tv] [BPatn] (RowMatch m n tv (EScope Id.EVar ev))
+  MkGrpMatchItem (Name DCon) [Type tv] [BPatn] (RowMatch m n tv (EScope (Name EVar) ev))
 
 -- | A grouped pattern match. They result from the transformation in
 -- 'groupCPatn'.
@@ -246,8 +251,8 @@ data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev)
 -- Fresh binders are only introduced when necessary, i.e., when a certain
 -- constructor appears mutliple times in the first column.
 groupCPatns ::
-  forall m m' n tv ev. m ~ 'LS.Succ m' =>
-  Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> PM (GrpMatch tv ev)
+  forall m m' n tv ev effs. (CanPM effs, m ~ 'LS.Succ m') =>
+  Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> Eff effs (GrpMatch tv ev)
 groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
   (MkTConDecl tcon _params dcons0, _dconDecl) <- findInfo info2dcons dcon0
@@ -280,9 +285,9 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
           pure (MkGrpMatchItem con ts (fmap BName ixs0) (MkRowMatch es1 grpRows))
   pure $ MkGrpMatch t grps
 
-grpMatchExpr :: GrpMatch tv ev -> PM (Expr Out tv ev)
+grpMatchExpr :: CanPM effs => GrpMatch tv ev -> Eff effs (Expr Out tv ev)
 grpMatchExpr (MkGrpMatch t is) = EMat t <$> traverse grpMatchItemAltn is
 
-grpMatchItemAltn :: GrpMatchItem tv ev -> PM (Altn Out tv ev)
+grpMatchItemAltn :: CanPM effs => GrpMatchItem tv ev -> Eff effs (Altn Out tv ev)
 grpMatchItemAltn (MkGrpMatchItem con ts bs rm) = do
   MkAltn (PSimple con ts (fmap bindName bs)) <$> pmMatch rm

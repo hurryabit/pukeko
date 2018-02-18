@@ -13,13 +13,13 @@ import qualified Data.Set      as Set
 
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
-import qualified Pukeko.AST.Identifier as Id
+import           Pukeko.AST.Name
 
 type In  = Surface
 
 data FRState = MkFRState
-  { _declared :: Map Id.EVar SourcePos
-  , _defined  :: Set Id.EVar
+  { _declared :: Map (Name EVar) SourcePos
+  , _defined  :: Set (Name EVar)
   }
 makeLenses ''FRState
 
@@ -36,14 +36,14 @@ resolveModule (MkModule decls) = runReader noPos . evalState st0 $ do
     st0 = MkFRState mempty mempty
 
 declareFun :: CanFR effs => SignDecl tv -> Eff effs ()
-declareFun = here' $ \(MkSignDecl (unlctd -> fun) _) -> do
+declareFun = here' $ \(MkSignDecl fun _) -> do
   whenM (uses declared (Map.member fun)) $
     throwHere ("duplicate declaration of function:" <+> pretty fun)
   pos <- where_
   modifying declared (Map.insert fun pos)
 
-defineFun :: CanFR effs => Lctd Id.EVar -> Eff effs ()
-defineFun = here' $ \(unlctd -> fun) -> do
+defineFun :: CanFR effs => Name EVar -> Eff effs ()
+defineFun = here' $ \fun -> do
   unlessM (uses declared (Map.member fun)) $
     throwHere ("undeclared function:" <+> pretty fun)
   whenM (uses defined (Set.member fun)) $

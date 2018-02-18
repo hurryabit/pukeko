@@ -23,11 +23,13 @@ data Bool = | A
 -- SUBSECTION data constructor
 
 -- TEST unknown in expression
--- FAILURE 1:7: unknown data constructor: Con
+-- FAILURE 2:7: unknown data constructor: Con
+bad : a
 bad = Con
 
 -- TEST unknown in pattern
--- FAILURE 3:5: unknown data constructor: Con
+-- FAILURE 4:5: unknown data constructor: Con
+f : a
 f x =
   match x with
   | Con -> 1
@@ -140,12 +142,12 @@ bad = abort
 -- SUBSECTION too many declarations
 
 -- TEST duplicate declaration
--- FAILURE 2:1: duplicate declaration of function: f
+-- FAILURE 2:1: duplicate function declaration: f
 f : a -> a
 f : a -> a
 
 -- TEST redeclaration
--- FAILURE 1:1: duplicate declaration of function: not
+-- FAILURE 1:1: duplicate function declaration: not
 not : Bool -> Bool
 
 -- TEST missing definition

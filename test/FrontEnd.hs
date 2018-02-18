@@ -11,12 +11,13 @@ import Test.Hspec
 import Test.Hspec.Core.Spec
 import Text.Parsec hiding (Error)
 
+import           Pukeko.AST.Name
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 
 shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do
-  let result = run . runError $ do
+  let result = run . runNameSource . runError $ do
         module_ <- Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack
@@ -26,7 +27,7 @@ shouldFail prelude expect code = do
 
 shouldSucceed :: Parser.Package -> String -> Expectation
 shouldSucceed prelude code = do
-  let result = run . runError $ do
+  let result = run . runNameSource . runError $ do
         module_ <- Parser.parseInput "" code
         FrontEnd.run False (module_ `Parser.extend` prelude)
   let ?callStack = freezeCallStack emptyCallStack

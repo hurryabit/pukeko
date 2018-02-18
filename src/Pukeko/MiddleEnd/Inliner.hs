@@ -6,7 +6,6 @@ import qualified Data.Map    as Map
 import qualified Data.Vector as Vec
 import           Debug.Trace
 
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
@@ -15,7 +14,7 @@ import           Pukeko.MiddleEnd.CallGraph
 import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
 
 data InState = InState
-  { _inlinables :: Map Id.EVar (FuncDecl (Only SupC))
+  { _inlinables :: Map (Name EVar) (FuncDecl (Only SupC))
   }
 
 type In = Eff '[State InState]
@@ -23,7 +22,7 @@ type In = Eff '[State InState]
 makeLenses ''InState
 
 makeInlinable :: FuncDecl (Only SupC) -> In ()
-makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name.lctd) supc)
+makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name) supc)
 
 unwind :: Expr tv ev -> (Expr tv ev, [Type tv], [Expr tv ev])
 unwind e0 =
@@ -37,7 +36,7 @@ unwind e0 =
       e           -> (e, concat tss)
 
 -- | Replace a reference to an alias by a reference to the target of the alias.
-inEVal :: Id.EVar -> In (Expr tv ev)
+inEVal :: Name EVar -> In (Expr tv ev)
 inEVal z0 = do
   fdecl_mb <- uses inlinables (Map.lookup z0)
   case fdecl_mb of

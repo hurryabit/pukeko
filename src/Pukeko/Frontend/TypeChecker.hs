@@ -9,7 +9,6 @@ import qualified Data.List.NE as NE
 import qualified Data.Map     as Map
 import qualified Data.Set     as Set
 
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Expr
@@ -120,7 +119,7 @@ typeOfAltn t (MkAltn p e) = do
   withinEScope id env (typeOf e)
 
 patnEnvLevel :: forall lg tv ev. (TypeOf lg ~ Type, IsTVar tv) =>
-  Patn lg tv -> Type tv -> TC tv ev (EnvLevelOf Id.EVar (Type tv))
+  Patn lg tv -> Type tv -> TC tv ev (EnvLevelOf (Name EVar) (Type tv))
 patnEnvLevel p t0 = case p of
   PWld -> pure Map.empty
   PVar x -> pure (Map.singleton x t0)
@@ -159,10 +158,10 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DFunc (SysF.MkFuncDecl _ typ_ body) -> checkExpr body typ_
     SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
-    SysF.DInst (SysF.MkInstDecl _ atom qvs ds) -> do
+    SysF.DInst (SysF.MkInstDecl _ _ atom qvs ds) -> do
       let t_inst = mkTApp (TAtm atom) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      withQVars qvs $ for_ ds $ \(SysF.MkFuncDecl (unlctd -> name) _typ body) -> do
+      withQVars qvs $ for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
         (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
         let t_decl = renameType (instantiate' (const t_inst) t_mthd)
         checkExpr body t_decl

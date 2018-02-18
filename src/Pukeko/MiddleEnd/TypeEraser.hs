@@ -13,7 +13,6 @@ import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Name       as In
 import qualified Pukeko.AST.SuperCore  as In
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Info
 
 eraseModule :: In.Module -> Module
@@ -22,25 +21,25 @@ eraseModule m0@(In.MkModule _types extns supcs) = runCC m0 $ do
   supcs <- traverse ccSupCDecl (toList supcs)
   pure (extns ++ supcs)
 
-type CCState = Map Id.EVar Name
+type CCState = Map (In.Name In.EVar) Name
 
 type CC = Eff [Reader ModuleInfo, State CCState]
 
 runCC :: In.Module -> CC a -> a
 runCC mod0 = run . evalState mempty . runInfo mod0
 
-name :: Id.EVar -> Name
-name = MkName . Id.name
+name :: In.Name In.EVar -> Name
+name = MkName . untag . In.nameText
 
 bindName :: In.Bind tv -> Name
-bindName = name . unlctd . In._bind2evar
+bindName = name . In.nameOf
 
 ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel
-ccSupCDecl (In.SupCDecl (unlctd -> z) _ _ bs e) =
+ccSupCDecl (In.SupCDecl z _ _ bs e) =
   Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
 
 ccExtnDecl :: In.FuncDecl (In.Only In.Extn) -> CC TopLevel
-ccExtnDecl (In.ExtnDecl (unlctd -> z) _ s) = do
+ccExtnDecl (In.ExtnDecl z _ s) = do
     let n = MkName s
     modify (Map.insert z n)
     pure (Asm n)

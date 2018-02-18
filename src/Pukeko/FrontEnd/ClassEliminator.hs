@@ -26,12 +26,12 @@ type Out = Unclassy
 type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
 
 type CE tv ev =
-  EffXGamma (Map (Name Clss)) Type tv ev [Reader ModuleInfo, Reader SourcePos]
+  EffXGamma (Map (Name Clss)) Type tv ev [Reader ModuleInfo, Reader SourcePos, NameSource]
 
-runCE :: Module In -> CE Void Void a -> a
-runCE m0 = run . runReader noPos . runInfo m0 . runGamma
+runCE :: Member NameSource effs => Module In -> CE Void Void a -> Eff effs a
+runCE m0 = delayNameSource . runReader noPos . runInfo m0 . runGamma
 
-elimModule :: Module In -> Module Out
+elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
 elimModule m0@(MkModule decls) = runCE m0 $
   MkModule . map unclssDecl . concat <$> traverse elimDecl decls
 
@@ -39,15 +39,6 @@ elimModule m0@(MkModule decls) = runCE m0 $
 -- for type class @Eq@.
 clssTCon :: Name Clss -> Name TCon
 clssTCon = coerce
-
--- | Name of the dictionary for a type class instance of either a known type
--- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
--- @dict$Monoid$m@.
-dictEVar :: Name Clss -> Either TypeAtom Id.TVar -> Id.EVar
-dictEVar clss tcon =
-  -- FIXME: @render . pretty@ is an awful hack.
-  Id.evar ("dict$" ++ untag (nameText clss) ++ "$"
-           ++ either (render . pretty) Id.name tcon)
 
 -- | Apply the dictionary type constructor of a type class to a type. For the
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
@@ -65,10 +56,10 @@ mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 -- The @List@ instance of @Eq@ yields
 --
 -- > dict$Eq$List : ∀a. (Eq a) => Dict$Eq (List a)
-instDictInfo :: InstDecl st -> (Id.EVar, Type Void)
-instDictInfo (MkInstDecl clss tatom qvs _) =
+instDictInfo :: InstDecl st -> (Name EVar, Type Void)
+instDictInfo (MkInstDecl inst clss tatom qvs _) =
     let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TAtm tatom) (mkTVarsQ qvs)))
-    in  (dictEVar clss (Left tatom), t_dict)
+    in  (inst, t_dict)
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
@@ -101,19 +92,19 @@ elimClssDecl :: ClssDecl -> CE Void Void [Decl Out]
 elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
   let qprm = NE.singleton (MkQVar mempty prm)
-      prmType = TVar (mkBound 0 prm)
-      dictPrm = Id.evar "dict"
-      sels = do
-        (i, MkSignDecl (Lctd mpos z) t0) <- itoList mthds
+  let prmType = TVar (mkBound 0 prm)
+  dictPrm <- mkName (Lctd noPos "dict")
+  let sels = do
+        (i, MkSignDecl z t0) <- itoList mthds
         let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
         let e_rhs = EVar (mkBound z z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
         let c_one = MkAltn (PSimple dcon [prmType] c_binds) e_rhs
         let e_cas = EMat (EVar (mkBound () dictPrm)) (c_one :| [])
-        let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
+        let b_lam = MkBind dictPrm (mkTDict clss prmType)
         let e_lam = ELam b_lam (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
-        pure (DFunc (MkFuncDecl (Lctd mpos z) t1 e_tyabs))
+        pure (DFunc (MkFuncDecl z t1 e_tyabs))
   pure (DType tcon : sels)
 
 -- | Transform a class instance definition into a dictionary definition.
@@ -133,21 +124,22 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
 -- >   in
 -- >   Dict$Traversable @List traverse
 elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
-elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl clss tatom qvs defns0) = do
+elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ clss tatom qvs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
-  defns1 <- for methods0 $ \(MkSignDecl (unlctd -> mthd) _) -> do
-    case find (\defn -> defn^.func2name.lctd == mthd) defns0 of
+  defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
+    case find (\defn -> nameOf defn == mthd) defns0 of
       Nothing -> bugWith "missing method" (clss, tatom, mthd)
-      Just (MkFuncDecl name typ_ body) -> pure (MkDefn (MkBind name typ_) body)
+      Just (MkFuncDecl name0 typ_ body) -> do
+        name1 <- copyName (getPos inst) name0
+        pure (MkDefn (MkBind name1 typ_) body)
   let e_dcon = mkETyApp (ECon dcon) [t_inst]
-  let e_body =
-        foldl EApp e_dcon (imap (\i -> EVar . mkBound i . (^.defn2func)) defns1)
+  let e_body = foldl EApp e_dcon (imap (\i -> EVar . mkBound i . nameOf) defns1)
   let e_let :: Expr In _ _
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In _ _
       e_rhs = mkETyAbs qvs e_let
-  pure [DFunc (MkFuncDecl (Lctd (getPos clss) z_dict) t_dict e_rhs)]
+  pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
 
 elimDecl :: Decl In -> CE Void Void [Decl Out]
 elimDecl = here' $ \case
@@ -191,17 +183,23 @@ elimETyApp e0 t_e0 ts0 = do
     dicts <- sequence dictBldrs
     pure (foldl EApp (mkETyApp e0 ts0) dicts, instantiateN ts0 t_e1)
 
+-- | Name of the dictionary for a type class instance of either a known type
+-- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
+-- @dict$Monoid$m@.
+dictEVar :: Name Clss -> Id.TVar -> CE tv ev (Name EVar)
+dictEVar clss tcon =
+  mkName (Lctd noPos (Tagged ("dict$" ++ untag (nameText clss) ++ "$" ++ Id.name tcon)))
+
 -- | Enrich a type abstraction with value abstractions for type class
 -- dictionaries.
 elimETyAbs :: (IsTVar tv, HasEnv ev) =>
   NonEmpty QVar -> Expr In (TScope Int tv) ev -> CE tv ev (Expr Out tv ev, Type tv)
 elimETyAbs qvs0 e0 = do
-    pos <- where_
-    let ixbs = do
-          (i, MkQVar qual v) <- itoList qvs0
-          clss <- toList qual
-          let x = dictEVar clss (Right v)
-          pure ((i, clss, x), MkBind (Lctd pos x) (mkTDict clss (TVar (mkBound i v))))
+    -- TODO: This is horribly imperative.
+    ixbs <- fmap concat . for (itoList qvs0) $ \(i, MkQVar qual v) ->
+      for (toList qual) $ \clss -> do
+          x <- dictEVar clss v
+          pure ((i, clss, x), MkBind x (mkTDict clss (TVar (mkBound i v))))
     let (ixs, bs) = unzip ixbs
     let refs = Vec.accum Map.union (Vec.replicate (length qvs0) mempty)
                [ (i, Map.singleton (clss) (mkBound j x))

@@ -1,9 +1,9 @@
 module Pukeko.AST.Identifier
   ( Named (..)
-  , EVar
-  , evar
-  , main
-  , freshEVars
+  -- , EVar
+  -- , evar
+  -- , main
+  -- , freshEVars
   , TVar
   , tvar
   , freshTVars
@@ -21,16 +21,6 @@ class Named a where
 
 data EVar = EVar String
   deriving (Show, Eq, Ord)
-
-evar :: String -> EVar
-evar x@((isLower -> True):_) = EVar x
-evar x = bugWith "invalid variable name" x
-
-main :: EVar
-main = evar "main"
-
-freshEVars :: String -> EVar -> [EVar]
-freshEVars comp (EVar x) = map (\n -> EVar (x ++ '$':comp ++ show n)) [1::Int ..]
 
 instance Named EVar where
   name (EVar x) = x

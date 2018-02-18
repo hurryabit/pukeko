@@ -12,7 +12,6 @@ import           Data.Aeson
 import           Data.Aeson.TH
 import qualified Data.Map as Map
 
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Language
 import           Pukeko.AST.Expr hiding (Defn, Expr, Bind, Altn)
@@ -27,7 +26,7 @@ type Extn = 'Extn
 data FuncDecl (m :: Super DeclMode)
   = (m ?:> SupC) =>
     SupCDecl
-    { _supc2name  :: Lctd Id.EVar
+    { _supc2name  :: Name EVar
     , _supc2type  :: Type Void
     , _supc2tprms :: [QVar]
     , _supc2eprms :: [Bind (TScope Int Void)]
@@ -35,15 +34,15 @@ data FuncDecl (m :: Super DeclMode)
     }
   | (m ?:> Extn) =>
     ExtnDecl
-    { _extn2name :: Lctd Id.EVar
+    { _extn2name :: Name EVar
     , _extn2type :: Type Void
     , _extn2extn :: String
     }
 
 data Module = MkModule
   { _mod2types :: Map (Name TCon) TConDecl
-  , _mod2extns :: Map Id.EVar (FuncDecl (Only Extn))
-  , _mod2supcs :: Map Id.EVar (FuncDecl (Only SupC))
+  , _mod2extns :: Map (Name EVar) (FuncDecl (Only Extn))
+  , _mod2supcs :: Map (Name EVar) (FuncDecl (Only SupC))
   }
 
 type Defn = Expr.Defn SuperCore
@@ -58,7 +57,7 @@ castAny = \case
   SupCDecl z t vs xs e -> SupCDecl z t vs xs e
   ExtnDecl z t s       -> ExtnDecl z t s
 
-func2name :: Lens' (FuncDecl m) (Lctd Id.EVar)
+func2name :: Lens' (FuncDecl m) (Name EVar)
 func2name f = \case
   SupCDecl z t vs xs e -> fmap (\z' -> SupCDecl z' t vs xs e) (f z)
   ExtnDecl z t s       -> fmap (\z' -> ExtnDecl z' t s)       (f z)
@@ -81,7 +80,7 @@ mkFuncDecl = \case
   SupCDecl z t vs xs e -> mkDecl mod2supcs z (SupCDecl z t vs xs e)
   ExtnDecl z t s       -> mkDecl mod2extns z (ExtnDecl z t s)
   where
-    mkDecl l k v = over l (Map.insert (k^.lctd) v) mempty
+    mkDecl l k v = over l (Map.insert k v) mempty
 
 
 instance Semigroup Module where

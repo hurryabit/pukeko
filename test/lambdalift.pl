@@ -32,10 +32,9 @@ data Monad m =
 data World =
        | World
 data IO a = World -> Pair a World
-external puti : Int -> Unit = "puti"
 external seq : ∀a b. a -> b -> b = "seq"
-g$ll1 : Int -> Int -> Int -> Int -> Int =
-  fun (a : Int) (b : Int) (c : Int) (d : Int) -> a
+external puti : Int -> Unit = "puti"
+main : IO Unit = print$ll1 (g$ll1 1 2 3 4)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b ->
     fun (f : a -> b) (x : a) (world : World) ->
@@ -44,6 +43,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b ->
     fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
-main : IO Unit = print$ll1 (g$ll1 1 2 3 4)
 print$ll1 : Int -> IO Unit =
   fun (n : Int) -> io$ll2 @Int @Unit puti n
+g$ll1 : Int -> Int -> Int -> Int -> Int =
+  fun (a : Int) (b : Int) (c : Int) (d : Int) -> a

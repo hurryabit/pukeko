@@ -10,6 +10,7 @@ import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.ByteString.Lazy     as BS
 import qualified Data.Text.Lazy.IO        as T
 
+import           Pukeko.AST.Name
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
@@ -18,7 +19,7 @@ import qualified Pukeko.BackEnd         as BackEnd
 
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()
 compile write_pl stop_tc unsafe json graph opts file = do
-  ok_or_error <- runM . runError $ do
+  ok_or_error <- runM . runNameSource . runError $ do
     package <- Parser.parsePackage file
     module_sf <- FrontEnd.run unsafe package
     if stop_tc

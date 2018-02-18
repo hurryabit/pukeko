@@ -126,7 +126,7 @@ instantiate e0 t0 = do
   pure (e1, t2, foldMap fold cstrs)
 
 inferPatn ::
-  Patn In tv -> UType s tv -> IT s ev (Patn (Aux s) tv, Map Id.EVar (UType s tv))
+  Patn In tv -> UType s tv -> IT s ev (Patn (Aux s) tv, Map (Name EVar) (UType s tv))
 inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
   PVar x -> pure (PVar x, Map.singleton x t_expr)
@@ -259,21 +259,21 @@ inferDecl = here' $ \case
   DSign{} -> pure Nothing
   DFunc func0 -> do
     reset @Id.TVar
-    t_decl <- open <$> typeOfFunc (func0^.func2name.lctd)
+    t_decl <- open <$> typeOfFunc (nameOf func0)
     func1 <- inferFuncDecl func0 t_decl
     yield (DFunc func1)
-  DExtn (MkExtnDecl z NoType s) -> do
-    t <- open <$> typeOfFunc (unlctd z)
-    yield (DExtn (MkExtnDecl z t s))
+  DExtn (MkExtnDecl name NoType s) -> do
+    t <- open <$> typeOfFunc name
+    yield (DExtn (MkExtnDecl name t s))
   DClss c -> yield (DClss c)
-  DInst (MkInstDecl clss atom qvs ds0) -> do
-    ds1 <- for ds0 $ \mthd@(MkFuncDecl (unlctd -> name) NoType _body) -> do
-      (_, MkSignDecl _ t_decl0) <- findInfo info2mthds name
+  DInst (MkInstDecl instName clss atom qvs ds0) -> do
+    ds1 <- for ds0 $ \mthd -> do
+      (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
       let t_inst = mkTApp (TAtm atom) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
       let t_decl1 :: Type (TScope Int Void)
           t_decl1 = renameType (instantiate' (const t_inst) t_decl0)
       withQVars qvs (inferFuncDecl mthd (open t_decl1))
-    yield (DInst (MkInstDecl clss atom qvs ds1))
+    yield (DInst (MkInstDecl instName clss atom qvs ds1))
   where
     yield = pure . Just
 
@@ -354,9 +354,9 @@ qualDecl = \case
       t0 -> qualType t0
     pure (DExtn (MkExtnDecl x t1 s))
   DClss c -> pure (DClss c)
-  DInst (MkInstDecl c t qvs ds0) -> do
+  DInst (MkInstDecl instName c t qvs ds0) -> do
     ds1 <- for ds0 $ \d0 -> localizeTQ qvs (qualFuncDecl d0)
-    pure (DInst (MkInstDecl c t qvs ds1))
+    pure (DInst (MkInstDecl instName c t qvs ds1))
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule = module2decls (traverse (\decl -> reset @Id.TVar *> qualDecl decl))

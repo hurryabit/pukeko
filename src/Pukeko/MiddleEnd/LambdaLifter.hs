@@ -17,7 +17,6 @@ import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
@@ -30,11 +29,18 @@ type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, Reader SourcePos, Supply Id.EVar, Writer Core.Module]
+    [Reader ModuleInfo, State (Name EVar), Supply Int, Writer Core.Module, NameSource]
 
-execLL :: Module In -> LL Void Void () -> Core.Module
+execLL :: Member NameSource effs =>
+  Module In -> LL Void Void () -> Eff effs Core.Module
 execLL m0 =
-  snd . run . runWriter . evalSupply [] . runReader noPos . runInfo m0 . runGamma
+  fmap snd . delayNameSource . runWriter . evalSupply [1..] . runState undefined . runInfo m0 . runGamma
+
+freshEVar :: LL tv ev (Name EVar)
+freshEVar = do
+  func <- get @(Name EVar)
+  n <- fresh @Int
+  mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
 
 -- NOTE: It might be interesting to proof some stuff about indices here using
 -- Liquid Haskell.
@@ -75,10 +81,12 @@ llELam ::
   Expr Out tv (EScope Int ev) ->
   LL tv ev (Expr Out tv ev)
 llELam oldBinds t_rhs rhs1 = do
+    -- FIXME: We're copying the y_i (and the a_i) from the description above.
+    -- Copy the names properly using 'copyName'.
     let evCaptured = Set.toList (setOf (traverse . _Free) rhs1)
     let n0 = length evCaptured
     -- TODO: We should figure out a location for @x@.
-    newBinds <- for evCaptured $ \x -> MkBind (Lctd noPos (baseEVar x)) <$> lookupEVar x
+    newBinds <- for evCaptured $ \x -> MkBind (baseEVar x) <$> lookupEVar x
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
           (setOf (traverse . bind2type . traverse) allBinds0 <> setOf traverse t_rhs)
@@ -93,10 +101,10 @@ llELam oldBinds t_rhs rhs1 = do
                    (mkBound . (n0+))
     let allBinds1 = map (fmap tvRename) allBinds0
     let rhs2 = bimap tvRename evRename rhs1
-    lhs <- fresh
+    lhs <- freshEVar
     let t_lhs = mkTUni tyBinds (map _bind2type allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
-    let supc = SupCDecl (Lctd noPos lhs) t_lhs tyBinds allBinds1 rhs2
+    let supc = SupCDecl lhs t_lhs tyBinds allBinds1 rhs2
     tell (mkFuncDecl @Any supc)
     pure (foldl EApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
 
@@ -104,7 +112,7 @@ llExpr ::
   forall tv ev. (HasEnv tv, IsTVar tv, IsEVar ev) =>
   Expr In tv ev -> LL tv ev (Expr Out tv ev)
 llExpr = \case
-  ELoc le -> here le $ llExpr (unlctd le)
+  ELoc le -> llExpr (unlctd le)
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   EApp fun arg -> EApp <$> llExpr fun <*> llExpr arg
@@ -141,11 +149,12 @@ llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType t -> tell (mkTypeDecl t)
   DFunc (MkFuncDecl lhs t rhs) -> do
-    resetWith (Id.freshEVars "ll" (lhs^.lctd))
+    reset @Int
+    put @(Name EVar) lhs
     rhs <- llExpr rhs
     let supc = SupCDecl lhs (fmap absurd t) [] [] (bimap absurd absurd rhs)
     tell (mkFuncDecl @Any supc)
   DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @Any (ExtnDecl z t s))
 
-liftModule :: Module In -> Core.Module
+liftModule :: Member NameSource effs => Module In -> Eff effs Core.Module
 liftModule m0@(MkModule decls) = execLL m0 (traverse_ llDecl decls)

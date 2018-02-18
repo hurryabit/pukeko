@@ -26,7 +26,7 @@ import           Text.Megaparsec.Expr
 import           Pukeko.AST.Name       hiding (Name)
 import           Pukeko.AST.Operator   (Spec (..))
 import           Pukeko.AST.Surface
-import qualified Pukeko.AST.Identifier as Id
+import qualified Pukeko.AST.Identifier as Id (TVar, tvar)
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
@@ -167,8 +167,8 @@ bar     = reservedOp "|"
 name :: Parser String -> Parser (LctdName nsp)
 name p = lctd (Tagged <$> p)
 
-evar :: Parser Id.EVar
-evar = Id.evar <$> lIdent <?> "expression variable"
+evar :: Parser (LctdName EVar)
+evar = name lIdent <?> "expression variable"
 
 tvar :: Parser Id.TVar
 tvar = Id.tvar <$> lIdent <?> "type variable"
@@ -218,11 +218,10 @@ apatn = symbol "_" *> pure PWld   <|>
         PCon <$> dcon <*> pure [] <|>
         parens patn
 
-defn :: Parser (Defn Id.EVar)
-defn = indented (lctd evar) $ \z ->
-  MkDefn z <$> (mkLam <$> many (lctd evar) <*> (equals *> expr))
+defn :: Parser (Defn (LctdName EVar))
+defn = indented evar $ \z -> MkDefn z <$> (mkLam <$> many evar <*> (equals *> expr))
 
-exprMatch :: Parser (Expr Id.EVar)
+exprMatch :: Parser (Expr (LctdName EVar))
 exprMatch = do
   tokCol <- indentGuard
   fstCol <- RWS.gets sourceColumn
@@ -238,12 +237,12 @@ exprMatch = do
       <$> (expr <* reserved "with")
       <*> aligned (some altn)
 
-altn :: Parser (Altn Id.EVar)
+altn :: Parser (Altn (LctdName EVar))
 altn = indented_ bar (MkAltn <$> patn <*> (arrow *> expr))
 
 let_ ::
-  (NonEmpty (Defn Id.EVar) -> a) ->
-  (NonEmpty (Defn Id.EVar) -> a) ->
+  (NonEmpty (Defn (LctdName EVar)) -> a) ->
+  (NonEmpty (Defn (LctdName EVar)) -> a) ->
   Parser a
 let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
@@ -254,7 +253,7 @@ coercion =
   MkCoercion Inject  <$> (symbol "_" *> arrow *> tcon      ) <|>
   MkCoercion Project <$> (tcon       <* arrow <* symbol "_")
 
-expr, aexpr :: Parser (Expr Id.EVar)
+expr, aexpr :: Parser (Expr (LctdName EVar))
 aexpr = choice
   [ EVar <$> evar
   , ECon <$> dcon
@@ -271,7 +270,7 @@ expr =
       <*> (reserved "else" *> expr)
     , exprMatch
     , ELam
-      <$> (reserved "fun" *> NE.some (lctd evar))
+      <$> (reserved "fun" *> NE.some evar)
       <*> (arrow *> expr)
     , let_ ELet ERec <*> (reserved "in" *> expr)
     , ECoe <$> (reserved "coerce" *> char '@' *> parens coercion) <*> aexpr
@@ -308,7 +307,7 @@ dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
-  (try (indented (lctd evar) (\z -> colon *> pure z)))
+  (try (indented evar (\z -> colon *> pure z)))
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
@@ -326,7 +325,7 @@ instDecl = do
 
 extnDecl :: Parser ExtnDecl
 extnDecl = MkExtnDecl
-  <$> lctd evar
+  <$> evar
   <*> (equals *> char '\"' *> some (lowerChar <|> char '_') <* symbol "\"")
 
 infxDecl :: Parser InfxDecl

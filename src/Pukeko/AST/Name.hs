@@ -15,7 +15,9 @@ module Pukeko.AST.Name
   , Name
   , NameSource
   , nameText
+  , namePos
   , runNameSource
+  , delayNameSource
   , runSTBelowNameSource
   , mkName
   , copyName
@@ -62,10 +64,20 @@ data Name (nsp :: NameSpace) = Name
 nameText :: Name nsp -> Tagged nsp String
 nameText = Tagged . _text
 
+namePos :: Lens' (Name nsp) SourcePos
+namePos f (Name i t p) = Name i t <$> f p
+
 newtype NameSource a = NameSource{toState :: State Int a}
 
 runNameSource :: forall effs a. Eff (NameSource : effs) a -> Eff effs a
 runNameSource = evalState 1 . translate toState
+
+delayNameSource :: Member NameSource effs => Eff '[NameSource] a -> Eff effs a
+delayNameSource act = do
+  n1 <- send (NameSource Get)
+  let (res, n2) = act & translate toState & runState n1 & run
+  send (NameSource (Put n2))
+  pure res
 
 runSTBelowNameSource :: Member NameSource effs =>
   (forall s. Eff [NameSource, ST s] a) -> Eff effs a

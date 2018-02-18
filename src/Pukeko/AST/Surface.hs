@@ -39,7 +39,7 @@ where
 import Pukeko.Prelude
 
 import           Pukeko.AST.Name       hiding (Name)
-import qualified Pukeko.AST.Identifier as Id
+import qualified Pukeko.AST.Identifier as Id (TVar)
 import qualified Pukeko.AST.Operator   as Op
 
 type Name (nsp :: NameSpace) = Tagged nsp String
@@ -61,7 +61,7 @@ data Decl
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
-  | DDefn (Defn Id.EVar)
+  | DDefn (Defn (LctdName EVar))
   | DExtn ExtnDecl
   | DInfx InfxDecl
 
@@ -78,7 +78,7 @@ data DConDecl = MkDConDecl
   }
 
 data SignDecl = MkSignDecl
-  { _sign2func :: Lctd Id.EVar
+  { _sign2func :: LctdName EVar
   , _sign2type :: TypeScheme
   }
 
@@ -93,17 +93,17 @@ data InstDecl = MkInstDecl
   , _inst2atom  :: TypeAtom
   , _inst2tvars :: [Id.TVar]
   , _inst2cstr  :: TypeCstr
-  , _inst2defns :: [Defn Id.EVar]
+  , _inst2defns :: [Defn (LctdName EVar)]
   }
 
 data ExtnDecl = MkExtnDecl
-  { _extn2func :: Lctd Id.EVar
+  { _extn2func :: LctdName EVar
   , _extn2name :: String
   }
 
 data InfxDecl = MkInfxDecl
   { _infx2op   :: Lctd Op.Binary
-  , _infx2func :: Id.EVar
+  , _infx2func :: LctdName EVar
   }
 
 data TypeAtom
@@ -124,7 +124,7 @@ data CoercionDir = Inject | Project
 
 data Coercion = MkCoercion CoercionDir (LctdName TCon)
 
-data Defn v = MkDefn (Lctd Id.EVar) (Expr v)
+data Defn v = MkDefn (LctdName EVar) (Expr v)
 
 data Expr v
   = ELoc (Lctd (Expr v))
@@ -134,7 +134,7 @@ data Expr v
   | EApp (Expr v) (NonEmpty (Expr v))
   | EOpp Op.Binary (Expr v) (Expr v)
   | EMat (Expr v) [Altn v]
-  | ELam (NonEmpty (Lctd Id.EVar)) (Expr v)
+  | ELam (NonEmpty (LctdName EVar)) (Expr v)
   | ELet (NonEmpty (Defn v)) (Expr v)
   | ERec (NonEmpty (Defn v)) (Expr v)
   | ECoe Coercion (Expr v)
@@ -143,7 +143,7 @@ data Altn v = MkAltn Patn (Expr v)
 
 data Patn
   = PWld
-  | PVar Id.EVar
+  | PVar (LctdName EVar)
   | PCon (LctdName DCon) [Patn]
 
 extend :: Module -> Package -> Package
@@ -160,7 +160,7 @@ mkIf t u v =
          , MkAltn (PCon (Lctd noPos (Tagged "False")) []) v
          ]
 
-mkLam :: [Lctd Id.EVar] -> Expr v -> Expr v
+mkLam :: [LctdName EVar] -> Expr v -> Expr v
 mkLam = \case
   []     -> id
   (b:bs) -> ELam (b :| bs)

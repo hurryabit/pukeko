@@ -30,7 +30,6 @@ import qualified Pukeko.AST.SuperCore  as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Type
 
@@ -38,9 +37,9 @@ import           Pukeko.AST.Type
 data ModuleInfo = MkModuleInfo
   { _info2tcons :: Map (Name TCon) TConDecl
   , _info2dcons :: Map (Name DCon) (TConDecl, DConDecl)
-  , _info2signs :: Map Id.EVar (Type Void)
+  , _info2signs :: Map (Name EVar) (Type Void)
   , _info2clsss :: Map (Name Clss) SysF.ClssDecl
-  , _info2mthds :: Map Id.EVar (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
+  , _info2mthds :: Map (Name EVar) (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
   , _info2insts :: Map (Name Clss, TypeAtom) SomeInstDecl
   }
 
@@ -67,7 +66,7 @@ findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k <$> view l
 
 typeOfFunc ::
   (HasCallStack, Member (Reader ModuleInfo) effs) =>
-  Id.EVar -> Eff effs (Type tv)
+  Name EVar -> Eff effs (Type tv)
 typeOfFunc func = fmap absurd <$> findInfo info2signs func
 
 typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
@@ -89,8 +88,8 @@ tconDeclInfo tcon =
   in  itemInfo info2tcons (nameOf tcon) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
-signInfo :: Lctd Id.EVar -> Type Void -> ModuleInfo
-signInfo = itemInfo info2signs . unlctd
+signInfo :: Name EVar -> Type Void -> ModuleInfo
+signInfo = itemInfo info2signs
 
 instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
   collectInfo (SysF.MkModule decls) = foldFor decls $ \case
@@ -107,9 +106,9 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
       let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
             let typ1 = mkTUni [MkQVar (Set.singleton clss) param] typ0
             in  signInfo mthd typ1
-                <> itemInfo info2mthds (mthd^.lctd) (clssDecl, mthdDecl)
+                <> itemInfo info2mthds mthd (clssDecl, mthdDecl)
       in  itemInfo info2clsss clss clssDecl <> mthds_info
-    SysF.DInst inst@(SysF.MkInstDecl clss t _ _) ->
+    SysF.DInst inst@(SysF.MkInstDecl _ clss t _ _) ->
       itemInfo info2insts (clss, t) (SomeInstDecl inst)
 
 instance HasModuleInfo Core.Module where
