@@ -95,7 +95,7 @@ llELam oldBinds t_rhs rhs1 = do
     lhs <- fresh
     let t_lhs = mkTUni tyBinds (map _bind2type allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
-    let supc = SupCDecl (MkBind (Lctd noPos lhs) t_lhs) tyBinds allBinds1 rhs2
+    let supc = SupCDecl (Lctd noPos lhs) t_lhs tyBinds allBinds1 rhs2
     tell (mkFuncDecl @'SupC supc)
     pure (foldl EApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
 
@@ -139,12 +139,12 @@ llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
 llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType t -> tell (mkTypeDecl t)
-  DDefn (MkDefn (MkBind lhs t) rhs) -> do
+  DFunc (MkFuncDecl lhs t rhs) -> do
     resetWith (Id.freshEVars "ll" (lhs^.lctd))
     rhs <- llExpr rhs
-    let supc = SupCDecl (MkBind lhs (fmap absurd t)) [] [] (bimap absurd absurd rhs)
+    let supc = SupCDecl lhs (fmap absurd t) [] [] (bimap absurd absurd rhs)
     tell (mkFuncDecl @'SupC supc)
-  DExtn (MkExtnDecl z s) -> tell (mkFuncDecl @'Extn (ExtnDecl z s))
+  DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @'Extn (ExtnDecl z t s))
 
 liftModule :: Module In -> Core.Module
 liftModule m0@(MkModule decls) = execLL m0 (traverse_ llDecl decls)

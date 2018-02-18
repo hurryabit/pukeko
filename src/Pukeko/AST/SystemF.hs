@@ -18,88 +18,98 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 
-data ClssDecl = MkClssDecl
-  { _clss2name    :: Name Clss
-  , _clss2param   :: Id.TVar
-  , _clss2methods :: [Bind Type (TScope Int Void)]
+-- | Declaration of a function signature (@SignDecl Void@) or a method signature
+-- (@SignDecl (TScope Int Void)@).
+data SignDecl tv = MkSignDecl
+  { _sign2name :: Lctd Id.EVar
+  , _sign2type :: Type tv
   }
 
-data InstDecl st = MkInstDecl
-  { _inst2clss  :: Name Clss
-  , _inst2atom  :: TypeAtom
-  , _inst2qvars :: [QVar]
-  , _inst2defns :: [Defn st (TScope Int Void) Void]
+-- | Definition of a function (@FuncDecl lg Void@) or an instance method
+-- (@FuncDecl lg (TScope Int Void)@).
+data FuncDecl lg tv = MkFuncDecl
+  { _func2name :: Lctd Id.EVar
+  , _func2type :: TypeOf lg tv
+    -- ^ Before type inference, this is 'TArr' and hence bogus. Since 'TArr'
+    -- doesn't have kind '*', it will never be there after type inference. This
+    -- allows for finding out if we are before or after type inference.
+  , _func2body :: Expr lg tv Void
   }
 
-data ExtnDecl ty = MkExtnDecl
-  { _extn2bind :: Bind ty Void
+-- | Declaration of an external function.
+data ExtnDecl lg = MkExtnDecl
+  { _extn2name :: Lctd Id.EVar
+  , _extn2type :: TypeOf lg Void
+    -- ^ Before type inference, this is 'TArr' for the same reason given for
+    -- '_func2type'.
   , _extn2extn :: String
   }
 
+-- | Declaration of a class.
+data ClssDecl = MkClssDecl
+  { _clss2name    :: Name Clss
+  , _clss2param   :: Id.TVar
+  , _clss2methods :: [SignDecl (TScope Int Void)]
+  }
+
+-- | Definition of an instance of a class.
+data InstDecl lg = MkInstDecl
+  { _inst2clss    :: Name Clss
+  , _inst2atom    :: TypeAtom
+  , _inst2qvars   :: [QVar]
+  , _inst2methods :: [FuncDecl lg (TScope Int Void)]
+  }
+
 data Decl lg
-  =                          DType TConDecl
-  | IsPreTyped lg ~ False => DSign (Bind Type Void)
-  | IsClassy   lg ~ True  => DClss ClssDecl
+  =                          DType  TConDecl
+  | IsPreTyped lg ~ False => DSign (SignDecl Void)
+  |                          DFunc (FuncDecl lg Void)
+  |                          DExtn (ExtnDecl lg)
+  | IsClassy   lg ~ True  => DClss  ClssDecl
   | IsClassy   lg ~ True  => DInst (InstDecl lg)
-  |                          DDefn (Defn lg Void Void)
-  |                          DExtn (ExtnDecl (TypeOf lg))
 
 data Module lg = MkModule
   { _module2decls :: [Decl lg]
   }
 
+makeLenses ''SignDecl
+makeLenses ''FuncDecl
+makeLenses ''ExtnDecl
 makeLenses ''ClssDecl
 makeLenses ''InstDecl
-makeLenses ''ExtnDecl
-makePrisms ''Decl
+-- makePrisms ''Decl
 makeLenses ''Module
 
--- * Optics
-inst2defn :: Traversal
-  (InstDecl st1) (InstDecl st2)
-  (Defn st1 (TScope Int Void) Void) (Defn st2 (TScope Int Void) Void)
-inst2defn f (MkInstDecl c t qs ds) = MkInstDecl c t qs <$> traverse f ds
-
--- | Travere over the names of all the functions defined in either a 'DDefn', a
--- 'DSupC' or a 'DExtn'.
-decl2func :: Traversal' (Decl st) Id.EVar
-decl2func f top = case top of
-  DType{} -> pure top
-  DSign{} -> pure top
-  DClss{} -> pure top
-  DInst{} -> pure top
-  DDefn d -> DDefn <$> defn2bind (bind2evar (lctd f)) d
-  DExtn p -> DExtn <$> extn2bind (bind2evar (lctd f)) p
-
-decl2expr ::
-  (Applicative f) =>
-  (forall tv ev. Expr st tv ev -> f (Expr st tv ev)) -> Decl st -> f (Decl st)
-decl2expr f top = case top of
-  DType{} -> pure top
-  DSign{} -> pure top
-  DClss{} -> pure top
-  DInst i -> DInst <$> inst2defn (defn2expr f) i
-  DDefn d -> DDefn <$> defn2expr f d
-  DExtn p -> pure (DExtn p)
 
 type instance NameSpaceOf ClssDecl = Clss
-instance HasName   ClssDecl where nameOf = _clss2name
-instance HasPos    ClssDecl where getPos = getPos . nameOf
+instance HasName  ClssDecl where nameOf = _clss2name
+
+instance HasPos (SignDecl tv) where getPos = getPos . _sign2name
+instance HasPos  ClssDecl     where getPos = getPos . nameOf
 
 instance HasPos (Decl st) where
   getPos = \case
     DType tcon  -> getPos tcon
     DSign sign  -> getPos sign
+    DFunc func  -> getPos (_func2name func)
+    DExtn extn  -> getPos (_extn2name extn)
     DClss clss  -> getPos clss
     DInst inst  -> getPos (_inst2clss inst)
-    DDefn defn  -> getPos (_defn2bind defn)
-    DExtn extn  -> getPos (_extn2bind extn)
 
-instance (PrettyStage st) => Pretty (Decl st) where
+instance BaseTVar tv => Pretty (SignDecl tv) where
+  pretty (MkSignDecl name typ_) = pretty (name ::: typ_)
+
+instance (TypeOf lg ~ Type, BaseTVar tv) => Pretty (FuncDecl lg tv) where
+  pretty (MkFuncDecl name typ_ body) =
+    hang (pretty (name ::: typ_) <+> "=") 2 (pretty body)
+
+instance (TypeOf lg ~ Type) => Pretty (Decl lg) where
   pretty = \case
-    DType tcon ->
-      "data" <+> pretty tcon
-    DSign s -> pretty s
+    DType tcon -> "data" <+> pretty tcon
+    DSign sign -> pretty sign
+    DFunc func -> pretty func
+    DExtn (MkExtnDecl name typ_ extn) ->
+      hsep ["external", pretty (name ::: typ_), "=", doubleQuotes (pretty extn)]
     DClss (MkClssDecl c v ms) ->
       "class" <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
@@ -109,14 +119,13 @@ instance (PrettyStage st) => Pretty (Decl st) where
       where
         t1 :: Type (TScope Int Void)
         t1 = mkTApp (TAtm t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
-    DDefn d -> pretty d
-    DExtn (MkExtnDecl b s) ->
-      hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
 
-instance (PrettyStage st) => Pretty (Module st) where
+instance TypeOf lg ~ Type => Pretty (Module lg) where
   pretty (MkModule decls) = vcatMap pretty decls
 
-deriving instance                                         Show  ClssDecl
-deriving instance (TypeOf st ~ Type)                   => Show (InstDecl st)
-deriving instance                                         Show (ExtnDecl Type)
-deriving instance (TypeOf st ~ Type)                   => Show (Decl st)
+deriving instance                   (Show tv) => Show (SignDecl tv)
+deriving instance (TypeOf lg ~ Type, Show tv) => Show (FuncDecl lg tv)
+deriving instance (TypeOf lg ~ Type)          => Show (ExtnDecl lg)
+deriving instance                                Show  ClssDecl
+deriving instance (TypeOf lg ~ Type)          => Show (InstDecl lg)
+deriving instance (TypeOf lg ~ Type)          => Show (Decl lg)

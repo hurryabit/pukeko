@@ -46,18 +46,18 @@ pmExpr = \case
   ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
   ETyAnn t  e  -> ETyAnn t <$> pmExpr e
 
-pmDefn :: Defn In tv ev -> PM (Defn Out tv ev)
-pmDefn (MkDefn b e) = do
-    put (Id.freshEVars "pm" (unlctd (b^.bind2evar)))
-    MkDefn b <$> pmExpr e
+pmFuncDecl :: FuncDecl In tv -> PM (FuncDecl Out tv)
+pmFuncDecl (MkFuncDecl name typ_ body) = do
+  put (Id.freshEVars "pm" (unlctd name))
+  MkFuncDecl name typ_ <$> pmExpr body
 
 pmDecl :: Decl In -> PM (Decl Out)
 pmDecl = \case
   DType ds -> pure (DType ds)
+  DFunc func -> DFunc <$> pmFuncDecl func
+  DExtn (MkExtnDecl name typ_ extn) -> pure (DExtn (MkExtnDecl name typ_ extn))
   DClss c -> pure (DClss c)
-  DInst i -> DInst <$> inst2defn pmDefn i
-  DDefn d -> DDefn <$> pmDefn d
-  DExtn p -> pure (DExtn p)
+  DInst i -> DInst <$> (inst2methods . traverse) pmFuncDecl i
 
 compileModule :: Member (Error Failure) effs => Module In -> Eff effs (Module Out)
 compileModule m0 =

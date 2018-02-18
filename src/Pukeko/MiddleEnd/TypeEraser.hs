@@ -35,13 +35,13 @@ bindName :: In.Bind tv -> Name
 bindName = name . unlctd . In._bind2evar
 
 ccSupCDecl :: In.FuncDecl 'In.SupC -> CC TopLevel
-ccSupCDecl (In.SupCDecl (unlctd . In._bind2evar -> z) _ bs e) =
+ccSupCDecl (In.SupCDecl (unlctd -> z) _ _ bs e) =
   Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
 
 ccExtnDecl :: In.FuncDecl 'In.Extn -> CC TopLevel
-ccExtnDecl (In.ExtnDecl b s) = do
+ccExtnDecl (In.ExtnDecl (unlctd -> z) _ s) = do
     let n = MkName s
-    modify (Map.insert (unlctd (In._bind2evar b)) n)
+    modify (Map.insert z n)
     pure (Asm n)
 
 ccDefn :: (BaseEVar ev) => In.Defn tv ev -> CC Defn

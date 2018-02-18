@@ -17,7 +17,7 @@ cleanModule :: Module -> Module
 cleanModule mod0@(MkModule types extns supcs) =
   let g = CG.makeCallGraph mod0
       reach = Set.fromList
-              $ map ((^. func2name) . CG.toDecl g)
+              $ map ((^. func2name.lctd) . CG.toDecl g)
               $ maybe [] (G.reachable (CG.graph g)) (CG.fromEVar g Id.main)
       clean :: Map Id.EVar a -> Map Id.EVar a
       clean = Map.filterWithKey (\z _ -> z `Set.member` reach)

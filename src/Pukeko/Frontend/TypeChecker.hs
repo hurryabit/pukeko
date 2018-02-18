@@ -94,7 +94,7 @@ satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
 satisfiesCstr :: (IsTVar tv) => Type tv -> Name Clss -> TC tv ev ()
 satisfiesCstr t0 clss = do
   let (t1, tps) = gatherTApp t0
-  let throwNoInst = throwHere ("no instance for" <+> pretty clss <+> parens (pretty t1))
+  let throwNoInst = throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
   case t1 of
     TAtm atom -> do
       inst_mb <- lookupInfo info2insts (clss, atom)
@@ -156,20 +156,20 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
   checkModule (SysF.MkModule decls) = for_ decls $ \case
     SysF.DType{} -> pure ()
     SysF.DSign{} -> pure ()
+    SysF.DFunc (SysF.MkFuncDecl _ typ_ body) -> checkExpr body typ_
+    SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
     SysF.DInst (SysF.MkInstDecl _ atom qvs ds) -> do
       let t_inst = mkTApp (TAtm atom) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      withQVars qvs $ for_ ds $ \(MkDefn b e) -> do
-        (_, MkBind _ t_mthd) <- findInfo info2mthds (b^.bind2evar.lctd)
+      withQVars qvs $ for_ ds $ \(SysF.MkFuncDecl (unlctd -> name) _typ body) -> do
+        (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
         let t_decl = renameType (instantiate' (const t_inst) t_mthd)
-        checkExpr e t_decl
-    SysF.DDefn d -> checkDefn d
-    SysF.DExtn _ -> pure ()
+        checkExpr body t_decl
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
-    for_ supcs $ \(Core.SupCDecl (MkBind z t_decl) qvs bs e0) -> do
+    for_ supcs $ \(Core.SupCDecl z t_decl qvs bs e0) -> do
         t0 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
         match t_decl (mkTUni qvs (fmap _bind2type bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

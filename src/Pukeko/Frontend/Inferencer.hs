@@ -107,7 +107,7 @@ splitCstr t0 clss = do
   where
     throwNoInst = do
       p0 <- sendM (prettyUType 1 t0)
-      throwHere ("no instance for" <+> pretty clss <+> p0)
+      throwHere ("TI: no instance for" <+> pretty clss <+> p0)
 
 splitCstrs :: Cstrs s tv -> TI ev s (SplitCstrs s tv)
 splitCstrs cstrs = fold <$> traverse (uncurry splitCstr) cstrs
@@ -229,10 +229,10 @@ infer = \case
       unify t_from t1
       pure (ETyAnn t_to (ETyCoe c e1), t_to, cstrs)
 
-inferTypedDefn ::
+inferFuncDecl ::
   (BaseTVar tv) =>
-  Defn In tv Void -> UType s tv -> IT s Void (Defn (Aux s) tv Void)
-inferTypedDefn (MkDefn (MkBind x NoType) e0) t_decl = do
+  FuncDecl In tv -> UType s tv -> IT s Void (FuncDecl (Aux s) tv)
+inferFuncDecl (MkFuncDecl name NoType e0) t_decl = do
     -- NOTE: We do not instantiate the universally quantified type variables in
     -- prenex position of @t_decl@. Turning them into unification variables
     -- would make the following type check:
@@ -251,30 +251,29 @@ inferTypedDefn (MkDefn (MkBind x NoType) e0) t_decl = do
       unless (q1 `Set.isSubsetOf` q0) $ do
         let clss = Set.findMin (q1 `Set.difference` q0)
         throwHere ("cannot deduce" <+> pretty clss <+> pretty v <+> "from context")
-    pure (MkDefn (MkBind x t_decl) e1)
+    pure (MkFuncDecl name t_decl e1)
 
 inferDecl :: Decl In -> TI Void s (Maybe (Decl (Aux s)))
 inferDecl = here' $ \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
+  DFunc func0 -> do
+    reset @Id.TVar
+    t_decl <- open <$> typeOfFunc (func0^.func2name.lctd)
+    func1 <- inferFuncDecl func0 t_decl
+    yield (DFunc func1)
+  DExtn (MkExtnDecl z NoType s) -> do
+    t <- open <$> typeOfFunc (unlctd z)
+    yield (DExtn (MkExtnDecl z t s))
   DClss c -> yield (DClss c)
   DInst (MkInstDecl clss atom qvs ds0) -> do
-    ds1 <- for ds0 $ \d0 -> do
-      (_, MkBind _ t_decl0) <-
-        findInfo info2mthds (d0^.defn2bind.bind2evar.lctd)
+    ds1 <- for ds0 $ \mthd@(MkFuncDecl (unlctd -> name) NoType _body) -> do
+      (_, MkSignDecl _ t_decl0) <- findInfo info2mthds name
       let t_inst = mkTApp (TAtm atom) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
       let t_decl1 :: Type (TScope Int Void)
           t_decl1 = renameType (instantiate' (const t_inst) t_decl0)
-      withQVars qvs (inferTypedDefn d0 (open t_decl1))
+      withQVars qvs (inferFuncDecl mthd (open t_decl1))
     yield (DInst (MkInstDecl clss atom qvs ds1))
-  DDefn d0 -> do
-    reset @Id.TVar
-    t_decl <- open <$> typeOfFunc (d0^.defn2bind.bind2evar.lctd)
-    d1 <- inferTypedDefn d0 t_decl
-    yield (DDefn d1)
-  DExtn (MkExtnDecl (MkBind z NoType) s) -> do
-    t <- open <$> typeOfFunc (unlctd z)
-    yield (DExtn (MkExtnDecl (MkBind z t) s))
   where
     yield = pure . Just
 
@@ -340,19 +339,24 @@ qualPatn = \case
   PVar x -> pure (PVar x)
   PCon c ts ps -> PCon c <$> traverse qualType ts <*> traverse qualPatn ps
 
+qualFuncDecl :: FuncDecl (Aux s) tv' -> TQ tv s (FuncDecl Out tv)
+qualFuncDecl (MkFuncDecl name type0 body0) = do
+  MkDefn (MkBind _ type1) body1 <- qualDefn (MkDefn (MkBind name type0) body0)
+  pure (MkFuncDecl name type1 body1)
+
 qualDecl :: Decl (Aux s) -> TQ Void s (Decl Out)
 qualDecl = \case
   DType ds -> pure (DType ds)
-  DClss c -> pure (DClss c)
-  DInst (MkInstDecl c t qvs ds0) -> do
-    ds1 <- for ds0 $ \d0 -> localizeTQ qvs (qualDefn d0)
-    pure (DInst (MkInstDecl c t qvs ds1))
-  DDefn d -> DDefn <$> qualDefn d
-  DExtn (MkExtnDecl (MkBind x ts) s) -> do
+  DFunc func -> DFunc <$> qualFuncDecl func
+  DExtn (MkExtnDecl x ts s) -> do
     t1 <- case ts of
       UTUni (toList -> qvs) t0 -> localizeTQ qvs (mkTUni qvs <$> qualType t0)
       t0 -> qualType t0
-    pure (DExtn (MkExtnDecl (MkBind x t1) s))
+    pure (DExtn (MkExtnDecl x t1 s))
+  DClss c -> pure (DClss c)
+  DInst (MkInstDecl c t qvs ds0) -> do
+    ds1 <- for ds0 $ \d0 -> localizeTQ qvs (qualFuncDecl d0)
+    pure (DInst (MkInstDecl c t qvs ds1))
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
 qualModule = module2decls (traverse (\decl -> reset @Id.TVar *> qualDecl decl))

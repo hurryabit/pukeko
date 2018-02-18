@@ -22,7 +22,7 @@ type In = Eff '[State InState]
 makeLenses ''InState
 
 makeInlinable :: FuncDecl 'SupC -> In ()
-makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name) supc)
+makeInlinable supc = modifying inlinables (Map.insert (supc^.func2name.lctd) supc)
 
 unwind :: Expr tv ev -> (Expr tv ev, [Type tv], [Expr tv ev])
 unwind e0 =
@@ -40,7 +40,7 @@ inEVal :: Id.EVar -> In (Expr tv ev)
 inEVal z0 = do
   fdecl_mb <- uses inlinables (Map.lookup z0)
   case fdecl_mb of
-    Just (SupCDecl _z0 [] [] (EVal z1)) -> inEVal z1
+    Just (SupCDecl _z0 _t0 [] [] (EVal z1)) -> inEVal z1
     _ -> pure (EVal z0)
 
 inRedex :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
@@ -52,10 +52,10 @@ inRedex e0 = do
     EVal z0 -> do
       supc_mb <- uses inlinables (Map.lookup z0)
       case supc_mb of
-        Just (SupCDecl _ [] [] (EVal z1)) ->
+        Just (SupCDecl _ _ [] [] (EVal z1)) ->
           -- trace ("INLINING: " ++ render (pretty e0))
             (inExpr (foldl EApp (EVal z1 `mkETyApp` ts) as))
-        Just (SupCDecl _ vs xs e1)
+        Just (SupCDecl _ _ vs xs e1)
           -- NOTE: We don't want to inline CAFs. That's why we ensure @1 <= n@.
           | length vs == length ts && 1 <= n && n <= length as -> do
               let (as0, as1) = splitAt n as

@@ -81,7 +81,7 @@ instDictInfo (MkInstDecl clss tatom qvs _) =
 dictTConDecl :: ClssDecl -> TConDecl
 dictTConDecl (MkClssDecl clss prm mthds) =
     let tcon = coerce clss
-        flds = map _bind2type mthds
+        flds = map _sign2type mthds
         dcon = MkDConDecl tcon (Lctd (getPos clss) (clssDCon clss)) 0 flds
     in  MkTConDecl tcon [prm] (Right [dcon])
 
@@ -110,7 +110,7 @@ elimClssDecl clssDecl@(MkClssDecl clss prm mthds) = do
       prmType = TVar (mkBound 0 prm)
       dictPrm = Id.evar "dict"
       sels = do
-        (i, MkBind (Lctd mpos z) t0) <- itoList mthds
+        (i, MkSignDecl (Lctd mpos z) t0) <- itoList mthds
         let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
         let e_rhs = EVar (mkBound z z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
@@ -119,7 +119,7 @@ elimClssDecl clssDecl@(MkClssDecl clss prm mthds) = do
         let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
         let e_lam = ELam b_lam (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
-        pure (DDefn (MkDefn (MkBind (Lctd mpos z) t1) e_tyabs))
+        pure (DFunc (MkFuncDecl (Lctd mpos z) t1 e_tyabs))
   pure (DType tcon : sels)
 
 -- | Transform a class instance definition into a dictionary definition.
@@ -142,10 +142,10 @@ elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
 elimInstDecl clssDecl inst@(MkInstDecl clss tatom qvs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
-  defns1 <- for (clssDecl^.clss2methods) $ \(MkBind (unlctd -> mthd) _) -> do
-    case find (\defn -> defn^.defn2func == mthd) defns0 of
+  defns1 <- for (clssDecl^.clss2methods) $ \(MkSignDecl (unlctd -> mthd) _) -> do
+    case find (\defn -> defn^.func2name.lctd == mthd) defns0 of
       Nothing -> bugWith "missing method" (clss, tatom, mthd)
-      Just defn -> pure defn
+      Just (MkFuncDecl name typ_ body) -> pure (MkDefn (MkBind name typ_) body)
   let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
   let e_body =
         foldl EApp e_dcon (imap (\i -> EVar . mkBound i . (^.defn2func)) defns1)
@@ -153,10 +153,14 @@ elimInstDecl clssDecl inst@(MkInstDecl clss tatom qvs defns0) = do
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In _ _
       e_rhs = mkETyAbs qvs e_let
-  pure [DDefn (MkDefn (MkBind (Lctd (getPos clss) z_dict) t_dict) e_rhs)]
+  pure [DFunc (MkFuncDecl (Lctd (getPos clss) z_dict) t_dict e_rhs)]
 
 elimDecl :: Decl In -> CE Void Void [Decl Out]
 elimDecl = here' $ \case
+  DType tcons -> pure [DType tcons]
+  DFunc (MkFuncDecl name typ_ body) ->
+    (:[]) . DFunc . MkFuncDecl name typ_ . fst <$> elimExpr body
+  DExtn (MkExtnDecl name typ_ extn) -> pure [DExtn (MkExtnDecl name typ_ extn)]
   DClss clss  -> elimClssDecl clss
   DInst inst  -> do
     -- TODO: Constructing the declaration of the dictionary type again and
@@ -165,9 +169,6 @@ elimDecl = here' $ \case
     local (<> tconDeclInfo (dictTConDecl clss)) $ do
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
-  DDefn defn  -> (:[]) . DDefn <$> elimDefn defn
-  DType tcons -> pure [DType tcons]
-  DExtn extn  -> pure [DExtn extn]
 
 buildDict :: (IsTVar tv) => Name Clss -> Type tv -> CE tv ev (Expr Out tv ev)
 buildDict clss t0 = do
@@ -298,5 +299,7 @@ unclssDecl = \case
     -- constraints. This might change in the future.
     let tcon2type = tcon2dcons . _Right . traverse . dcon2fields . traverse
     in  DType (over tcon2type unclssType tcon)
-  DDefn defn -> run (runReader noPos (DDefn <$> defn2type (pure . unclssType) defn))
-  DExtn extn -> DExtn (over (extn2bind . bind2type) unclssType extn)
+  DFunc (MkFuncDecl name typ_ body0) ->
+    let body1 = runIdentity (expr2type (Identity . unclssType) body0)
+    in  DFunc (MkFuncDecl name (unclssType typ_) body1)
+  DExtn extn -> DExtn (over extn2type unclssType extn)

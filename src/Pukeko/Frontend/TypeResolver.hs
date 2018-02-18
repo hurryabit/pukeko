@@ -24,7 +24,6 @@ makeLenses ''TRState
 
 type CanTR effs = Members [Reader SourcePos, State TRState, Error Failure] effs
 
--- TODO: Use proper terminology in error messages.
 trType :: CanTR effs => Type tv -> Eff effs ()
 trType = type2tcon_ $ \tcon -> do
   ex <- uses st2tcons (Map.member tcon)
@@ -48,9 +47,11 @@ findDCon dcon = do
   unless ex (throwHere ("unknown data constructor:" <+> pretty dcon))
   pure dcon
 
--- TODO: Move this check into the renamer.
-trDefn :: CanTR effs => Defn In tv ev -> Eff effs ()
-trDefn = traverseOf_ (defn2expr . expr2atom . _ACon) findDCon
+trSignDecl :: CanTR effs => SignDecl tv -> Eff effs ()
+trSignDecl (MkSignDecl _ typ_) = trType typ_
+
+trFuncDecl :: CanTR effs => FuncDecl In tv -> Eff effs ()
+trFuncDecl (MkFuncDecl _ NoType body) = traverseOf_ (expr2atom . _ACon) findDCon body
 
 trDecl :: CanTR effs => Decl In -> Eff effs ()
 trDecl top = case top of
@@ -62,12 +63,11 @@ trDecl top = case top of
           for_ dconDecls $ here' $ \dcon@MkDConDecl{_dcon2fields = flds} -> do
             for_ flds trType
             insertDCon tcon dcon
-  DSign (MkBind _ t) -> trType t
-  -- FIXME: Resolve types in class declarations and instance definitions.
-  DClss _ -> pure ()
-  DInst i -> traverseOf_ inst2defn trDefn i
-  DDefn d -> trDefn d
-  DExtn _ -> pure ()
+  DSign sign -> trSignDecl sign
+  DFunc func -> trFuncDecl func
+  DExtn (MkExtnDecl _ NoType _) -> pure ()
+  DClss clss -> traverse_ trSignDecl (_clss2methods clss)
+  DInst inst -> traverse_ trFuncDecl (_inst2methods inst)
 
 resolveModule :: Member (Error Failure) effs => Module In -> Eff effs ()
 resolveModule (MkModule decls) =

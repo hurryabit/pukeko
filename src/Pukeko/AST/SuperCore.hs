@@ -35,14 +35,16 @@ type family HasExtn (a :: DeclMode) where
 data FuncDecl (m :: DeclMode)
   = HasSupC m ~ True =>
     SupCDecl
-    { _supc2bind  :: Bind Void
+    { _supc2name  :: Lctd Id.EVar
+    , _supc2type  :: Type Void
     , _supc2tprms :: [QVar]
     , _supc2eprms :: [Bind (TScope Int Void)]
     , _supc2expr  :: Expr (TScope Int Void) (EScope Int Void)
     }
   | HasExtn m ~ True =>
     ExtnDecl
-    { _extn2bind :: Bind Void
+    { _extn2name :: Lctd Id.EVar
+    , _extn2type :: Type Void
     , _extn2extn :: String
     }
 
@@ -61,32 +63,34 @@ makeLenses ''Module
 
 castAny :: FuncDecl m -> FuncDecl Any
 castAny = \case
-  SupCDecl z vs xs e -> SupCDecl z vs xs e
-  ExtnDecl z s       -> ExtnDecl z s
+  SupCDecl z t vs xs e -> SupCDecl z t vs xs e
+  ExtnDecl z t s       -> ExtnDecl z t s
 
-func2bind :: Lens' (FuncDecl m) (Bind Void)
-func2bind f = \case
-  SupCDecl z vs xs e -> fmap (\z' -> SupCDecl z' vs xs e) (f z)
-  ExtnDecl z s       -> fmap (\z' -> ExtnDecl z' s) (f z)
+func2name :: Lens' (FuncDecl m) (Lctd Id.EVar)
+func2name f = \case
+  SupCDecl z t vs xs e -> fmap (\z' -> SupCDecl z' t vs xs e) (f z)
+  ExtnDecl z t s       -> fmap (\z' -> ExtnDecl z' t s)       (f z)
 
-func2name :: Lens' (FuncDecl m) Id.EVar
-func2name = func2bind . bind2evar . lctd
+func2type :: Lens' (FuncDecl m) (Type Void)
+func2type f = \case
+  SupCDecl z t vs xs e -> fmap (\t' -> SupCDecl z t' vs xs e) (f t)
+  ExtnDecl z t s       -> fmap (\t' -> ExtnDecl z t' s)       (f t)
 
 func2expr :: Traversal' (FuncDecl m) (Expr (TScope Int Void) (EScope Int Void))
 func2expr f = \case
-  SupCDecl z qvs xs e -> SupCDecl z qvs xs <$> f e
-  ExtnDecl z s -> pure (ExtnDecl z s)
-
-mkDecl :: (Ord k) => Lens' Module (Map k v) -> (Lens' v k) -> v -> Module
-mkDecl l k v = over l (Map.insert (v^.k) v) mempty
+  SupCDecl z t qvs xs e -> SupCDecl z t qvs xs <$> f e
+  func@ExtnDecl{} -> pure func
 
 mkTypeDecl :: TConDecl -> Module
-mkTypeDecl = mkDecl mod2types tcon2name
+mkTypeDecl tcon = over mod2types (Map.insert (nameOf tcon) tcon) mempty
 
 mkFuncDecl :: FuncDecl m -> Module
 mkFuncDecl = \case
-  SupCDecl z vs xs e -> mkDecl mod2supcs func2name (SupCDecl z vs xs e)
-  ExtnDecl z s       -> mkDecl mod2extns func2name (ExtnDecl z s)
+  SupCDecl z t vs xs e -> mkDecl mod2supcs z (SupCDecl z t vs xs e)
+  ExtnDecl z t s       -> mkDecl mod2extns z (ExtnDecl z t s)
+  where
+    mkDecl l k v = over l (Map.insert (k^.lctd) v) mempty
+
 
 instance Semigroup Module where
   MkModule t1 e1 s1 <> MkModule t2 e2 s2 =
@@ -98,10 +102,10 @@ instance Monoid Module where
 
 instance Pretty (FuncDecl m) where
   pretty = \case
-    SupCDecl z qvs bs e ->
-      hang (pretty z <+> "=") 2 (prettyETyAbs 0 qvs (prettyELam 0 bs e))
-    ExtnDecl b s ->
-      hsep ["external", pretty b, "=", doubleQuotes (pretty s)]
+    SupCDecl z t qvs bs e ->
+      hang (pretty (z ::: t) <+> "=") 2 (prettyETyAbs 0 qvs (prettyELam 0 bs e))
+    ExtnDecl z t s ->
+      hsep ["external", pretty (z ::: t), "=", doubleQuotes (pretty s)]
 
 instance Pretty Module where
   pretty (MkModule types extns supcs) = vcat

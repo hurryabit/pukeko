@@ -96,13 +96,15 @@ kcVal = \case
 
 kcDecl :: Decl In -> KC n s ()
 kcDecl decl = case decl of
-  DType tcon         -> kcTConDecl tcon
-  DSign (MkBind _ t) -> kcVal t
+  DType tcon -> kcTConDecl tcon
+  DSign (MkSignDecl _ t) -> kcVal t
+  -- NOTE: The typed in (external) function declaration are bogus (for now), so
+  -- there's nothing to be checked.
+  DFunc{} -> pure ()
+  DExtn{} -> pure ()
   -- FIXME: Check kinds in type class declarations and instance definitions.
   DClss{} -> pure ()
   DInst{} -> pure ()
-  DDefn{} -> pure ()
-  DExtn{} -> pure ()
 
 kcModule ::Module In -> KC n s ()
 kcModule (MkModule decls)= traverse_ (\top -> reset @Id.TVar *> kcDecl top) decls

@@ -213,6 +213,16 @@ rnExpr = \case
 
 -- * Renaming of top level declarations
 
+-- | Rename a data constructor declaration. Assumes that the corresponding type
+-- constructor (or at least some dummy version of it) has already been
+-- introduced to the global environment.
+rnDConDecl :: CanRn effs =>
+  Name TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
+rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
+  MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
+  where
+    env = finRenamer vs
+
 -- | Rename a (potentially) recursive type declaration.
 rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TConDecl
 rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
@@ -231,21 +241,24 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
   modifying tconTab (Map.insert (unlctd name) (Left tcon))
   pure tcon
 
--- | Rename a data constructor declaration. Assumes that the corresponding type
--- constructor (or at least some dummy version of it) has already been
--- introduced to the global environment.
-rnDConDecl :: CanRn effs =>
-  Name TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
-rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
-  MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
-  where
-    env = finRenamer vs
-
--- | Rename a signature declaration.
-rnSignDecl :: CanRn effs => Map Id.TVar tv -> Ps.SignDecl -> Eff effs (Bind Type tv)
+-- | Rename a signature declaration. For signatures of top level functions, we
+-- have @tv = Void@ and hence the map is empty. For method signatures, we have
+-- @tv = TScope Int Void@ and the map contains the class paramaters.
+rnSignDecl :: CanRn effs => Map Id.TVar tv -> Ps.SignDecl -> Eff effs (SignDecl tv)
 rnSignDecl env (Ps.MkSignDecl z t) = do
   modifying funcs (Set.insert (z^.lctd))
-  MkBind z <$> rnTypeScheme env t
+  MkSignDecl z <$> rnTypeScheme env t
+
+-- | Rename a function declaration. The filled in type is bogus. For top level
+-- functions, we have @tv = Void@. For method definitions, we have @tv = TScope
+-- Int Void@.
+rnFuncDecl :: CanRn effs => Ps.Defn Id.EVar -> Eff effs (FuncDecl Out tv)
+rnFuncDecl (Ps.MkDefn func body) =
+  MkFuncDecl func NoType <$> runReader mempty (rnExpr body)
+
+-- | Rename an external function declaration. The filled in type is bogus.
+rnExtnDecl :: CanRn effs => Ps.ExtnDecl -> Eff effs (ExtnDecl Out)
+rnExtnDecl (Ps.MkExtnDecl func extn) = pure (MkExtnDecl func NoType extn)
 
 -- | Rename a class declaration. Due to the FIXME for 'rnConstraints', all
 -- constraints which methods put on the class type variables are silently
@@ -254,36 +267,39 @@ rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClssDecl
 rnClssDecl (Ps.MkClssDecl name param methods0) =
   introGlobal tconTab "type constructor" name Right $ \binder -> do
     let env = Map.singleton param (mkBound 0 param)
-    methods1 <- traverse (rnSignDecl env) methods0
-    modifying funcs (<> setOf (traverse . bind2evar . lctd) methods1)
+    methods1 <- for methods0 $ \mthd@(Ps.MkSignDecl z _) -> do
+      modifying funcs (Set.insert (z^.lctd))
+      rnSignDecl env mthd
     pure (MkClssDecl binder param methods1)
 
 -- | Rename an instance definition. There's /no/ check whether an instance for
 -- this class/type combination has already been defined.
 rnInstDecl :: GlobalEffs effs => Ps.InstDecl -> Eff effs (InstDecl Out)
-rnInstDecl (Ps.MkInstDecl clss0 tatm0 params0 cstrs0 defns0) = do
+rnInstDecl (Ps.MkInstDecl clss0 tatm0 params0 cstrs0 methods0) = do
   cstrs1 <- rnConstraints cstrs0
   MkInstDecl
     <$> lookupGlobal tconTab isRight "class" clss0
     <*> rnTypeAtom tatm0
     <*> applyConstraints params0 cstrs1
-    <*> traverse (runReader mempty . rnDefn) defns0
+    <*> traverse rnFuncDecl methods0
+
+-- | Rename an infix operator declaration, i.e., introduce the mapping from the
+-- infix operator to the backing function to the global environment.
+rnInfxDecl :: GlobalEffs effs => Ps.InfxDecl -> Eff effs ()
+rnInfxDecl (Ps.MkInfxDecl l@(unlctd -> op) fun) = here l $ do
+    checkFunc fun
+    modifying binops (Map.insert op fun)
 
 -- | Rename a top level declaration.
 rnDecl :: CanRn effs => Ps.Decl -> Eff effs (Maybe (Decl Out))
 rnDecl = \case
-  Ps.DType t -> Just . DType <$> rnTypeDecl t
-  Ps.DSign s -> Just . DSign <$> rnSignDecl mempty s
-  Ps.DDefn d -> Just . DDefn <$> runReader mempty (rnDefn d)
-  Ps.DExtn (Ps.MkExtnDecl z s) -> do
-    modifying funcs (<> Set.singleton (z^.lctd))
-    pure (Just (DExtn (MkExtnDecl (MkBind z NoType) s)))
-  Ps.DClss c -> Just . DClss <$> rnClssDecl c
-  Ps.DInst i -> Just . DInst <$> rnInstDecl i
-  Ps.DInfx (Ps.MkInfxDecl l@(unlctd -> op) fun) -> here l $ do
-    checkFunc fun
-    modifying binops (Map.insert op fun)
-    pure Nothing
+  Ps.DType tcon -> Just . DType <$> rnTypeDecl tcon
+  Ps.DSign sign -> Just . DSign <$> rnSignDecl mempty sign
+  Ps.DDefn defn -> Just . DFunc <$> rnFuncDecl defn
+  Ps.DExtn extn -> Just . DExtn <$> rnExtnDecl extn
+  Ps.DClss clss -> Just . DClss <$> rnClssDecl clss
+  Ps.DInst inst -> Just . DInst <$> rnInstDecl inst
+  Ps.DInfx infx -> Nothing      <$  rnInfxDecl infx
 
 -- | Rename a whole package, i.e., a module with its transiticve dependencies.
 renameModule :: Member (Error Failure) effs => Ps.Package -> Eff effs (Module Out)

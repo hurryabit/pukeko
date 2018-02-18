@@ -10,6 +10,7 @@ module Pukeko.AST.Type
   , QVar (..)
   , CoercionDir (..)
   , Coercion (..)
+  , (:::) (..)
   , pattern TArr
   , pattern TCon
   , weakenT
@@ -95,6 +96,10 @@ data Coercion = MkCoercion
   { _coeDir  :: CoercionDir
   , _coeTCon :: Name TCon
   }
+
+-- | A convenience data type to make pretty printing of (name, type) pairs in
+-- the for "name : type" easier.
+data a ::: t = a ::: t
 
 strengthenT0 :: Type (TScope Int tv) -> Type tv
 strengthenT0 = fmap strengthenScope0
@@ -232,6 +237,9 @@ prettyQVar :: QVar -> Doc ann
 prettyQVar (MkQVar q v)
   | null q    = pretty v
   | otherwise = parens (pretty v <+> "|" <+> hsepMap pretty q)
+
+instance (Pretty a, Pretty t) => Pretty (a ::: t) where
+  pretty (x ::: t) = pretty x <+> ":" <+> pretty t
 
 deriving instance Functor     Type
 deriving instance Foldable    Type

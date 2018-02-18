@@ -25,7 +25,7 @@ _TVar = \case
 
 erSupCDecl :: FuncDecl 'SupC -> FuncDecl 'SupC
 erSupCDecl = \case
-  supc@(SupCDecl z vs0 bs0 e0) ->
+  supc@(SupCDecl z tz vs0 bs0 e0) ->
     case e0 of
       -- Reduce expression parameters:
       EApp{}
@@ -33,7 +33,7 @@ erSupCDecl = \case
             unwindEApp e0
         , length bs0 == length xs1
         , iall (\i -> scope absurd (== i)) xs1 ->
-          erSupCDecl (SupCDecl z vs0 [] (weakenE e1))
+          erSupCDecl (SupCDecl z tz vs0 [] (weakenE e1))
       -- Reduce type paramaters:
       ETyApp
         (bitraverse strengthenScope strengthenScope -> Just e1)
@@ -41,16 +41,16 @@ erSupCDecl = \case
         | null bs0
         , length vs0 == length vs1
         , iall (\i -> scope absurd (== i)) vs1 ->
-          SupCDecl z [] [] (bimap weakenScope weakenScope e1)
+          SupCDecl z tz [] [] (bimap weakenScope weakenScope e1)
       -- Promote type abstraction when the super combinator doesn't contain any
       -- abstractions itself:
       ETyAbs vs1 e1
         | null vs0 && null bs0
-        , TUni (length -> n) _ <- z^.bind2type
+        , TUni (length -> n) _ <- tz
           -- NOTE: The check @length vs == n@ is only necessary because our type
           -- checker distinguishes between the types @∀a b. t[a, b]@ and
           -- @∀a. ∀b. t[a, b]@, which is clearly a problem.
         , length vs1 == n ->
             let e2 = first (over _Free strengthenScope0) e1
-            in  erSupCDecl (SupCDecl z (toList vs1) [] e2)
+            in  erSupCDecl (SupCDecl z tz (toList vs1) [] e2)
       _ -> supc

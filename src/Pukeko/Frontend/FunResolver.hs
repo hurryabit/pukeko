@@ -13,7 +13,6 @@ import qualified Data.Set      as Set
 
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
-import           Pukeko.AST.Type
 import qualified Pukeko.AST.Identifier as Id
 
 type In  = Surface
@@ -36,8 +35,8 @@ resolveModule (MkModule decls) = runReader noPos . evalState st0 $ do
   where
     st0 = MkFRState mempty mempty
 
-declareFun :: CanFR effs => Bind Type tv -> Eff effs ()
-declareFun = here' $ \(MkBind (unlctd -> fun) _) -> do
+declareFun :: CanFR effs => SignDecl tv -> Eff effs ()
+declareFun = here' $ \(MkSignDecl (unlctd -> fun) _) -> do
   whenM (uses declared (Map.member fun)) $
     throwHere ("duplicate declaration of function:" <+> pretty fun)
   pos <- where_
@@ -54,11 +53,11 @@ defineFun = here' $ \(unlctd -> fun) -> do
 frDecl :: CanFR effs => Decl In -> Eff effs ()
 frDecl = \case
   DType _ -> pure ()
-  DSign s -> declareFun s
+  DSign sign -> declareFun sign
+  DFunc func -> defineFun (func^.func2name)
+  DExtn extn -> defineFun (extn^.extn2name)
   -- FIXME: Check that classes are declared only once and before their first
   -- instantiation. Check that no class/type constructor pair is instantiated
   -- twice.
-  DClss c -> for_ (_clss2methods c) $ \m -> declareFun m *> defineFun (m^.bind2evar)
+  DClss c -> for_ (_clss2methods c) $ \m -> declareFun m *> defineFun (m^.sign2name)
   DInst _ -> pure ()
-  DDefn d -> defineFun (d^.defn2bind.bind2evar)
-  DExtn p -> defineFun (p^.extn2bind.bind2evar)

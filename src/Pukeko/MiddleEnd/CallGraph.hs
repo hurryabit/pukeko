@@ -34,7 +34,7 @@ makeCallGraph' decls = CallGraph g (fst3 . f) n
   where
     (g, f, n) = G.graphFromEdges (map deps (toList decls))
     deps decl =
-      (decl, decl^.func2name, toList (setOf (func2expr . expr2atom . _AVal) decl))
+      (decl, decl^.func2name.lctd, toList (setOf (func2expr . expr2atom . _AVal) decl))
 
 makeCallGraph :: Module -> CallGraph 'Any
 makeCallGraph (MkModule _types extns supcs) =
@@ -59,5 +59,5 @@ renderCallGraph g = D.renderDot . D.toDot . D.digraph' $ do
     let shape = case decl of
           SupCDecl{} -> D.Ellipse
           ExtnDecl{} -> D.BoxShape
-    D.node v [D.Label (D.StrLabel (T.pack (Id.name (decl^.func2name)))), D.Shape shape]
+    D.node v [D.Label (D.StrLabel (T.pack (Id.name (decl^.func2name.lctd)))), D.Shape shape]
     traverse (v D.-->) us

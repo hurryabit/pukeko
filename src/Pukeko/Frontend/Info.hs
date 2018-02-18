@@ -40,7 +40,7 @@ data ModuleInfo = MkModuleInfo
   , _info2dcons :: Map Id.DCon (TConDecl, DConDecl)
   , _info2signs :: Map Id.EVar (Type Void)
   , _info2clsss :: Map (Name Clss) SysF.ClssDecl
-  , _info2mthds :: Map Id.EVar (SysF.ClssDecl, Bind Type (TScope Int Void))
+  , _info2mthds :: Map Id.EVar (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
   , _info2insts :: Map (Name Clss, TypeAtom) SomeInstDecl
   }
 
@@ -89,30 +89,34 @@ tconDeclInfo tcon =
   in  itemInfo info2tcons (nameOf tcon) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
-bindInfo :: IsType ty => Lens' decl (Bind ty Void) -> decl -> ModuleInfo
-bindInfo l ((^.l) -> MkBind z t) =
-  maybe mempty (itemInfo info2signs (unlctd z)) (isType t)
+signInfo :: Lctd Id.EVar -> Type Void -> ModuleInfo
+signInfo = itemInfo info2signs . unlctd
 
 instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
   collectInfo (SysF.MkModule decls) = foldFor decls $ \case
     SysF.DType tcon -> tconDeclInfo tcon
-    SysF.DSign (MkBind z t) -> bindInfo id (MkBind z t)
-    SysF.DClss clssDecl@(SysF.MkClssDecl clss v ms) ->
-      let mthds_info = foldFor ms $ \mthd@(MkBind z t0) ->
-            let t1 = mkTUni [MkQVar (Set.singleton clss) v] t0
-            in  bindInfo id (MkBind z t1)
-                <> itemInfo info2mthds (z^.lctd) (clssDecl, mthd)
+    SysF.DSign (SysF.MkSignDecl func typ_) -> signInfo func typ_
+    -- NOTE: See the comment for 'SysF._func2type' on why we treat 'TArr' like this.
+    -- SysF.DFunc (SysF.MkFuncDecl _    TArr _) -> mempty
+    SysF.DFunc (SysF.MkFuncDecl func typ_ _) ->
+      maybe mempty (signInfo func) (isType typ_)
+    -- SysF.DExtn (SysF.MkExtnDecl _    TArr _) -> mempty
+    SysF.DExtn (SysF.MkExtnDecl func typ_ _) ->
+      maybe mempty (signInfo func) (isType typ_)
+    SysF.DClss clssDecl@(SysF.MkClssDecl clss param mthds) ->
+      let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
+            let typ1 = mkTUni [MkQVar (Set.singleton clss) param] typ0
+            in  signInfo mthd typ1
+                <> itemInfo info2mthds (mthd^.lctd) (clssDecl, mthdDecl)
       in  itemInfo info2clsss clss clssDecl <> mthds_info
     SysF.DInst inst@(SysF.MkInstDecl clss t _ _) ->
       itemInfo info2insts (clss, t) (SomeInstDecl inst)
-    SysF.DDefn defn -> bindInfo defn2bind defn
-    SysF.DExtn extn -> bindInfo SysF.extn2bind extn
 
 instance HasModuleInfo Core.Module where
   collectInfo (Core.MkModule types extns supcs) = fold
     [ foldMap tconDeclInfo types
-    , foldMap (bindInfo Core.func2bind) extns
-    , foldMap (bindInfo Core.func2bind) supcs
+    , foldMap (\extn -> signInfo (Core._extn2name extn) (Core._extn2type extn)) extns
+    , foldMap (\supc -> signInfo (Core._supc2name supc) (Core._supc2type supc)) supcs
     ]
 
 foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
