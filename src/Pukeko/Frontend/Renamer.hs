@@ -39,15 +39,6 @@ type GlobalEffs effs = CanRn effs
 
 makeLenses ''Tabs
 
-renameModule :: Member (Error Failure) effs =>
-  Ps.Package -> Eff effs (Module Out)
-renameModule (Ps.MkPackage _ modules) =
-  runNameSource . runReader noPos . evalState st0 $ do
-    let ldecls = concatMap Ps._mod2decls modules
-    MkModule . catMaybes <$> traverse rnDecl ldecls
-  where
-    st0 = Tabs mempty mempty mempty
-
 -- | Create a new global 'Binder' if the name has not been declared before in
 -- the same namespace and pass the result to the continuation. The continuations
 -- result is finally stored in the declaration table.
@@ -111,90 +102,19 @@ findBinop op = do
     Just fun -> pure fun
     Nothing  -> throwHere ("unknown operator:" <+> pretty op)
 
-rnDecl :: CanRn effs => Ps.Decl -> Eff effs (Maybe (Decl Out))
-rnDecl = \case
-  Ps.DType t -> Just . DType <$> rnTypeDecl t
-  Ps.DSign s -> Just . DSign <$> rnSignDecl mempty s
-  Ps.DClss c -> Just . DClss <$> rnClssDecl c
-  Ps.DInst i -> Just . DInst <$> rnInstDecl i
-  Ps.DDefn d -> Just . DDefn <$> runReader mempty (rnDefn d)
-  Ps.DExtn (Ps.MkExtnDecl z s) -> do
-    modifying funcs (<> Set.singleton (z^.lctd))
-    yield (DExtn (MkExtnDecl (MkBind z NoType) s))
-  Ps.DInfx (Ps.MkInfxDecl l@(unlctd -> op) fun) -> here l $ do
-    checkFunc fun
-    modifying binops (Map.insert op fun)
-    pure Nothing
-  where
-    yield = pure . Just
+-- * Renaming of types
 
--- -- | Rename a 'Ps.DConDecl' under the assumption that all mentioned type
--- -- constructors are already in the global environment.
--- rnDConDecl :: LocalEffs TVar effs =>
---   Binder TCon -> Int -> Ps.DConDecl -> Eff effs DConDecl
--- rnDConDecl tcon tag (Ps.MkDConDecl name fields0) =
---   introGlobal dconTab "data constructor" name id $ \binder ->
---     MkDConDecl (bindAt name tcon) binder tag <$> traverse rnType fields0
-
--- | Rename a (potentially) recursive 'PS.TConDecl'.
-rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TConDecl
-rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
-  -- NOTE: Since the type definition might be recursive, we need to introduce a
-  -- dummy version of the type constructor first and overwrite it in the end.
-  let mkDummy binder = Left (MkTConDecl binder [] (Right []))
-  binder <- introGlobal tconTab "type constructor" name mkDummy pure
-  -- (dcons1, params1) <- runReader @(Env TVar) mempty $
-  --   introMany (introLocal "type parameter") params0 $
-  --     bitraverse rnType (itraverse (rnDConDecl binder)) dcons0
-  dcons1 <- bitraverse
-            (rnType (finRenamer params0))
-            (zipWithM (\tag -> rnDConDecl binder params0 tag) [0..])
-            dcons0
-  let tcon = MkTConDecl binder params0 dcons1
-  modifying tconTab (Map.insert (unlctd name) (Left tcon))
-  pure tcon
-
-rnDConDecl :: CanRn effs =>
-  Name TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
-rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
-  MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
-  where
-    env = finRenamer vs
-
-rnSignDecl :: CanRn effs => Map Id.TVar tv -> Ps.SignDecl -> Eff effs (Bind Type tv)
-rnSignDecl env (Ps.MkSignDecl z t) = do
-  modifying funcs (Set.insert (z^.lctd))
-  MkBind z <$> rnTypeScheme env t
-
--- | Rename a 'Ps.ClssDecl'. Due to the FIXME for 'rnConstraints', all
--- constraints methods put on the class type variables are silently dropped on
--- the floor.
-rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClssDecl
-rnClssDecl (Ps.MkClssDecl name param methods0) =
-  introGlobal tconTab "type constructor" name Right $ \binder -> do
-    let env = Map.singleton param (mkBound 0 param)
-    methods1 <- traverse (rnSignDecl env) methods0
-    modifying funcs (<> setOf (traverse . bind2evar . lctd) methods1)
-    pure (MkClssDecl binder param methods1)
-
-
--- | Rename an instance definition. There's /no/ check whether an instance for
--- this class/type combination has already been defined.
-rnInstDecl :: GlobalEffs effs => Ps.InstDecl -> Eff effs (InstDecl Out)
-rnInstDecl (Ps.MkInstDecl clss0 tatm0 params0 cstrs0 defns0) = do
-  cstrs1 <- rnConstraints cstrs0
-  MkInstDecl
-    <$> lookupGlobal tconTab isRight "class" clss0
-    <*> rnTypeAtom tatm0
-    <*> applyConstraints params0 cstrs1
-    <*> traverse (runReader mempty . rnDefn) defns0
-
+-- | Rename an atomic type. Does basically nothing unless it is a reference to a
+-- type constructor.
 rnTypeAtom :: GlobalEffs effs => Ps.TypeAtom -> Eff effs TypeAtom
 rnTypeAtom = \case
   Ps.TAArr -> pure TAArr
   Ps.TAInt -> pure TAInt
   Ps.TACon name -> TACon <$> lookupGlobal tconTab isLeft "type constructor" name
 
+-- | Rename a type under the assumption that all its free variables are
+-- contained in the map. All references to type constructors are renamed as
+-- well.
 rnType :: CanRn effs => Map Id.TVar tv -> Ps.Type -> Eff effs (Type tv)
 rnType env = go
   where
@@ -205,13 +125,16 @@ rnType env = go
       Ps.TAtm a -> TAtm <$> rnTypeAtom a
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
--- | Rename a 'Ps.TypeCstr'.
+-- | Collect all type class-type variable pairs in a type constraint. Rename all
+-- references to type classes.
 rnConstraints :: GlobalEffs effs =>
   Ps.TypeCstr -> Eff effs (Map Id.TVar (Set (Name Clss)))
 rnConstraints (Ps.MkTypeCstr constraints) =
   fmap (fmap Set.fromList . Map.fromMultiList) . for constraints $ \(clss, tvar) ->
     (,) tvar <$> lookupGlobal tconTab isRight "type class" clss
 
+-- | Rename a type scheme. Fails if there are constraints on type variables
+-- which are contained in the map or not in the type.
 rnTypeScheme :: CanRn effs => Map Id.TVar tv -> Ps.TypeScheme -> Eff effs (Type tv)
 rnTypeScheme env (Ps.MkTypeScheme qs0 t) = do
   let vs0 = toList (setOf Ps.type2tvar t `Set.difference` Map.keysSet env)
@@ -219,6 +142,7 @@ rnTypeScheme env (Ps.MkTypeScheme qs0 t) = do
   qvs <- applyConstraints vs0 qs1
   mkTUni qvs <$> rnType (fmap weakenScope env <> finRenamer vs0) t
 
+-- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
 rnCoercion (Ps.MkCoercion dir0 tname) = do
   let dir1 = case dir0 of
@@ -226,9 +150,32 @@ rnCoercion (Ps.MkCoercion dir0 tname) = do
         Ps.Project -> Project
   MkCoercion dir1 <$> lookupGlobal tconTab isLeft "type constructor" tname
 
+
+-- * Renaming of expressions
+
+-- | Rename a typed binder.
+rnBind :: Lctd Id.EVar -> Bind NoType tv
+rnBind x = MkBind x NoType
+
+-- | Rename a pattern.
+rnPatn :: Ps.Patn -> Patn Out tv
+rnPatn = \case
+  Ps.PWld      -> PWld
+  Ps.PVar x    -> PVar x
+  Ps.PCon c ps -> PCon c [] (map rnPatn ps)
+
+-- | Rename a definition.
 rnDefn :: CanRn effs => Ps.Defn Id.EVar -> Eff (Env ev : effs) (Defn Out tv ev)
 rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 
+-- | Rename a pattern match alternative.
+rnAltn :: CanRn effs => Ps.Altn Id.EVar -> Eff (Env ev : effs) (Altn Out tv ev)
+rnAltn (Ps.MkAltn p0 e) = do
+  let p1 = rnPatn p0
+  let bs = Map.fromSet id (setOf patn2evar p1)
+  MkAltn p1 <$> localize bs (rnExpr e)
+
+-- | Rename a value abstraction (lambda).
 rnELam :: CanRn effs =>
   [Lctd Id.EVar] -> Ps.Expr Id.EVar -> Eff (Env ev : effs) (Expr Out tv ev)
 rnELam [] e0 = rnExpr e0
@@ -236,6 +183,7 @@ rnELam (b0:bs) e0 = do
   let b1@(MkBind (unlctd -> x) NoType) = rnBind b0
   ELam b1 <$> localize1 x (rnELam bs e0)
 
+-- | Rename an expression.
 rnExpr :: CanRn effs => Ps.Expr Id.EVar -> Eff (Env ev : effs) (Expr Out tv ev)
 rnExpr = \case
   Ps.ELoc le -> here le $ ELoc <$> lctd rnExpr le
@@ -262,17 +210,86 @@ rnExpr = \case
     localizeDefns ds0 $ ERec <$> traverse rnDefn ds0 <*> rnExpr e0
   Ps.ECoe c e -> ETyCoe <$> rnCoercion c <*> rnExpr e
 
-rnBind :: Lctd Id.EVar -> Bind NoType tv
-rnBind x = MkBind x NoType
 
-rnAltn :: CanRn effs => Ps.Altn Id.EVar -> Eff (Env ev : effs) (Altn Out tv ev)
-rnAltn (Ps.MkAltn p0 e) = do
-  let p1 = rnPatn p0
-  let bs = Map.fromSet id (setOf patn2evar p1)
-  MkAltn p1 <$> localize bs (rnExpr e)
+-- * Renaming of top level declarations
 
-rnPatn :: Ps.Patn -> Patn Out tv
-rnPatn = \case
-  Ps.PWld      -> PWld
-  Ps.PVar x    -> PVar x
-  Ps.PCon c ps -> PCon c [] (map rnPatn ps)
+-- | Rename a (potentially) recursive type declaration.
+rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TConDecl
+rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
+  -- NOTE: Since the type definition might be recursive, we need to introduce a
+  -- dummy version of the type constructor first and overwrite it in the end.
+  let mkDummy binder = Left (MkTConDecl binder [] (Right []))
+  binder <- introGlobal tconTab "type constructor" name mkDummy pure
+  -- (dcons1, params1) <- runReader @(Env TVar) mempty $
+  --   introMany (introLocal "type parameter") params0 $
+  --     bitraverse rnType (itraverse (rnDConDecl binder)) dcons0
+  dcons1 <- bitraverse
+            (rnType (finRenamer params0))
+            (zipWithM (\tag -> rnDConDecl binder params0 tag) [0..])
+            dcons0
+  let tcon = MkTConDecl binder params0 dcons1
+  modifying tconTab (Map.insert (unlctd name) (Left tcon))
+  pure tcon
+
+-- | Rename a data constructor declaration. Assumes that the corresponding type
+-- constructor (or at least some dummy version of it) has already been
+-- introduced to the global environment.
+rnDConDecl :: CanRn effs =>
+  Name TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
+rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
+  MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
+  where
+    env = finRenamer vs
+
+-- | Rename a signature declaration.
+rnSignDecl :: CanRn effs => Map Id.TVar tv -> Ps.SignDecl -> Eff effs (Bind Type tv)
+rnSignDecl env (Ps.MkSignDecl z t) = do
+  modifying funcs (Set.insert (z^.lctd))
+  MkBind z <$> rnTypeScheme env t
+
+-- | Rename a class declaration. Due to the FIXME for 'rnConstraints', all
+-- constraints which methods put on the class type variables are silently
+-- dropped on the floor.
+rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClssDecl
+rnClssDecl (Ps.MkClssDecl name param methods0) =
+  introGlobal tconTab "type constructor" name Right $ \binder -> do
+    let env = Map.singleton param (mkBound 0 param)
+    methods1 <- traverse (rnSignDecl env) methods0
+    modifying funcs (<> setOf (traverse . bind2evar . lctd) methods1)
+    pure (MkClssDecl binder param methods1)
+
+-- | Rename an instance definition. There's /no/ check whether an instance for
+-- this class/type combination has already been defined.
+rnInstDecl :: GlobalEffs effs => Ps.InstDecl -> Eff effs (InstDecl Out)
+rnInstDecl (Ps.MkInstDecl clss0 tatm0 params0 cstrs0 defns0) = do
+  cstrs1 <- rnConstraints cstrs0
+  MkInstDecl
+    <$> lookupGlobal tconTab isRight "class" clss0
+    <*> rnTypeAtom tatm0
+    <*> applyConstraints params0 cstrs1
+    <*> traverse (runReader mempty . rnDefn) defns0
+
+-- | Rename a top level declaration.
+rnDecl :: CanRn effs => Ps.Decl -> Eff effs (Maybe (Decl Out))
+rnDecl = \case
+  Ps.DType t -> Just . DType <$> rnTypeDecl t
+  Ps.DSign s -> Just . DSign <$> rnSignDecl mempty s
+  Ps.DDefn d -> Just . DDefn <$> runReader mempty (rnDefn d)
+  Ps.DExtn (Ps.MkExtnDecl z s) -> do
+    modifying funcs (<> Set.singleton (z^.lctd))
+    pure (Just (DExtn (MkExtnDecl (MkBind z NoType) s)))
+  Ps.DClss c -> Just . DClss <$> rnClssDecl c
+  Ps.DInst i -> Just . DInst <$> rnInstDecl i
+  Ps.DInfx (Ps.MkInfxDecl l@(unlctd -> op) fun) -> here l $ do
+    checkFunc fun
+    modifying binops (Map.insert op fun)
+    pure Nothing
+
+-- | Rename a whole package, i.e., a module with its transiticve dependencies.
+renameModule :: Member (Error Failure) effs => Ps.Package -> Eff effs (Module Out)
+renameModule (Ps.MkPackage _ modules) =
+  let ldecls = concatMap Ps._mod2decls modules
+  in  MkModule . catMaybes <$> traverse rnDecl ldecls
+      & evalState (Tabs mempty mempty mempty)
+      & runReader noPos
+      & runNameSource
