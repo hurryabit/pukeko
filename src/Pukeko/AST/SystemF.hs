@@ -50,6 +50,11 @@ data ExtnDecl lg = MkExtnDecl
 data ClssDecl = MkClssDecl
   { _clss2name    :: Name Clss
   , _clss2param   :: Id.TVar
+  , _clss2dcon    :: Name DCon
+    -- ^ During type class elimination, we introduce a data constructor for the
+    -- dictionary type. The easiest way to get and distribute a 'Name' for this
+    -- constructor is to get it during renaming and carry it around afterwards.
+    -- For class @XYZ@ this constructor is called @Dict$XZY@.
   , _clss2methods :: [SignDecl (TScope Int Void)]
   }
 
@@ -120,7 +125,7 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
     DFunc func -> pretty func
     DExtn (MkExtnDecl name typ_ extn) ->
       hsep ["external", pretty (name ::: typ_), "=", doubleQuotes (pretty extn)]
-    DClss (MkClssDecl c v ms) ->
+    DClss (MkClssDecl c v _ ms) ->
       "class" <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
     DInst (MkInstDecl c t0 qvs ds) ->

@@ -73,7 +73,7 @@ data TConDecl = MkTConDecl
   }
 
 data DConDecl = MkDConDecl
-  { _dcon2name :: Lctd Id.DCon
+  { _dcon2name :: LctdName DCon
   , _dcon2flds :: [Type]
   }
 
@@ -129,7 +129,7 @@ data Defn v = MkDefn (Lctd Id.EVar) (Expr v)
 data Expr v
   = ELoc (Lctd (Expr v))
   | EVar v
-  | ECon Id.DCon
+  | ECon (LctdName DCon)
   | ENum Int
   | EApp (Expr v) (NonEmpty (Expr v))
   | EOpp Op.Binary (Expr v) (Expr v)
@@ -144,7 +144,7 @@ data Altn v = MkAltn Patn (Expr v)
 data Patn
   = PWld
   | PVar Id.EVar
-  | PCon Id.DCon [Patn]
+  | PCon (LctdName DCon) [Patn]
 
 extend :: Module -> Package -> Package
 extend mdl (MkPackage _ mdls) = MkPackage (_mod2file mdl) (mdls ++ [mdl])
@@ -156,8 +156,8 @@ mkApp fun = \case
 
 mkIf :: Expr v -> Expr v -> Expr v -> Expr v
 mkIf t u v =
-  EMat t [ MkAltn (PCon (Id.dcon "True") []) u
-         , MkAltn (PCon (Id.dcon "False") []) v
+  EMat t [ MkAltn (PCon (Lctd noPos (Tagged "True" )) []) u
+         , MkAltn (PCon (Lctd noPos (Tagged "False")) []) v
          ]
 
 mkLam :: [Lctd Id.EVar] -> Expr v -> Expr v

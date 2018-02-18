@@ -7,13 +7,6 @@ module Pukeko.AST.Identifier
   , TVar
   , tvar
   , freshTVars
-  -- , TCon
-  -- , tcon
-  , DCon
-  , dcon
-  -- , Clss
-  -- , clss
-  , annot
   )
 where
 
@@ -21,7 +14,7 @@ import Pukeko.Prelude
 
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Char (isLower, isUpper)
+import Data.Char (isLower)
 
 class Named a where
   name :: a -> String
@@ -66,34 +59,8 @@ instance Named TVar where
 instance Pretty TVar where
   pretty = pretty . name
 
-data XCon tag = XCon String
-  deriving (Show, Eq, Ord)
-
-xcon :: String -> XCon tag
-xcon name@(first:_)
-  | isUpper first = XCon name
-xcon name = bugWith "invalid constructor/clss name" name
-
-annot :: XCon tag -> String -> XCon tag
-annot (XCon x) y = XCon (x ++ "$" ++ y)
-
-instance Named (XCon tag) where
-  name (XCon n) = n
-
-instance Pretty (XCon tag) where
-  pretty = pretty . name
-
-data DConTag
-type DCon = XCon DConTag
-
-dcon :: String -> DCon
-dcon = xcon
-
 deriveToJSON defaultOptions ''EVar
 deriveToJSON defaultOptions ''TVar
 
-instance ToJSON (XCon tag) where
-  toJSON = $(mkToJSON defaultOptions ''XCon)
 instance ToJSONKey EVar
 instance ToJSONKey TVar
-instance ToJSONKey (XCon tag)

@@ -86,13 +86,6 @@ patn2type f = \case
   PSimple dcon targs binds ->
     PSimple dcon <$> traverse (simplify f) targs <*> pure binds
 
-patn2dcon :: Traversal (Patn ty tv) (Patn ty tv) Id.DCon Id.DCon
-patn2dcon f = \case
-  PWld      -> pure PWld
-  PVar x    -> pure (PVar x)
-  PCon c ts ps -> PCon <$> f c <*> pure ts <*> (traverse . patn2dcon) f ps
-  PSimple c ts bs -> PSimple <$> f c <*> pure ts <*> pure bs
-
 -- | Traverse over all binders in a pattern.
 patn2evar :: Traversal' (Patn st tv) Id.EVar
 patn2evar f = \case

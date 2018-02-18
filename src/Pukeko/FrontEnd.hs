@@ -15,7 +15,6 @@ import qualified Pukeko.FrontEnd.Parser         as Parser
 import qualified Pukeko.FrontEnd.PatternMatcher as PatternMatcher
 import qualified Pukeko.FrontEnd.Inferencer     as Inferencer
 import qualified Pukeko.FrontEnd.TypeChecker    as TypeChecker
-import qualified Pukeko.FrontEnd.TypeResolver   as TypeResolver
 import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
 
 type Module = SystemF.Module SystemF
@@ -23,7 +22,6 @@ type Module = SystemF.Module SystemF
 run :: Member (Error Failure) effs => Bool -> Parser.Package -> Eff effs Module
 run unsafe pkg = do
   surface <- Renamer.renameModule pkg
-  TypeResolver.resolveModule surface
   FunResolver.resolveModule  surface
   KindChecker.checkModule    surface
   typed <- Inferencer.inferModule surface

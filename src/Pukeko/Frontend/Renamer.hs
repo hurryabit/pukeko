@@ -28,6 +28,7 @@ data Tabs = Tabs
   { _funcs  :: Set Id.EVar
   , _binops :: Map Op.Binary Id.EVar
   , _tconTab :: Map (Ps.Name TCon) (GenDecl (Only TCon) Out)
+  , _dconTab :: Map (Ps.Name DCon) DConDecl
   }
 
 type Env ev = Reader (Map Id.EVar ev)
@@ -158,11 +159,15 @@ rnBind :: Lctd Id.EVar -> Bind NoType tv
 rnBind x = MkBind x NoType
 
 -- | Rename a pattern.
-rnPatn :: Ps.Patn -> Patn Out tv
+rnPatn :: CanRn effs => Ps.Patn -> Eff effs (Patn Out tv)
 rnPatn = \case
-  Ps.PWld      -> PWld
-  Ps.PVar x    -> PVar x
-  Ps.PCon c ps -> PCon c [] (map rnPatn ps)
+  Ps.PWld      -> pure PWld
+  Ps.PVar x    -> pure (PVar x)
+  Ps.PCon dcon patns ->
+    PCon
+    <$> lookupGlobal dconTab (const True) "data constructor" dcon
+    <*> pure []
+    <*> traverse rnPatn patns
 
 -- | Rename a definition.
 rnDefn :: CanRn effs => Ps.Defn Id.EVar -> Eff (Env ev : effs) (Defn Out tv ev)
@@ -171,7 +176,7 @@ rnDefn (Ps.MkDefn b e) = MkDefn (rnBind b) <$> rnExpr e
 -- | Rename a pattern match alternative.
 rnAltn :: CanRn effs => Ps.Altn Id.EVar -> Eff (Env ev : effs) (Altn Out tv ev)
 rnAltn (Ps.MkAltn p0 e) = do
-  let p1 = rnPatn p0
+  p1 <- rnPatn p0
   let bs = Map.fromSet id (setOf patn2evar p1)
   MkAltn p1 <$> localize bs (rnExpr e)
 
@@ -194,7 +199,7 @@ rnExpr = \case
       Nothing -> do
         checkFunc x
         pure (EVal x)
-  Ps.ECon c -> pure (ECon c)
+  Ps.ECon name -> ECon <$> lookupGlobal dconTab (const True) "data constructor" name
   Ps.ENum n -> pure (ENum n)
   Ps.EApp e0 es -> foldl EApp <$> rnExpr e0 <*> traverse rnExpr es
   Ps.EOpp op e1 e2 ->
@@ -218,10 +223,9 @@ rnExpr = \case
 -- introduced to the global environment.
 rnDConDecl :: CanRn effs =>
   Name TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
-rnDConDecl tcon vs tag (Ps.MkDConDecl dcon flds) = here dcon $
-  MkDConDecl tcon dcon tag <$> traverse (rnType env) flds
-  where
-    env = finRenamer vs
+rnDConDecl tcon vs tag (Ps.MkDConDecl name fields) = here name $
+  introGlobal dconTab "data constructor" name id $ \dcon ->
+    MkDConDecl tcon dcon tag <$> traverse (rnType (finRenamer vs)) fields
 
 -- | Rename a (potentially) recursive type declaration.
 rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TConDecl
@@ -265,12 +269,13 @@ rnExtnDecl (Ps.MkExtnDecl func extn) = pure (MkExtnDecl func NoType extn)
 -- dropped on the floor.
 rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClssDecl
 rnClssDecl (Ps.MkClssDecl name param methods0) =
-  introGlobal tconTab "type constructor" name DClss $ \binder -> do
+  introGlobal tconTab "type constructor" name DClss $ \clss -> do
+    dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
     let env = Map.singleton param (mkBound 0 param)
     methods1 <- for methods0 $ \mthd@(Ps.MkSignDecl z _) -> do
       modifying funcs (Set.insert (z^.lctd))
       rnSignDecl env mthd
-    pure (MkClssDecl binder param methods1)
+    pure (MkClssDecl clss param dcon methods1)
 
 -- | Rename an instance definition. There's /no/ check whether an instance for
 -- this class/type combination has already been defined.
@@ -306,6 +311,6 @@ renameModule :: Member (Error Failure) effs => Ps.Package -> Eff effs (Module Ou
 renameModule (Ps.MkPackage _ modules) =
   let ldecls = concatMap Ps._mod2decls modules
   in  MkModule . catMaybes <$> traverse rnDecl ldecls
-      & evalState (Tabs mempty mempty mempty)
+      & evalState (Tabs mempty mempty mempty mempty)
       & runReader noPos
       & runNameSource

@@ -28,7 +28,7 @@ data TConDecl = MkTConDecl
 
 data DConDecl = MkDConDecl
   { _dcon2tcon   :: Name TCon
-  , _dcon2name   :: Lctd Id.DCon
+  , _dcon2name   :: Name DCon
   , _dcon2tag    :: Int
   , _dcon2fields :: [Type (TScope Int Void)]
   }
@@ -40,7 +40,9 @@ typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
   in  mkTUni (map (MkQVar mempty) tparams) (fields *~> res)
 
 type instance NameSpaceOf TConDecl = TCon
+type instance NameSpaceOf DConDecl = DCon
 instance HasName   TConDecl where nameOf = _tcon2name
+instance HasName   DConDecl where nameOf = _dcon2name
 instance HasPos    TConDecl where getPos = getPos . nameOf
 instance HasPos    DConDecl where getPos = getPos . _dcon2name
 

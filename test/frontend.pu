@@ -23,11 +23,11 @@ data Bool = | A
 -- SUBSECTION data constructor
 
 -- TEST unknown in expression
--- FAILURE 1:1: unknown data constructor: Con
+-- FAILURE 1:7: unknown data constructor: Con
 bad = Con
 
 -- TEST unknown in pattern
--- FAILURE 1:1: undeclared function: f
+-- FAILURE 3:5: unknown data constructor: Con
 f x =
   match x with
   | Con -> 1

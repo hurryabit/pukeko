@@ -37,7 +37,7 @@ import           Pukeko.AST.Type
 
 data ModuleInfo = MkModuleInfo
   { _info2tcons :: Map (Name TCon) TConDecl
-  , _info2dcons :: Map Id.DCon (TConDecl, DConDecl)
+  , _info2dcons :: Map (Name DCon) (TConDecl, DConDecl)
   , _info2signs :: Map Id.EVar (Type Void)
   , _info2clsss :: Map (Name Clss) SysF.ClssDecl
   , _info2mthds :: Map Id.EVar (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
@@ -84,7 +84,7 @@ tconDeclInfo :: TConDecl -> ModuleInfo
 tconDeclInfo tcon =
   let dis = foldMapOf
         (tcon2dcons . _Right . traverse)
-        (\dcon -> itemInfo info2dcons (dcon^.dcon2name.lctd) (tcon, dcon))
+        (\dcon -> itemInfo info2dcons (nameOf dcon) (tcon, dcon))
         tcon
   in  itemInfo info2tcons (nameOf tcon) tcon <> dis
 
@@ -103,7 +103,7 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
     -- SysF.DExtn (SysF.MkExtnDecl _    TArr _) -> mempty
     SysF.DExtn (SysF.MkExtnDecl func typ_ _) ->
       maybe mempty (signInfo func) (isType typ_)
-    SysF.DClss clssDecl@(SysF.MkClssDecl clss param mthds) ->
+    SysF.DClss clssDecl@(SysF.MkClssDecl clss param _dcon mthds) ->
       let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
             let typ1 = mkTUni [MkQVar (Set.singleton clss) param] typ0
             in  signInfo mthd typ1

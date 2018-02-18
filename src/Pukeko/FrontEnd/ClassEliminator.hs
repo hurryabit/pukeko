@@ -40,12 +40,6 @@ elimModule m0@(MkModule decls) = runCE m0 $
 clssTCon :: Name Clss -> Name TCon
 clssTCon = coerce
 
--- | Name of the dictionary data constructor of a type class, e.g., @Dict$Eq@
--- for type class @Eq@. This is currently the same as the dictionary type
--- constructor.
-clssDCon :: Name Clss -> Id.DCon
-clssDCon clss = Id.dcon ("Dict$" ++ untag (nameText clss))
-
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
@@ -79,11 +73,11 @@ instDictInfo (MkInstDecl clss tatom qvs _) =
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
 dictTConDecl :: ClssDecl -> TConDecl
-dictTConDecl (MkClssDecl clss prm mthds) =
+dictTConDecl (MkClssDecl clss prm dcon mthds) =
     let tcon = coerce clss
         flds = map _sign2type mthds
-        dcon = MkDConDecl tcon (Lctd (getPos clss) (clssDCon clss)) 0 flds
-    in  MkTConDecl tcon [prm] (Right [dcon])
+        dconDecl = MkDConDecl tcon dcon 0 flds
+    in  MkTConDecl tcon [prm] (Right [dconDecl])
 
 -- | Transform a type class declaration into a data type declaration for the
 -- dictionary and projections from the dictionary to each class method.
@@ -104,7 +98,7 @@ dictTConDecl (MkClssDecl clss prm mthds) =
 -- >       match dict with
 -- >       | Dict$Traversable @t traverse -> traverse
 elimClssDecl :: ClssDecl -> CE Void Void [Decl Out]
-elimClssDecl clssDecl@(MkClssDecl clss prm mthds) = do
+elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
   let qprm = NE.singleton (MkQVar mempty prm)
       prmType = TVar (mkBound 0 prm)
@@ -114,7 +108,7 @@ elimClssDecl clssDecl@(MkClssDecl clss prm mthds) = do
         let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
         let e_rhs = EVar (mkBound z z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
-        let c_one = MkAltn (PSimple (clssDCon clss) [prmType] c_binds) e_rhs
+        let c_one = MkAltn (PSimple dcon [prmType] c_binds) e_rhs
         let e_cas = EMat (EVar (mkBound () dictPrm)) (c_one :| [])
         let b_lam = MkBind (Lctd mpos dictPrm) (mkTDict clss prmType)
         let e_lam = ELam b_lam (ETyAnn t0 e_cas)
@@ -139,14 +133,14 @@ elimClssDecl clssDecl@(MkClssDecl clss prm mthds) = do
 -- >   in
 -- >   Dict$Traversable @List traverse
 elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
-elimInstDecl clssDecl inst@(MkInstDecl clss tatom qvs defns0) = do
+elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl clss tatom qvs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
-  defns1 <- for (clssDecl^.clss2methods) $ \(MkSignDecl (unlctd -> mthd) _) -> do
+  defns1 <- for methods0 $ \(MkSignDecl (unlctd -> mthd) _) -> do
     case find (\defn -> defn^.func2name.lctd == mthd) defns0 of
       Nothing -> bugWith "missing method" (clss, tatom, mthd)
       Just (MkFuncDecl name typ_ body) -> pure (MkDefn (MkBind name typ_) body)
-  let e_dcon = mkETyApp (ECon (clssDCon clss)) [t_inst]
+  let e_dcon = mkETyApp (ECon dcon) [t_inst]
   let e_body =
         foldl EApp e_dcon (imap (\i -> EVar . mkBound i . (^.defn2func)) defns1)
   let e_let :: Expr In _ _

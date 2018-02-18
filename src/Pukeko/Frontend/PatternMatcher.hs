@@ -17,6 +17,7 @@ import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
+import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Identifier as Id
 
@@ -190,7 +191,7 @@ elimBPatnCols (MkColMatch cs0 us0) k = do
       _ -> throwHere "pattern match too simple, use a let binding instead"
 
 -- | A constructor pattern, i.e., neither a wildcard nor a variable pattern.
-data CPatn tv = MkCPatn Id.DCon [Type tv] [Patn In tv]
+data CPatn tv = MkCPatn (Name DCon) [Type tv] [Patn In tv]
 
 patnToCPatn :: forall tv. Patn In tv -> Maybe (CPatn tv)
 patnToCPatn = \case
@@ -216,7 +217,7 @@ findCPatnCol (MkColMatch cs0 us) =
 -- | A single group of a grouped pattern match.
 data GrpMatchItem tv ev =
   forall m m' n. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem Id.DCon [Type tv] [BPatn] (RowMatch m n tv (EScope Id.EVar ev))
+  MkGrpMatchItem (Name DCon) [Type tv] [BPatn] (RowMatch m n tv (EScope Id.EVar ev))
 
 -- | A grouped pattern match. They result from the transformation in
 -- 'groupCPatn'.
@@ -254,10 +255,10 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
     Left _       -> bugWith "pattern match on type synonym" tcon
     Right []     -> bugWith "pattern match on type without data constructors" tcon
     Right (d:ds) -> pure (d :| ds)
-  grps <- for dcons1 $ \MkDConDecl{_dcon2name = unlctd -> dcon1} -> do
-    let drs1 = filter (\(MkCPatn dcon2 _ts _, _) -> dcon1 == dcon2) drs
+  grps <- for dcons1 $ \dcon1 -> do
+    let drs1 = filter (\(MkCPatn dcon2 _ts _, _) -> nameOf dcon1 == dcon2) drs
     LS.withList drs1 $ \case
-      LS.Nil -> throwHere ("unmatched constructor:" <+> pretty dcon1)
+      LS.Nil -> throwHere ("unmatched constructor:" <+> pretty (nameOf dcon1))
 
       -- NOTE: This is the case where a constructor appears exactly once and no
       -- new binders are introduced.

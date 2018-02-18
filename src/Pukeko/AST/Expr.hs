@@ -19,6 +19,7 @@ import           Data.Bitraversable
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
 import qualified Pukeko.AST.Identifier as Id
+import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 import           Pukeko.AST.Scope
@@ -30,7 +31,7 @@ data Defn st tv ev = MkDefn
 
 data Atom
   = AVal Id.EVar
-  | ACon Id.DCon
+  | ACon (Name DCon)
   | ANum Int
 
 -- NOTE: All constructors added here also NEED TO be added to the COMPLETE
@@ -62,13 +63,13 @@ data Altn lg tv ev = MkAltn
 data Patn lg tv
   = IsNested lg ~ True  => PWld
   | IsNested lg ~ True  => PVar    Id.EVar
-  | IsNested lg ~ True  => PCon    Id.DCon [TypeOf lg tv] [Patn lg tv]
-  | IsNested lg ~ False => PSimple Id.DCon [TypeOf lg tv] [Maybe Id.EVar]
+  | IsNested lg ~ True  => PCon    (Name DCon) [TypeOf lg tv] [Patn lg tv]
+  | IsNested lg ~ False => PSimple (Name DCon) [TypeOf lg tv] [Maybe Id.EVar]
 
 pattern EVal :: Id.EVar -> Expr st tv ev
 pattern EVal z = EAtm (AVal z)
 
-pattern ECon :: Id.DCon -> Expr st tv ev
+pattern ECon :: Name DCon -> Expr st tv ev
 pattern ECon c = EAtm (ACon c)
 
 pattern ENum :: Int -> Expr st tv ev

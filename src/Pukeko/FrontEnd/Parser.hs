@@ -176,8 +176,8 @@ tvar = Id.tvar <$> lIdent <?> "type variable"
 tcon :: Parser (LctdName TCon)
 tcon = name uIdent <?> "type constructor"
 
-dcon :: Parser Id.DCon
-dcon = Id.dcon <$> uIdent <?> "data constructor"
+dcon :: Parser (LctdName DCon)
+dcon = name uIdent <?> "data constructor"
 
 clss :: Parser (LctdName Clss)
 clss = name uIdent <?> "class name"
@@ -304,7 +304,7 @@ tconDecl = MkTConDecl
   <*> (Right <$> aligned (some dconDecl))
 
 dconDecl :: Parser DConDecl
-dconDecl = indented_ bar (MkDConDecl <$> lctd dcon <*> many atype)
+dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
