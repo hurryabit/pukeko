@@ -8,7 +8,7 @@ import Pukeko.Prelude
 
 import           Control.Lens ((+~))
 import           Control.Monad.Freer.Fresh
-import qualified Data.Map as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Set as Set
 
 import Pukeko.BackEnd.Info
@@ -78,9 +78,8 @@ ccExpr mode expr =
   case expr of
     Local{_name} -> do
       MkContext { _offsets, _depth } <- ask
-      case Map.lookup _name _offsets of
-        Nothing     -> bugWith "unknown local variable" _name
-        Just offset -> output [PUSH (_depth - offset)]
+      let offset = _offsets Map.! _name
+      output [PUSH (_depth - offset)]
       case mode of
         Stack -> return ()
         Eval  -> output [EVAL]
@@ -113,7 +112,7 @@ ccExpr mode expr =
               Redex -> continueRedex UNWIND
       case _fun of
         Pack{_tag, _arity}
-          | n > _arity -> bugWith "overapplied constructor" _fun
+          | n > _arity -> impossible  -- type checker catches overapplications
           | n == _arity && _arity > 0 -> do
               ccArgs Stack
               output [CONS _tag _arity]

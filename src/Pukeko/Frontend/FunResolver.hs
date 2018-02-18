@@ -42,8 +42,8 @@ declareFun = here' $ \(MkSignDecl fun _) -> do
   pos <- where_
   modifying declared (Map.insert fun pos)
 
-defineFun :: CanFR effs => Name EVar -> Eff effs ()
-defineFun = here' $ \fun -> do
+defineFun :: (CanFR effs, NameSpaceOf a ~ EVar, HasName a) => a -> Eff effs ()
+defineFun = \(nameOf -> fun) -> here fun $ do
   unlessM (uses declared (Map.member fun)) $
     throwHere ("undeclared function:" <+> pretty fun)
   whenM (uses defined (Set.member fun)) $
@@ -54,10 +54,10 @@ frDecl :: CanFR effs => Decl In -> Eff effs ()
 frDecl = \case
   DType _ -> pure ()
   DSign sign -> declareFun sign
-  DFunc func -> defineFun (func^.func2name)
-  DExtn extn -> defineFun (extn^.extn2name)
+  DFunc func -> defineFun func
+  DExtn extn -> defineFun extn
   -- FIXME: Check that classes are declared only once and before their first
   -- instantiation. Check that no class/type constructor pair is instantiated
   -- twice.
-  DClss c -> for_ (_clss2methods c) $ \m -> declareFun m *> defineFun (m^.sign2name)
+  DClss c -> for_ (_clss2methods c) $ \m -> declareFun m *> defineFun m
   DInst _ -> pure ()

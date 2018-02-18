@@ -70,8 +70,7 @@ typeOf = \case
     t_from <- typeOf e0
     checkCoercion c t_from t_to
     pure t_to
-  ETyCoe{} ->
-    bug "type coercion without surrounding type annotation durch type checking"
+  ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
   ETyAbs qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0
@@ -91,22 +90,18 @@ satisfiesCstrs :: (IsTVar tv) => Type tv -> QVar -> TC tv ev ()
 satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
 
 satisfiesCstr :: (IsTVar tv) => Type tv -> Name Clss -> TC tv ev ()
-satisfiesCstr t0 clss = do
-  let (t1, tps) = gatherTApp t0
-  let throwNoInst = throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
+satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
+  let throwNoInst =
+        throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
   case t1 of
-    TAtm atom -> do
-      inst_mb <- lookupInfo info2insts (clss, atom)
-      case inst_mb of
+    TAtm atom ->
+      lookupInfo info2insts (clss, atom) >>= \case
         Nothing -> throwNoInst
-        Just (SomeInstDecl SysF.MkInstDecl{_inst2qvars = qvsV}) -> do
-          let qvs = toList qvsV
-          unless (length tps == length qvs) $
-            -- NOTE: This should be caught by the kind checker.
-            bugWith "mitmatching number of type arguments for instance" (clss, atom)
-          zipWithM_ satisfiesCstrs tps qvs
+        Just (SomeInstDecl inst) ->
+          -- the kind checker guarantees parameter/argument arity
+          sequence_ (zipWithExact satisfiesCstrs targs (SysF._inst2qvars inst))
     TVar v
-      | null tps -> do
+      | null targs -> do
           qual <- lookupQual v
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst

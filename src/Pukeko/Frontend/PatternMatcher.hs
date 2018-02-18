@@ -255,11 +255,11 @@ groupCPatns ::
   Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> Eff effs (GrpMatch tv ev)
 groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
-  (MkTConDecl tcon _params dcons0, _dconDecl) <- findInfo info2dcons dcon0
+  (MkTConDecl _ _params dcons0, _dconDecl) <- findInfo info2dcons dcon0
   dcons1 <- case dcons0 of
-    Left _       -> bugWith "pattern match on type synonym" tcon
-    Right []     -> bugWith "pattern match on type without data constructors" tcon
     Right (d:ds) -> pure (d :| ds)
+    _ -> impossible  -- the type checker guarantees that we pattern match only
+                     -- on ADTs and only on those with at least one constructur
   grps <- for dcons1 $ \dcon1 -> do
     let drs1 = filter (\(MkCPatn dcon2 _ts _, _) -> nameOf dcon1 == dcon2) drs
     LS.withList drs1 $ \case
@@ -279,7 +279,7 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
         LS.withList (toList ixs0) $ \ixs -> do
           grpRows <- for drs2 $ \(MkCPatn _ _ts ps, MkRow qs u) ->
             case LS.match ixs ps of
-              Nothing  -> bug "wrong number of patterns"
+              Nothing  -> impossible  -- the type checker guarantees the correct arity
               Just ps1 -> pure $ MkRow (ps1 LS.++ qs) (fmap (over _Free weakenScope) u)
           let es1 = LS.map (\x -> EVar (mkBound x x)) ixs LS.++ LS.map weakenE es
           pure (MkGrpMatchItem con ts (fmap BName ixs0) (MkRowMatch es1 grpRows))

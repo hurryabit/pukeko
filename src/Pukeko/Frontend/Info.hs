@@ -22,7 +22,7 @@ module Pukeko.FrontEnd.Info
 import Pukeko.Prelude
 
 import           Control.Lens                (foldMapOf, _Right)
-import qualified Data.Map                    as Map
+import qualified Data.Map.Extended           as Map
 import qualified Data.Set                    as Set
 
 import qualified Pukeko.AST.SystemF    as SysF
@@ -62,7 +62,7 @@ lookupInfo l k = Map.lookup k <$> view l
 findInfo ::
   (HasCallStack, Member (Reader ModuleInfo) effs, Ord k, Show k) =>
   Lens' ModuleInfo (Map k v) -> k -> Eff effs v
-findInfo l k = Map.findWithDefault (bugWith "findInfo" k) k <$> view l
+findInfo l k = views l (Map.! k)
 
 typeOfFunc ::
   (HasCallStack, Member (Reader ModuleInfo) effs) =>
@@ -114,8 +114,8 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
 instance HasModuleInfo Core.Module where
   collectInfo (Core.MkModule types extns supcs) = fold
     [ foldMap tconDeclInfo types
-    , foldMap (\extn -> signInfo (Core._extn2name extn) (Core._extn2type extn)) extns
-    , foldMap (\supc -> signInfo (Core._supc2name supc) (Core._supc2type supc)) supcs
+    , foldMap (\extn -> signInfo (nameOf extn) (Core._extn2type extn)) extns
+    , foldMap (\supc -> signInfo (nameOf supc) (Core._supc2type supc)) supcs
     ]
 
 foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m

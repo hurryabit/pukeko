@@ -15,12 +15,13 @@ import qualified Data.Set as Set
 
 data BinaryTag
 
+-- TODO: Use Name for this.
 type Binary = Tagged BinaryTag String
 
 binary :: String -> Binary
 binary op
   | all (`Set.member` letters) op = Tagged op
-  | otherwise                     = bugWith "invalid operator name" op
+  | otherwise = impossible  -- guaranteed by parser
 
 data Assoc = AssocLeft | AssocRight | AssocNone
 

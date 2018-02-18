@@ -1,51 +1,28 @@
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.Prelude
   ( module X
 
-  , Doc
-  , Pretty (..)
-  , PrettyPrec (..)
-  , (<+>)
-  , (<:~>)
-  -- , shown
-  -- , text
-  , render
-
   , local'
-
-  , SourcePos
-  , noPos
 
   , Failure
   , CanThrowHere
   , throwFailure
   , renderFailure
 
-  , HasPos (..)
-  , Where (..)
-  , here
-  , here'
   , throwAt
   , throwHere
-  , WhereLens
-  , WhereLens'
-  , WhereTraversal
-  , WhereTraversal'
-
-  , Lctd (..)
-  , lctd
 
   , bug
   , bugWith
+  , assert
+  , assertM
+  , impossible
   , traceJSON
   ) where
 
 import Prelude               as X
 
 import Control.Applicative   as X
-import Control.Exception     as X (assert)
 import Control.Lens          as X
        ( Iso, Lens, Lens', Traversal, Traversal', Prism, Prism'
        , (^.), (.~), (%~)
@@ -88,15 +65,15 @@ import Data.Vector           as X (Vector)
 import Data.Void             as X (Void, absurd)
 import Safe.Exact            as X (zipExact, zipWithExact)
 
+import Pukeko.AST.Pos        as X
+import Pukeko.Pretty         as X (pretty, (<+>), (<:~>))
+
 import           Data.Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BSL
-import           Data.Functor.Compose           (Compose (..))
 import           Debug.Trace
-import qualified Text.PrettyPrint.Annotated     as PP
-import           Text.PrettyPrint.Annotated     (Doc, render)
-import           Text.Megaparsec.Pos            (SourcePos, initialPos, sourcePosPretty)
 
+import           Pukeko.Pretty
 import           Pukeko.Orphans ()
 
 type Failure = Doc ()
@@ -106,52 +83,6 @@ throwFailure = throwError
 
 renderFailure :: Failure -> String
 renderFailure = render
-
-infixr 6 <+>, <:~>
-
-(<+>), (<:~>) :: Doc ann -> Doc ann -> Doc ann
-(<+>) = (PP.<+>)
-x <:~> y = x <> ":" <+> y
-{-# INLINE (<+>) #-}
-{-# INLINE (<:~>) #-}
-
-class Pretty a where
-  pretty :: a -> Doc ann
-  default pretty :: PrettyPrec a => a -> Doc ann
-  pretty = prettyPrec 0
-
-class Pretty a => PrettyPrec a where
-  prettyPrec :: Int -> a -> Doc ann
-
--- shown :: (Show a) => a -> Doc
--- shown = text . show
-
-noPos :: SourcePos
-noPos = initialPos ""
-
-class HasPos a where
-  getPos :: a -> SourcePos
-
-instance HasPos SourcePos where
-  getPos = id
-
-class Where f where
-  where_ :: f SourcePos
-  here_ :: SourcePos -> f a -> f a
-
-instance (Member (Reader SourcePos) effs) => Where (Eff effs) where
-  where_ = ask
-  here_ pos = local (const pos)
-
-instance (Applicative f) => Where (Compose ((->) SourcePos) f) where
-  where_ = Compose pure
-  here_ pos (Compose f) = Compose (const (f pos))
-
-here :: (Where f, HasPos a) => a -> f b -> f b
-here = here_ . getPos
-
-here' :: (Where f, HasPos a) => (a -> f b) -> a -> f b
-here' f x = here x (f x)
 
 throwAt :: (Member (Error Failure) effs, HasPos x) => x -> Failure -> Eff effs a
 throwAt x msg = throwFailure (pretty (getPos x) <:~> msg)
@@ -163,27 +94,22 @@ throwHere msg = do
   pos <- where_
   throwAt pos msg
 
-type WhereLens s t a b =
-  forall f. (Functor f, Where f) => (a -> f b) -> s -> f t
-
-type WhereLens' s a = WhereLens s s a a
-
-type WhereTraversal s t a b =
-  forall f. (Applicative f, Where f) => (a -> f b) -> s -> f t
-
-type WhereTraversal' s a = WhereTraversal s s a a
-
-data Lctd a = Lctd{pos :: SourcePos, unlctd :: a}
-  deriving (Show, Foldable, Functor, Traversable)
-
-lctd :: Lens (Lctd a) (Lctd b) a b
-lctd f (Lctd pos thng) = Lctd pos <$> f thng
-
 bug :: HasCallStack => String -> a
 bug msg = error ("BUG! " ++ msg)
 
 bugWith :: (HasCallStack, Show b) => String -> b -> a
 bugWith msg x = bug (msg ++ " (" ++ show x ++ ")")
+
+assert :: HasCallStack => Bool -> a -> a
+assert True  = id
+assert False = error "ASSERTION FAILED!"
+
+assertM :: (HasCallStack, Applicative m) => Bool -> m ()
+assertM True  = pure ()
+assertM False = error "ASSERTION FAILED!"
+
+impossible :: HasCallStack => a
+impossible = error "IMPOSSIBLE CODE REACHED!"
 
 traceJSON :: ToJSON a => a -> b -> b
 traceJSON =
@@ -192,30 +118,3 @@ traceJSON =
 
 local' :: (r1 -> r2) -> Eff (Reader r2 : effs) a -> Eff (Reader r1 : effs) a
 local' f = reinterpret (\Ask -> asks f)
-
-instance HasPos (Lctd a) where
-  getPos = pos
-
-instance Pretty String where
-  pretty = PP.text
-
-instance Pretty Int where
-  pretty = PP.int
-
-instance Pretty a => Pretty (Tagged tag a) where
-  pretty = pretty . untag
-
-instance Pretty Void where
-  pretty = absurd
-
-instance Pretty SourcePos where
-  pretty = pretty . sourcePosPretty
-
-instance Pretty a => Pretty (Lctd a) where
-  pretty = pretty . unlctd
-
-instance PrettyPrec a => PrettyPrec (Lctd a) where
-  prettyPrec prec = prettyPrec prec . unlctd
-
-instance ToJSON a => ToJSON (Lctd a) where
-  toJSON = toJSON . unlctd

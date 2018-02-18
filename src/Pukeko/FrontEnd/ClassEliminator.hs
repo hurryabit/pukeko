@@ -9,7 +9,7 @@ import qualified Data.List.NE      as NE
 import qualified Data.Map          as Map
 import qualified Data.Set          as Set
 import qualified Data.Vector       as Vec
-import qualified Safe.Exact        as Safe
+import qualified Safe              as Safe
 
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
@@ -124,15 +124,14 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
 -- >   in
 -- >   Dict$Traversable @List traverse
 elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
-elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ clss tatom qvs defns0) = do
+elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ _ tatom qvs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
-    case find (\defn -> nameOf defn == mthd) defns0 of
-      Nothing -> bugWith "missing method" (clss, tatom, mthd)
-      Just (MkFuncDecl name0 typ_ body) -> do
-        name1 <- copyName (getPos inst) name0
-        pure (MkDefn (MkBind name1 typ_) body)
+    let (MkFuncDecl name0 typ_ body) =
+          Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
+    name1 <- copyName (getPos inst) name0
+    pure (MkDefn (MkBind name1 typ_) body)
   let e_dcon = mkETyApp (ECon dcon) [t_inst]
   let e_body = foldl EApp e_dcon (imap (\i -> EVar . mkBound i . nameOf) defns1)
   let e_let :: Expr In _ _
@@ -161,15 +160,12 @@ buildDict clss t0 = do
   let (t1, tps) = gatherTApp t0
   case t1 of
     TVar v
-      | null tps ->
-          lookupTVar v >>= maybe bugNoDict (pure . EVar) . Map.lookup clss
+      | null tps -> EVar . (Map.! clss) <$> lookupTVar v
     TAtm tatom -> do
       SomeInstDecl inst <- findInfo info2insts (clss, tatom)
       let (z_dict, t_dict) = instDictInfo inst
       fst <$> elimETyApp (EVal z_dict) (fmap absurd t_dict) tps
-    _ -> bugNoDict
-  where
-    bugNoDict = bugWith "cannot build dict" (clss, t0)
+    _ -> impossible  -- type checker would catch this
 
 elimETyApp ::
   (IsTVar tv) =>
@@ -226,7 +222,7 @@ elimExpr = \case
     (arg1, _t_arg) <- elimExpr arg0
     case t_fun of
       TFun _ t_res -> pure (EApp fun1 arg1, t_res)
-      _            -> bug "too many arguments"
+      _            -> impossible  -- type checker catches overapplications
   ELam param body0 -> do
     let t_param = _bind2type param
     (body1, t_body) <- withinEScope1 id t_param (elimExpr body0)
@@ -248,8 +244,7 @@ elimExpr = \case
   ETyAnn t_to (ETyCoe c e0) -> do
     (e1, _) <- elimExpr e0
     pure (ETyAnn t_to (ETyCoe c e1), t_to)
-  ETyCoe{} ->
-    bug "type coercion without surrounding type annotation during class elimination"
+  ETyCoe{} -> impossible  -- type inferencer wraps coercions in type annotations
   ETyApp e0 ts0 -> do
     (e1, t_e1) <- elimExpr e0
     elimETyApp e1 t_e1 (toList ts0)
@@ -265,7 +260,7 @@ elimAltn (MkAltn (PSimple dcon targs0 bnds) e0) = do
   (_, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
   let flds1 = map (instantiateN' targs0) flds0
   let env = Map.fromList
-            (catMaybes (Safe.zipWithExact (\b t -> (,) <$> b <*> pure t) bnds flds1))
+            (catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bnds flds1))
   withinEScope id env $ do
     (e1, t1) <- elimExpr e0
     pure (MkAltn (PSimple dcon targs0 bnds) e1, t1)

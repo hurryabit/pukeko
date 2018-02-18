@@ -79,7 +79,7 @@ instance PrettyPrec Expr where
           prettyPrec 1 _fun : map (prettyPrec 1) _args
       Let{ _isrec, _defns, _body } ->
         case _defns of
-          [] -> bug "empty let"
+          [] -> impossible  -- maintained invariant
           defn0:defns ->
             let let_ | _isrec    = "let rec"
                      | otherwise = "let"

@@ -12,7 +12,7 @@ import           Control.Lens.Indexed
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
 import qualified Data.List.NE     as NE
-import qualified Data.Map         as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Sequence    as Seq
 import qualified Data.Set         as Set
 import           Data.STRef
@@ -67,7 +67,7 @@ generalize = go
           ULink t1 -> go t1
       UTVar{} -> pureDefault
       UTAtm{} -> pureDefault
-      UTUni{} -> bug "quantification during generalization"
+      UTUni{} -> impossible  -- we have only rank-1 types
       UTApp tf0 tp0 -> do
         (tf1, vsf) <- go tf0
         (tp1, vsp) <- go tp0
@@ -80,30 +80,26 @@ splitCstr t0 clss = do
   (t1, tps) <- sendM (unUTApp t0)
   case t1 of
     UVar uref -> do
-      uvar <- sendM (readSTRef uref)
       cur_level <- getTLevel
-      case uvar of
+      sendM (readSTRef uref) >>= \case
         UFree v l
           | l > cur_level ->
               throwHere
                 ("ambiguous type variable in constraint" <+> pretty clss <+> pretty v)
           | otherwise -> pure (MkSplitCstrs mempty (Seq.singleton (t0, clss)))
-        ULink{} -> bug "ULink after unUTApp"
+        ULink{} -> impossible  -- we've unwound 'UTApp's
     UTVar v -> pure (MkSplitCstrs (Map.singleton v (Set.singleton clss)) mempty)
     UTAtm atom -> do
       inst_mb <- lookupInfo info2insts (clss, atom)
       case inst_mb of
         Nothing -> throwNoInst
-        Just (SomeInstDecl MkInstDecl{_inst2qvars = qvs})
-          | length qual /= length tps ->
-              bugWith "mitmatching number of type arguments for instance" (clss, atom)
-          | otherwise -> do
-              let cstrs = Seq.fromList
-                    [ (tp, c) | (tp, MkQVar q _) <- zip tps qual, c <- toList q ]
-              splitCstrs cstrs
+        Just (SomeInstDecl MkInstDecl{_inst2qvars = qvs}) -> do
+          let cstrs = Seq.fromList
+                [ (tp, c) | (tp, MkQVar q _) <- zipExact tps qual, c <- toList q ]
+          splitCstrs cstrs
           where qual = toList qvs
-    UTApp{} -> bug "UTApp after unUTApp"
-    UTUni{} -> bug "UTUni during constraint splitting"
+    UTApp{} -> impossible  -- we've unwound 'UTApp's
+    UTUni{} -> impossible  -- we have only rank-1 types
   where
     throwNoInst = do
       p0 <- sendM (prettyUType 1 t0)
@@ -245,7 +241,7 @@ inferFuncDecl (MkFuncDecl name NoType e0) t_decl = do
     -- it does not, the quantification step will catch them.
     withQVars qvs (unify t0 t1)
     MkSplitCstrs rs1 ds1 <- splitCstrs cstrs1
-    unless (null ds1) $ bug "deferred constraints at top level"
+    assertM (null ds1)  -- the renamer catches free type variables in constraints
     for_ qvs $ \(MkQVar q0 v) -> do
       let q1 = Map.findWithDefault mempty v rs1
       unless (q1 `Set.isSubsetOf` q0) $ do
@@ -294,19 +290,14 @@ localizeTQ qvs =
 
 qualType :: UType s tv' -> TQ tv s (Type tv)
 qualType = \case
-  UTVar x -> do
-    y_mb <- asks (x `Map.lookup`)
-    case y_mb of
-      Nothing -> bugWith "unknown type variable during quantification" x
-      Just y  -> pure (TVar y)
+  UTVar x -> TVar <$> asks (Map.! x)
   UTAtm a -> pure (TAtm a)
   UTApp t1 t2 -> TApp <$> qualType t1 <*> qualType t2
-  UTUni{} -> bug "quantification during quantification"
-  UVar uref -> do
-    uvar <- sendM (readSTRef uref)
-    case uvar of
-      UFree x _ -> bugWith "free unification variable during quantification" x
+  UTUni{} -> impossible  -- we have only rank-1 types
+  UVar uref ->
+    sendM (readSTRef uref) >>= \case
       ULink t -> qualType t
+      UFree{} -> impossible  -- all unification variables have been generalized
 
 qualDefn :: Defn (Aux s) tv' ev -> TQ tv s (Defn Out tv ev)
 qualDefn (MkDefn (MkBind x t0) e0) = case t0 of

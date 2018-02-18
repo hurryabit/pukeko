@@ -61,15 +61,13 @@ kcType k = \case
   TAtm TAArr -> unify (Arrow Star (Arrow Star Star)) k
   TAtm TAInt -> unify Star k
   TAtm (TACon tcon) -> do
-    kcon_opt <- gets (tcon `Map.lookup`)
-    case kcon_opt of
-      Nothing -> bugWith "unknown type constructor" tcon
-      Just kcon -> unify kcon k
+    kcon <- gets (Map.! tcon)
+    unify kcon k
   TApp tf tp -> do
     ktp <- freshUVar
     kcType ktp tp
     kcType (Arrow ktp k) tf
-  TUni _ _ -> bug "universal quantificatio"
+  TUni{} -> impossible  -- we have only rank-1 types and no type annotations
 
 kcTConDecl :: TConDecl -> KC n s ()
 kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
@@ -121,23 +119,21 @@ checkModule module0 = either throwError pure $ runST $
 
 
 unwind :: Kind (Open s) -> KC n s (Kind (Open s))
-unwind = \case
-  k0@(UVar uref) -> do
-    uvar <- sendM (readSTRef uref)
-    case uvar of
+unwind k0 = case k0 of
+  UVar uref -> do
+    sendM (readSTRef uref) >>= \case
       Free _  -> pure k0
       Link k1 -> do
         k2 <- unwind k1
         sendM (writeSTRef uref (Link k2))
         pure k2
-  k -> pure k
+  _ -> pure k0
 
 assertFree :: STRef s (UVar s) -> KC a s ()
-assertFree uref = do
-  uvar <- sendM (readSTRef uref)
-  case uvar of
+assertFree uref =
+  sendM (readSTRef uref) >>= \case
     Free _ -> pure ()
-    Link _ -> bug "unwinding produced link"
+    Link _ -> impossible  -- this is only called after unwinding
 
 occursCheck :: STRef s (UVar s) -> Kind (Open s) -> KC n s ()
 occursCheck uref1 = \case

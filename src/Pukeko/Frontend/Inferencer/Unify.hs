@@ -21,39 +21,38 @@ type TU s ev =
   EffGamma s ev [Reader ModuleInfo, Reader SourcePos, Supply Id.TVar, Error Failure, ST s]
 
 -- TODO: link compression
+-- | Unwind a chain of 'ULink's.
 unwind :: UType s tv -> TU s ev (UType s tv)
 unwind t0 = case t0 of
   UVar uref -> do
-    uvar <- sendM $ readSTRef uref
-    case uvar of
-      ULink t1  -> unwind t1
-      UFree _ _ -> return t0
-  _ -> return t0
+    sendM (readSTRef uref) >>= \case
+      ULink t1 -> unwind t1
+      UFree{}  -> pure t0
+  _ -> pure t0
 
+-- | Read a 'UVar' /after/ 'unwind'ing.
 readUnwound :: STRef s (UVar s tv) -> TU s ev (Id.TVar, Int)
-readUnwound uref = do
-  uvar <- sendM (readSTRef uref)
-  case uvar of
-    ULink{} -> bug "link in unwound unification variable"
+readUnwound uref =
+  sendM (readSTRef uref) >>= \case
+    ULink{} -> impossible  -- we only call this after unwinding
     UFree v lvl -> pure (v, lvl)
 
--- NOTE: The reference is assumed to be unwound.
+-- | Perform the occurs check. Assumes that the 'UVar' has been unwound.
 occursCheck :: STRef s (UVar s tv) -> UType s tv -> TU s ev ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwHere "occurs check"
-    | otherwise      -> do
-        uvar2 <- sendM $ readSTRef uref2
-        case uvar2 of
+    | otherwise -> do
+        sendM (readSTRef uref2) >>= \case
           UFree x2 l2 -> do
             (_, l1) <- readUnwound uref1
-            sendM $ writeSTRef uref2 (UFree x2 (min l1 l2))
+            sendM (writeSTRef uref2 (UFree x2 (min l1 l2)))
           ULink t2' -> occursCheck uref1 t2'
   UTVar v -> do
     !_ <- lookupTVar v  -- NOTE: This is a sanity check.
     pure ()
-  UTAtm _ -> pure ()
-  UTUni{} -> bug "universal quantification in occurs check"
+  UTAtm{} -> pure ()
+  UTUni{} -> impossible  -- UVar is assumed to be unwound
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
 unify :: UType s tv -> UType s tv -> TU s ev ()
@@ -65,9 +64,9 @@ unify t1 t2 = do
     (UVar uref1, _) -> do
       (v1, _) <- readUnwound uref1
       occursCheck uref1 t2 `catchError` \(_ :: Failure) -> do
-        p2 <- sendM $ prettyUType 0 t2
+        p2 <- sendM (prettyUType 0 t2)
         throwHere (quotes (pretty v1) <+> "occurs in" <+> p2)
-      sendM $ writeSTRef uref1 (ULink t2)
+      sendM (writeSTRef uref1 (ULink t2))
     (_, UVar _) -> unify t2 t1
     (UTVar x1, UTVar x2)
       | x1 == x2 -> pure ()
@@ -75,6 +74,6 @@ unify t1 t2 = do
       | atom1 == atom2 -> pure ()
     (UTApp tf1 tp1, UTApp tf2 tp2) -> unify tf1 tf2 *> unify tp1 tp2
     _ -> do
-      p1 <- sendM $ prettyUType 0 t1
-      p2 <- sendM $ prettyUType 0 t2
+      p1 <- sendM (prettyUType 0 t1)
+      p2 <- sendM (prettyUType 0 t2)
       throwHere ("mismatching types" <+> p1 <+> "and" <+> p2)

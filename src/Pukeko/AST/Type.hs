@@ -45,7 +45,7 @@ import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
 import           Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map          as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
@@ -260,7 +260,7 @@ newtype Boxed tv = Box{unBox :: tv}
 
 instance (BaseTVar tv, Ord tv) => HasEnv (Boxed tv) where
   type EnvOf (Boxed tv) = Map (Boxed tv)
-  lookupEnv v@(Box v0) = Map.findWithDefault (bugWith "lookupEnv" (baseTVar v0)) v
+  lookupEnv v env = env Map.!  v
 
 data TypeF typ tv
   = TVarF tv

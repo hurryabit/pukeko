@@ -7,9 +7,8 @@ import Pukeko.Prelude
 
 import           Control.Monad.Freer.Supply
 import qualified Data.List.NE      as NE
-import qualified Data.Map          as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
-import qualified Safe.Exact        as Safe
 
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Altn, Bind)
@@ -93,12 +92,10 @@ llELam oldBinds t_rhs rhs1 = do
     tyBinds <- traverse (\v -> MkQVar <$> lookupQual v <*> pure (baseTVar v)) tvCaptured
     let tvMap = ifoldMap (\j v -> Map.singleton v (mkBound j (baseTVar v))) tvCaptured
     let tvRename :: tv -> TScope Int Void
-        tvRename v = Map.findWithDefault (bugWith "tvRename" (baseTVar v)) v tvMap
+        tvRename v = tvMap Map.! v
     let evMap = ifoldMap (\i x -> Map.singleton x (mkBound i (baseEVar x))) evCaptured
     let evRename :: EScope Int ev -> EScope Int Void
-        evRename = scope'
-                   (\x -> Map.findWithDefault (bugWith "evRename" (baseEVar x)) x evMap)
-                   (mkBound . (n0+))
+        evRename = scope' (evMap Map.!) (mkBound . (n0+))
     let allBinds1 = map (fmap tvRename) allBinds0
     let rhs2 = bimap tvRename evRename rhs1
     lhs <- freshEVar
@@ -128,7 +125,7 @@ llExpr = \case
     | (oldBinds, ETyAnn t_rhs rhs0) <- unwindELam elam -> do
         rhs1 <- withinEScope' _bind2type oldBinds (llExpr rhs0)
         llELam (NE.fromList oldBinds) t_rhs rhs1
-  ELam{} -> bug "lambda without type annotation around body during lambda lifting"
+  ELam{} -> impossible  -- the type inferencer puts type anns around lambda bodies
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
@@ -138,11 +135,10 @@ llAltn ::
   (HasEnv tv, IsTVar tv, IsEVar ev) => Altn In tv ev -> LL tv ev (Altn Out tv ev)
 llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
   (MkTConDecl _ vs _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
-  unless (length vs == length ts0)
-    (bug "wrong number of type arguments for type constructor")
+  assertM (length vs == length ts0)  -- the kind checker guarantees this
   let t_flds = fmap (instantiateN' ts0) flds0
   let env = Map.fromList
-            (catMaybes (Safe.zipWithExact (\b t -> (,) <$> b <*> pure t) bs t_flds))
+            (catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bs t_flds))
   MkAltn (PSimple dcon ts0 bs) <$> withinEScope id env (llExpr e)
 
 llDecl :: Decl In -> LL Void Void ()

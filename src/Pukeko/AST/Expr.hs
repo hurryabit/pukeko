@@ -271,7 +271,7 @@ instance (BaseEVar ev, BaseTVar tv, PrettyStage st) => Pretty (Defn st tv ev) wh
 prettyDefns :: (BaseEVar ev, BaseTVar tv, PrettyStage st) =>
   Bool -> [Defn st tv ev] -> Doc ann
 prettyDefns isrec ds = case ds of
-    [] -> bug "empty definitions"
+    [] -> impossible  -- maintained invariant
     d0:ds ->
       let_ <+> pretty d0
       $$ vcatMap (\d -> "and" <+> pretty d) ds

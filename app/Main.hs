@@ -16,6 +16,7 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
 import qualified Pukeko.MiddleEnd.CallGraph as G
 import qualified Pukeko.BackEnd         as BackEnd
+import           Pukeko.Pretty
 
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()
 compile write_pl stop_tc unsafe json graph opts file = do

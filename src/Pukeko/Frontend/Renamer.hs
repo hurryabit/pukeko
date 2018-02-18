@@ -20,6 +20,7 @@ import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Type
+import           Pukeko.Pretty
 
 type Out = Surface
 

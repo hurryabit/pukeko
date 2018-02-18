@@ -25,12 +25,22 @@ module Pukeko.AST.Name
   , HasName (..)
   ) where
 
-import Pukeko.Prelude
+import Prelude
 
+import           Control.Lens (Lens')
+import           Control.Monad.Freer
+import           Control.Monad.Freer.State
 import           Control.Monad.ST
 import           Data.Aeson
 import           Data.Aeson.TH
+import           Data.Function
 import           Data.Kind
+import           Data.Tagged
+import           Text.Megaparsec.Pos (SourcePos)
+
+import Pukeko.AST.Pos
+import Pukeko.Orphans ()
+import Pukeko.Pretty
 
 -- | The four different name spaces. To be used as a kind.
 data NameSpace
@@ -129,9 +139,3 @@ instance ToJSON (Name nsp) where
   toJSON = $(mkToJSON defaultOptions ''Name)
 
 instance ToJSONKey (Name nsp)
-
--- FIXME: Remove this when it is no longer necessary!
-type instance NameSpaceOf (Either a b) = NameSpaceOf a
-instance (HasName a, HasName b, NameSpaceOf a ~ NameSpaceOf b) =>
-  HasName (Either a b) where
-  nameOf = either nameOf nameOf

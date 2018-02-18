@@ -26,7 +26,7 @@ import Pukeko.Pretty
 import           Control.Monad.ST
 import           Data.Coerce        (coerce)
 import           Data.STRef
-import qualified Data.Map           as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Vector        as Vec
 
 import           Pukeko.AST.Name
@@ -108,22 +108,15 @@ open1 = \case
 subst :: Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env = go
   where
-    go = \case
-      UTVar x -> do
-        let e = bugWith "unknown type variable in instantiation" x
-        pure (Map.findWithDefault e x env)
-      t@UTAtm{}   -> pure t
+    go t0 = case t0 of
+      UTVar x -> pure (env Map.! x)
+      UTAtm{} -> pure t0
       UTApp tf tp -> UTApp <$> go tf <*> go tp
-      t0@(UTUni _qvs _t1) -> do
-        p0 <- prettyUType 0 t0
-        bug ("quantification during instantiation: " ++ render p0)
-        -- let vs = setOf (traverse . qvar2tvar) qvs
-        -- subst (env `Map.difference` Map.fromSet (const ()) vs) t1
-      t0@(UVar uref) -> do
-        uvar <- readSTRef uref
-        case uvar of
-          UFree _ _ -> pure t0
-          ULink t1  -> go  t1
+      UTUni{} -> impossible  -- we have only rank-1 types
+      UVar uref ->
+        readSTRef uref >>= \case
+          UFree{}  -> pure t0
+          ULink t1 -> go  t1
 
 -- * Pretty printing
 prettyUVar :: Int -> UVar s tv -> ST s (Doc ann)

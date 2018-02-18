@@ -40,7 +40,7 @@ import Pukeko.Prelude
 
 import           Control.Lens.Indexed
 import           Data.Forget
-import qualified Data.Map          as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Vector       as Vec
 import           Data.Aeson.TH
 
@@ -102,7 +102,7 @@ instantiateN' :: (HasCallStack, Monad f, Foldable t) =>
   t (f v) -> f (Scope b Int Void) -> f v
 instantiateN' xsL = instantiate' lk
   where xsV = Vec.fromList (toList xsL)
-        lk i = maybe (bugWith "instantiateN" i) id (xsV Vec.!? i)
+        lk i = maybe (bugWith "instantiateN'" i) id (xsV Vec.!? i)
 
 abstract1 :: (j -> Maybe i) -> Scope b j v -> Scope b j (Scope b i v)
 abstract1 f = \case
@@ -130,9 +130,6 @@ _Bound = prism (uncurry mkBound) $ \case
 
 finRenamer :: (Ord b, FoldableWithIndex Int t) => t b -> Map b (Scope b Int tv)
 finRenamer = ifoldMap (\i b -> Map.singleton b (mkBound i b))
-
-lookupMap :: (Ord i, Pretty i) => i -> Map i a -> a
-lookupMap i = Map.findWithDefault (bugWith "lookup failed" (pretty i)) i
 
 data Pair f g a = Pair (f a) (g a)
   deriving (Functor)
@@ -162,7 +159,7 @@ class (Functor (EnvLevelOf i)) => HasEnvLevel i where
 
 instance HasEnvLevel (Name nsp) where
   type EnvLevelOf (Name nsp) = Map (Name nsp)
-  lookupEnvLevel = lookupMap
+  lookupEnvLevel = flip (Map.!)
 
 instance HasEnvLevel Int where
   type EnvLevelOf Int = Vec.Vector

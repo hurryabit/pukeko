@@ -14,6 +14,7 @@ import Text.Parsec hiding (Error)
 import           Pukeko.AST.Name
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
+import           Pukeko.Pretty
 
 shouldFail :: Parser.Package -> String -> String -> Expectation
 shouldFail prelude expect code = do

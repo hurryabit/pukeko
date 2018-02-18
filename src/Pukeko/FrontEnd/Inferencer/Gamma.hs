@@ -15,7 +15,7 @@ import Pukeko.Prelude
 
 import           Control.Lens ((+~), (<>~))
 import           Data.Coerce (coerce)
-import qualified Data.Map     as Map
+import qualified Data.Map.Extended as Map
 
 import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Name
@@ -65,4 +65,4 @@ lookupEVar :: forall s ev effs tv. (HasEnv ev) => ev -> EffGamma s ev effs (UTyp
 lookupEVar x = fmap absurd <$> views (tenv @s @ev) (lookupEnv x)
 
 lookupTVar :: forall s ev effs. Id.TVar -> EffGamma s ev effs (Set (Name Clss))
-lookupTVar x = views (qenv @s @ev) (Map.findWithDefault (bugWith "lookupTVar" x) x)
+lookupTVar x = views (qenv @s @ev) (Map.! x)
