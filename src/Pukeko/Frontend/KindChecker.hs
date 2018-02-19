@@ -19,7 +19,6 @@ import           Pukeko.AST.SystemF    hiding (Free)
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 
 type In  = Surface
@@ -27,7 +26,7 @@ type In  = Surface
 data Open s
 
 data UVar s
-  = Free (Forget Id.TVar)
+  = Free (Forget Int)
   | Link (Kind (Open s))
 
 data Kind a where
@@ -42,7 +41,7 @@ type KCState s = Map (Name TCon) (Kind (Open s))
 type KC n s =
   Eff
   [ Reader (KCEnv n s), State (KCState s)
-  , Reader SourcePos, Supply Id.TVar, Error Failure, ST s
+  , Reader SourcePos, Supply Int, Error Failure, ST s
   ]
 
 freshUVar :: KC n s (Kind (Open s))
@@ -105,7 +104,7 @@ kcDecl decl = case decl of
   DInst{} -> pure ()
 
 kcModule ::Module In -> KC n s ()
-kcModule (MkModule decls)= traverse_ (\top -> reset @Id.TVar *> kcDecl top) decls
+kcModule (MkModule decls)= traverse_ (\top -> reset @Int *> kcDecl top) decls
 
 checkModule :: Member (Error Failure) effs => Module In -> Eff effs ()
 checkModule module0 = either throwError pure $ runST $
@@ -113,7 +112,7 @@ checkModule module0 = either throwError pure $ runST $
   & runReader Vec.empty
   & evalState mempty
   & runReader noPos
-  & evalSupply Id.freshTVars
+  & evalSupply [1 ..]
   & runError
   & runM
 
@@ -187,5 +186,5 @@ prettyKind prec = \case
   UVar uref -> do
     uvar <- readSTRef uref
     case uvar of
-      Free (Forget v) -> pure (pretty v)
+      Free (Forget v) -> pure ("_" <> pretty v)
       Link k          -> prettyKind prec k

@@ -158,7 +158,12 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
       -- FIXME: Ensure that the type in @b@ is correct as well.
       withQVars qvs $ for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
         (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
-        let t_decl = renameType (instantiate' (const t_inst) t_mthd)
+        -- TODO: There might be some lexical name capturing going on here: type
+        -- variables with different IDs could still share the same lexical name.
+        -- Since this is a UX thing and all type errors here are compiler bugs,
+        -- we don't put any effort into correcting this until we finally hit
+        -- that problem.
+        let t_decl = instantiate' (const t_inst) t_mthd
         checkExpr body t_decl
 
 instance TypeCheckable Core.Module where

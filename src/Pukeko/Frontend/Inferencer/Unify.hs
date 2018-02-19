@@ -12,13 +12,13 @@ import           Control.Monad.ST
 import           Data.STRef
 
 import           Pukeko.Pretty
-import qualified Pukeko.AST.Identifier            as Id
+import           Pukeko.AST.Name
 import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Info
 
-type TU s ev =
-  EffGamma s ev [Reader ModuleInfo, Reader SourcePos, Supply Id.TVar, Error Failure, ST s]
+type TU s ev = EffGamma s ev
+  [Reader ModuleInfo, Reader SourcePos, Supply UVarId, Error Failure, NameSource, ST s]
 
 -- TODO: link compression
 -- | Unwind a chain of 'ULink's.
@@ -31,7 +31,7 @@ unwind t0 = case t0 of
   _ -> pure t0
 
 -- | Read a 'UVar' /after/ 'unwind'ing.
-readUnwound :: STRef s (UVar s tv) -> TU s ev (Id.TVar, Int)
+readUnwound :: STRef s (UVar s tv) -> TU s ev (UVarId, Level)
 readUnwound uref =
   sendM (readSTRef uref) >>= \case
     ULink{} -> impossible  -- we only call this after unwinding

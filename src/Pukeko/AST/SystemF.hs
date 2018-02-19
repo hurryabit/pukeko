@@ -11,7 +11,6 @@ module Pukeko.AST.SystemF
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import qualified Pukeko.AST.Identifier as Id (TVar)
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
@@ -49,7 +48,7 @@ data ExtnDecl lg = MkExtnDecl
 -- | Declaration of a class.
 data ClssDecl = MkClssDecl
   { _clss2name    :: Name Clss
-  , _clss2param   :: Id.TVar
+  , _clss2param   :: Name TVar
   , _clss2dcon    :: Name DCon
     -- ^ During type class elimination, we introduce a data constructor for the
     -- dictionary type. The easiest way to get and distribute a 'Name' for this

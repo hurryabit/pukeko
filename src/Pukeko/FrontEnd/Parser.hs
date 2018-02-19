@@ -26,7 +26,6 @@ import           Text.Megaparsec.Expr
 import           Pukeko.AST.Name       hiding (Name)
 import           Pukeko.AST.Operator   (Spec (..))
 import           Pukeko.AST.Surface
-import qualified Pukeko.AST.Identifier as Id (TVar, tvar)
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
@@ -170,8 +169,8 @@ name p = lctd (Tagged <$> p)
 evar :: Parser (LctdName EVar)
 evar = name lIdent <?> "expression variable"
 
-tvar :: Parser Id.TVar
-tvar = Id.tvar <$> lIdent <?> "type variable"
+tvar :: Parser (LctdName TVar)
+tvar = name lIdent <?> "type variable"
 
 tcon :: Parser (LctdName TCon)
 tcon = name uIdent <?> "type constructor"

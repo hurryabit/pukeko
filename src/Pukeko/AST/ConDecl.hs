@@ -16,13 +16,12 @@ import Pukeko.Pretty
 import           Data.Aeson.TH
 
 import           Pukeko.AST.Name
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type
 import           Pukeko.AST.Scope
 
 data TConDecl = MkTConDecl
   { _tcon2name  :: Name TCon
-  , _tcon2prms  :: [Id.TVar]
+  , _tcon2prms  :: [Name TVar]
   , _tcon2dcons :: Either (Type (TScope Int Void)) [DConDecl]
   }
 

@@ -6,6 +6,7 @@ module Pukeko.FrontEnd.Renamer
 
 import Pukeko.Prelude
 
+import           Control.Lens (indexing, iover)
 import           Control.Lens.Extras (is)
 import           Control.Monad.Extra
 import           Data.Bitraversable
@@ -17,7 +18,6 @@ import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Surface    as Ps
-import qualified Pukeko.AST.Identifier as Id
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Type
 import           Pukeko.Pretty
@@ -109,32 +109,39 @@ rnTypeAtom = \case
 -- | Rename a type under the assumption that all its free variables are
 -- contained in the map. All references to type constructors are renamed as
 -- well.
-rnType :: CanRn effs => Map Id.TVar tv -> Ps.Type -> Eff effs (Type tv)
+rnType :: CanRn effs => Map (Ps.Name TVar) tv -> Ps.Type -> Eff effs (Type tv)
 rnType env = go
   where
     go = \case
-      Ps.TVar x
+      Ps.TVar (unlctd -> x)
         | Just v <- x `Map.lookup` env -> pure (TVar v)
         | otherwise -> throwHere ("unknown type variable:" <+> pretty x)
       Ps.TAtm a -> TAtm <$> rnTypeAtom a
       Ps.TApp tf tp -> TApp <$> go tf <*> go tp
 
--- | Collect all type class-type variable pairs in a type constraint. Rename all
+-- | Collect all type class/type variable pairs in a type constraint. Rename all
 -- references to type classes.
 rnConstraints :: GlobalEffs effs =>
-  Ps.TypeCstr -> Eff effs (Map Id.TVar (Set (Name Clss)))
-rnConstraints (Ps.MkTypeCstr constraints) =
-  fmap (fmap Set.fromList . Map.fromMultiList) . for constraints $ \(clss, tvar) ->
-    (,) tvar <$> lookupGlobal tconTab (is _DClss) "unknown type class" clss
+  Map (Ps.Name TVar) (Name TVar) -> Ps.TypeCstr ->
+  Eff effs (Map (Name TVar) (Set (Name Clss)))
+rnConstraints env (Ps.MkTypeCstr constraints) =
+  fmap (fmap Set.fromList . Map.fromMultiList) $
+  for constraints $ \(clss, unlctd -> tvar0) -> do
+    case env Map.!? tvar0 of
+      Nothing -> throwHere ("unknown type variable" <:~> pretty tvar0)
+      Just tvar1 ->
+        (,) tvar1 <$> lookupGlobal tconTab (is _DClss) "unknown type class" clss
 
 -- | Rename a type scheme. Fails if there are constraints on type variables
 -- which are contained in the map or not in the type.
-rnTypeScheme :: CanRn effs => Map Id.TVar tv -> Ps.TypeScheme -> Eff effs (Type tv)
-rnTypeScheme env (Ps.MkTypeScheme qs0 t) = do
-  let vs0 = toList (setOf Ps.type2tvar t `Set.difference` Map.keysSet env)
-  qs1 <- rnConstraints qs0
-  qvs <- applyConstraints vs0 qs1
-  mkTUni qvs <$> rnType (fmap weakenScope env <> finRenamer vs0) t
+rnTypeScheme :: CanRn effs =>
+  Map (Ps.Name TVar) tv -> Ps.TypeScheme -> Eff effs (Type tv)
+rnTypeScheme env0 (Ps.MkTypeScheme qs0 t) = do
+  env1 <- traverse mkName (Ps.freeTVars t `Map.difference` env0)
+  qs1 <- rnConstraints env1 qs0
+  qvs <- applyConstraints (Map.elems env1) qs1
+  mkTUni qvs <$>
+    rnType (iover (indexing traverse) mkBound env1 <> fmap weakenScope env0) t
 
 -- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
@@ -228,10 +235,11 @@ rnExpr = \case
 -- constructor (or at least some dummy version of it) has already been
 -- introduced to the global environment.
 rnDConDecl :: CanRn effs =>
-  Name TCon -> [Id.TVar] -> Int -> Ps.DConDecl -> Eff effs DConDecl
-rnDConDecl tcon vs tag (Ps.MkDConDecl name fields) = here name $
+  Name TCon -> Map (Ps.Name TVar) (TScope Int Void) -> Int -> Ps.DConDecl ->
+  Eff effs DConDecl
+rnDConDecl tcon env tag (Ps.MkDConDecl name fields) = here name $
   introGlobal dconTab "data constructor" name id $ \dcon ->
-    MkDConDecl tcon dcon tag <$> traverse (rnType (finRenamer vs)) fields
+    MkDConDecl tcon dcon tag <$> traverse (rnType env) fields
 
 -- | Rename a (potentially) recursive type declaration.
 rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TConDecl
@@ -240,14 +248,13 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
   -- dummy version of the type constructor first and overwrite it in the end.
   let mkDummy binder = DType (MkTConDecl binder [] (Right []))
   binder <- introGlobal tconTab "type constructor" name mkDummy pure
-  -- (dcons1, params1) <- runReader @(Env TVar) mempty $
-  --   introMany (introLocal "type parameter") params0 $
-  --     bitraverse rnType (itraverse (rnDConDecl binder)) dcons0
+  params1 <- traverse mkName params0
+  let env = Map.fromList (zip (map unlctd params0) (zipWithFrom mkBound 0 params1))
   dcons1 <- bitraverse
-            (rnType (finRenamer params0))
-            (zipWithM (\tag -> rnDConDecl binder params0 tag) [0..])
+            (rnType env)
+            (zipWithM (\tag -> rnDConDecl binder env tag) [0..])
             dcons0
-  let tcon = MkTConDecl binder params0 dcons1
+  let tcon = MkTConDecl binder params1 dcons1
   modifying tconTab (Map.insert (unlctd name) (DType tcon))
   pure tcon
 
@@ -257,7 +264,8 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
 -- paramaters and the function adds universal quantification over the class
 -- parameters.
 rnSignDecl :: CanRn effs =>
-  Map Id.TVar tv -> (Type tv -> Type Void) -> Ps.SignDecl -> Eff effs (SignDecl tv)
+  Map (Ps.Name TVar) tv -> (Type tv -> Type Void) -> Ps.SignDecl ->
+  Eff effs (SignDecl tv)
 rnSignDecl env close (Ps.MkSignDecl binder typeScheme) = do
   introGlobal evarTab "function declaration" binder mkDSign $ \name ->
     MkSignDecl name <$> rnTypeScheme env typeScheme
@@ -284,13 +292,14 @@ rnExtnDecl (Ps.MkExtnDecl binder extn) = do
 -- constraints which methods put on the class type variables are silently
 -- dropped on the floor.
 rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClssDecl
-rnClssDecl (Ps.MkClssDecl name param methods0) =
+rnClssDecl (Ps.MkClssDecl name param0 methods0) =
   introGlobal tconTab "type constructor" name DClss $ \clss -> do
     dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
-    let env = Map.singleton param (mkBound 0 param)
-    let qvs = MkQVar (Set.singleton clss) param :| []
+    param1 <- mkName param0
+    let env = Map.singleton (unlctd param0) (mkBound 0 param1)
+    let qvs = MkQVar (Set.singleton clss) param1 :| []
     methods1 <- traverse (rnSignDecl env (TUni qvs)) methods0
-    pure (MkClssDecl clss param dcon methods1)
+    pure (MkClssDecl clss param1 dcon methods1)
 
 -- | Rename an instance definition. There's /no/ check whether an instance for
 -- this class/type combination has already been defined.
@@ -301,9 +310,11 @@ rnInstDecl (Ps.MkInstDecl clss0 tatom0 params0 cstrs0 methods0) = do
   -- FIXME: 'render . pretty' to get a name is an awful hack.
   let name0 = "dict$" ++ untag (unlctd clss0) ++ "$" ++ render (pretty tatom1)
   name <- mkName (Lctd (getPos clss0) (Tagged name0))
-  cstrs1 <- rnConstraints cstrs0
+  params1 <- traverse mkName params0
+  let env = Map.fromList (zip (map unlctd params0) params1)
+  cstrs1 <- rnConstraints env cstrs0
   MkInstDecl name clss1 tatom1
-    <$> applyConstraints params0 cstrs1
+    <$> applyConstraints params1 cstrs1
     <*> traverse rnFuncDecl methods0
 
 -- | Rename an infix operator declaration, i.e., introduce the mapping from the

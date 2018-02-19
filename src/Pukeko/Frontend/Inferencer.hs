@@ -9,6 +9,7 @@ import Pukeko.Prelude
 import Pukeko.Pretty
 
 import           Control.Lens.Indexed
+import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
 import qualified Data.List.NE     as NE
@@ -23,7 +24,6 @@ import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF    hiding (instantiate)
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Type       hiding ((~>), (*~>))
 import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Inferencer.Gamma
@@ -36,7 +36,7 @@ type Aux s = PreTyped (UType s)
 type Cstrs s tv = Seq (UType s tv, Name Clss)
 
 data SplitCstrs s tv = MkSplitCstrs
-  { _retained :: Map Id.TVar (Set (Name Clss))
+  { _retained :: Map (Name TVar) (Set (Name Clss))
   , _deferred :: Cstrs s tv
   }
 
@@ -49,21 +49,21 @@ freshUVar = do
   l <- getTLevel
   UVar <$> sendM (newSTRef (UFree v l))
 
-generalize :: forall s tv ev. UType s tv -> IT s ev (UType s tv, Set Id.TVar)
+generalize :: forall s tv ev. UType s tv -> IT s ev (UType s tv, Set (Name TVar))
 generalize = go
   where
-    go :: UType s tv -> IT s ev (UType s tv, Set Id.TVar)
+    go :: UType s tv -> IT s ev (UType s tv, Set (Name TVar))
     go t0 = case t0 of
       UVar uref -> do
-        uvar <- sendM (readSTRef uref)
-        cur_level <- getTLevel
-        case uvar of
-          UFree v l
-            | l > cur_level -> do
-                let t1 = UTVar v
+        curLevel <- getTLevel
+        sendM (readSTRef uref) >>= \case
+          UFree uid lvl
+            | lvl > curLevel -> do
+                name <- mkName (Lctd noPos (uvarIdName uid))
+                let t1 = UTVar name
                 sendM (writeSTRef uref (ULink t1))
-                pure (t1, Set.singleton v)
-            | otherwise     -> pureDefault
+                pure (t1, Set.singleton name)
+            | otherwise -> pureDefault
           ULink t1 -> go t1
       UTVar{} -> pureDefault
       UTAtm{} -> pureDefault
@@ -254,7 +254,7 @@ inferDecl = here' $ \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
   DFunc func0 -> do
-    reset @Id.TVar
+    reset @UVarId
     t_decl <- open <$> typeOfFunc (nameOf func0)
     func1 <- inferFuncDecl func0 t_decl
     yield (DFunc func1)
@@ -266,8 +266,7 @@ inferDecl = here' $ \case
     ds1 <- for ds0 $ \mthd -> do
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
       let t_inst = mkTApp (TAtm atom) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
-      let t_decl1 :: Type (TScope Int Void)
-          t_decl1 = renameType (instantiate' (const t_inst) t_decl0)
+      t_decl1 <- renameType (instantiate' (const t_inst) t_decl0)
       withQVars qvs (inferFuncDecl mthd (open t_decl1))
     yield (DInst (MkInstDecl instName clss atom qvs ds1))
   where
@@ -276,10 +275,10 @@ inferDecl = here' $ \case
 inferModule' :: Module In -> TI Void s (Module (Aux s))
 inferModule' = module2decls (fmap catMaybes . traverse inferDecl)
 
-type TQEnv tv = Map Id.TVar tv
+type TQEnv tv = Map (Name TVar) tv
 
 type TQ tv s =
-  Eff [Reader (TQEnv tv), Reader SourcePos, Supply Id.TVar, Error Failure, ST s]
+  Eff [Reader (TQEnv tv), Reader SourcePos, Error Failure, NameSource, ST s]
 
 localizeTQ :: (TraversableWithIndex Int t) =>
   t QVar -> TQ (TScope Int tv) s a -> TQ tv s a
@@ -350,19 +349,19 @@ qualDecl = \case
     pure (DInst (MkInstDecl instName c t qvs ds1))
 
 qualModule :: Module (Aux s) -> TQ Void s (Module Out)
-qualModule = module2decls (traverse (\decl -> reset @Id.TVar *> qualDecl decl))
+qualModule = module2decls (traverse qualDecl)
 
-inferModule :: Member (Error Failure) effs => Module In -> Eff effs (Module Out)
-inferModule m0 = either throwError pure $ runST $ runM $ runError $ do
+inferModule :: Members [NameSource, Error Failure] effs =>
+  Module In -> Eff effs (Module Out)
+inferModule m0 = eitherM throwError pure $ runSTBelowNameSource $ runError $ do
   m1 <- inferModule' m0
         & runGamma
         & runInfo m0
         & runReader noPos
-        & evalSupply Id.freshTVars
+        & evalSupply @UVarId uvarIds
   m2 <- qualModule m1
         & runReader mempty
         & runReader noPos
-        & evalSupply (map (Id.tvar . (:[])) ['a' .. 'z'] ++ Id.freshTVars)
   pure m2
 
 instance Monoid (SplitCstrs s tv) where

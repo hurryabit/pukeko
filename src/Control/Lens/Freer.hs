@@ -4,6 +4,7 @@ module Control.Lens.Freer
   , view
   , views
   , modifying
+  , locally
   ) where
 
 import Control.Lens hiding (use, uses, view, views, modifying)
@@ -31,3 +32,8 @@ views l f = asks (getConst #. l (Const #. f))
 modifying :: (Member (State s) effs) => ASetter s s a b -> (a -> b) -> Eff effs ()
 modifying l f = modify (over l f)
 {-# INLINE modifying #-}
+
+locally :: Member (Reader s) effs =>
+  ASetter s s a b -> (a -> b) -> Eff effs x -> Eff effs x
+locally l f = local (l %~ f)
+{-# INLINE locally #-}

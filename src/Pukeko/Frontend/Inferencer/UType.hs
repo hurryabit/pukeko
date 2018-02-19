@@ -2,8 +2,13 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.FrontEnd.Inferencer.UType
-  ( UType (..)
+  ( Level
+  , UVarId
+  , UType (..)
   , UVar (..)
+  , topLevel
+  , uvarIdName
+  , uvarIds
   , mkUTUni
   , unUTUni
   , unUTUni1
@@ -31,18 +36,21 @@ import qualified Data.Vector        as Vec
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type       hiding ((~>), (*~>))
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Scope
 
 infixr 1 ~>, *~>
 
+newtype Level = Level Int
+  deriving (Eq, Ord, Enum)
+
+newtype UVarId = UVarId Int
+
 data UVar s tv
-  = UFree Id.TVar Int
-    -- NOTE: The @Int@ is the level of this unification variable.
+  = UFree UVarId Level
   | ULink (UType s tv)
 
 data UType s tv
-  = UTVar Id.TVar
+  = UTVar (Name TVar)
   | UTAtm TypeAtom
   | UTApp (UType s tv) (UType s tv)
   | UTUni (NonEmpty QVar) (UType s tv)
@@ -50,6 +58,15 @@ data UType s tv
 
 pattern UTFun :: UType s tv -> UType s tv -> UType s tv
 pattern UTFun tx ty = UTApp (UTApp (UTAtm TAArr) tx) ty
+
+topLevel :: Level
+topLevel = Level 0
+
+uvarIds :: [UVarId]
+uvarIds = map UVarId [1 ..]
+
+uvarIdName :: UVarId -> Tagged TVar String
+uvarIdName (UVarId n) = Tagged ('_':show n)
 
 mkUTUni :: [QVar] -> UType s tv -> UType s tv
 mkUTUni xs0 t0 = case xs0 of
@@ -105,7 +122,7 @@ open1 = \case
     where
       utvar = UTVar . _qvar2tvar . (Vec.fromList (toList xs) Vec.!)
 
-subst :: Map Id.TVar (UType s tv) -> UType s tv -> ST s (UType s tv)
+subst :: Map (Name TVar) (UType s tv) -> UType s tv -> ST s (UType s tv)
 subst env = go
   where
     go t0 = case t0 of
@@ -119,6 +136,9 @@ subst env = go
           ULink t1 -> go  t1
 
 -- * Pretty printing
+instance Pretty UVarId where
+  pretty = pretty . uvarIdName
+
 prettyUVar :: Int -> UVar s tv -> ST s (Doc ann)
 prettyUVar prec = \case
   UFree v _ -> pure (pretty v)

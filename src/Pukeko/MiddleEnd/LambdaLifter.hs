@@ -88,9 +88,8 @@ llELam oldBinds t_rhs rhs1 = do
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
           (setOf (traverse . bind2type . traverse) allBinds0 <> setOf traverse t_rhs)
-    -- TODO: When we switch to @Name TVar@, we need to @copyName@ the @baseTVar
-    -- v@ below.
-    tyBinds <- traverse (\v -> MkQVar <$> lookupQual v <*> pure (baseTVar v)) tvCaptured
+    tyBinds <- for tvCaptured $ \v ->
+      MkQVar <$> lookupQual v <*> copyName noPos (baseTVar v)
     let tvMap = map _qvar2tvar tyBinds
                 & zipWithFrom mkBound 0
                 & zipExact tvCaptured

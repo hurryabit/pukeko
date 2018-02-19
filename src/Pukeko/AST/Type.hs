@@ -40,6 +40,7 @@ module Pukeko.AST.Type
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import           Control.Lens (forOf)
 import           Control.Lens.Indexed (FunctorWithIndex)
 import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
@@ -49,7 +50,6 @@ import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Functor2
 import           Pukeko.AST.Scope
 
@@ -87,7 +87,7 @@ pattern TFun tx ty = TApp (TApp TArr tx) ty
 data QVar = MkQVar
   { _qvar2cstr :: Set (Name Clss)
     -- ^ The set of type class constraints on the type variable.
-  , _qvar2tvar :: Id.TVar
+  , _qvar2tvar :: Name TVar
   }
 
 data CoercionDir = Inject | Project
@@ -107,7 +107,7 @@ strengthenT0 = fmap strengthenScope0
 weakenT :: Type tv -> Type (TScope i tv)
 weakenT = fmap weakenScope
 
-mkTVars :: (FunctorWithIndex Int t) => t Id.TVar -> t (Type (TScope Int tv))
+mkTVars :: (FunctorWithIndex Int t) => t (Name TVar) -> t (Type (TScope Int tv))
 mkTVars = imap (\i b -> TVar (mkBound i b))
 
 -- TODO: Use class 'BaseTVar' to avoid this duplication.
@@ -162,7 +162,7 @@ type2tcon_ f = fmap getConst . cataM2 (fmap Const . step)
       _               -> pure ()
 -- | Apply a bunch of constraints to a list of 'Binder's.
 applyConstraints :: CanThrowHere effs =>
-  [Id.TVar] -> Map Id.TVar (Set (Name Clss)) -> Eff effs [QVar]
+  [Name TVar] -> Map (Name TVar) (Set (Name Clss)) -> Eff effs [QVar]
 applyConstraints binders constraints = do
   let badNames = Map.keysSet constraints `Set.difference` Set.fromList binders
   whenJust (Set.lookupMin badNames) $ \name ->
@@ -294,26 +294,31 @@ instance Corecursive2 Type where
 
 makeLenses ''QVar
 
-renameType :: (BaseTVar tv, Ord tv) => Type tv -> Type tv
-renameType t0 =
+-- TODO: We rename types for pretty printing and only when we anticipate the
+-- lexical name capture. There should be a principles approach to this in the
+-- pretty printer itself.
+renameType :: (Member NameSource effs, BaseTVar tv, Ord tv) =>
+  Type tv -> Eff effs (Type tv)
+renameType t0 = do
   let t1 = fmap Box t0
       vs = setOf traverse t1
-      nvs = Set.fromList [Id.tvar [c] | c <- ['a' .. 'z']]
-            `Set.difference` Set.map (baseTVar . unBox) vs
+      nvs = Set.fromList [Tagged [c] | c <- ['a' .. 'z']]
+            `Set.difference` Set.map (nameText . baseTVar . unBox) vs
       -- env0 :: Map tv tv
       env0 = Map.fromSet id vs
-      sup0 = Set.toList nvs ++ Id.freshTVars
-  in fmap unBox (run (evalSupply sup0 (runReader env0 (go t1))))
+      sup0 = Set.toList nvs ++ map (\n -> Tagged ('_':show n)) [1::Int ..]
+  fmap unBox <$> evalSupply sup0 (runReader env0 (go t1))
   where
-    go ::
-      forall tv. (HasEnv tv) =>
-      Type tv -> Eff [Reader (EnvOf tv tv), Supply Id.TVar] (Type tv)
+    go :: forall tv effs. (Member NameSource effs, HasEnv tv) =>
+      Type tv ->
+      Eff (Reader (EnvOf tv tv) : Supply (Tagged TVar String) : effs) (Type tv)
     go = \case
       TVar v -> TVar <$> asks (lookupEnv v)
       TAtm a -> pure (TAtm a)
       TApp tf tp -> TApp <$> go tf <*> go tp
       TUni qvs0 tq -> do
-        qvs1 <- traverse (qvar2tvar (const fresh)) qvs0
+        qvs1 <- forOf (traverse . qvar2tvar) qvs0 $ \tvar ->
+          fresh >>= mkName . Lctd (getPos tvar)
         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
         local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
           TUni qvs1 <$> go tq

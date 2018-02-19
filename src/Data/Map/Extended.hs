@@ -1,5 +1,5 @@
 module Data.Map.Extended
-  ( module Data.Map
+  ( module Data.Map.Lazy
 
   , (!)
   , fromMultiList
@@ -7,7 +7,7 @@ module Data.Map.Extended
 where
 
 import Prelude  hiding (lookup)
-import Data.Map hiding (foldr, (!))
+import Data.Map.Lazy hiding (foldr, (!))
 import Data.CallStack
 
 infixl 9 !

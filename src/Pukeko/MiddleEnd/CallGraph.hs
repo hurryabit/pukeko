@@ -17,7 +17,6 @@ import qualified Data.GraphViz.Types.Monadic       as D
 import qualified Data.Text.Lazy as T
 import           Data.Tuple.Extra (fst3)
 
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore

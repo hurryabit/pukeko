@@ -32,14 +32,15 @@ module Pukeko.AST.Surface
   , mkTFun
 
   , extend
-  , type2tvar
+  , freeTVars
   )
 where
 
 import Pukeko.Prelude
 
+import qualified Data.Map.Extended as Map
+
 import           Pukeko.AST.Name       hiding (Name)
-import qualified Pukeko.AST.Identifier as Id (TVar)
 import qualified Pukeko.AST.Operator   as Op
 
 type Name (nsp :: NameSpace) = Tagged nsp String
@@ -67,7 +68,7 @@ data Decl
 
 data TConDecl = MkTConDecl
   { _tcon2name  :: LctdName TCon
-  , _tcon2prms  :: [Id.TVar]
+  , _tcon2prms  :: [LctdName TVar]
     -- FIXME: Use a proper type to distinguish between 'type' and 'data'.
   , _tcon2dcons :: Either Type [DConDecl]
   }
@@ -84,14 +85,14 @@ data SignDecl = MkSignDecl
 
 data ClssDecl = MkClssDecl
   { _clss2name  :: LctdName Clss
-  , _clss2prm   :: Id.TVar
+  , _clss2prm   :: LctdName TVar
   , _clss2mthds :: [SignDecl]
   }
 
 data InstDecl = MkInstDecl
   { _inst2clss  :: LctdName Clss
   , _inst2atom  :: TypeAtom
-  , _inst2tvars :: [Id.TVar]
+  , _inst2tvars :: [LctdName TVar]
   , _inst2cstr  :: TypeCstr
   , _inst2defns :: [Defn (LctdName EVar)]
   }
@@ -112,11 +113,11 @@ data TypeAtom
   | TACon (LctdName TCon)
 
 data Type
-  = TVar Id.TVar
+  = TVar (LctdName TVar)
   | TAtm TypeAtom
   | TApp Type Type
 
-data TypeCstr = MkTypeCstr [(LctdName Clss, Id.TVar)]
+data TypeCstr = MkTypeCstr [(LctdName Clss, LctdName TVar)]
 
 data TypeScheme = MkTypeScheme TypeCstr Type
 
@@ -171,12 +172,11 @@ mkTApp = foldl TApp
 mkTFun :: Type -> Type -> Type
 mkTFun tx ty = mkTApp (TAtm TAArr) [tx, ty]
 
-type2tvar :: Traversal' Type Id.TVar
-type2tvar f = \case
-  TVar v     -> TVar <$> f v
-  TAtm a     -> pure (TAtm a)
-  TApp tf tp -> TApp <$> type2tvar f tf <*> type2tvar f tp
-
+freeTVars :: Type -> Map (Name TVar) (LctdName TVar)
+freeTVars = \case
+  TVar v -> Map.singleton (unlctd v) v
+  TAtm _ -> mempty
+  TApp tf ta -> freeTVars tf <> freeTVars ta
 
 deriving instance Show Module
 deriving instance Show Decl

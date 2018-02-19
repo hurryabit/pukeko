@@ -11,7 +11,6 @@ import qualified Data.Set          as Set
 import qualified Data.Vector       as Vec
 import qualified Safe              as Safe
 
-import qualified Pukeko.AST.Identifier as Id
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
@@ -182,9 +181,10 @@ elimETyApp e0 t_e0 ts0 = do
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: Name Clss -> Id.TVar -> CE tv ev (Name EVar)
-dictEVar clss tcon =
-  mkName (Lctd noPos (Tagged ("dict$" ++ untag (nameText clss) ++ "$" ++ Id.name tcon)))
+dictEVar :: Name Clss -> Name TVar -> CE tv ev (Name EVar)
+dictEVar clss tvar = do
+  let name0 = "dict$" ++ untag (nameText clss) ++ "$" ++ untag (nameText tvar)
+  mkName (Lctd noPos (Tagged name0))
 
 -- | Enrich a type abstraction with value abstractions for type class
 -- dictionaries.

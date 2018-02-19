@@ -45,7 +45,6 @@ import qualified Data.Vector       as Vec
 import           Data.Aeson.TH
 
 import           Pukeko.AST.Name
-import qualified Pukeko.AST.Identifier as Id
 
 -- NOTE: The order of the constructors is chosen such that the derived @Ord@
 -- instance sorts the corresponding de Bruijn indices in decreasing order, which
@@ -57,7 +56,7 @@ data Scope b i v
 
 type EScope = Scope (Name EVar)
 
-type TScope = Scope Id.TVar
+type TScope = Scope (Name TVar)
 
 scope :: (v -> a) -> (i -> a) -> Scope b i v -> a
 scope f g = scope' f (const . g)
@@ -191,15 +190,15 @@ baseName = fst . baseNameIx
 
 type BaseEVar ev = (BaseName (Name EVar) ev)
 
-type BaseTVar tv = (BaseName Id.TVar tv)
+type BaseTVar tv = (BaseName (Name TVar) tv)
 
 baseEVar :: BaseEVar ev => ev -> Name EVar
 baseEVar = baseName
 
-baseTVarIx :: BaseTVar tv => tv -> (Id.TVar, Int)
+baseTVarIx :: BaseTVar tv => tv -> (Name TVar, Int)
 baseTVarIx = baseNameIx
 
-baseTVar :: BaseTVar tv => tv -> Id.TVar
+baseTVar :: BaseTVar tv => tv -> Name TVar
 baseTVar = baseName
 
 instance BaseName b Void where
