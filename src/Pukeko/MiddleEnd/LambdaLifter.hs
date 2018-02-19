@@ -33,6 +33,7 @@ type LL tv ev =
 execLL :: Member NameSource effs =>
   Module In -> LL Void Void () -> Eff effs Core.Module
 execLL m0 =
+  -- FIXME: Get rid of this 'undefined'.
   fmap snd . delayNameSource . runWriter . evalSupply [1..] . runState undefined . runInfo m0 . runGamma
 
 freshEVar :: LL tv ev (Name EVar)
@@ -41,7 +42,7 @@ freshEVar = do
   n <- fresh @Int
   mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
 
--- NOTE: It might be interesting to proof some stuff about indices here using
+-- NOTE: It might be interesting to prove some stuff about indices here using
 -- Liquid Haskell.
 -- | Lift a value abstraction to the top level.
 --
@@ -70,7 +71,7 @@ freshEVar = do
 --
 -- > F' = f @a₁ … @aₖ y₁ … yₘ
 --
--- Last but not least, not that if we sort the aᵢ and yⱼ by /decreasing/ de
+-- Last but not least, note that if we sort the aᵢ and yⱼ by /decreasing/ de
 -- Bruijn indices, we create more opportunities for η-reduction, which is good
 -- for inlining.
 llELam ::
@@ -80,20 +81,26 @@ llELam ::
   Expr Out tv (EScope Int ev) ->
   LL tv ev (Expr Out tv ev)
 llELam oldBinds t_rhs rhs1 = do
-    -- FIXME: We're copying the y_i (and the a_i) from the description above.
-    -- Copy the names properly using 'copyName'.
     let evCaptured = Set.toList (setOf (traverse . _Free) rhs1)
     let n0 = length evCaptured
-    -- TODO: We should figure out a location for @x@.
-    newBinds <- for evCaptured $ \x -> MkBind (baseEVar x) <$> lookupEVar x
+    newBinds <- for evCaptured $ \x ->
+      MkBind <$> copyName noPos (baseEVar x) <*> lookupEVar x
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
           (setOf (traverse . bind2type . traverse) allBinds0 <> setOf traverse t_rhs)
+    -- TODO: When we switch to @Name TVar@, we need to @copyName@ the @baseTVar
+    -- v@ below.
     tyBinds <- traverse (\v -> MkQVar <$> lookupQual v <*> pure (baseTVar v)) tvCaptured
-    let tvMap = ifoldMap (\j v -> Map.singleton v (mkBound j (baseTVar v))) tvCaptured
+    let tvMap = map _qvar2tvar tyBinds
+                & zipWithFrom mkBound 0
+                & zipExact tvCaptured
+                & Map.fromList
     let tvRename :: tv -> TScope Int Void
         tvRename v = tvMap Map.! v
-    let evMap = ifoldMap (\i x -> Map.singleton x (mkBound i (baseEVar x))) evCaptured
+    let evMap = map nameOf newBinds
+                & zipWithFrom mkBound 0
+                & zipExact evCaptured
+                & Map.fromList
     let evRename :: EScope Int ev -> EScope Int Void
         evRename = scope' (evMap Map.!) (mkBound . (n0+))
     let allBinds1 = map (fmap tvRename) allBinds0
