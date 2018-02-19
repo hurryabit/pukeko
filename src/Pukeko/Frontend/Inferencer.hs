@@ -254,7 +254,6 @@ inferDecl = here' $ \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
   DFunc func0 -> do
-    reset @UVarId
     t_decl <- open <$> typeOfFunc (nameOf func0)
     func1 <- inferFuncDecl func0 t_decl
     yield (DFunc func1)
@@ -272,8 +271,12 @@ inferDecl = here' $ \case
   where
     yield = pure . Just
 
-inferModule' :: Module In -> TI Void s (Module (Aux s))
-inferModule' = module2decls (fmap catMaybes . traverse inferDecl)
+inferModule' :: Module In -> Eff (GlobalEffs s) (Module (Aux s))
+inferModule' = module2decls $ \decls ->
+  fmap catMaybes . for decls $ \decl -> inferDecl decl
+                                        & runGamma
+                                        & evalSupply uvarIds
+                                        & runReader (getPos decl)
 
 type TQEnv tv = Map (Name TVar) tv
 
@@ -348,21 +351,16 @@ qualDecl = \case
     ds1 <- for ds0 $ \d0 -> localizeTQ qvs (qualFuncDecl d0)
     pure (DInst (MkInstDecl instName c t qvs ds1))
 
-qualModule :: Module (Aux s) -> TQ Void s (Module Out)
-qualModule = module2decls (traverse qualDecl)
+qualModule :: Module (Aux s) -> Eff [Error Failure, NameSource, ST s](Module Out)
+qualModule = module2decls . traverse $ \decl ->
+  qualDecl decl
+  & runReader mempty
+  & runReader (getPos decl)
 
 inferModule :: Members [NameSource, Error Failure] effs =>
   Module In -> Eff effs (Module Out)
-inferModule m0 = eitherM throwError pure $ runSTBelowNameSource $ runError $ do
-  m1 <- inferModule' m0
-        & runGamma
-        & runInfo m0
-        & runReader noPos
-        & evalSupply @UVarId uvarIds
-  m2 <- qualModule m1
-        & runReader mempty
-        & runReader noPos
-  pure m2
+inferModule m0 = eitherM throwError pure $ runSTBelowNameSource $ runError $
+  runInfo m0 (inferModule' m0) >>= qualModule
 
 instance Monoid (SplitCstrs s tv) where
   mempty = MkSplitCstrs mempty mempty

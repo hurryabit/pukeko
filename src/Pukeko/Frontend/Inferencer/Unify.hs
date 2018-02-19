@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module Pukeko.FrontEnd.Inferencer.Unify
   ( TU
+  , GlobalEffs
   , unify
   )
 where
@@ -17,8 +18,10 @@ import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Info
 
-type TU s ev = EffGamma s ev
-  [Reader ModuleInfo, Reader SourcePos, Supply UVarId, Error Failure, NameSource, ST s]
+type GlobalEffs s = [Reader ModuleInfo, Error Failure, NameSource, ST s]
+
+type TU s ev = EffGamma s ev (Supply UVarId : Reader SourcePos : GlobalEffs s)
+
 
 -- TODO: link compression
 -- | Unwind a chain of 'ULink's.

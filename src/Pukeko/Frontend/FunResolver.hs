@@ -26,12 +26,12 @@ makeLenses ''FRState
 type CanFR effs = Members [State FRState, Reader SourcePos, Error Failure] effs
 
 resolveModule :: Member (Error Failure) effs => Module In -> Eff effs ()
-resolveModule (MkModule decls) = runReader noPos . evalState st0 $ do
-  traverse_ frDecl decls
+resolveModule (MkModule decls) = evalState st0 $ do
+  for_ decls $ \decl -> runReader (getPos decl) (frDecl decl)
   MkFRState decld defnd <- get
   let undefnd = decld `Map.difference` Map.fromSet id defnd
   whenJust (Map.minViewWithKey undefnd) $ \((fun, pos), _) ->
-    here_ pos (throwHere ("declared but undefined function:" <+> pretty fun))
+    throwAt pos ("declared but undefined function:" <+> pretty fun)
   where
     st0 = MkFRState mempty mempty
 

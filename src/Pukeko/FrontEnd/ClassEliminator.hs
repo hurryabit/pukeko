@@ -25,14 +25,15 @@ type Out = Unclassy
 type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
 
 type CE tv ev =
-  EffXGamma (Map (Name Clss)) Type tv ev [Reader ModuleInfo, Reader SourcePos, NameSource]
-
-runCE :: Member NameSource effs => Module In -> CE Void Void a -> Eff effs a
-runCE m0 = delayNameSource . runReader noPos . runInfo m0 . runGamma
+  EffXGamma (Map (Name Clss)) Type tv ev
+  [Reader SourcePos, Reader ModuleInfo, NameSource]
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
-elimModule m0@(MkModule decls) = runCE m0 $
-  MkModule . map unclssDecl . concat <$> traverse elimDecl decls
+elimModule m0@(MkModule decls0) = delayNameSource . runInfo m0 $ do
+  decls1 <- for decls0 $ \decl0 -> elimDecl decl0
+                                   & runGamma
+                                   & runReader (getPos decl0)
+  pure (MkModule (map unclssDecl (concat decls1)))
 
 -- | Name of the dictionary type constructor of a type class, e.g., @Dict$Eq@
 -- for type class @Eq@.

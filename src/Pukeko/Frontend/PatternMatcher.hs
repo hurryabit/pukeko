@@ -24,9 +24,9 @@ import           Pukeko.AST.ConDecl
 type In  = Typed
 type Out = Unnested
 
-type CanPM effs = Members
-  [Reader ModuleInfo, Supply Int, Reader SourcePos, NameSource, Error Failure]
-  effs
+type GlobalEffs effs = Members [Reader ModuleInfo, NameSource, Error Failure] effs
+
+type CanPM effs = (Members [Supply Int, Reader SourcePos] effs, GlobalEffs effs)
 
 freshEVar :: CanPM effs => Eff effs (Name EVar)
 freshEVar = do
@@ -50,12 +50,13 @@ pmExpr = \case
   ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
   ETyAnn t  e  -> ETyAnn t <$> pmExpr e
 
-pmFuncDecl :: CanPM effs => FuncDecl In tv -> Eff effs (FuncDecl Out tv)
-pmFuncDecl (MkFuncDecl name typ_ body) = do
-  reset @Int
+pmFuncDecl :: GlobalEffs effs => FuncDecl In tv -> Eff effs (FuncDecl Out tv)
+pmFuncDecl decl@(MkFuncDecl name typ_ body) =
   MkFuncDecl name typ_ <$> pmExpr body
+  & evalSupply @Int [1 ..]
+  & runReader (getPos decl)
 
-pmDecl :: CanPM effs => Decl In -> Eff effs (Decl Out)
+pmDecl :: GlobalEffs effs => Decl In -> Eff effs (Decl Out)
 pmDecl = \case
   DType ds -> pure (DType ds)
   DFunc func -> DFunc <$> pmFuncDecl func
@@ -65,12 +66,7 @@ pmDecl = \case
 
 compileModule :: Members [NameSource, Error Failure] effs =>
   Module In -> Eff effs (Module Out)
-compileModule m0 =
-  module2decls (traverse pmDecl) m0
-  & runInfo m0
-  & evalState []
-  & runReader noPos
-  & evalSupply @Int [1 ..]
+compileModule m0 = module2decls (traverse pmDecl) m0 & runInfo m0
 
 
 pmMatch ::

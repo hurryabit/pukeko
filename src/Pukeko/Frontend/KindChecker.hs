@@ -40,8 +40,8 @@ type KCState s = Map (Name TCon) (Kind (Open s))
 
 type KC n s =
   Eff
-  [ Reader (KCEnv n s), State (KCState s)
-  , Reader SourcePos, Supply Int, Error Failure, ST s
+  [ Reader (KCEnv n s), Reader SourcePos, Supply Int
+  , State (KCState s), Error Failure, ST s
   ]
 
 freshUVar :: KC n s (Kind (Open s))
@@ -92,27 +92,22 @@ kcVal = \case
       localize env (kcType Star t)
 
 kcDecl :: Decl In -> KC n s ()
-kcDecl decl = case decl of
+kcDecl = \case
   DType tcon -> kcTConDecl tcon
   DSign (MkSignDecl _ t) -> kcVal t
-  -- NOTE: The typed in (external) function declaration are bogus (for now), so
-  -- there's nothing to be checked.
   DFunc{} -> pure ()
   DExtn{} -> pure ()
   -- FIXME: Check kinds in type class declarations and instance definitions.
   DClss{} -> pure ()
   DInst{} -> pure ()
 
-kcModule ::Module In -> KC n s ()
-kcModule (MkModule decls)= traverse_ (\top -> reset @Int *> kcDecl top) decls
-
 checkModule :: Member (Error Failure) effs => Module In -> Eff effs ()
-checkModule module0 = either throwError pure $ runST $
-  kcModule module0
-  & runReader Vec.empty
+checkModule (MkModule decls) = either throwError pure $ runST $
+  for_ decls (\decl -> kcDecl decl
+                       & runReader Vec.empty
+                       & runReader (getPos decl)
+                       & evalSupply [1 ..])
   & evalState mempty
-  & runReader noPos
-  & evalSupply [1 ..]
   & runError
   & runM
 

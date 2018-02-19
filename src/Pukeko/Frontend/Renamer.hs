@@ -342,6 +342,7 @@ renameModule :: Members [NameSource, Error Failure] effs =>
   Ps.Package -> Eff effs (Module Out)
 renameModule (Ps.MkPackage _ modules) =
   let ldecls = concatMap Ps._mod2decls modules
-  in  MkModule . catMaybes <$> traverse rnDecl ldecls
+  in  MkModule . catMaybes
+      -- FIXME: Figure out the location of the declaration.
+      <$> traverse (\ldecl -> runReader noPos (rnDecl ldecl)) ldecls
       & evalState (Tabs mempty mempty mempty mempty)
-      & runReader noPos

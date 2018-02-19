@@ -28,13 +28,7 @@ type IsEVar ev = (Ord ev, BaseEVar ev, HasEnv ev)
 
 type LL tv ev =
   EffGamma tv ev
-    [Reader ModuleInfo, State (Name EVar), Supply Int, Writer Core.Module, NameSource]
-
-execLL :: Member NameSource effs =>
-  Module In -> LL Void Void () -> Eff effs Core.Module
-execLL m0 =
-  -- FIXME: Get rid of this 'undefined'.
-  fmap snd . delayNameSource . runWriter . evalSupply [1..] . runState undefined . runInfo m0 . runGamma
+    [Supply Int, Reader ModuleInfo, State (Name EVar), Writer Core.Module, NameSource]
 
 freshEVar :: LL tv ev (Name EVar)
 freshEVar = do
@@ -151,7 +145,6 @@ llDecl :: Decl In -> LL Void Void ()
 llDecl = \case
   DType t -> tell (mkTypeDecl t)
   DFunc (MkFuncDecl lhs t rhs) -> do
-    reset @Int
     put @(Name EVar) lhs
     rhs <- llExpr rhs
     let supc = SupCDecl lhs (fmap absurd t) [] [] (bimap absurd absurd rhs)
@@ -159,4 +152,11 @@ llDecl = \case
   DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @Any (ExtnDecl z t s))
 
 liftModule :: Member NameSource effs => Module In -> Eff effs Core.Module
-liftModule m0@(MkModule decls) = execLL m0 (traverse_ llDecl decls)
+liftModule m0@(MkModule decls) =
+  for_ decls (\decl -> llDecl decl & runGamma & evalSupply [1 ..])
+  & runInfo m0
+  -- FIXME: Get rid of this 'undefined'.
+  & runState undefined
+  & runWriter
+  & delayNameSource
+  & fmap snd
