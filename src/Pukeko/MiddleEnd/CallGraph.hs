@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 module Pukeko.MiddleEnd.CallGraph
   ( module Pukeko.MiddleEnd.CallGraph
   , G.SCC (..)
@@ -7,21 +6,17 @@ module Pukeko.MiddleEnd.CallGraph
 
 import Pukeko.Prelude
 
-import Control.Lens
 import qualified Data.Array as A
 import qualified Data.Graph as G
 import qualified Data.GraphViz.Attributes.Complete as D
 import qualified Data.GraphViz.Printing            as D
-import qualified Data.GraphViz.Types.Generalised   as D
 import qualified Data.GraphViz.Types.Monadic       as D
 import qualified Data.Text.Lazy as T
 import           Data.Tuple.Extra (fst3)
 
-import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
-import           Pukeko.AST.Type
 
 data CallGraph m = CallGraph
   { graph    :: G.Graph

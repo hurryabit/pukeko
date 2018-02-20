@@ -1,11 +1,8 @@
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# LANGUAGE ViewPatterns #-}
 module Pukeko.AST.ConDecl
   ( TConDecl (..)
   , DConDecl (..)
-  , tcon2name
   , tcon2dcons
-  , dcon2name
   , dcon2fields
   , typeOfDCon
   ) where
@@ -13,30 +10,32 @@ module Pukeko.AST.ConDecl
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import           Control.Lens (makeLensesFor)
 import           Data.Aeson.TH
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
-import           Pukeko.AST.Scope
 
+-- TODO: We could make it @Type Int@!?
 data TConDecl = MkTConDecl
   { _tcon2name  :: Name TCon
   , _tcon2prms  :: [Name TVar]
-  , _tcon2dcons :: Either (Type (TScope Int Void)) [DConDecl]
+  , _tcon2dcons :: Either Type [DConDecl]
   }
 
 data DConDecl = MkDConDecl
   { _dcon2tcon   :: Name TCon
   , _dcon2name   :: Name DCon
   , _dcon2tag    :: Int
-  , _dcon2fields :: [Type (TScope Int Void)]
+  , _dcon2fields :: [Type]
   }
 
-typeOfDCon :: TConDecl -> DConDecl -> Type Void
+-- FIXME: Remove 'Void'.
+typeOfDCon :: TConDecl -> DConDecl -> GenType Void
 typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
   assert (tcon == tconRef) $
-  let res = mkTApp (TCon tcon) (mkTVars tparams)
-  in  mkTUni (map (MkQVar mempty) tparams) (fields *~> res)
+  let res = mkTApp (TCon tcon) (map TVar tparams)
+  in  closeT (mkTUni (map (MkQVar mempty) tparams) (fields *~> res))
 
 type instance NameSpaceOf TConDecl = TCon
 type instance NameSpaceOf DConDecl = DCon
@@ -62,8 +61,8 @@ instance Pretty DConDecl where
 deriving instance Show TConDecl
 deriving instance Show DConDecl
 
-makeLenses ''TConDecl
-makeLenses ''DConDecl
+makeLensesFor [("_tcon2dcons" , "tcon2dcons" )] ''TConDecl
+makeLensesFor [("_dcon2fields", "dcon2fields")] ''DConDecl
 
 deriveToJSON defaultOptions ''TConDecl
 deriveToJSON defaultOptions ''DConDecl

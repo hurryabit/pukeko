@@ -25,7 +25,7 @@ type TU s ev = EffGamma s ev (Supply UVarId : Reader SourcePos : GlobalEffs s)
 
 -- TODO: link compression
 -- | Unwind a chain of 'ULink's.
-unwind :: UType s tv -> TU s ev (UType s tv)
+unwind :: UType s -> TU s ev (UType s)
 unwind t0 = case t0 of
   UVar uref -> do
     sendM (readSTRef uref) >>= \case
@@ -34,14 +34,14 @@ unwind t0 = case t0 of
   _ -> pure t0
 
 -- | Read a 'UVar' /after/ 'unwind'ing.
-readUnwound :: STRef s (UVar s tv) -> TU s ev (UVarId, Level)
+readUnwound :: STRef s (UVar s) -> TU s ev (UVarId, Level)
 readUnwound uref =
   sendM (readSTRef uref) >>= \case
     ULink{} -> impossible  -- we only call this after unwinding
     UFree v lvl -> pure (v, lvl)
 
 -- | Perform the occurs check. Assumes that the 'UVar' has been unwound.
-occursCheck :: STRef s (UVar s tv) -> UType s tv -> TU s ev ()
+occursCheck :: STRef s (UVar s) -> UType s -> TU s ev ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwHere "occurs check"
@@ -58,7 +58,7 @@ occursCheck uref1 t2 = case t2 of
   UTUni{} -> impossible  -- UVar is assumed to be unwound
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
-unify :: UType s tv -> UType s tv -> TU s ev ()
+unify :: UType s -> UType s -> TU s ev ()
 unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2

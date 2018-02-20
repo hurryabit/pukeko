@@ -3,19 +3,19 @@ module Pukeko.AST.Language where
 
 import Pukeko.Prelude
 
-import GHC.TypeLits (type (<=?), type (-))
+import GHC.TypeLits (Nat, type (<=?), type (-))
 
 import Pukeko.AST.Type (NoType, Type)
 
 data Surface
-data PreTyped (t :: * -> *)
+data PreTyped (t :: *)
 data Typed
 data Unnested
 data Unclassy
 type SystemF = Unclassy
 data SuperCore
 
-type family LangId lg where
+type family LangId lg :: Nat where
   LangId Surface      = 100
   LangId (PreTyped t) = 399
   LangId Typed        = 400
@@ -23,15 +23,13 @@ type family LangId lg where
   LangId Unclassy     = 600
   LangId SuperCore    = 700
 
-type family TypeOf lg where
+type family TypeOf lg :: * where
   TypeOf Surface      = NoType
   TypeOf (PreTyped t) = t
   TypeOf Typed        = Type
   TypeOf Unnested     = Type
   TypeOf Unclassy     = Type
   TypeOf SuperCore    = Type
-
-type IsLang lg = Traversable (TypeOf lg)
 
 type IsPreTyped lg = LangId (PreTyped Type) <=? LangId lg
 type IsTyped    lg = ((LangId Typed <=? LangId lg) ~ True, TypeOf lg ~ Type)

@@ -21,7 +21,7 @@ import qualified Data.Vector      as Vec
 
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Name
-import           Pukeko.AST.SystemF    hiding (instantiate)
+import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type       hiding ((~>), (*~>))
@@ -33,26 +33,26 @@ type In    = Surface
 type Out   = Typed
 type Aux s = PreTyped (UType s)
 
-type Cstrs s tv = Seq (UType s tv, Name Clss)
+type Cstrs s = Seq (UType s, Name Clss)
 
-data SplitCstrs s tv = MkSplitCstrs
-  { _retained :: Map (Name TVar) (Set (Name Clss))
-  , _deferred :: Cstrs s tv
+data SplitCstrs s = MkSplitCstrs
+  { _retained :: Map NameTVar (Set (Name Clss))
+  , _deferred :: Cstrs s
   }
 
 type TI ev s = TU s ev
 type IT s ev = TU s ev
 
-freshUVar :: TI v s (UType s tv)
+freshUVar :: TI v s (UType s)
 freshUVar = do
   v <- fresh
   l <- getTLevel
   UVar <$> sendM (newSTRef (UFree v l))
 
-generalize :: forall s tv ev. UType s tv -> IT s ev (UType s tv, Set (Name TVar))
+generalize :: forall s ev. UType s -> IT s ev (UType s, Set (Name TVar))
 generalize = go
   where
-    go :: UType s tv -> IT s ev (UType s tv, Set (Name TVar))
+    go :: UType s -> IT s ev (UType s, Set (Name TVar))
     go t0 = case t0 of
       UVar uref -> do
         curLevel <- getTLevel
@@ -75,7 +75,7 @@ generalize = go
       where
         pureDefault = pure (t0, mempty)
 
-splitCstr :: UType s tv -> Name Clss -> TI ev s (SplitCstrs s tv)
+splitCstr :: UType s -> Name Clss -> TI ev s (SplitCstrs s)
 splitCstr t0 clss = do
   (t1, tps) <- sendM (unUTApp t0)
   case t1 of
@@ -105,12 +105,10 @@ splitCstr t0 clss = do
       p0 <- sendM (prettyUType 1 t0)
       throwHere ("TI: no instance for" <+> pretty clss <+> p0)
 
-splitCstrs :: Cstrs s tv -> TI ev s (SplitCstrs s tv)
+splitCstrs :: Cstrs s -> TI ev s (SplitCstrs s)
 splitCstrs cstrs = fold <$> traverse (uncurry splitCstr) cstrs
 
-instantiate ::
-  Expr (Aux s) tv ev -> UType s tv ->
-  IT s ev (Expr (Aux s) tv ev, UType s tv, Cstrs s tv)
+instantiate :: Expr (Aux s) ev -> UType s -> IT s ev (Expr (Aux s) ev, UType s, Cstrs s)
 instantiate e0 t0 = do
   let (qvss, t1) = unUTUni t0
   (env, cstrs) <- fmap unzip . for qvss $ \qvs -> do
@@ -121,12 +119,11 @@ instantiate e0 t0 = do
   let e1 = foldl (\e -> mkETyApp e . map snd) e0 env
   pure (e1, t2, foldMap fold cstrs)
 
-inferPatn ::
-  Patn In tv -> UType s tv -> IT s ev (Patn (Aux s) tv, Map (Name EVar) (UType s tv))
+inferPatn :: Patn In -> UType s -> IT s ev (Patn (Aux s), Map (Name EVar) (UType s))
 inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
   PVar x -> pure (PVar x, Map.singleton x t_expr)
-  PCon dcon (_ :: [NoType _]) ps0 -> do
+  PCon dcon (_ :: [NoType]) ps0 -> do
     (MkTConDecl tcon params _dcons, MkDConDecl{_dcon2fields = fields})
       <- findInfo info2dcons dcon
     when (length ps0 /= length fields) $
@@ -135,12 +132,12 @@ inferPatn patn t_expr = case patn of
     t_params <- traverse (const freshUVar) params
     let t_inst = appTCon tcon (toList t_params)
     unify t_expr t_inst
-    let t_fields = map (open1 . fmap (scope absurd (Vec.fromList t_params Vec.!))) fields
+    let env = Map.fromList (zipExact params t_params)
+    let t_fields = map (open1 . fmap (env Map.!)) fields
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
     pure (PCon dcon (toList t_params) ps1, Map.unions binds)
 
-inferLet :: (BaseTVar tv, HasEnv ev) =>
-  Defn In tv ev -> IT s ev (Defn (Aux s) tv ev, UType s tv, Cstrs s tv)
+inferLet :: HasEnv ev => Defn In ev -> IT s ev (Defn (Aux s) ev, UType s, Cstrs s)
 inferLet (MkDefn l0 r0) = do
   (r1, t1, cstrs1) <- withinTScope (infer r0)
   (t2, vs2) <- generalize t1
@@ -152,9 +149,9 @@ inferLet (MkDefn l0 r0) = do
 
 -- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
 -- have the same length as the input list.
-inferRec :: (BaseTVar tv, HasEnv ev) =>
-  [Defn In tv (EScope Int ev)] ->
-  IT s ev ([Defn (Aux s) tv (EScope Int ev)], [UType s tv], Cstrs s tv)
+inferRec :: HasEnv ev =>
+  [Defn In (EScope Int ev)] ->
+  IT s ev ([Defn (Aux s) (EScope Int ev)], [UType s], Cstrs s)
 inferRec defns0 = do
   let (ls0, rs0) = unzip (map (\(MkDefn l r) -> (l, r)) defns0)
   (rs1, ts1, cstrs1) <- withinTScope $ do
@@ -173,9 +170,7 @@ inferRec defns0 = do
   let defns1 = zipWith3 (\t3 -> MkDefn . (bind2type .~ t3)) ts3 ls0 rs2
   pure (defns1, ts3, cstrs_def)
 
-infer ::
-  (BaseTVar tv, HasEnv ev) =>
-  Expr In tv ev -> IT s ev (Expr (Aux s) tv ev, UType s tv, Cstrs s tv)
+infer :: HasEnv ev => Expr In ev -> IT s ev (Expr (Aux s) ev, UType s, Cstrs s)
 infer = \case
     ELoc (Lctd pos e0) -> here_ pos $ do
       (e1, t1, cstrs) <- infer e0
@@ -217,7 +212,8 @@ infer = \case
         Left t_rhs0 -> pure t_rhs0
       t_prms <- traverse (const freshUVar) prms
       let t_lhs = appTCon tcon (toList t_prms)
-      let t_rhs = open1 (fmap (scope absurd (Vec.fromList t_prms Vec.!)) t_rhs0)
+      let env = Map.fromList (zipExact prms t_prms)
+      let t_rhs = open1 (fmap (env Map.!) t_rhs0)
       let (t_to, t_from) = case dir of
             Inject  -> (t_lhs, t_rhs)
             Project -> (t_rhs, t_lhs)
@@ -225,9 +221,7 @@ infer = \case
       unify t_from t1
       pure (ETyAnn t_to (ETyCoe c e1), t_to, cstrs)
 
-inferFuncDecl ::
-  (BaseTVar tv) =>
-  FuncDecl In tv -> UType s tv -> IT s Void (FuncDecl (Aux s) tv)
+inferFuncDecl :: FuncDecl In tv -> UType s -> IT s Void (FuncDecl (Aux s) tv)
 inferFuncDecl (MkFuncDecl name NoType e0) t_decl = do
     -- NOTE: We do not instantiate the universally quantified type variables in
     -- prenex position of @t_decl@. Turning them into unification variables
@@ -254,7 +248,7 @@ inferDecl = here' $ \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
   DFunc func0 -> do
-    t_decl <- open <$> typeOfFunc (nameOf func0)
+    t_decl :: UType _ <- open <$> typeOfFunc (nameOf func0)
     func1 <- inferFuncDecl func0 t_decl
     yield (DFunc func1)
   DExtn (MkExtnDecl name NoType s) -> do
@@ -264,8 +258,9 @@ inferDecl = here' $ \case
   DInst (MkInstDecl instName clss atom qvs ds0) -> do
     ds1 <- for ds0 $ \mthd -> do
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
-      let t_inst = mkTApp (TAtm atom) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
-      t_decl1 <- renameType (instantiate' (const t_inst) t_decl0)
+      let t_inst = mkTApp (TAtm atom) (map (TVar . _qvar2tvar) qvs)
+      -- FIXME: renameType
+      t_decl1 <- renameType (t_decl0 >>= const t_inst)
       withQVars qvs (inferFuncDecl mthd (open t_decl1))
     yield (DInst (MkInstDecl instName clss atom qvs ds1))
   where
@@ -278,21 +273,20 @@ inferModule' = module2decls $ \decls ->
                                         & evalSupply uvarIds
                                         & runReader (getPos decl)
 
-type TQEnv tv = Map (Name TVar) tv
+-- FIXME: We use this set make sure there are unintended free type variables
+-- left in expressions. Make this intention clear through code.
+type TQEnv = Set NameTVar
 
-type TQ tv s =
-  Eff [Reader (TQEnv tv), Reader SourcePos, Error Failure, NameSource, ST s]
+type TQ s = Eff [Reader TQEnv, Reader SourcePos, Error Failure, NameSource, ST s]
 
-localizeTQ :: (TraversableWithIndex Int t) =>
-  t QVar -> TQ (TScope Int tv) s a -> TQ tv s a
+localizeTQ :: (TraversableWithIndex Int t) => t QVar -> TQ s a -> TQ s a
 localizeTQ qvs =
-  let env1 = ifoldMap (\i (MkQVar _ v) -> Map.singleton v (mkBound i v)) qvs
-      upd env0 = env1 <> fmap Free env0
-  in  local' upd
+  let env = Set.fromList (map _qvar2tvar (toList qvs))
+  in  local' (env <>)
 
-qualType :: UType s tv' -> TQ tv s (Type tv)
+qualType :: UType s -> TQ s Type
 qualType = \case
-  UTVar x -> TVar <$> asks (Map.! x)
+  UTVar x -> (asks (x `Set.member`) >>= assertM) $> TVar x
   UTAtm a -> pure (TAtm a)
   UTApp t1 t2 -> TApp <$> qualType t1 <*> qualType t2
   UTUni{} -> impossible  -- we have only rank-1 types
@@ -301,7 +295,7 @@ qualType = \case
       ULink t -> qualType t
       UFree{} -> impossible  -- all unification variables have been generalized
 
-qualDefn :: Defn (Aux s) tv' ev -> TQ tv s (Defn Out tv ev)
+qualDefn :: Defn (Aux s) ev -> TQ s (Defn Out ev)
 qualDefn (MkDefn (MkBind x t0) e0) = case t0 of
   UTUni (toList -> qvs) t1 -> localizeTQ qvs $ do
     t2  <- mkTUni qvs <$> qualType t1
@@ -309,7 +303,7 @@ qualDefn (MkDefn (MkBind x t0) e0) = case t0 of
     pure (MkDefn (MkBind x t2) e2)
   _ -> MkDefn <$> (MkBind x <$> qualType t0) <*> qualExpr e0
 
-qualExpr :: Expr (Aux s) tv' ev -> TQ tv s (Expr Out tv ev)
+qualExpr :: Expr (Aux s) ev -> TQ s (Expr Out ev)
 qualExpr = \case
   ELoc le -> here le $ ELoc <$> lctd qualExpr le
   EVar x -> pure (EVar x)
@@ -323,21 +317,21 @@ qualExpr = \case
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
 
-qualAltn :: Altn (Aux s) tv' ev -> TQ tv s (Altn Out tv ev)
+qualAltn :: Altn (Aux s) ev -> TQ s (Altn Out ev)
 qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e
 
-qualPatn :: Patn (Aux s) tv' -> TQ tv s (Patn Out tv)
+qualPatn :: Patn (Aux s) -> TQ s (Patn Out)
 qualPatn = \case
   PWld -> pure PWld
   PVar x -> pure (PVar x)
   PCon c ts ps -> PCon c <$> traverse qualType ts <*> traverse qualPatn ps
 
-qualFuncDecl :: FuncDecl (Aux s) tv' -> TQ tv s (FuncDecl Out tv)
+qualFuncDecl :: FuncDecl (Aux s) tv -> TQ s (FuncDecl Out tv)
 qualFuncDecl (MkFuncDecl name type0 body0) = do
   MkDefn (MkBind _ type1) body1 <- qualDefn (MkDefn (MkBind name type0) body0)
   pure (MkFuncDecl name type1 body1)
 
-qualDecl :: Decl (Aux s) -> TQ Void s (Decl Out)
+qualDecl :: Decl (Aux s) -> TQ s (Decl Out)
 qualDecl = \case
   DType ds -> pure (DType ds)
   DFunc func -> DFunc <$> qualFuncDecl func
@@ -362,7 +356,7 @@ inferModule :: Members [NameSource, Error Failure] effs =>
 inferModule m0 = eitherM throwError pure $ runSTBelowNameSource $ runError $
   runInfo m0 (inferModule' m0) >>= qualModule
 
-instance Monoid (SplitCstrs s tv) where
+instance Monoid (SplitCstrs s) where
   mempty = MkSplitCstrs mempty mempty
   MkSplitCstrs rs1 ds1 `mappend` MkSplitCstrs rs2 ds2 =
     MkSplitCstrs (Map.unionWith (<>) rs1 rs2) (ds1 <> ds2)

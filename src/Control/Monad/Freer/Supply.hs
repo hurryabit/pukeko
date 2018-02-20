@@ -1,7 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE GADTs #-}
 module Control.Monad.Freer.Supply
-  ( Supply (..)
+  ( Supply
   , fresh
   , evalSupply
   ) where

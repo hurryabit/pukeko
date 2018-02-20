@@ -37,9 +37,9 @@ import           Pukeko.AST.Type
 data ModuleInfo = MkModuleInfo
   { _info2tcons :: Map (Name TCon) TConDecl
   , _info2dcons :: Map (Name DCon) (TConDecl, DConDecl)
-  , _info2signs :: Map (Name EVar) (Type Void)
+  , _info2signs :: Map (Name EVar) Type
   , _info2clsss :: Map (Name Clss) SysF.ClssDecl
-  , _info2mthds :: Map (Name EVar) (SysF.ClssDecl, SysF.SignDecl (TScope Int Void))
+  , _info2mthds :: Map (Name EVar) (SysF.ClssDecl, SysF.SignDecl (Name TVar))
   , _info2insts :: Map (Name Clss, TypeAtom) SomeInstDecl
   }
 
@@ -64,13 +64,11 @@ findInfo ::
   Lens' ModuleInfo (Map k v) -> k -> Eff effs v
 findInfo l k = views l (Map.! k)
 
-typeOfFunc ::
-  (HasCallStack, Member (Reader ModuleInfo) effs) =>
-  Name EVar -> Eff effs (Type tv)
-typeOfFunc func = fmap absurd <$> findInfo info2signs func
+typeOfFunc :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
+  Name EVar -> Eff effs Type
+typeOfFunc func = findInfo info2signs func
 
-typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
-  Atom -> Eff effs (Type tv)
+typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) => Atom -> Eff effs Type
 typeOfAtom = \case
   AVal z -> typeOfFunc z
   ACon c -> fmap absurd <$> uncurry typeOfDCon <$> findInfo info2dcons c
@@ -88,7 +86,7 @@ tconDeclInfo tcon =
   in  itemInfo info2tcons (nameOf tcon) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
-signInfo :: Name EVar -> Type Void -> ModuleInfo
+signInfo :: Name EVar -> Type -> ModuleInfo
 signInfo = itemInfo info2signs
 
 instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
@@ -114,8 +112,8 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
 instance HasModuleInfo Core.Module where
   collectInfo (Core.MkModule types extns supcs) = fold
     [ foldMap tconDeclInfo types
-    , foldMap (\extn -> signInfo (nameOf extn) (Core._extn2type extn)) extns
-    , foldMap (\supc -> signInfo (nameOf supc) (Core._supc2type supc)) supcs
+    , foldMap (\extn -> signInfo (nameOf extn) (vacuous (Core._extn2type extn))) extns
+    , foldMap (\supc -> signInfo (nameOf supc) (vacuous (Core._supc2type supc))) supcs
     ]
 
 foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m

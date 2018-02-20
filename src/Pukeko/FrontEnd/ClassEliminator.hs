@@ -6,7 +6,7 @@ import Pukeko.Prelude
 
 import           Data.Coerce       (coerce)
 import qualified Data.List.NE      as NE
-import qualified Data.Map          as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 import qualified Data.Vector       as Vec
 import qualified Safe              as Safe
@@ -22,10 +22,8 @@ import           Pukeko.FrontEnd.Gamma
 type In  = Unnested
 type Out = Unclassy
 
-type IsTVar tv = (BaseTVar tv, HasEnv tv, Show tv)
-
-type CE tv ev =
-  EffXGamma (Map (Name Clss)) Type tv ev
+type CE ev =
+  EffXGamma (Map (Name Clss)) GenType ev
   [Reader SourcePos, Reader ModuleInfo, NameSource]
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
@@ -44,7 +42,7 @@ clssTCon = coerce
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
 --
 -- > TApp (TCon "Dict$Traversable") [TCon "List"]
-mkTDict :: Name Clss -> Type tv -> Type tv
+mkTDict :: Name Clss -> GenType tv -> GenType tv
 mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 
 -- | Get the name of the dictionary for a type class instance and its type.
@@ -56,7 +54,7 @@ mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 -- The @List@ instance of @Eq@ yields
 --
 -- > dict$Eq$List : ∀a. (Eq a) => Dict$Eq (List a)
-instDictInfo :: InstDecl st -> (Name EVar, Type Void)
+instDictInfo :: InstDecl st -> (Name EVar, Type)
 instDictInfo (MkInstDecl inst clss tatom qvs _) =
     let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TAtm tatom) (mkTVarsQ qvs)))
     in  (inst, t_dict)
@@ -88,15 +86,15 @@ dictTConDecl (MkClssDecl clss prm dcon mthds) =
 -- >     fun (dict : Dict$Traversable t) ->
 -- >       match dict with
 -- >       | Dict$Traversable @t traverse -> traverse
-elimClssDecl :: ClssDecl -> CE Void Void [Decl Out]
+elimClssDecl :: ClssDecl -> CE Void [Decl Out]
 elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
   let qprm = NE.singleton (MkQVar mempty prm)
-  let prmType = TVar (mkBound 0 prm)
+  let prmType = TVar prm
   dictPrm <- mkName (Lctd noPos "dict")
   let sels = do
         (i, MkSignDecl z t0) <- itoList mthds
-        let t1 = TUni (NE.singleton (MkQVar (Set.singleton clss) prm)) t0
+        let t1 = mkTUni [MkQVar (Set.singleton clss) prm] t0
         let e_rhs = EVar (mkBound z z)
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
         let c_one = MkAltn (PSimple dcon [prmType] c_binds) e_rhs
@@ -123,7 +121,7 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
 -- >         sequence @b @m (map @List @a @(m b) f xs)
 -- >   in
 -- >   Dict$Traversable @List traverse
-elimInstDecl :: ClssDecl -> InstDecl In -> CE Void Void [Decl In]
+elimInstDecl :: ClssDecl -> InstDecl In -> CE Void [Decl In]
 elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ _ tatom qvs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
   let (z_dict, t_dict) = instDictInfo inst
@@ -134,13 +132,13 @@ elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ _ tatom qvs defns
     pure (MkDefn (MkBind name1 typ_) body)
   let e_dcon = mkETyApp (ECon dcon) [t_inst]
   let e_body = foldl EApp e_dcon (imap (\i -> EVar . mkBound i . nameOf) defns1)
-  let e_let :: Expr In _ _
+  let e_let :: Expr In _
       e_let = ELet defns1 e_body
-  let e_rhs :: Expr In _ _
+  let e_rhs :: Expr In _
       e_rhs = mkETyAbs qvs e_let
   pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
 
-elimDecl :: Decl In -> CE Void Void [Decl Out]
+elimDecl :: Decl In -> CE Void [Decl Out]
 elimDecl = here' $ \case
   DType tcons -> pure [DType tcons]
   DFunc (MkFuncDecl name typ_ body) ->
@@ -155,7 +153,7 @@ elimDecl = here' $ \case
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
 
-buildDict :: (IsTVar tv) => Name Clss -> Type tv -> CE tv ev (Expr Out tv ev)
+buildDict :: Name Clss -> Type -> CE ev (Expr Out ev)
 buildDict clss t0 = do
   let (t1, tps) = gatherTApp t0
   case t1 of
@@ -164,12 +162,10 @@ buildDict clss t0 = do
     TAtm tatom -> do
       SomeInstDecl inst <- findInfo info2insts (clss, tatom)
       let (z_dict, t_dict) = instDictInfo inst
-      fst <$> elimETyApp (EVal z_dict) (fmap absurd t_dict) tps
+      fst <$> elimETyApp (EVal z_dict) (t_dict) tps
     _ -> impossible  -- type checker would catch this
 
-elimETyApp ::
-  (IsTVar tv) =>
-  Expr Out tv ev -> Type tv -> [Type tv] -> CE tv ev (Expr Out tv ev, Type tv)
+elimETyApp :: Expr Out ev -> Type -> [Type] -> CE ev (Expr Out ev, Type)
 elimETyApp e0 t_e0 ts0 = do
     let (qvs, t_e1) = gatherTUni t_e0
     let dictBldrs = do
@@ -182,38 +178,36 @@ elimETyApp e0 t_e0 ts0 = do
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: Name Clss -> Name TVar -> CE tv ev (Name EVar)
+dictEVar :: Name Clss -> Name TVar -> CE ev (Name EVar)
 dictEVar clss tvar = do
   let name0 = "dict$" ++ untag (nameText clss) ++ "$" ++ untag (nameText tvar)
   mkName (Lctd noPos (Tagged name0))
 
 -- | Enrich a type abstraction with value abstractions for type class
 -- dictionaries.
-elimETyAbs :: (IsTVar tv, HasEnv ev) =>
-  NonEmpty QVar -> Expr In (TScope Int tv) ev -> CE tv ev (Expr Out tv ev, Type tv)
+elimETyAbs :: HasEnv ev => NonEmpty QVar -> Expr In ev -> CE ev (Expr Out ev, Type)
 elimETyAbs qvs0 e0 = do
     -- TODO: This is horribly imperative.
-    ixbs <- fmap concat . for (itoList qvs0) $ \(i, MkQVar qual v) ->
+    ixbs <- fmap concat . for (toList qvs0) $ \(MkQVar qual v) ->
       for (toList qual) $ \clss -> do
           x <- dictEVar clss v
-          pure ((i, clss, x), MkBind x (mkTDict clss (TVar (mkBound i v))))
+          pure ((v, clss, x), MkBind x (mkTDict clss (TVar v)))
     let (ixs, bs) = unzip ixbs
-    let refs = Vec.accum Map.union (Vec.replicate (length qvs0) mempty)
-               [ (i, Map.singleton (clss) (mkBound j x))
-               | (j, (i, clss, x)) <- itoList ixs
+    let refs = Map.fromListWith Map.union
+               [ (v, Map.singleton (clss) (mkBound j x))
+               | (j, (v, clss, x)) <- itoList ixs
                ]
     (e1, t1) <-
       withinXScope refs (Vec.fromList (fmap _bind2type bs)) (elimExpr (weakenE e0))
     let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
-    pure (ETyAbs qvs1 (mkELam bs t1 e1), TUni qvs0 t1)
+    pure (ETyAbs qvs1 (mkELam bs t1 e1), mkTUni (toList qvs0) t1)
 
-elimDefn :: (IsTVar tv, HasEnv ev) => Defn In tv ev -> CE tv ev (Defn Out tv ev)
+elimDefn :: HasEnv ev => Defn In ev -> CE ev (Defn Out ev)
 elimDefn = defn2expr (fmap fst . elimExpr)
 
 -- TODO: Figure out if we can remove the 'Type' component from the result.
 -- Adding type annotations is perhaps a better way to solve this problem.
-elimExpr ::
-  (IsTVar tv, HasEnv ev) => Expr In tv ev -> CE tv ev (Expr Out tv ev, Type tv)
+elimExpr :: HasEnv ev => Expr In ev -> CE ev (Expr Out ev, Type)
 elimExpr = \case
   ELoc (Lctd pos e0) -> here_ pos $ first (ELoc . Lctd pos) <$> elimExpr e0
   EVar x -> (,) <$> pure (EVar x) <*> lookupEVar x
@@ -254,19 +248,18 @@ elimExpr = \case
     (e1, _) <- elimExpr e0
     pure (ETyAnn t0 e1, t0)
 
-elimAltn ::
-  (IsTVar tv, HasEnv ev) =>
-  Altn In tv ev -> CE tv ev (Altn Out tv ev, Type tv)
+elimAltn :: HasEnv ev => Altn In ev -> CE ev (Altn Out ev, Type)
 elimAltn (MkAltn (PSimple dcon targs0 bnds) e0) = do
-  (_, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
-  let flds1 = map (instantiateN' targs0) flds0
+  (MkTConDecl _ tparams _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
+  let env0 = Map.fromList (zipExact tparams targs0)
+  let flds1 = map (>>= (env0 Map.!)) flds0
   let env = Map.fromList
             (catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bnds flds1))
   withinEScope id env $ do
     (e1, t1) <- elimExpr e0
     pure (MkAltn (PSimple dcon targs0 bnds) e1, t1)
 
-unclssType :: Type tv -> Type tv
+unclssType :: GenType tv -> GenType tv
 unclssType = \case
   TVar v -> TVar v
   TAtm a -> TAtm a

@@ -6,7 +6,7 @@ import Pukeko.Prelude
 import Pukeko.Pretty
 
 import qualified Data.List.NE as NE
-import qualified Data.Map     as Map
+import qualified Data.Map.Extended as Map
 import qualified Data.Set     as Set
 
 import           Pukeko.FrontEnd.Gamma
@@ -21,23 +21,21 @@ import           Pukeko.AST.Type
 
 type IsEVar ev = (HasEnv ev)
 
-type IsTVar tv = (Eq tv, HasEnv tv, BaseTVar tv)
-
-type TC tv ev = EffGamma tv ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
+type TC ev = EffGamma ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
 class HasModuleInfo m => TypeCheckable m where
-  checkModule :: m -> TC Void Void ()
+  checkModule :: m -> TC Void ()
 
 check :: (Member (Error Failure) effs, TypeCheckable m) => m -> Eff effs ()
 check m0 = either throwError pure .
   run . runError . runReader noPos . runInfo m0 . runGamma $ checkModule m0
 
-checkCoercion :: Coercion -> Type tv -> Type tv -> TC tv ev ()
+checkCoercion :: Coercion -> Type -> Type -> TC ev ()
 checkCoercion (MkCoercion _dir _tcon) _from _to =
   -- FIXME: Implement the actual check.
   pure ()
 
-typeOf :: (IsTyped st, IsEVar ev, IsTVar tv) => Expr st tv ev -> TC tv ev (Type tv)
+typeOf :: (IsTyped lg, IsEVar ev) => Expr lg ev -> TC ev Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
@@ -71,7 +69,9 @@ typeOf = \case
     checkCoercion c t_from t_to
     pure t_to
   ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
-  ETyAbs qvs e0 -> withQVars qvs (TUni qvs <$> typeOf e0)
+  ETyAbs qvs e0 -> withQVars qvs (TUni qvs . fmap (abstract (env Map.!?)) <$> typeOf e0)
+    where vs = map _qvar2tvar (toList qvs)
+          env = Map.fromList (zip vs (zipFrom 0 vs))
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
@@ -86,10 +86,10 @@ typeOf = \case
       _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
 
-satisfiesCstrs :: (IsTVar tv) => Type tv -> QVar -> TC tv ev ()
+satisfiesCstrs :: Type -> QVar -> TC ev ()
 satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
 
-satisfiesCstr :: (IsTVar tv) => Type tv -> Name Clss -> TC tv ev ()
+satisfiesCstr :: Type -> Name Clss -> TC ev ()
 satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
   let throwNoInst =
         throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
@@ -106,20 +106,18 @@ satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
-typeOfAltn ::
-  (IsTyped st, IsTVar tv, IsEVar ev) =>
-  Type tv -> Altn st tv ev -> TC tv ev (Type tv)
+typeOfAltn :: (IsTyped lg, IsEVar ev) => Type -> Altn lg ev -> TC ev Type
 typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
   withinEScope id env (typeOf e)
 
-patnEnvLevel :: forall lg tv ev. (TypeOf lg ~ Type, IsTVar tv) =>
-  Patn lg tv -> Type tv -> TC tv ev (EnvLevelOf (Name EVar) (Type tv))
+patnEnvLevel :: forall lg ev. TypeOf lg ~ Type =>
+  Patn lg -> Type -> TC ev (EnvLevelOf (Name EVar) Type)
 patnEnvLevel p t0 = case p of
   PWld -> pure Map.empty
   PVar x -> pure (Map.singleton x t0)
   PCon c ts1 ps -> do
-    (_tconDecl, MkDConDecl tcon dcon _tag flds1) <- findInfo info2dcons c
+    (MkTConDecl _ params _, MkDConDecl tcon dcon _tag flds1) <- findInfo info2dcons c
     let t1 = mkTApp (TCon tcon) (toList ts1)
     unless (t0 == t1) $ throwHere
       ("expected pattern of type" <+> pretty t0
@@ -127,23 +125,23 @@ patnEnvLevel p t0 = case p of
     unless (length flds1 == length ps) $ throwHere
       ("expected" <+> pretty (length flds1) <+> "pattern arguments of" <+> pretty dcon
        <> ", but found" <+> pretty (length ps) <+> "pattern arguments")
+    let env = Map.fromList (zipExact params ts1)
     -- NOTE: If the instantiation fails, the field type contains type
     -- variables not mentioned in the parameter list of the type constructor.
     -- The renamer should have caught this.
-    let t_ps = map (instantiateN' ts1) flds1
+    let t_ps = map (>>= (env Map.!)) flds1
     Map.unions <$> zipWithM patnEnvLevel ps t_ps
   PSimple c ts1 bs -> patnEnvLevel @Typed (PCon c ts1 (map (maybe PWld PVar) bs)) t0
 
-match :: (IsTVar tv) => Type tv -> Type tv -> TC tv ev ()
+match :: Type -> Type -> TC ev ()
 match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-checkExpr :: (IsTyped st, IsTVar tv, IsEVar ev) =>
-  Expr st tv ev -> Type tv -> TC tv ev ()
+checkExpr :: (IsTyped lg, IsEVar ev) => Expr lg ev -> Type -> TC ev ()
 checkExpr e t0 = typeOf e >>= match t0
 
-checkDefn :: (IsTyped st, IsEVar ev, IsTVar tv) => Defn st tv ev -> TC tv ev ()
+checkDefn :: (IsTyped lg, IsEVar ev) => Defn lg ev -> TC ev ()
 checkDefn (MkDefn (MkBind _ t) e) = checkExpr e t
 
 instance IsTyped st => TypeCheckable (SysF.Module st) where
@@ -154,7 +152,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
     SysF.DInst (SysF.MkInstDecl _ _ atom qvs ds) -> do
-      let t_inst = mkTApp (TAtm atom) (imap (\i -> TVar . mkBound i . _qvar2tvar) qvs)
+      let t_inst = mkTApp (TAtm atom) (map (TVar . _qvar2tvar) qvs)
       -- FIXME: Ensure that the type in @b@ is correct as well.
       withQVars qvs $ for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
         (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
@@ -163,12 +161,12 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
         -- Since this is a UX thing and all type errors here are compiler bugs,
         -- we don't put any effort into correcting this until we finally hit
         -- that problem.
-        let t_decl = instantiate' (const t_inst) t_mthd
+        let t_decl = t_mthd >>= const t_inst
         checkExpr body t_decl
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
     for_ supcs $ \(Core.SupCDecl z t_decl qvs bs e0) -> do
         t0 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
-        match t_decl (mkTUni qvs (fmap _bind2type bs *~> t0))
+        match (vacuous t_decl) (mkTUni qvs (fmap _bind2type bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

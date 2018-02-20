@@ -6,7 +6,8 @@ module Pukeko.AST.Type
   ( IsType (..)
   , NoType (..)
   , TypeAtom (..)
-  , Type (..)
+  , GenType (..)
+  , Type
   , QVar (..)
   , CoercionDir (..)
   , Coercion (..)
@@ -14,8 +15,7 @@ module Pukeko.AST.Type
   , pattern TArr
   , pattern TCon
   , weakenT
-  , strengthenT0
-  , mkTVars
+  , closeT
   , mkTVarsQ
   , mkTUni
   , gatherTUni
@@ -24,11 +24,7 @@ module Pukeko.AST.Type
   , (*~>)
   , mkTApp
   , gatherTApp
-  , vars
   , qvar2cstr
-  , qvar2tvar
-  , type2tcon
-  , type2tcon_
   , applyConstraints
   , prettyTypeCstr
   , prettyTUni
@@ -56,28 +52,30 @@ import           Pukeko.AST.Scope
 infixr 1 ~>, *~>
 
 class IsType t where
-  isType :: t tv -> Maybe (Type tv)
+  isType :: t -> Maybe Type
 
-data NoType tv = NoType
+data NoType = NoType
 
 data TypeAtom
   = TAArr
   | TAInt
   | TACon (Name TCon)
 
-data Type tv
+data GenType tv
   = TVar tv
   | TAtm TypeAtom
-  | TApp (Type tv) (Type tv)
-  | TUni (NonEmpty QVar) (Type (TScope Int tv))
+  | TApp (GenType tv) (GenType tv)
+  | TUni (NonEmpty QVar) (GenType (TScope Int tv))
 
-pattern TArr :: Type tv
+type Type = GenType (Name TVar)
+
+pattern TArr :: GenType tv
 pattern TArr = TAtm TAArr
 
-pattern TCon :: Name TCon -> Type tv
+pattern TCon :: Name TCon -> GenType tv
 pattern TCon tcon = TAtm (TACon tcon)
 
-pattern TFun :: Type tv -> Type tv -> Type tv
+pattern TFun :: GenType tv -> GenType tv -> GenType tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
 
 -- | A type variable which is qualified by some (potentially empty) type class
@@ -101,66 +99,52 @@ data Coercion = MkCoercion
 -- the for "name : type" easier.
 data a ::: t = a ::: t
 
-strengthenT0 :: Type (TScope Int tv) -> Type tv
+closeT :: HasCallStack => Type -> GenType Void
+closeT t0 = case traverse Left t0 of
+  Left  v  -> bugWith "closeT" v
+  Right t1 -> t1
+
+strengthenT0 :: GenType (TScope Int tv) -> GenType tv
 strengthenT0 = fmap strengthenScope0
 
-weakenT :: Type tv -> Type (TScope i tv)
+weakenT :: GenType tv -> GenType (TScope i tv)
 weakenT = fmap weakenScope
 
-mkTVars :: (FunctorWithIndex Int t) => t (Name TVar) -> t (Type (TScope Int tv))
-mkTVars = imap (\i b -> TVar (mkBound i b))
-
 -- TODO: Use class 'BaseTVar' to avoid this duplication.
-mkTVarsQ :: FunctorWithIndex Int t => t QVar -> t (Type (TScope Int tv))
-mkTVarsQ = mkTVars . fmap _qvar2tvar
+mkTVarsQ :: FunctorWithIndex Int t => t QVar -> t Type
+mkTVarsQ = fmap (TVar . _qvar2tvar)
 
-mkTUni :: [QVar] -> Type (TScope Int tv) -> Type tv
-mkTUni qvs0 t0 = case qvs0 of
+mkTUni :: [QVar] -> Type -> Type
+mkTUni qvs = mkTUniN qvs . fmap (abstract (env Map.!?))
+  where env = Map.fromList (zipWithFrom (\i (MkQVar _ v) -> (v, (i, v))) 0 qvs)
+
+mkTUniN :: [QVar] -> GenType (TScope Int tv) -> GenType tv
+mkTUniN qvs0 t0 = case qvs0 of
   []     -> strengthenT0 t0
   qv:qvs -> TUni (qv :| qvs) t0
 
-gatherTUni :: Type tv -> ([QVar], Type (TScope Int tv))
+gatherTUni :: GenType tv -> ([QVar], GenType (TScope Int tv))
 gatherTUni = \case
   TUni qvs t1 -> (toList qvs, t1)
   t0          -> ([], weakenT t0)
 
-(~>) :: Type tv -> Type tv -> Type tv
+(~>) :: GenType tv -> GenType tv -> GenType tv
 (~>) = TFun
 
-(*~>) :: Foldable t => t (Type tv) -> Type tv -> Type tv
+(*~>) :: Foldable t => t (GenType tv) -> GenType tv -> GenType tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
-mkTApp :: (Foldable t) => Type tv -> t (Type tv) -> Type tv
+mkTApp :: (Foldable t) => GenType tv -> t (GenType tv) -> GenType tv
 mkTApp = foldl TApp
 
-gatherTApp :: Type tv -> (Type tv, [Type tv])
+gatherTApp :: GenType tv -> (GenType tv, [GenType tv])
 gatherTApp = go []
   where
     go us = \case
       TApp t u -> go (u:us) t
       t        -> (t, us)
 
-vars :: Ord tv => Type tv -> Set tv
-vars = setOf traverse
-
 -- * Deep traversals
-type2tcon :: forall m tv. Monad m =>
-  (Name TCon -> m (Name TCon)) -> Type tv -> m (Type tv)
-type2tcon f = cataM2 (fmap embed2 . step)
-  where
-    step :: TypeF Type tv' -> m (TypeF Type tv')
-    step = \case
-      TAtmF (TACon c) -> TAtmF . TACon <$> f c
-      x               -> pure x
-
-type2tcon_ :: forall m tv. Monad m => (Name TCon -> m ()) -> Type tv -> m ()
-type2tcon_ f = fmap getConst . cataM2 (fmap Const . step)
-  where
-    step :: TypeF _ _ -> m ()
-    step = \case
-      TAtmF (TACon c) -> f c
-      _               -> pure ()
--- | Apply a bunch of constraints to a list of 'Binder's.
 applyConstraints :: CanThrowHere effs =>
   [Name TVar] -> Map (Name TVar) (Set (Name Clss)) -> Eff effs [QVar]
 applyConstraints binders constraints = do
@@ -177,7 +161,7 @@ instance IsType NoType where
 instance IsType Type where
   isType = Just
 
-instance (Eq tv) => Eq (Type tv) where
+instance (Eq tv) => Eq (GenType tv) where
   t1 == t2 = case (t1, t2) of
     (TVar x1, TVar x2) -> x1 == x2
     (TAtm a1, TAtm a2) -> a1 == a2
@@ -191,11 +175,11 @@ instance (Eq tv) => Eq (Type tv) where
     (TApp{}, _) -> False
     (TUni{}, _) -> False
 
-instance Applicative Type where
+instance Applicative GenType where
   pure = TVar
   (<*>) = ap
 
-instance Monad Type where
+instance Monad GenType where
   return = pure
   t >>= f = case t of
     TVar x -> f x
@@ -209,17 +193,21 @@ instance Pretty TypeAtom where
     TAInt   -> "Int"
     TACon c -> pretty c
 
-instance BaseTVar tv => Pretty (Type tv)
+instance Pretty (GenType Void) where pretty = pretty @Type . vacuous
+instance Pretty Type
 
-instance BaseTVar tv => PrettyPrec (Type tv) where
+instance PrettyPrec (GenType Void) where
+  prettyPrec prec = prettyPrec @Type prec . vacuous
+instance PrettyPrec Type where
   prettyPrec prec = \case
-    TVar x -> pretty (baseTVar x)
+    TVar x -> pretty x
     TAtm a -> pretty a
     TFun tx ty ->
       maybeParens (prec > 1) (prettyPrec 2 tx <+> "->" <+> prettyPrec 1 ty)
     TApp tf ta ->
       maybeParens (prec > 2) (prettyPrec 2 tf <+> prettyPrec 3 ta)
-    TUni qvs tq -> prettyTUni prec qvs (pretty tq)
+    TUni qvs tq ->
+      prettyTUni prec qvs (pretty (instantiateN (fmap (TVar . _qvar2tvar) qvs) tq))
 
 prettyTypeCstr :: Foldable t => t QVar -> Doc ann
 prettyTypeCstr qvs
@@ -241,17 +229,13 @@ prettyQVar (MkQVar q v)
 instance (Pretty a, Pretty t) => Pretty (a ::: t) where
   pretty (x ::: t) = pretty x <+> ":" <+> pretty t
 
-deriving instance Functor     Type
-deriving instance Foldable    Type
-deriving instance Traversable Type
-
-deriving instance Functor     NoType
-deriving instance Foldable    NoType
-deriving instance Traversable NoType
+deriving instance Functor     GenType
+deriving instance Foldable    GenType
+deriving instance Traversable GenType
 
 deriving instance Show QVar
 deriving instance Show TypeAtom
-deriving instance Show tv => Show (Type tv)
+deriving instance Show tv => Show (GenType tv)
 deriving instance Show CoercionDir
 deriving instance Show Coercion
 
@@ -268,7 +252,7 @@ data TypeF typ tv
   | TAppF (typ tv) (typ tv)
   | TUniF (NonEmpty QVar) (typ (TScope Int tv))
 
-type instance Base2 Type = TypeF
+type instance Base2 GenType = TypeF
 
 instance Functor2 TypeF
 instance Traversable2 TypeF where
@@ -278,14 +262,14 @@ instance Traversable2 TypeF where
     TAppF t1 t2  -> TAppF <$> f t1 <*> f t2
     TUniF qvs t1 -> TUniF qvs <$> f t1
 
-instance Recursive2 Type where
+instance Recursive2 GenType where
   project2 = \case
     TVar v      -> TVarF v
     TAtm a      -> TAtmF a
     TApp t1 t2  -> TAppF t1 t2
     TUni qvs t1 -> TUniF qvs t1
 
-instance Corecursive2 Type where
+instance Corecursive2 GenType where
   embed2 = \case
     TVarF v      -> TVar v
     TAtmF a      -> TAtm a
@@ -298,7 +282,7 @@ makeLenses ''QVar
 -- lexical name capture. There should be a principles approach to this in the
 -- pretty printer itself.
 renameType :: (Member NameSource effs, BaseTVar tv, Ord tv) =>
-  Type tv -> Eff effs (Type tv)
+  GenType tv -> Eff effs (GenType tv)
 renameType t0 = do
   let t1 = fmap Box t0
       vs = setOf traverse t1
@@ -310,8 +294,8 @@ renameType t0 = do
   fmap unBox <$> evalSupply sup0 (runReader env0 (go t1))
   where
     go :: forall tv effs. (Member NameSource effs, HasEnv tv) =>
-      Type tv ->
-      Eff (Reader (EnvOf tv tv) : Supply (Tagged TVar String) : effs) (Type tv)
+      GenType tv ->
+      Eff (Reader (EnvOf tv tv) : Supply (Tagged TVar String) : effs) (GenType tv)
     go = \case
       TVar v -> TVar <$> asks (lookupEnv v)
       TAtm a -> pure (TAtm a)
@@ -328,6 +312,6 @@ deriving instance Ord TypeAtom
 
 deriveToJSON defaultOptions ''QVar
 deriveToJSON defaultOptions ''TypeAtom
-deriveToJSON defaultOptions ''Type
+deriveToJSON defaultOptions ''GenType
 deriveToJSON defaultOptions ''CoercionDir
 deriveToJSON defaultOptions ''Coercion

@@ -11,9 +11,8 @@ import Pukeko.Pretty
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
 import           Data.Forget      (Forget (..))
-import qualified Data.Map           as Map
+import qualified Data.Map.Extended as Map
 import           Data.STRef
-import qualified Data.Vector        as Vec
 
 import           Pukeko.AST.SystemF    hiding (Free)
 import           Pukeko.AST.Language
@@ -34,7 +33,7 @@ data Kind a where
   Arrow :: Kind a -> Kind a -> Kind a
   UVar  :: STRef s (UVar s) -> Kind (Open s)
 
-type KCEnv n s = Vector (Kind (Open s))
+type KCEnv n s = Map (Name TVar) (Kind (Open s))
 
 type KCState s = Map (Name TCon) (Kind (Open s))
 
@@ -49,13 +48,10 @@ freshUVar = do
   v <- fresh
   UVar <$> sendM (newSTRef (Free (Forget v)))
 
-localize :: [Kind (Open s)] -> KC n s a -> KC m s a
-localize env = local' (const (Vec.fromList env))
-
-kcType :: Kind (Open s) -> Type (TScope Int Void) -> KC n s ()
+kcType :: Kind (Open s) -> Type -> KC n s ()
 kcType k = \case
   TVar v -> do
-    kv <- asks (Vec.! scope absurd id v)
+    kv <- asks (Map.! v)
     unify kv k
   TAtm TAArr -> unify (Arrow Star (Arrow Star Star)) k
   TAtm TAInt -> unify Star k
@@ -74,7 +70,8 @@ kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
   modify (Map.insert tcon kind)
   paramKinds <- traverse (const freshUVar) prms
   unify kind (foldr Arrow Star paramKinds)
-  localize paramKinds $
+  let env = Map.fromList (zip prms paramKinds)
+  local (const env) $
     case dcons0 of
       Left typ -> kcType Star typ
       Right dcons ->
@@ -82,14 +79,18 @@ kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
           traverse_ (kcType Star) flds
   close kind
 
-kcVal :: Type Void -> KC n s ()
+kcVal :: Type -> KC n s ()
 kcVal = \case
   TUni xs t -> k (toList xs) t
-  t         -> k [] (fmap absurd t)
+  t         -> k [] (weakenT t)
   where
-    k xs t = do
-      env <- traverse (const freshUVar) xs
-      localize env (kcType Star t)
+    k :: [QVar] -> GenType (TScope Int (Name TVar)) -> KC n s ()
+    k qvs t0 = do
+      let vs = map _qvar2tvar qvs
+      let t1 = fmap (scope id (vs !!)) t0
+      uvars <- traverse (const freshUVar) vs
+      let env = Map.fromList (zip vs uvars)
+      local (const env) (kcType Star t1)
 
 kcDecl :: Decl In -> KC n s ()
 kcDecl = \case
@@ -104,7 +105,7 @@ kcDecl = \case
 checkModule :: Member (Error Failure) effs => Module In -> Eff effs ()
 checkModule (MkModule decls) = either throwError pure $ runST $
   for_ decls (\decl -> kcDecl decl
-                       & runReader Vec.empty
+                       & runReader Map.empty
                        & runReader (getPos decl)
                        & evalSupply [1 ..])
   & evalState mempty

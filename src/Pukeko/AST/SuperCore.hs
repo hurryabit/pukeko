@@ -27,15 +27,15 @@ data FuncDecl (m :: Super DeclMode)
   = (m ?:> SupC) =>
     SupCDecl
     { _supc2name  :: Name EVar
-    , _supc2type  :: Type Void
+    , _supc2type  :: GenType Void
     , _supc2tprms :: [QVar]
-    , _supc2eprms :: [Bind (TScope Int Void)]
-    , _supc2expr  :: Expr (TScope Int Void) (EScope Int Void)
+    , _supc2eprms :: [Bind]
+    , _supc2expr  :: Expr (EScope Int Void)
     }
   | (m ?:> Extn) =>
     ExtnDecl
     { _extn2name :: Name EVar
-    , _extn2type :: Type Void
+    , _extn2type :: GenType Void
     , _extn2extn :: String
     }
 
@@ -62,12 +62,12 @@ func2name f = \case
   SupCDecl z t vs xs e -> fmap (\z' -> SupCDecl z' t vs xs e) (f z)
   ExtnDecl z t s       -> fmap (\z' -> ExtnDecl z' t s)       (f z)
 
-func2type :: Lens' (FuncDecl m) (Type Void)
+func2type :: Lens' (FuncDecl m) (GenType Void)
 func2type f = \case
   SupCDecl z t vs xs e -> fmap (\t' -> SupCDecl z t' vs xs e) (f t)
   ExtnDecl z t s       -> fmap (\t' -> ExtnDecl z t' s)       (f t)
 
-func2expr :: Traversal' (FuncDecl m) (Expr (TScope Int Void) (EScope Int Void))
+func2expr :: Traversal' (FuncDecl m) (Expr (EScope Int Void))
 func2expr f = \case
   SupCDecl z t qvs xs e -> SupCDecl z t qvs xs <$> f e
   func@ExtnDecl{} -> pure func

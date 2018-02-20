@@ -33,7 +33,7 @@ freshEVar = do
   n <- fresh @Int
   mkName (Lctd noPos (Tagged ("pm$" ++ show n)))
 
-pmExpr :: CanPM effs => Expr In tv ev -> Eff effs (Expr Out tv ev)
+pmExpr :: CanPM effs => Expr In ev -> Eff effs (Expr Out ev)
 pmExpr = \case
   ELoc le         -> here le $ ELoc <$> lctd pmExpr le
   EVar x          -> pure (EVar x)
@@ -70,8 +70,8 @@ compileModule m0 = module2decls (traverse pmDecl) m0 & runInfo m0
 
 
 pmMatch ::
-  forall m m' n tv ev effs. (CanPM effs, m ~ 'LS.Succ m') =>
-  RowMatch m n tv ev -> Eff effs (Expr Out tv ev)
+  forall m m' n ev effs. (CanPM effs, m ~ 'LS.Succ m') =>
+  RowMatch m n ev -> Eff effs (Expr Out ev)
 pmMatch rowMatch0 = do
   let colMatch1 = rowToCol rowMatch0
   elimBPatnCols colMatch1 $ \case
@@ -94,44 +94,43 @@ bindName = \case
   BWild   -> Nothing
   BName x -> Just x
 
-patnToBPatn :: Patn In tv -> Maybe BPatn
+patnToBPatn :: Patn In -> Maybe BPatn
 patnToBPatn = \case
   PWld   -> Just (BWild)
   PVar x -> Just (BName x)
   PCon{} -> Nothing
 
 -- | The expression on the RHS of a pattern match alternative.
-type RhsExpr tv ev = Expr In tv (EScope (Name EVar) ev)
+type RhsExpr ev = Expr In (EScope (Name EVar) ev)
 
 -- | A row of a pattern match, i.e., an alternative.
-data Row n tv ev = MkRow (LS.List n (Patn In tv)) (RhsExpr tv ev)
+data Row n ev = MkRow (LS.List n (Patn In)) (RhsExpr ev)
 
 -- | A pattern match in it's row-major representation.
-data RowMatch m n tv ev =
-  MkRowMatch (LS.List n (Expr Out tv ev)) (LS.List m (Row n tv ev))
+data RowMatch m n ev = MkRowMatch (LS.List n (Expr Out ev)) (LS.List m (Row n ev))
 
 -- | Translate an alternative of a pattern match with one column into a row.
-mkRow1 :: Altn In tv ev -> Row LS.One tv ev
+mkRow1 :: Altn In ev -> Row LS.One ev
 mkRow1 (MkAltn p t) = MkRow (LS.Singleton p) t
 
 -- | Tanslate a pattern match with one column into its row-major representation.
-mkRowMatch1 :: Expr Out tv ev -> LS.List m (Altn In tv ev) -> RowMatch m LS.One tv ev
+mkRowMatch1 :: Expr Out ev -> LS.List m (Altn In ev) -> RowMatch m LS.One ev
 mkRowMatch1 t as = MkRowMatch (LS.Singleton t) (LS.map mkRow1 as)
 
 -- | A column of a pattern match.
-data Col m tv ev a = MkCol (Expr Out tv ev) (LS.List m a)
+data Col m ev a = MkCol (Expr Out ev) (LS.List m a)
 
 -- | A pattern match in it's column-major representation.
-data ColMatch m n tv ev =
-  MkColMatch (LS.List n (Col m tv ev (Patn In tv))) (LS.List m (RhsExpr tv ev))
+data ColMatch m n ev =
+  MkColMatch (LS.List n (Col m ev (Patn In))) (LS.List m (RhsExpr ev))
 
 -- | Traversal of a 'Col'.
-colPatn :: Traversal (Col m tv ev a) (Col m tv ev b) a b
+colPatn :: Traversal (Col m ev a) (Col m ev b) a b
 colPatn f (MkCol t ps) = MkCol t <$> traverse f ps
 
 -- | Turn the row-major representation of a pattern match into its column-major
 -- representation.
-rowToCol :: RowMatch m n tv ev -> ColMatch m n tv ev
+rowToCol :: RowMatch m n ev -> ColMatch m n ev
 rowToCol (MkRowMatch ts rs) =
   let (pss, us) = LS.unzipWith (\(MkRow ps u) -> (ps, u)) rs
       cs = LS.zipWith MkCol ts (LS.transpose ts pss)
@@ -139,7 +138,7 @@ rowToCol (MkRowMatch ts rs) =
 
 -- | Turn the column-major representation of a pattern match into its row-major
 -- representation.
-colToRow :: ColMatch m n tv ev -> RowMatch m n tv ev
+colToRow :: ColMatch m n ev -> RowMatch m n ev
 colToRow (MkColMatch cs us) =
   let (ts, pss) = LS.unzipWith (\(MkCol t ps) -> (t, ps)) cs
       rs = LS.zipWith MkRow (LS.transpose us pss) us
@@ -163,22 +162,19 @@ colToRow (MkColMatch cs us) =
 -- > | EQ -> f[p/y]
 -- > | GT -> g
 elimBPatnCols :: CanPM effs =>
-  ColMatch m n tv ev -> (forall n'. ColMatch m n' tv ev -> Eff effs a) -> Eff effs a
+  ColMatch m n ev -> (forall n'. ColMatch m n' ev -> Eff effs a) -> Eff effs a
 elimBPatnCols (MkColMatch cs0 us0) k = do
   let (cs1, bcs) = partitionEithers (map isBPatnCol (toList cs0))
   us1 <- foldlM applyBPatnCol us0 bcs
   LS.withList cs1 $ \cs2 -> k (MkColMatch cs2 us1)
  where
-    isBPatnCol ::
-      Col n tv ev (Patn In tv) -> Either (Col n tv ev (Patn In tv)) (Col n tv ev BPatn)
+    isBPatnCol :: Col n ev (Patn In) -> Either (Col n ev (Patn In)) (Col n ev BPatn)
     isBPatnCol (MkCol t ps) =
       case traverse patnToBPatn ps of
         Just bs -> Right (MkCol t bs)
         Nothing -> Left  (MkCol t ps)
     applyBPatnCol :: CanPM effs =>
-      LS.List m (RhsExpr tv ev) ->
-      Col m tv ev BPatn ->
-      Eff effs (LS.List m (RhsExpr tv ev))
+      LS.List m (RhsExpr ev) -> Col m ev BPatn -> Eff effs (LS.List m (RhsExpr ev))
     applyBPatnCol rhss (MkCol t bs) = case t of
       EVar x ->
         let replacePatnWithX rhs = \case
@@ -192,9 +188,9 @@ elimBPatnCols (MkColMatch cs0 us0) k = do
       _ -> throwHere "pattern match too simple, use a let binding instead"
 
 -- | A constructor pattern, i.e., neither a wildcard nor a variable pattern.
-data CPatn tv = MkCPatn (Name DCon) [Type tv] [Patn In tv]
+data CPatn = MkCPatn (Name DCon) [Type] [Patn In]
 
-patnToCPatn :: forall tv. Patn In tv -> Maybe (CPatn tv)
+patnToCPatn :: Patn In -> Maybe CPatn
 patnToCPatn = \case
   PWld{}      -> Nothing
   PVar{}      -> Nothing
@@ -203,7 +199,7 @@ patnToCPatn = \case
 -- | Find the first column of a pattern match which consists entirely of
 -- constructor patterns.
 findCPatnCol :: CanPM effs =>
-  ColMatch m ('LS.Succ n) tv ev -> Eff effs (Col m tv ev (CPatn tv), ColMatch m n tv ev)
+  ColMatch m ('LS.Succ n) ev -> Eff effs (Col m ev CPatn, ColMatch m n ev)
 findCPatnCol (MkColMatch cs0 us) =
   case find (colPatn patnToCPatn) cs0 of
     Nothing       -> throwHere "cannot apply constructor rule"
@@ -216,13 +212,13 @@ findCPatnCol (MkColMatch cs0 us) =
       LS.Cons x             xs@LS.Cons{} -> fmap (second (LS.Cons x)) (find f xs)
 
 -- | A single group of a grouped pattern match.
-data GrpMatchItem tv ev =
+data GrpMatchItem ev =
   forall m m' n. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem (Name DCon) [Type tv] [BPatn] (RowMatch m n tv (EScope (Name EVar) ev))
+  MkGrpMatchItem (Name DCon) [Type] [BPatn] (RowMatch m n (EScope (Name EVar) ev))
 
 -- | A grouped pattern match. They result from the transformation in
 -- 'groupCPatn'.
-data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev))
+data GrpMatch ev = MkGrpMatch (Expr Out ev) (NonEmpty (GrpMatchItem ev))
 
 -- | Group a pattern match by its first column. For instance,
 --
@@ -247,8 +243,8 @@ data GrpMatch tv ev = MkGrpMatch (Expr Out tv ev) (NonEmpty (GrpMatchItem tv ev)
 -- Fresh binders are only introduced when necessary, i.e., when a certain
 -- constructor appears mutliple times in the first column.
 groupCPatns ::
-  forall m m' n tv ev effs. (CanPM effs, m ~ 'LS.Succ m') =>
-  Col m tv ev (CPatn tv) -> RowMatch m n tv ev -> Eff effs (GrpMatch tv ev)
+  forall m m' n ev effs. (CanPM effs, m ~ 'LS.Succ m') =>
+  Col m ev CPatn -> RowMatch m n ev -> Eff effs (GrpMatch ev)
 groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
   (MkTConDecl _ _params dcons0, _dconDecl) <- findInfo info2dcons dcon0
@@ -281,9 +277,9 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
           pure (MkGrpMatchItem con ts (fmap BName ixs0) (MkRowMatch es1 grpRows))
   pure $ MkGrpMatch t grps
 
-grpMatchExpr :: CanPM effs => GrpMatch tv ev -> Eff effs (Expr Out tv ev)
+grpMatchExpr :: CanPM effs => GrpMatch ev -> Eff effs (Expr Out ev)
 grpMatchExpr (MkGrpMatch t is) = EMat t <$> traverse grpMatchItemAltn is
 
-grpMatchItemAltn :: CanPM effs => GrpMatchItem tv ev -> Eff effs (Altn Out tv ev)
+grpMatchItemAltn :: CanPM effs => GrpMatchItem ev -> Eff effs (Altn Out ev)
 grpMatchItemAltn (MkGrpMatchItem con ts bs rm) = do
   MkAltn (PSimple con ts (fmap bindName bs)) <$> pmMatch rm

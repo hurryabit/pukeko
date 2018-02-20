@@ -29,7 +29,6 @@ import Pukeko.Prelude
 import Pukeko.Pretty
 
 import           Control.Monad.ST
-import           Data.Coerce        (coerce)
 import           Data.STRef
 import qualified Data.Map.Extended as Map
 import qualified Data.Vector        as Vec
@@ -45,18 +44,18 @@ newtype Level = Level Int
 
 newtype UVarId = UVarId Int
 
-data UVar s tv
+data UVar s
   = UFree UVarId Level
-  | ULink (UType s tv)
+  | ULink (UType s)
 
-data UType s tv
+data UType s
   = UTVar (Name TVar)
   | UTAtm TypeAtom
-  | UTApp (UType s tv) (UType s tv)
-  | UTUni (NonEmpty QVar) (UType s tv)
-  | UVar (STRef s (UVar s tv))
+  | UTApp (UType s) (UType s)
+  | UTUni (NonEmpty QVar) (UType s)
+  | UVar (STRef s (UVar s))
 
-pattern UTFun :: UType s tv -> UType s tv -> UType s tv
+pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp (UTAtm TAArr) tx) ty
 
 topLevel :: Level
@@ -68,37 +67,37 @@ uvarIds = map UVarId [1 ..]
 uvarIdName :: UVarId -> Tagged TVar String
 uvarIdName (UVarId n) = Tagged ('_':show n)
 
-mkUTUni :: [QVar] -> UType s tv -> UType s tv
+mkUTUni :: [QVar] -> UType s -> UType s
 mkUTUni xs0 t0 = case xs0 of
   [] -> t0
   x:xs -> UTUni (x :| xs) t0
 
 -- TODO: Follow links.
-unUTUni1 :: UType s tv -> ([QVar], UType s tv)
+unUTUni1 :: UType s -> ([QVar], UType s)
 unUTUni1 = \case
   UTUni qvs t1 -> (toList qvs, t1)
   t0 -> ([], t0)
 
-unUTUni :: UType s tv -> ([[QVar]], UType s tv)
+unUTUni :: UType s -> ([[QVar]], UType s)
 unUTUni = go []
   where
     go qvss = \case
       UTUni qvs t -> go (toList qvs:qvss) t
       t -> (reverse qvss, t)
 
-(~>) :: UType s tv -> UType s tv -> UType s tv
+(~>) :: UType s -> UType s -> UType s
 (~>) = UTFun
 
-(*~>) :: Foldable t => t (UType s tv) -> UType s tv -> UType s tv
+(*~>) :: Foldable t => t (UType s) -> UType s -> UType s
 t_args *~> t_res = foldr (~>) t_res t_args
 
-appN :: UType s tv -> [UType s tv] -> UType s tv
+appN :: UType s -> [UType s] -> UType s
 appN = foldl UTApp
 
-appTCon :: Name TCon -> [UType s tv] -> UType s tv
+appTCon :: Name TCon -> [UType s] -> UType s
 appTCon = appN . UTAtm . TACon
 
-unUTApp :: UType s tv -> ST s (UType s tv, [UType s tv])
+unUTApp :: UType s -> ST s (UType s, [UType s])
 unUTApp = go []
   where
     go tps = \case
@@ -110,10 +109,10 @@ unUTApp = go []
           UFree{}  -> pure (t0, tps)
       t0           -> pure (t0, tps)
 
-open :: (BaseTVar tv) => Type tv -> UType s tv
-open = open1 . fmap (UTVar . baseTVar)
+open :: Type -> UType s
+open = open1 . fmap UTVar
 
-open1 :: Type (UType s tv) -> UType s tv
+open1 :: GenType (UType s) -> UType s
 open1 = \case
   TVar t -> t
   TAtm a -> UTAtm a
@@ -122,7 +121,7 @@ open1 = \case
     where
       utvar = UTVar . _qvar2tvar . (Vec.fromList (toList xs) Vec.!)
 
-subst :: Map (Name TVar) (UType s tv) -> UType s tv -> ST s (UType s tv)
+subst :: Map (Name TVar) (UType s) -> UType s -> ST s (UType s)
 subst env = go
   where
     go t0 = case t0 of
@@ -139,12 +138,12 @@ subst env = go
 instance Pretty UVarId where
   pretty = pretty . uvarIdName
 
-prettyUVar :: Int -> UVar s tv -> ST s (Doc ann)
+prettyUVar :: Int -> UVar s -> ST s (Doc ann)
 prettyUVar prec = \case
   UFree v _ -> pure (pretty v)
   ULink t   -> prettyUType prec t
 
-prettyUType :: Int -> UType s tv -> ST s (Doc ann)
+prettyUType :: Int -> UType s -> ST s (Doc ann)
 prettyUType prec = \case
   UTVar v -> pure (pretty v)
   UTAtm a -> pure (pretty a)
@@ -160,6 +159,3 @@ prettyUType prec = \case
   UVar uref -> do
     uvar <- readSTRef uref
     prettyUVar prec uvar
-
-instance Functor (UType s) where
-  fmap _ = coerce

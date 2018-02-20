@@ -8,37 +8,30 @@ module Pukeko.AST.Scope
   , TScope
   , scope
   , scope'
-  , _Bound
   , _Free
   , mkBound
   , strengthenScope
   , strengthenScope0
   , unsafeStrengthenScope
   , weakenScope
-  , instantiate
   , instantiateN
-  , instantiate'
-  , instantiateN'
+  , abstract
   , abstract1
-  , dist
   , (>>>=)
-  , finRenamer
   , voidEnv
   , extendEnv
   , extendEnv'
-  , HasEnvLevel (..)
+  , HasEnvLevel (EnvLevelOf)
   , HasEnv (..)
   , BaseEVar
   , BaseTVar
   , baseEVar
   , baseTVar
-  , baseTVarIx
   )
   where
 
 import Pukeko.Prelude
 
-import           Control.Lens.Indexed
 import           Data.Forget
 import qualified Data.Map.Extended as Map
 import qualified Data.Vector       as Vec
@@ -88,20 +81,14 @@ weakenScope = Free
 instantiate :: Monad f => (i -> f v) -> f (Scope b i v) -> f v
 instantiate f e = e >>= scope pure f
 
-instantiate' :: Monad f => (i -> f v) -> f (Scope b i Void) -> f v
-instantiate' f e = e >>= scope absurd f
-
 instantiateN :: (HasCallStack, Monad f, Foldable t) =>
   t (f v) -> f (Scope b Int v) -> f v
 instantiateN xsL = instantiate lk
   where xsV = Vec.fromList (toList xsL)
         lk i = maybe (bugWith "instantiateN" i) id (xsV Vec.!? i)
 
-instantiateN' :: (HasCallStack, Monad f, Foldable t) =>
-  t (f v) -> f (Scope b Int Void) -> f v
-instantiateN' xsL = instantiate' lk
-  where xsV = Vec.fromList (toList xsL)
-        lk i = maybe (bugWith "instantiateN'" i) id (xsV Vec.!? i)
+abstract :: (v -> Maybe (i, b)) -> v -> Scope b i v
+abstract f x = maybe (Free x) (uncurry mkBound) (f x)
 
 abstract1 :: (j -> Maybe i) -> Scope b j v -> Scope b j (Scope b i v)
 abstract1 f = \case
@@ -126,9 +113,6 @@ _Bound :: Prism (Scope b i1 v) (Scope b i2 v) (i1, b) (i2, b)
 _Bound = prism (uncurry mkBound) $ \case
   Free x -> Left (Free x)
   Bound i (Forget b) -> Right (i, b)
-
-finRenamer :: (Ord b, FoldableWithIndex Int t) => t b -> Map b (Scope b Int tv)
-finRenamer = ifoldMap (\i b -> Map.singleton b (mkBound i b))
 
 data Pair f g a = Pair (f a) (g a)
   deriving (Functor)
@@ -183,10 +167,7 @@ instance (HasEnvLevel i, HasEnv v) => HasEnv (Scope b i v) where
     Free  v   -> lookupEnv v env_v
 
 class BaseName b v where
-  baseNameIx :: v -> (b, Int)
-
-baseName :: BaseName b v => v -> b
-baseName = fst . baseNameIx
+  baseName :: v -> b
 
 type BaseEVar ev = (BaseName (Name EVar) ev)
 
@@ -195,19 +176,19 @@ type BaseTVar tv = (BaseName (Name TVar) tv)
 baseEVar :: BaseEVar ev => ev -> Name EVar
 baseEVar = baseName
 
-baseTVarIx :: BaseTVar tv => tv -> (Name TVar, Int)
-baseTVarIx = baseNameIx
-
 baseTVar :: BaseTVar tv => tv -> Name TVar
 baseTVar = baseName
 
 instance BaseName b Void where
-  baseNameIx = absurd
+  baseName = absurd
+
+instance BaseName (Name nsp) (Name nsp) where
+  baseName = id
 
 instance (BaseName b v) => BaseName b (Scope b i v) where
-  baseNameIx = \case
-    Bound _ (Forget b) -> (b, 0)
-    Free  v            -> second succ (baseNameIx v)
+  baseName = \case
+    Bound _ (Forget b) -> b
+    Free  v            -> baseName v
 
 instance Bifunctor (Scope b) where
   bimap f g = \case

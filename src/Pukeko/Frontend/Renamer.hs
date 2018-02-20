@@ -6,7 +6,6 @@ module Pukeko.FrontEnd.Renamer
 
 import Pukeko.Prelude
 
-import           Control.Lens (indexing, iover)
 import           Control.Lens.Extras (is)
 import           Control.Monad.Extra
 import           Data.Bitraversable
@@ -109,7 +108,8 @@ rnTypeAtom = \case
 -- | Rename a type under the assumption that all its free variables are
 -- contained in the map. All references to type constructors are renamed as
 -- well.
-rnType :: CanRn effs => Map (Ps.Name TVar) tv -> Ps.Type -> Eff effs (Type tv)
+rnType :: CanRn effs =>
+  Map (Ps.Name TVar) (Name TVar) -> Ps.Type -> Eff effs Type
 rnType env = go
   where
     go = \case
@@ -135,13 +135,12 @@ rnConstraints env (Ps.MkTypeCstr constraints) =
 -- | Rename a type scheme. Fails if there are constraints on type variables
 -- which are contained in the map or not in the type.
 rnTypeScheme :: CanRn effs =>
-  Map (Ps.Name TVar) tv -> Ps.TypeScheme -> Eff effs (Type tv)
+  Map (Ps.Name TVar) (Name TVar) -> Ps.TypeScheme -> Eff effs Type
 rnTypeScheme env0 (Ps.MkTypeScheme qs0 t) = do
   env1 <- traverse mkName (Ps.freeTVars t `Map.difference` env0)
   qs1 <- rnConstraints env1 qs0
   qvs <- applyConstraints (Map.elems env1) qs1
-  mkTUni qvs <$>
-    rnType (iover (indexing traverse) mkBound env1 <> fmap weakenScope env0) t
+  mkTUni qvs <$> rnType (env1 <> env0) t
 
 -- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
@@ -156,7 +155,7 @@ rnCoercion (Ps.MkCoercion dir0 tname) = do
 
 -- | Rename a pattern.
 rnPatn :: CanRn effs =>
-  Ps.Patn -> Eff effs (Patn Out tv, Map (Ps.Name EVar) (Name EVar))
+  Ps.Patn -> Eff effs (Patn Out, Map (Ps.Name EVar) (Name EVar))
 rnPatn = \case
   Ps.PWld -> pure (PWld, mempty)
   Ps.PVar name -> do
@@ -169,7 +168,7 @@ rnPatn = \case
 
 -- | Rename a pattern match alternative.
 rnAltn :: CanRn effs =>
-  Ps.Altn (Ps.LctdName EVar) -> Eff (Env ev : effs) (Altn Out tv ev)
+  Ps.Altn (Ps.LctdName EVar) -> Eff (Env ev : effs) (Altn Out ev)
 rnAltn (Ps.MkAltn patn0 rhs) = do
   (patn1, env) <- rnPatn patn0
   MkAltn patn1 <$> localize (fmap (\x -> (x, x)) env) (rnExpr rhs)
@@ -178,7 +177,7 @@ rnAltn (Ps.MkAltn patn0 rhs) = do
 rnELam :: CanRn effs =>
   [Ps.LctdName EVar] ->
   Ps.Expr (Ps.LctdName EVar) ->
-  Eff (Env ev : effs) (Expr Out tv ev)
+  Eff (Env ev : effs) (Expr Out ev)
 rnELam [] body = rnExpr body
 rnELam (name:names) body = do
   binder <- mkName name
@@ -186,7 +185,7 @@ rnELam (name:names) body = do
 
 -- | Rename an expression.
 rnExpr :: CanRn effs =>
-  Ps.Expr (Ps.LctdName EVar) -> Eff (Env ev : effs) (Expr Out tv ev)
+  Ps.Expr (Ps.LctdName EVar) -> Eff (Env ev : effs) (Expr Out ev)
 rnExpr = \case
   Ps.ELoc le -> here le $ ELoc <$> lctd rnExpr le
   Ps.EVar x -> do
@@ -235,7 +234,7 @@ rnExpr = \case
 -- constructor (or at least some dummy version of it) has already been
 -- introduced to the global environment.
 rnDConDecl :: CanRn effs =>
-  Name TCon -> Map (Ps.Name TVar) (TScope Int Void) -> Int -> Ps.DConDecl ->
+  Name TCon -> Map (Ps.Name TVar) (Name TVar) -> Int -> Ps.DConDecl ->
   Eff effs DConDecl
 rnDConDecl tcon env tag (Ps.MkDConDecl name fields) = here name $
   introGlobal dconTab "data constructor" name id $ \dcon ->
@@ -249,7 +248,7 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
   let mkDummy binder = DType (MkTConDecl binder [] (Right []))
   binder <- introGlobal tconTab "type constructor" name mkDummy pure
   params1 <- traverse mkName params0
-  let env = Map.fromList (zip (map unlctd params0) (zipWithFrom mkBound 0 params1))
+  let env = Map.fromList (zip (map unlctd params0) params1)
   dcons1 <- bitraverse
             (rnType env)
             (zipWithM (\tag -> rnDConDecl binder env tag) [0..])
@@ -264,13 +263,13 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
 -- paramaters and the function adds universal quantification over the class
 -- parameters.
 rnSignDecl :: CanRn effs =>
-  Map (Ps.Name TVar) tv -> (Type tv -> Type Void) -> Ps.SignDecl ->
+  Map (Ps.Name TVar) (Name TVar) -> (Type -> Type) -> Ps.SignDecl ->
   Eff effs (SignDecl tv)
-rnSignDecl env close (Ps.MkSignDecl binder typeScheme) = do
+rnSignDecl env preClose (Ps.MkSignDecl binder typeScheme) = do
   introGlobal evarTab "function declaration" binder mkDSign $ \name ->
     MkSignDecl name <$> rnTypeScheme env typeScheme
   where
-    mkDSign = DSign . over sign2type close
+    mkDSign = DSign . over sign2type preClose
 
 -- | Rename a function declaration. The filled in type is bogus. For top level
 -- functions, we have @tv = Void@. For method definitions, we have @tv = TScope
@@ -296,9 +295,9 @@ rnClssDecl (Ps.MkClssDecl name param0 methods0) =
   introGlobal tconTab "type constructor" name DClss $ \clss -> do
     dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
     param1 <- mkName param0
-    let env = Map.singleton (unlctd param0) (mkBound 0 param1)
-    let qvs = MkQVar (Set.singleton clss) param1 :| []
-    methods1 <- traverse (rnSignDecl env (TUni qvs)) methods0
+    let env = Map.singleton (unlctd param0) param1
+    let qvs = [MkQVar (Set.singleton clss) param1]
+    methods1 <- traverse (rnSignDecl env (mkTUni qvs)) methods0
     pure (MkClssDecl clss param1 dcon methods1)
 
 -- | Rename an instance definition. There's /no/ check whether an instance for

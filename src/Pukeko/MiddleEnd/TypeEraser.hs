@@ -31,7 +31,7 @@ runCC mod0 = run . evalState mempty . runInfo mod0
 name :: In.Name In.EVar -> Name
 name = MkName . untag . In.nameText
 
-bindName :: In.Bind tv -> Name
+bindName :: In.Bind -> Name
 bindName = name . In.nameOf
 
 ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel
@@ -44,10 +44,10 @@ ccExtnDecl (In.ExtnDecl z _ s) = do
     modify (Map.insert z n)
     pure (Asm n)
 
-ccDefn :: (BaseEVar ev) => In.Defn tv ev -> CC Defn
+ccDefn :: (BaseEVar ev) => In.Defn ev -> CC Defn
 ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
-ccExpr :: (BaseEVar ev) => In.Expr tv ev -> CC Expr
+ccExpr :: (BaseEVar ev) => In.Expr ev -> CC Expr
 ccExpr = \case
   In.EVar x -> pure (Local (name (baseEVar x)))
   In.EVal z -> do
@@ -69,5 +69,5 @@ ccExpr = \case
   In.ETyCoe _   e0 -> ccExpr e0
   In.ETyAnn _   e0 -> ccExpr e0
 
-ccAltn :: (BaseEVar ev) => In.Altn tv ev -> CC Altn
+ccAltn :: (BaseEVar ev) => In.Altn ev -> CC Altn
 ccAltn (In.MkAltn (In.PSimple _ _ bs) e) = MkAltn (map (fmap name) bs) <$> ccExpr e

@@ -22,24 +22,24 @@ import           Pukeko.AST.ConDecl
 -- (@SignDecl (TScope Int Void)@).
 data SignDecl tv = MkSignDecl
   { _sign2name :: Name EVar
-  , _sign2type :: Type tv
+  , _sign2type :: Type
   }
 
 -- | Definition of a function (@FuncDecl lg Void@) or an instance method
 -- (@FuncDecl lg (TScope Int Void)@).
 data FuncDecl lg tv = MkFuncDecl
   { _func2name :: Name EVar
-  , _func2type :: TypeOf lg tv
+  , _func2type :: TypeOf lg
     -- ^ Before type inference, this is 'TArr' and hence bogus. Since 'TArr'
     -- doesn't have kind '*', it will never be there after type inference. This
     -- allows for finding out if we are before or after type inference.
-  , _func2body :: Expr lg tv Void
+  , _func2body :: Expr lg Void
   }
 
 -- | Declaration of an external function.
 data ExtnDecl lg = MkExtnDecl
   { _extn2name :: Name EVar
-  , _extn2type :: TypeOf lg Void
+  , _extn2type :: TypeOf lg
     -- ^ Before type inference, this is 'TArr' for the same reason given for
     -- '_func2type'.
   , _extn2extn :: String
@@ -54,7 +54,7 @@ data ClssDecl = MkClssDecl
     -- dictionary type. The easiest way to get and distribute a 'Name' for this
     -- constructor is to get it during renaming and carry it around afterwards.
     -- For class @XYZ@ this constructor is called @Dict$XZY@.
-  , _clss2methods :: [SignDecl (TScope Int Void)]
+  , _clss2methods :: [SignDecl (Name TVar)]
   }
 
 -- | Definition of an instance of a class.
@@ -67,7 +67,7 @@ data InstDecl lg = MkInstDecl
   , _inst2clss    :: Name Clss
   , _inst2atom    :: TypeAtom
   , _inst2qvars   :: [QVar]
-  , _inst2methods :: [FuncDecl lg (TScope Int Void)]
+  , _inst2methods :: [FuncDecl lg (Name TVar)]
   }
 
 data GenDecl (nsp :: Super NameSpace) lg
@@ -127,10 +127,10 @@ instance HasPos (GenDecl nsp st) where
     DClss clss  -> getPos clss
     DInst inst  -> getPos inst
 
-instance BaseTVar tv => Pretty (SignDecl tv) where
+instance Pretty (SignDecl tv) where
   pretty (MkSignDecl name typ_) = pretty (name ::: typ_)
 
-instance (TypeOf lg ~ Type, BaseTVar tv) => Pretty (FuncDecl lg tv) where
+instance TypeOf lg ~ Type => Pretty (FuncDecl lg tv) where
   pretty (MkFuncDecl name typ_ body) =
     hang (pretty (name ::: typ_) <+> "=") 2 (pretty body)
 
@@ -148,8 +148,7 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
       "instance" <+> prettyTypeCstr qvs <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where
-        t1 :: Type (TScope Int Void)
-        t1 = mkTApp (TAtm t0) (imap (\i (MkQVar _ v) -> TVar (mkBound i v)) qvs)
+        t1 = mkTApp (TAtm t0) (map (TVar . _qvar2tvar) qvs)
 
 instance TypeOf lg ~ Type => Pretty (Module lg) where
   pretty (MkModule decls) = vcatMap pretty decls

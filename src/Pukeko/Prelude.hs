@@ -62,7 +62,7 @@ import Data.Set.Lens         as X (setOf)
 import Data.Tagged           as X
 import Data.Traversable      as X
 import Data.Vector           as X (Vector)
-import Data.Void             as X (Void, absurd)
+import Data.Void             as X
 import Safe.Exact            as X (zipExact, zipWithExact)
 
 import Pukeko.AST.Pos        as X
