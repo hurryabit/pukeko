@@ -1,31 +1,27 @@
 {-# LANGUAGE BangPatterns #-}
 module Pukeko.FrontEnd.Inferencer.Unify
-  ( TU
-  , GlobalEffs
+  ( CanUnify
+  , MemberST
   , unify
   )
 where
 
 import Pukeko.Prelude
 
-import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
 import           Data.STRef
 
 import           Pukeko.Pretty
-import           Pukeko.AST.Name
 import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.UType
-import           Pukeko.FrontEnd.Info
 
-type GlobalEffs s = [Reader ModuleInfo, Error Failure, NameSource, ST s]
+type MemberST s effs = LastMember (ST s) effs
 
-type TU s ev = EffGamma s ev (Supply UVarId : Reader SourcePos : GlobalEffs s)
-
+type CanUnify s effs = (CanThrowHere effs, CanGamma s effs, MemberST s effs)
 
 -- TODO: link compression
 -- | Unwind a chain of 'ULink's.
-unwind :: UType s -> TU s ev (UType s)
+unwind :: MemberST s effs => UType s -> Eff effs (UType s)
 unwind t0 = case t0 of
   UVar uref -> do
     sendM (readSTRef uref) >>= \case
@@ -34,14 +30,15 @@ unwind t0 = case t0 of
   _ -> pure t0
 
 -- | Read a 'UVar' /after/ 'unwind'ing.
-readUnwound :: STRef s (UVar s) -> TU s ev (UVarId, Level)
+readUnwound :: MemberST s effs => STRef s (UVar s) -> Eff effs (UVarId, Level)
 readUnwound uref =
   sendM (readSTRef uref) >>= \case
     ULink{} -> impossible  -- we only call this after unwinding
     UFree v lvl -> pure (v, lvl)
 
 -- | Perform the occurs check. Assumes that the 'UVar' has been unwound.
-occursCheck :: STRef s (UVar s) -> UType s -> TU s ev ()
+occursCheck :: forall s effs. CanUnify s effs =>
+  STRef s (UVar s) -> UType s -> Eff effs ()
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwHere "occurs check"
@@ -52,13 +49,13 @@ occursCheck uref1 t2 = case t2 of
             sendM (writeSTRef uref2 (UFree x2 (min l1 l2)))
           ULink t2' -> occursCheck uref1 t2'
   UTVar v -> do
-    !_ <- lookupTVar v  -- NOTE: This is a sanity check.
+    !_ <- lookupTVar @s v  -- NOTE: This is a sanity check.
     pure ()
   UTAtm{} -> pure ()
   UTUni{} -> impossible  -- UVar is assumed to be unwound
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
-unify :: UType s -> UType s -> TU s ev ()
+unify :: forall s effs. CanUnify s effs => UType s -> UType s -> Eff effs ()
 unify t1 t2 = do
   t1 <- unwind t1
   t2 <- unwind t2

@@ -44,10 +44,10 @@ ccExtnDecl (In.ExtnDecl z _ s) = do
     modify (Map.insert z n)
     pure (Asm n)
 
-ccDefn :: (BaseEVar ev) => In.Defn ev -> CC Defn
+ccDefn :: In.Defn -> CC Defn
 ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
-ccExpr :: (BaseEVar ev) => In.Expr ev -> CC Expr
+ccExpr :: In.Expr -> CC Expr
 ccExpr = \case
   In.EVar x -> pure (Local (name (baseEVar x)))
   In.EVal z -> do
@@ -69,5 +69,5 @@ ccExpr = \case
   In.ETyCoe _   e0 -> ccExpr e0
   In.ETyAnn _   e0 -> ccExpr e0
 
-ccAltn :: (BaseEVar ev) => In.Altn ev -> CC Altn
+ccAltn :: In.Altn -> CC Altn
 ccAltn (In.MkAltn (In.PSimple _ _ bs) e) = MkAltn (map (fmap name) bs) <$> ccExpr e

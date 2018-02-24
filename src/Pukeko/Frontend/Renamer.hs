@@ -30,7 +30,7 @@ data Tabs = Tabs
   , _evarTab  :: Map (Ps.Name EVar) (GenDecl (Only EVar) Out)
   }
 
-type Env ev = Reader (Map (Ps.Name EVar) ev)
+type Env = Reader (Map (Ps.Name EVar) (Name EVar))
 
 type CanRn effs = Members [State Tabs, Reader SourcePos, NameSource, Error Failure] effs
 
@@ -74,18 +74,12 @@ lookupGlobal tab isok desc (Lctd pos name) = do
       | otherwise -> throwAt pos ("not a" <+> desc <:~> pretty name)
 
 localize :: CanRn effs =>
-  Map (Ps.Name EVar) (i, Name EVar) ->
-  Eff (Env (EScope i ev) : effs) a ->
-  Eff (Env ev : effs) a
-localize bs = local' upd
-  where
-    upd env = fmap (uncurry mkBound) bs `Map.union` Map.map Free env
+  Map (Ps.Name EVar) (Name EVar) -> Eff (Env : effs) a -> Eff (Env : effs) a
+localize env = local' (env <>)
 
 localize1 :: CanRn effs =>
-  Ps.Name EVar -> Name EVar ->
-  Eff (Env (EScope () ev) : effs) a ->
-  Eff (Env ev : effs) a
-localize1 binder name = localize (Map.singleton binder ((), name))
+  Ps.Name EVar -> Name EVar -> Eff (Env : effs) a -> Eff (Env : effs) a
+localize1 binder name = localize (Map.singleton binder name)
 
 lookupBinop :: CanRn effs => Op.Binary -> Eff effs (Name EVar)
 lookupBinop op = do
@@ -167,25 +161,21 @@ rnPatn = \case
     pure (PCon dcon1 [] patns1, fold envs)
 
 -- | Rename a pattern match alternative.
-rnAltn :: CanRn effs =>
-  Ps.Altn (Ps.LctdName EVar) -> Eff (Env ev : effs) (Altn Out ev)
+rnAltn :: CanRn effs => Ps.Altn (Ps.LctdName EVar) -> Eff (Env : effs) (Altn Out )
 rnAltn (Ps.MkAltn patn0 rhs) = do
   (patn1, env) <- rnPatn patn0
-  MkAltn patn1 <$> localize (fmap (\x -> (x, x)) env) (rnExpr rhs)
+  MkAltn patn1 <$> localize env (rnExpr rhs)
 
 -- | Rename a value abstraction (lambda).
 rnELam :: CanRn effs =>
-  [Ps.LctdName EVar] ->
-  Ps.Expr (Ps.LctdName EVar) ->
-  Eff (Env ev : effs) (Expr Out ev)
+  [Ps.LctdName EVar] -> Ps.Expr (Ps.LctdName EVar) -> Eff (Env : effs) (Expr Out)
 rnELam [] body = rnExpr body
 rnELam (name:names) body = do
   binder <- mkName name
   ELam (MkBind binder NoType) <$> localize1 (unlctd name) binder (rnELam names body)
 
 -- | Rename an expression.
-rnExpr :: CanRn effs =>
-  Ps.Expr (Ps.LctdName EVar) -> Eff (Env ev : effs) (Expr Out ev)
+rnExpr :: CanRn effs => Ps.Expr (Ps.LctdName EVar) -> Eff (Env : effs) (Expr Out)
 rnExpr = \case
   Ps.ELoc le -> here le $ ELoc <$> lctd rnExpr le
   Ps.EVar x -> do
@@ -208,7 +198,7 @@ rnExpr = \case
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkDefn binder expr) -> (binder, expr)) binds0)
     names <- traverse mkName binders0
-    let env = Map.fromList (zipExact (map unlctd binders0) (zipFrom 0 names))
+    let env = Map.fromList (zipExact (map unlctd binders0) names)
     exprs1 <- traverse rnExpr exprs0
     let binds1 =
           zipWithExact (\name expr -> MkDefn (MkBind name NoType) expr) names exprs1
@@ -218,7 +208,7 @@ rnExpr = \case
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkDefn binder expr) -> (binder, expr)) binds0)
     names <- traverse mkName binders0
-    let env = Map.fromList (zipExact (map unlctd binders0) (zipFrom 0 names))
+    let env = Map.fromList (zipExact (map unlctd binders0) names)
     localize env $ do
       exprs1 <- traverse rnExpr exprs0
       let binds1 =

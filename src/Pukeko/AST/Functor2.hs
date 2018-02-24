@@ -14,7 +14,6 @@ where
 
 import Pukeko.Prelude
 
-import Control.Natural
 import Data.Functor.Compose
 
 class Functor2 φ where

@@ -10,7 +10,7 @@ module Pukeko.AST.Expr
 
 import Pukeko.Prelude
 
-import           Control.Lens (ifoldr)
+import           Control.Lens (makeLensesFor)
 import           Data.Aeson
 import           Data.Aeson.TH
 
@@ -21,9 +21,9 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 import           Pukeko.AST.Scope
 
-data Defn lg ev = MkDefn
+data Defn lg = MkDefn
   { _defn2bind :: Bind (TypeOf lg)
-  , _defn2expr :: Expr lg ev
+  , _defn2expr :: Expr lg
   }
 
 data Atom
@@ -33,28 +33,28 @@ data Atom
 
 -- NOTE: All constructors added here also NEED TO be added to the COMPLETE
 -- pragma below.
-data Expr lg ev
-  = IsLambda lg ~ True => ELoc (Lctd (Expr lg ev))
-  | EVar ev
-  | EAtm Atom
-  | EApp (Expr lg ev) (Expr lg ev)
-  | IsLambda lg ~ True => ELam (Bind (TypeOf lg)) (Expr lg (EScope () ev))
-  | ELet [Defn lg             ev ] (Expr lg (EScope Int ev))
-  | ERec [Defn lg (EScope Int ev)] (Expr lg (EScope Int ev))
-  | EMat (Expr lg ev) (NonEmpty (Altn lg ev))
-  | ETyCoe Coercion (Expr lg ev)
-  | TypeOf lg ~ Type => ETyAbs (NonEmpty QVar) (Expr lg ev)
-  | IsPreTyped lg ~ True => ETyApp (Expr lg ev) (NonEmpty (TypeOf lg))
-  | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg ev)
+data Expr lg
+  = IsLambda lg ~ True   => ELoc (Lctd (Expr lg))
+  |                         EVar (Name EVar)
+  |                         EAtm Atom
+  |                         EApp (Expr lg) (Expr lg)
+  | IsLambda lg ~ True   => ELam (Bind (TypeOf lg)) (Expr lg)
+  |                         ELet [Defn lg] (Expr lg)
+  |                         ERec [Defn lg] (Expr lg)
+  |                         EMat (Expr lg) (NonEmpty (Altn lg))
+  |                         ETyCoe Coercion (Expr lg)
+  | TypeOf lg ~ Type     => ETyAbs (NonEmpty QVar) (Expr lg)
+  | IsPreTyped lg ~ True => ETyApp (Expr lg) (NonEmpty (TypeOf lg))
+  | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg )
 
 data Bind ty = MkBind
   { _bind2evar :: Name EVar
   , _bind2type :: ty
   }
 
-data Altn lg ev = MkAltn
+data Altn lg = MkAltn
   { _altn2patn :: Patn lg
-  , _altn2expr :: Expr lg (EScope (Name EVar) ev)
+  , _altn2expr :: Expr lg
   }
 
 data Patn lg
@@ -63,13 +63,13 @@ data Patn lg
   | IsNested lg ~ True  => PCon    (Name DCon) [TypeOf lg] [Patn lg]
   | IsNested lg ~ False => PSimple (Name DCon) [TypeOf lg] [Maybe (Name EVar)]
 
-pattern EVal :: Name EVar -> Expr lg ev
+pattern EVal :: Name EVar -> Expr lg
 pattern EVal z = EAtm (AVal z)
 
-pattern ECon :: Name DCon -> Expr lg ev
+pattern ECon :: Name DCon -> Expr lg
 pattern ECon c = EAtm (ACon c)
 
-pattern ENum :: Int -> Expr lg ev
+pattern ENum :: Int -> Expr lg
 pattern ENum n = EAtm (ANum n)
 
 -- NOTE: Do NOT forget to add new constructors here.
@@ -80,120 +80,71 @@ pattern ENum n = EAtm (ANum n)
 makeLenses ''Altn
 makePrisms ''Atom
 makeLenses ''Bind
+makeLensesFor [("_defn2bind", "defn2bind")] ''Defn
 
--- NOTE: The generated lens would not be ploymorphic enough for our use cases.
+-- NOTE: The generated lens would not be polymorphic in @lg@.
 defn2expr :: (TypeOf lg1 ~ TypeOf lg2) =>
-  Lens (Defn lg1 ev1) (Defn lg2 ev2) (Expr lg1 ev1) (Expr lg2 ev2)
+  Lens (Defn lg1) (Defn lg2) (Expr lg1) (Expr lg2)
 defn2expr f (MkDefn b e) = MkDefn b <$> f e
 
 -- * Smart constructors
 
 mkELam ::
   (IsLambda lg ~ True, IsPreTyped lg ~ True, TypeOf lg ~ Type) =>
-  [Bind (TypeOf lg)] -> Type -> Expr lg (EScope Int ev) -> Expr lg ev
+  [Bind (TypeOf lg)] -> Type -> Expr lg -> Expr lg
 mkELam bs0 t0 e0 = case bs0 of
-  [] -> strengthenE0 e0
-  _  -> strengthenE0 (ifoldr (\i b1 -> ELam b1 . fmap (abstr i)) (ETyAnn t0 e0) bs0)
-    where
-      abstr :: Int -> Scope b Int ev -> Scope b () (Scope b Int ev)
-      abstr i = \case
-        Bound j b | i == j -> Bound () b
-        s                  -> Free s
+  [] -> e0
+  _  -> (foldr ELam (ETyAnn t0 e0) bs0)
 
-unwindELam :: (IsLambda lg ~ True) =>
-  Expr lg ev -> ([Bind (TypeOf lg)], Expr lg (EScope Int ev))
-unwindELam = go 0 [] . weakenE
+unwindELam :: (IsLambda lg ~ True) => Expr lg -> ([Bind (TypeOf lg)], Expr lg)
+unwindELam = go []
   where
-    inst :: Int -> Scope b () (Scope b Int v) -> Scope b Int v
-    inst i = \case
-      Bound () b -> Bound i b
-      Free s     -> s
-    go ::
-      Int -> [Bind (TypeOf lg)] -> Expr lg (EScope Int ev) ->
-      ([Bind (TypeOf lg)], Expr lg (EScope Int ev))
-    go lvl params = \case
-      ELam param body -> go (lvl+1) (param:params) (fmap (inst lvl) body)
+    go :: [Bind (TypeOf lg)] -> Expr lg -> ([Bind (TypeOf lg)], Expr lg)
+    go params = \case
+      ELam param body -> go (param:params) body
       -- NOTE: We do this only conditional on the inner expression being a
       -- lambda to not strip the very last type annotation in a chain of
       -- lambdas.
-      ETyAnn _ e@ELam{} -> go lvl params e
+      ETyAnn _ e@ELam{} -> go params e
       body -> (reverse params, body)
 
-unwindEApp :: Expr lg ev -> (Expr lg ev, [Expr lg ev])
+unwindEApp :: Expr lg -> (Expr lg, [Expr lg])
 unwindEApp = go []
   where
     go args = \case
       EApp fun arg -> go (arg:args) fun
       fun          -> (fun, args)
 
-mkETyApp :: (IsPreTyped lg ~ True) => Expr lg ev -> [TypeOf lg] -> Expr lg ev
+mkETyApp :: IsPreTyped lg ~ True => Expr lg -> [TypeOf lg] -> Expr lg
 mkETyApp e0 = \case
   []    -> e0
   t1:ts -> ETyApp e0 (t1 :| ts)
 
-mkETyAbs :: (TypeOf lg ~ Type) => [QVar] -> Expr lg ev -> Expr lg ev
+mkETyAbs :: TypeOf lg ~ Type => [QVar] -> Expr lg -> Expr lg
 mkETyAbs qvs0 e0 = case qvs0 of
   []     -> e0
   qv:qvs -> ETyAbs (qv :| qvs) e0
 
--- * Abstraction and substition
-
-weakenE :: Expr lg ev -> Expr lg (EScope i ev)
-weakenE = fmap weakenScope
-
-strengthenE0 :: Expr lg (EScope Int ev) -> Expr lg ev
-strengthenE0 = fmap strengthenScope0
-
--- | Replace subexpressions.
-instance Applicative (Expr lg) where
-  pure = EVar
-  (<*>) = ap
-
-instance Monad (Expr lg) where
-  expr >>= f = case expr of
-    ELoc l       -> ELoc (fmap (>>= f) l)
-    EVar x       -> f x
-    EAtm a       -> EAtm a
-    EApp e  a    -> EApp (e >>= f) (a >>= f)
-    ELam b  e    -> ELam b (e >>>= f)
-    ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
-    ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
-    EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
-    ETyCoe c e   -> ETyCoe c (e >>= f)
-    ETyAbs _ _   -> error "FIXME: THIS IS NOT IMPLEMENTED"
-    ETyApp e t   -> ETyApp (e >>= f) t
-    ETyAnn t e   -> ETyAnn t (e >>= f)
+unBind :: Bind ty -> (NameEVar, ty)
+unBind (MkBind x t) = (x, t)
 
 
 -- * Instances
 
--- ** {Functor, Foldable, Traversable}
-deriving instance Functor     (Defn st)
-deriving instance Foldable    (Defn st)
-deriving instance Traversable (Defn st)
-
-deriving instance Functor     (Expr lg)
-deriving instance Foldable    (Expr lg)
-deriving instance Traversable (Expr lg)
-
-deriving instance Functor     (Altn lg)
-deriving instance Foldable    (Altn lg)
-deriving instance Traversable (Altn lg)
-
-type instance NameSpaceOf (Bind ty   ) = EVar
-type instance NameSpaceOf (Defn lg ev) = EVar
-instance HasName (Bind ty   ) where nameOf = _bind2evar
-instance HasName (Defn lg ev) where nameOf = nameOf . _defn2bind
-instance HasPos  (Bind ty   ) where getPos = getPos . nameOf
-instance HasPos  (Defn lg ev) where getPos = getPos . nameOf
+type instance NameSpaceOf (Bind ty) = EVar
+type instance NameSpaceOf (Defn lg) = EVar
+instance HasName (Bind ty) where nameOf = _bind2evar
+instance HasName (Defn lg) where nameOf = nameOf . _defn2bind
+instance HasPos  (Bind ty) where getPos = getPos . nameOf
+instance HasPos  (Defn lg) where getPos = getPos . nameOf
 
 
 -- * Pretty printing
-instance (TypeOf st ~ Type, BaseEVar ev) => Pretty (Defn st ev) where
+instance TypeOf st ~ Type => Pretty (Defn st) where
   pretty (MkDefn b t) =
     hang (pretty b <+> "=") 2 (prettyPrec 0 t)
 
-prettyDefns :: (TypeOf st ~ Type, BaseEVar ev) => Bool -> [Defn st ev] -> Doc ann
+prettyDefns :: TypeOf st ~ Type => Bool -> [Defn st] -> Doc ann
 prettyDefns isrec ds = case ds of
     [] -> impossible  -- maintained invariant
     d0:ds ->
@@ -209,9 +160,9 @@ instance Pretty Atom where
     ACon c -> pretty c
     ANum n -> pretty n
 
-instance (TypeOf lg ~ Type, BaseEVar ev) => Pretty (Expr lg ev)
+instance TypeOf lg ~ Type => Pretty (Expr lg)
 
-instance (TypeOf lg ~ Type, BaseEVar ev) => PrettyPrec (Expr lg ev) where
+instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
   prettyPrec prec = \case
     ELoc l -> prettyPrec prec l
     EVar x -> pretty (baseEVar x)
@@ -261,8 +212,8 @@ instance (TypeOf lg ~ Type, BaseEVar ev) => PrettyPrec (Expr lg ev) where
     -- during type inference.
     ETyAnn _ e -> prettyPrec prec e
 
-prettyELam :: (TypeOf lg ~ Type, BaseEVar ev, Foldable t) =>
-  Int -> t (Bind (TypeOf lg)) -> Expr lg (EScope i ev) -> Doc ann
+prettyELam :: (TypeOf lg ~ Type, Foldable t) =>
+  Int -> t (Bind (TypeOf lg)) -> Expr lg -> Doc ann
 prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
@@ -285,12 +236,12 @@ instance PrettyPrec (Bind Type) where
   prettyPrec prec (MkBind z t) =
     maybeParens (prec > 0) (pretty z <+> ":" <+> pretty t)
 
-instance (TypeOf lg ~ Type, BaseEVar ev) => Pretty (Altn lg ev) where
+instance TypeOf lg ~ Type => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)
 
-instance (TypeOf lg ~ Type) => Pretty (Patn lg)
+instance TypeOf lg ~ Type => Pretty (Patn lg)
 
-instance (TypeOf lg ~ Type) => PrettyPrec (Patn lg) where
+instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
   prettyPrec prec = \case
     PWld -> "_"
     PVar x    -> pretty x
@@ -305,22 +256,22 @@ instance (TypeOf lg ~ Type) => PrettyPrec (Patn lg) where
         <+> prettyAtType (prettyPrec 3) ts
         <+> hsep (map (maybe "_" pretty) bs)
 
-deriving instance (TypeOf lg ~ Type, Show ev) => Show (Defn lg ev)
-deriving instance (TypeOf lg ~ Type, Show ev) => Show (Expr lg ev)
-deriving instance (TypeOf lg ~ Type, Show ev) => Show (Altn lg ev)
-deriving instance                                Show  Atom
-deriving instance (TypeOf lg ~ Type)          => Show (Patn lg)
+deriving instance TypeOf lg ~ Type => Show (Defn lg)
+deriving instance TypeOf lg ~ Type => Show (Expr lg)
+deriving instance TypeOf lg ~ Type => Show (Altn lg)
+deriving instance                     Show  Atom
+deriving instance TypeOf lg ~ Type => Show (Patn lg)
 deriving instance                                Show (Bind Type)
 
 deriveToJSON defaultOptions ''Atom
 
-instance (TypeOf lg ~ Type) => ToJSON (Patn lg) where
+instance TypeOf lg ~ Type => ToJSON (Patn lg) where
   toJSON = $(mkToJSON defaultOptions ''Patn)
 instance ToJSON (Bind Type) where
   toJSON = $(mkToJSON defaultOptions ''Bind)
-instance (ToJSON ev, TypeOf lg ~ Type) => ToJSON (Altn lg ev) where
+instance TypeOf lg ~ Type => ToJSON (Altn lg) where
   toJSON = $(mkToJSON defaultOptions ''Altn)
-instance (ToJSON ev, TypeOf lg ~ Type) => ToJSON (Defn lg ev) where
+instance TypeOf lg ~ Type => ToJSON (Defn lg) where
   toJSON = $(mkToJSON defaultOptions ''Defn)
-instance (ToJSON ev, TypeOf lg ~ Type) => ToJSON (Expr lg ev) where
+instance TypeOf lg ~ Type => ToJSON (Expr lg) where
   toJSON = $(mkToJSON defaultOptions ''Expr)

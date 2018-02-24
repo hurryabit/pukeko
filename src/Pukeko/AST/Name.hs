@@ -8,6 +8,7 @@ module Pukeko.AST.Name
   , DCon
   , TCon
   , Clss
+  , NameEVar
   , NameTVar
   , type (?:>)
   , Super (..)
@@ -58,6 +59,7 @@ type TCon = 'TCon
 type Clss = 'TCon
 
 -- Saves us a few spaces, but more importantly tons of parentheses.
+type NameEVar = Name EVar
 type NameTVar = Name TVar
 
 data Super s = Any | Only s

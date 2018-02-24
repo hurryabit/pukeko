@@ -19,7 +19,7 @@ module Pukeko.FrontEnd.Inferencer.UType
   , unUTApp
   , open
   , open1
-  , subst
+  , substUType
   , prettyUVar
   , prettyUType
   )
@@ -121,8 +121,8 @@ open1 = \case
     where
       utvar = UTVar . _qvar2tvar . (Vec.fromList (toList xs) Vec.!)
 
-subst :: Map (Name TVar) (UType s) -> UType s -> ST s (UType s)
-subst env = go
+substUType :: Map (Name TVar) (UType s) -> UType s -> ST s (UType s)
+substUType env = go
   where
     go t0 = case t0 of
       UTVar x -> pure (env Map.! x)

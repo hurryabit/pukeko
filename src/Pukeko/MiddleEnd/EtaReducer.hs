@@ -15,7 +15,7 @@ import           Pukeko.AST.Type
 reduceModule :: Module -> Module
 reduceModule = over (mod2supcs . traverse) erSupCDecl
 
-_EVar :: Expr ev -> Maybe ev
+_EVar :: Expr -> Maybe (Name EVar)
 _EVar = \case
   EVar x -> Just x
   _      -> Nothing
@@ -31,16 +31,14 @@ erSupCDecl = \case
     case e0 of
       -- Reduce expression parameters:
       EApp{}
-        | (traverse strengthenScope -> Just e1, traverse _EVar -> Just xs1) <-
-            unwindEApp e0
-        , length bs0 == length xs1
-        , iall (\i -> scope absurd (== i)) xs1 ->
-          erSupCDecl (SupCDecl z tz vs0 [] (weakenE e1))
+        | (e1, traverse _EVar -> Just xs1) <- unwindEApp e0
+        , nullOf freeEVar e1
+        , map nameOf bs0 == xs1 ->
+          erSupCDecl (SupCDecl z tz vs0 [] e1)
       -- Reduce type paramaters:
-      ETyApp
-        (traverse strengthenScope -> Just e1)
-        (traverse _TVar -> Just vs1)
-        | null bs0
+      ETyApp e1 (traverse _TVar -> Just vs1)
+        | nullOf freeEVar e1
+        , null bs0
           -- FIXME: The condition below /should/ check whether there are type
           -- variables which are ultimately free in @e1@. However, it's actually
           -- checking for types which contain free type variables. This is more
@@ -50,7 +48,7 @@ erSupCDecl = \case
         , nullOf (expr2type . traverse) e1
         , length vs0 == length vs1
         , map _qvar2tvar vs0 == toList vs1 ->
-          SupCDecl z tz [] [] (fmap weakenScope e1)
+          SupCDecl z tz [] [] e1
       -- Promote type abstraction when the super combinator doesn't contain any
       -- abstractions itself:
       ETyAbs vs1 e1

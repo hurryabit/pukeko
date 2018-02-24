@@ -19,23 +19,21 @@ import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 
-type IsEVar ev = (HasEnv ev)
-
-type TC ev = EffGamma ev [Reader ModuleInfo, Reader SourcePos, Error Failure]
+type TC = EffGamma [Reader ModuleInfo, Reader SourcePos, Error Failure]
 
 class HasModuleInfo m => TypeCheckable m where
-  checkModule :: m -> TC Void ()
+  checkModule :: m -> TC ()
 
 check :: (Member (Error Failure) effs, TypeCheckable m) => m -> Eff effs ()
 check m0 = either throwError pure .
   run . runError . runReader noPos . runInfo m0 . runGamma $ checkModule m0
 
-checkCoercion :: Coercion -> Type -> Type -> TC ev ()
+checkCoercion :: Coercion -> Type -> Type -> TC ()
 checkCoercion (MkCoercion _dir _tcon) _from _to =
   -- FIXME: Implement the actual check.
   pure ()
 
-typeOf :: (IsTyped lg, IsEVar ev) => Expr lg ev -> TC ev Type
+typeOf :: IsTyped lg => Expr lg -> TC Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
@@ -46,14 +44,14 @@ typeOf = \case
       TFun tx ty -> checkExpr arg tx $> ty
       TUni{}     -> throwHere "expected type argument, but found value argument"
       _          -> throwHere "unexpected value argument"
-  ELam (MkBind _ t_param) body -> do
-    t_body <- withinEScope1 id t_param (typeOf body)
+  ELam (MkBind x t_param) body -> do
+    t_body <- withinEScope1 x t_param (typeOf body)
     pure (t_param ~> t_body)
   ELet ds e0 -> do
     traverse_ checkDefn ds
-    withinEScope' (_bind2type . _defn2bind) ds (typeOf e0)
+    withinEScope (map (unBind . _defn2bind) ds) (typeOf e0)
   ERec ds e0 -> do
-    withinEScope' (_bind2type . _defn2bind) ds $ do
+    withinEScope (map (unBind . _defn2bind) ds) $ do
       traverse_ checkDefn ds
       typeOf e0
   EMat e0 (a1 :| as) -> do
@@ -86,10 +84,10 @@ typeOf = \case
       _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
 
-satisfiesCstrs :: Type -> QVar -> TC ev ()
+satisfiesCstrs :: Type -> QVar -> TC ()
 satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
 
-satisfiesCstr :: Type -> Name Clss -> TC ev ()
+satisfiesCstr :: Type -> Name Clss -> TC ()
 satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
   let throwNoInst =
         throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
@@ -102,17 +100,16 @@ satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
           sequence_ (zipWithExact satisfiesCstrs targs (SysF._inst2qvars inst))
     TVar v
       | null targs -> do
-          qual <- lookupQual v
+          qual <- lookupTVar v
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
-typeOfAltn :: (IsTyped lg, IsEVar ev) => Type -> Altn lg ev -> TC ev Type
+typeOfAltn :: IsTyped lg => Type -> Altn lg -> TC Type
 typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
-  withinEScope id env (typeOf e)
+  withinEScope (Map.toList env) (typeOf e)
 
-patnEnvLevel :: forall lg ev. TypeOf lg ~ Type =>
-  Patn lg -> Type -> TC ev (EnvLevelOf (Name EVar) Type)
+patnEnvLevel :: TypeOf lg ~ Type => Patn lg -> Type -> TC (Map NameEVar Type)
 patnEnvLevel p t0 = case p of
   PWld -> pure Map.empty
   PVar x -> pure (Map.singleton x t0)
@@ -133,15 +130,15 @@ patnEnvLevel p t0 = case p of
     Map.unions <$> zipWithM patnEnvLevel ps t_ps
   PSimple c ts1 bs -> patnEnvLevel @Typed (PCon c ts1 (map (maybe PWld PVar) bs)) t0
 
-match :: Type -> Type -> TC ev ()
+match :: Type -> Type -> TC ()
 match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-checkExpr :: (IsTyped lg, IsEVar ev) => Expr lg ev -> Type -> TC ev ()
+checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
 
-checkDefn :: (IsTyped lg, IsEVar ev) => Defn lg ev -> TC ev ()
+checkDefn :: IsTyped lg => Defn lg -> TC ()
 checkDefn (MkDefn (MkBind _ t) e) = checkExpr e t
 
 instance IsTyped st => TypeCheckable (SysF.Module st) where
@@ -167,6 +164,6 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
     for_ supcs $ \(Core.SupCDecl z t_decl qvs bs e0) -> do
-        t0 <- withQVars qvs (withinEScope' _bind2type bs (typeOf e0))
+        t0 <- withQVars qvs $ withinEScope (map unBind bs) $ typeOf e0
         match (vacuous t_decl) (mkTUni qvs (fmap _bind2type bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

@@ -33,7 +33,7 @@ data FuncDecl lg tv = MkFuncDecl
     -- ^ Before type inference, this is 'TArr' and hence bogus. Since 'TArr'
     -- doesn't have kind '*', it will never be there after type inference. This
     -- allows for finding out if we are before or after type inference.
-  , _func2body :: Expr lg Void
+  , _func2body :: Expr lg
   }
 
 -- | Declaration of an external function.
