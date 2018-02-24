@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Language
-import           Pukeko.AST.Expr hiding (Defn, Expr, Altn)
+import           Pukeko.AST.Expr hiding (Bind, Expr, Altn)
 import qualified Pukeko.AST.Expr as Expr
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
@@ -45,7 +45,7 @@ data Module = MkModule
   , _mod2supcs :: Map (Name EVar) (FuncDecl (Only SupC))
   }
 
-type Defn = Expr.Defn SuperCore
+type Bind = Expr.Bind SuperCore
 type Expr = Expr.Expr SuperCore
 type Altn = Expr.Altn SuperCore
 

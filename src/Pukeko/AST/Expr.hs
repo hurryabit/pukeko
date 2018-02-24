@@ -4,9 +4,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.Expr
   ( Expr (..)
-  , EVarBinder
   , Atom (..)
-  , Defn (..)
+  , EVarBinder
+  , Bind (..)
   , Altn (..)
   , Patn (..)
 
@@ -14,8 +14,8 @@ module Pukeko.AST.Expr
   , pattern ECon
   , pattern ENum
 
-  , defn2bind
-  , defn2expr
+  , b2binder
+  , b2bound
   , altn2patn
   , altn2expr
 
@@ -44,17 +44,17 @@ import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 
-data Defn lg = MkDefn
-  { _defn2bind :: EVarBinder (TypeOf lg)
-  , _defn2expr :: Expr lg
-  }
-
 data Atom
   = AVal (Name EVar)
   | ACon (Name DCon)
   | ANum Int
 
 type EVarBinder ty = (NameEVar, ty)
+
+data Bind lg = MkBind
+  { _b2binder :: EVarBinder (TypeOf lg)
+  , _b2bound  :: Expr lg
+  }
 
 -- NOTE: All constructors added here also NEED TO be added to the COMPLETE
 -- pragma below.
@@ -64,8 +64,8 @@ data Expr lg
   |                         EAtm Atom
   |                         EApp (Expr lg) (Expr lg)
   | IsLambda lg ~ True   => ELam (EVarBinder (TypeOf lg)) (Expr lg)
-  |                         ELet [Defn lg] (Expr lg)
-  |                         ERec [Defn lg] (Expr lg)
+  |                         ELet [Bind lg] (Expr lg)
+  |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ETyCoe Coercion (Expr lg)
   | TypeOf lg ~ Type     => ETyAbs (NonEmpty TVarBinder) (Expr lg)
@@ -99,12 +99,11 @@ pattern ENum n = EAtm (ANum n)
 -- * Derived optics
 makeLenses ''Altn
 makePrisms ''Atom
-makeLensesFor [("_defn2bind", "defn2bind")] ''Defn
+makeLensesFor [("_b2binder", "b2binder")] ''Bind
 
 -- NOTE: The generated lens would not be polymorphic in @lg@.
-defn2expr :: (TypeOf lg1 ~ TypeOf lg2) =>
-  Lens (Defn lg1) (Defn lg2) (Expr lg1) (Expr lg2)
-defn2expr f (MkDefn b e) = MkDefn b <$> f e
+b2bound :: (TypeOf lg1 ~ TypeOf lg2) => Lens (Bind lg1) (Bind lg2) (Expr lg1) (Expr lg2)
+b2bound f (MkBind b e) = MkBind b <$> f e
 
 -- * Smart constructors
 
@@ -147,17 +146,17 @@ mkETyAbs qvs0 e0 = case qvs0 of
 
 -- * Instances
 
-type instance NameSpaceOf (Defn lg) = EVar
-instance HasName (Defn lg) where nameOf = nameOf . _defn2bind
-instance HasPos  (Defn lg) where getPos = getPos . nameOf
+type instance NameSpaceOf (Bind lg) = EVar
+instance HasName (Bind lg) where nameOf = nameOf . _b2binder
+instance HasPos  (Bind lg) where getPos = getPos . nameOf
 
 
 -- * Pretty printing
-instance TypeOf st ~ Type => Pretty (Defn st) where
-  pretty (MkDefn (z, t) e) =
+instance TypeOf st ~ Type => Pretty (Bind st) where
+  pretty (MkBind (z, t) e) =
     hang (pretty (z ::: t) <+> "=") 2 (prettyPrec 0 e)
 
-prettyDefns :: TypeOf st ~ Type => Bool -> [Defn st] -> Doc ann
+prettyDefns :: TypeOf st ~ Type => Bool -> [Bind st] -> Doc ann
 prettyDefns isrec ds = case ds of
     [] -> impossible  -- maintained invariant
     d0:ds ->
@@ -269,7 +268,7 @@ instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
         <+> prettyAtType (prettyPrec 3) ts
         <+> hsep (map (maybe "_" pretty) bs)
 
-deriving instance TypeOf lg ~ Type => Show (Defn lg)
+deriving instance TypeOf lg ~ Type => Show (Bind lg)
 deriving instance TypeOf lg ~ Type => Show (Expr lg)
 deriving instance TypeOf lg ~ Type => Show (Altn lg)
 deriving instance                     Show  Atom
@@ -281,7 +280,7 @@ instance TypeOf lg ~ Type => ToJSON (Patn lg) where
   toJSON = $(mkToJSON defaultOptions ''Patn)
 instance TypeOf lg ~ Type => ToJSON (Altn lg) where
   toJSON = $(mkToJSON defaultOptions ''Altn)
-instance TypeOf lg ~ Type => ToJSON (Defn lg) where
-  toJSON = $(mkToJSON defaultOptions ''Defn)
+instance TypeOf lg ~ Type => ToJSON (Bind lg) where
+  toJSON = $(mkToJSON defaultOptions ''Bind)
 instance TypeOf lg ~ Type => ToJSON (Expr lg) where
   toJSON = $(mkToJSON defaultOptions ''Expr)

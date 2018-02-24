@@ -62,7 +62,7 @@ module Pukeko.MiddleEnd.Inliner where
 --               let (as0, as1) = splitAt n as
 --               let tsV = Vec.fromList ts
 --               let defns = zipWith
---                           (MkDefn . over bind2type (instantiate' (tsV Vec.!)))
+--                           (Bind . over bind2type (instantiate' (tsV Vec.!)))
 --                           xs as0
 --               let e2 :: Expr (TScope Int tv) (EScope Int ev)
 --                   e2 = bimap (over _Free absurd) (over _Free absurd) e1
@@ -88,8 +88,8 @@ module Pukeko.MiddleEnd.Inliner where
 --   ENum n     -> pure (ENum n)
 --   EApp e  a  -> EApp <$> inExpr e <*> inExpr a
 --   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
---   ELet ds t  -> ELet <$> (traverse . defn2expr) inExpr ds <*> inExpr t
---   ERec ds t  -> ERec <$> (traverse . defn2expr) inExpr ds <*> inExpr t
+--   ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
+--   ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t
 --   ETyCoe d e -> ETyCoe d <$> inExpr e
 --   ETyAbs x e -> ETyAbs x <$> inExpr e
 --   ETyApp{}   -> inRedex e0

@@ -17,7 +17,7 @@ module Pukeko.AST.Surface
   , TypeScheme (..)
   , CoercionDir (..)
   , Coercion (..)
-  , Defn (..)
+  , Bind (..)
   , Expr (..)
   , Altn (..)
   , Patn (..)
@@ -62,7 +62,7 @@ data Decl
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
-  | DDefn (Defn (LctdName EVar))
+  | DDefn (Bind (LctdName EVar))
   | DExtn ExtnDecl
   | DInfx InfxDecl
 
@@ -94,7 +94,7 @@ data InstDecl = MkInstDecl
   , _inst2atom  :: TypeAtom
   , _inst2tvars :: [LctdName TVar]
   , _inst2cstr  :: TypeCstr
-  , _inst2defns :: [Defn (LctdName EVar)]
+  , _inst2defns :: [Bind (LctdName EVar)]
   }
 
 data ExtnDecl = MkExtnDecl
@@ -125,7 +125,7 @@ data CoercionDir = Inject | Project
 
 data Coercion = MkCoercion CoercionDir (LctdName TCon)
 
-data Defn v = MkDefn (LctdName EVar) (Expr v)
+data Bind v = MkBind (LctdName EVar) (Expr v)
 
 data Expr v
   = ELoc (Lctd (Expr v))
@@ -136,8 +136,8 @@ data Expr v
   | EOpp Op.Binary (Expr v) (Expr v)
   | EMat (Expr v) [Altn v]
   | ELam (NonEmpty (LctdName EVar)) (Expr v)
-  | ELet (NonEmpty (Defn v)) (Expr v)
-  | ERec (NonEmpty (Defn v)) (Expr v)
+  | ELet (NonEmpty (Bind v)) (Expr v)
+  | ERec (NonEmpty (Bind v)) (Expr v)
   | ECoe Coercion (Expr v)
 
 data Altn v = MkAltn Patn (Expr v)
@@ -193,7 +193,7 @@ deriving instance Show TypeCstr
 deriving instance Show TypeScheme
 deriving instance Show CoercionDir
 deriving instance Show Coercion
-deriving instance Show v => Show (Defn v)
+deriving instance Show v => Show (Bind v)
 deriving instance Show v => Show (Expr v)
 deriving instance Show v => Show (Altn v)
 deriving instance Show Patn

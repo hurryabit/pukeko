@@ -51,11 +51,11 @@ typeOf = \case
     t_body <- withinEScope1 binder (typeOf body)
     pure (snd binder ~> t_body)
   ELet ds e0 -> do
-    traverse_ checkDefn ds
-    withinEScope (map _defn2bind ds) (typeOf e0)
+    traverse_ checkBind ds
+    withinEScope (map _b2binder ds) (typeOf e0)
   ERec ds e0 -> do
-    withinEScope (map _defn2bind ds) $ do
-      traverse_ checkDefn ds
+    withinEScope (map _b2binder ds) $ do
+      traverse_ checkBind ds
       typeOf e0
   EMat e0 (a1 :| as) -> do
     t0 <- typeOf e0
@@ -141,8 +141,8 @@ match t0 t1 =
 checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
 
-checkDefn :: IsTyped lg => Defn lg -> TC ()
-checkDefn (MkDefn (_, t) e) = checkExpr e t
+checkBind :: IsTyped lg => Bind lg -> TC ()
+checkBind (MkBind (_, t) e) = checkExpr e t
 
 instance IsTyped st => TypeCheckable (SysF.Module st) where
   checkModule (SysF.MkModule decls) = for_ decls $ \case

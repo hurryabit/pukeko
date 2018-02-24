@@ -217,8 +217,8 @@ apatn = symbol "_" *> pure PWld   <|>
         PCon <$> dcon <*> pure [] <|>
         parens patn
 
-defn :: Parser (Defn (LctdName EVar))
-defn = indented evar $ \z -> MkDefn z <$> (mkLam <$> many evar <*> (equals *> expr))
+bind :: Parser (Bind (LctdName EVar))
+bind = indented evar $ \z -> MkBind z <$> (mkLam <$> many evar <*> (equals *> expr))
 
 exprMatch :: Parser (Expr (LctdName EVar))
 exprMatch = do
@@ -240,12 +240,12 @@ altn :: Parser (Altn (LctdName EVar))
 altn = indented_ bar (MkAltn <$> patn <*> (arrow *> expr))
 
 let_ ::
-  (NonEmpty (Defn (LctdName EVar)) -> a) ->
-  (NonEmpty (Defn (LctdName EVar)) -> a) ->
+  (NonEmpty (Bind (LctdName EVar)) -> a) ->
+  (NonEmpty (Bind (LctdName EVar)) -> a) ->
   Parser a
 let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
-  <*> NE.sepBy1 defn (reserved "and")
+  <*> NE.sepBy1 bind (reserved "and")
 
 coercion :: Parser Coercion
 coercion =
@@ -319,7 +319,7 @@ instDecl = do
   c       <- clss
   (t, vs) <- (,) <$> typeAtom <*> pure [] <|>
              parens ((,) <$> typeAtom <*> many tvar)
-  ds      <- reserved "where" *> aligned (many defn)
+  ds      <- reserved "where" *> aligned (many bind)
   pure (MkInstDecl c t vs q ds)
 
 extnDecl :: Parser ExtnDecl
@@ -345,7 +345,7 @@ module_ file = do
     , DInst <$> indented_ (reserved "instance") instDecl
     , DExtn <$> indented_ (reserved "external") extnDecl
     , DSign <$> signDecl <?> "function declaration"
-    , DDefn <$> defn <?> "function definition"
+    , DDefn <$> bind <?> "function definition"
     , DInfx <$> indented_ (reserved "infix") infxDecl
     ]
   pure (MkModule file imps decls)

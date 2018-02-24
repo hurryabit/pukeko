@@ -43,8 +43,8 @@ ccExtnDecl (In.ExtnDecl z _ s) = do
     modify (Map.insert z n)
     pure (Asm n)
 
-ccDefn :: In.Defn -> CC Defn
-ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
+ccDefn :: In.Bind -> CC Defn
+ccDefn (In.MkBind b t) = MkDefn (bindName b) <$> ccExpr t
 
 ccExpr :: In.Expr -> CC Expr
 ccExpr = \case

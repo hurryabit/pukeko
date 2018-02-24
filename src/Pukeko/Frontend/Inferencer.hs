@@ -142,21 +142,21 @@ inferPatn patn t_expr = case patn of
     pure (PCon dcon (toList t_params) ps1, Map.unions binds)
 
 inferLet :: forall s effs.
-  CanInfer s effs => Defn In -> Eff effs (Defn (Aux s), UType s, Cstrs s)
-inferLet (MkDefn l0 r0) = do
+  CanInfer s effs => Bind In -> Eff effs (Bind (Aux s), UType s, Cstrs s)
+inferLet (MkBind l0 r0) = do
   (r1, t1, cstrs1) <- withinTScope @s (infer r0)
   (t2, vs2) <- generalize t1
   MkSplitCstrs rs1 ds1 <- splitCstrs cstrs1
   let rs2 = Map.unionWith (<>) rs1 (Map.fromSet (const Set.empty) vs2)
   let t3 = mkUTUni (Map.toList rs2) t2
-  pure (MkDefn (l0 & _2 .~ t3) r1, t3, ds1)
+  pure (MkBind (l0 & _2 .~ t3) r1, t3, ds1)
 
 -- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
 -- have the same length as the input list.
 inferRec :: forall s effs. CanInfer s effs =>
-  [Defn In] -> Eff effs ([Defn (Aux s)], [UType s], Cstrs s)
+  [Bind In] -> Eff effs ([Bind (Aux s)], [UType s], Cstrs s)
 inferRec defns0 = do
-  let (ls0, rs0) = unzip (map (\(MkDefn (l, NoType) r) -> (l, r)) defns0)
+  let (ls0, rs0) = unzip (map (\(MkBind (l, NoType) r) -> (l, r)) defns0)
   (rs1, ts1, cstrs1) <- withinTScope @s $ do
     us <- traverse (const freshUVar) ls0
     (rs1, ts1, cstrs1) <-
@@ -173,7 +173,7 @@ inferRec defns0 = do
         | x `Set.member` Set.fromList ls0 = mkETyApp (EVar x) vs3
         | otherwise                       = EVar x
   let rs2 = map (subst addETyApp) rs1
-  let defns1 = zipWith3 (\l0 t3 r2 -> MkDefn (l0, t3) r2) ls0 ts3 rs2
+  let defns1 = zipWith3 (\l0 t3 r2 -> MkBind (l0, t3) r2) ls0 ts3 rs2
   pure (defns1, ts3, cstrs_def)
 
 infer :: forall s effs. CanInfer s effs =>
@@ -306,13 +306,13 @@ qualType = \case
       ULink t -> qualType t
       UFree{} -> impossible  -- all unification variables have been generalized
 
-qualDefn :: Defn (Aux s) -> TQ s (Defn Out)
-qualDefn (MkDefn (x, t0) e0) = case t0 of
+qualDefn :: Bind (Aux s) -> TQ s (Bind Out)
+qualDefn (MkBind (x, t0) e0) = case t0 of
   UTUni (toList -> qvs) t1 -> localizeTQ qvs $ do
     t2  <- mkTUni qvs <$> qualType t1
     e2  <- mkETyAbs qvs <$> qualExpr e0
-    pure (MkDefn (x, t2) e2)
-  _ -> MkDefn <$> ((x,) <$> qualType t0) <*> qualExpr e0
+    pure (MkBind (x, t2) e2)
+  _ -> MkBind <$> ((x,) <$> qualType t0) <*> qualExpr e0
 
 qualExpr :: Expr (Aux s) -> TQ s (Expr Out)
 qualExpr = \case
@@ -339,7 +339,7 @@ qualPatn = \case
 
 qualFuncDecl :: FuncDecl (Aux s) tv -> TQ s (FuncDecl Out tv)
 qualFuncDecl (MkFuncDecl name type0 body0) = do
-  MkDefn (_, type1) body1 <- qualDefn (MkDefn (name, type0) body0)
+  MkBind (_, type1) body1 <- qualDefn (MkBind (name, type0) body0)
   pure (MkFuncDecl name type1 body1)
 
 qualDecl :: Decl (Aux s) -> TQ s (Decl Out)

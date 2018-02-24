@@ -134,7 +134,7 @@ elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ _ tatom qvs defns
     let (MkFuncDecl name0 typ_ body) =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
     name1 <- copyName (getPos inst) name0
-    pure (MkDefn (name1, typ_) body)
+    pure (MkBind (name1, typ_) body)
   let e_dcon = mkETyApp (ECon dcon) [t_inst]
   let e_body = foldl EApp e_dcon (map (EVar . nameOf) defns1)
   let e_let :: Expr In
@@ -201,8 +201,8 @@ elimETyAbs qvs0 e0 = do
     let qvs1 = fmap (_2 .~ Set.empty) qvs0
     pure (ETyAbs qvs1 (mkELam dictBinders t1 e1), mkTUni (toList qvs0) t1)
 
-elimDefn :: Defn In -> CE (Defn Out)
-elimDefn = defn2expr (fmap fst . elimExpr)
+elimDefn :: Bind In -> CE (Bind Out)
+elimDefn = b2bound (fmap fst . elimExpr)
 
 -- TODO: Figure out if we can remove the 'Type' component from the result.
 -- Adding type annotations is perhaps a better way to solve this problem.
@@ -222,10 +222,10 @@ elimExpr = \case
     pure (ELam binder body1, snd binder ~> t_body)
   ELet ds0 e0 -> do
     ds1 <- traverse elimDefn ds0
-    (e1, t1) <- withinEScope (map _defn2bind ds1) (elimExpr e0)
+    (e1, t1) <- withinEScope (map _b2binder ds1) (elimExpr e0)
     pure (ELet ds1 e1, t1)
   ERec ds0 e0 -> do
-    withinEScope (map _defn2bind ds0) $ do
+    withinEScope (map _b2binder ds0) $ do
       ds1 <- traverse elimDefn ds0
       (e1, t1) <- elimExpr e0
       pure (ERec ds1 e1, t1)

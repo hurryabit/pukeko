@@ -25,10 +25,10 @@ subst' f = go Set.empty
       EAtm a      -> pure (EAtm a)
       EApp e  a   -> EApp <$> go bound e <*> go bound a
       ELam b  e   -> ELam b <$> go (Set.insert (nameOf b) bound) e
-      ELet ds e   -> ELet <$> (traverse . defn2expr) (go bound ) ds <*> go bound' e
-        where bound' = bound <> setOf (traverse . defn2bind . to nameOf) ds
-      ERec ds e   -> ERec <$> (traverse . defn2expr) (go bound') ds <*> go bound' e
-        where bound' = bound <> setOf (traverse . defn2bind . to nameOf) ds
+      ELet ds e   -> ELet <$> (traverse . b2bound) (go bound ) ds <*> go bound' e
+        where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
+      ERec ds e   -> ERec <$> (traverse . b2bound) (go bound') ds <*> go bound' e
+        where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
       ETyCoe c  e -> ETyCoe c <$> go bound e
       ETyAbs qv e -> ETyAbs qv <$> go bound e
@@ -57,17 +57,13 @@ patnEVar f = \case
 --     EAtm a       -> EAtm a
 --     EApp e  a    -> EApp (e >>= f) (a >>= f)
 --     ELam b  e    -> ELam b (e >>>= f)
---     ELet ds t    -> ELet (over (traverse . defn2expr) (>>=  f) ds) (t >>>= f)
---     ERec ds t    -> ERec (over (traverse . defn2expr) (>>>= f) ds) (t >>>= f)
+--     ELet ds t    -> ELet (over (traverse . b2bound) (>>=  f) ds) (t >>>= f)
+--     ERec ds t    -> ERec (over (traverse . b2bound) (>>>= f) ds) (t >>>= f)
 --     EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
 --     ETyCoe c e   -> ETyCoe c (e >>= f)
 --     ETyAbs _ _   -> error "FIXME: THIS IS NOT IMPLEMENTED"
 --     ETyApp e t   -> ETyApp (e >>= f) t
 --     ETyAnn t e   -> ETyAnn t (e >>= f)
-
--- | Traverse over all the atoms on the RHS of a definition.
-defn2atom :: Traversal' (Defn lg) Atom
-defn2atom f (MkDefn b e) = MkDefn b <$> expr2atom f e
 
 -- | Traverse over all the atoms in an expression.
 expr2atom :: Traversal' (Expr lg) Atom
@@ -77,8 +73,8 @@ expr2atom f = \case
   EAtm a       -> EAtm <$> f a
   EApp e  a    -> EApp <$> expr2atom f e <*> expr2atom f a
   ELam bs e    -> ELam bs <$> expr2atom f e
-  ELet ds t    -> ELet <$> (traverse . defn2atom) f ds <*> expr2atom f t
-  ERec ds t    -> ERec <$> (traverse . defn2atom) f ds <*> expr2atom f t
+  ELet ds t    -> ELet <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
+  ERec ds t    -> ERec <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
   ETyCoe d e   -> ETyCoe d <$> expr2atom f e
   ETyAbs x e   -> ETyAbs x <$> expr2atom f e
@@ -87,8 +83,8 @@ expr2atom f = \case
 
 -- | Traverse over all types in a definition, i.e., the type in the binder on
 -- the LHS and the types on the RHS.
-defn2type :: Traversal' (Defn lg) (TypeOf lg)
-defn2type f (MkDefn b e) = MkDefn <$> _2 f b <*> expr2type f e
+b2type :: Traversal' (Bind lg) (TypeOf lg)
+b2type f (MkBind b e) = MkBind <$> _2 f b <*> expr2type f e
 
 -- | Traverse over all types in an expression.
 expr2type :: Traversal' (Expr lg) (TypeOf lg)
@@ -98,8 +94,8 @@ expr2type f = \case
   EAtm a       -> pure (EAtm a)
   EApp e a     -> EApp <$> expr2type f e <*> expr2type f a
   ELam b e     -> ELam <$> _2 f b <*> expr2type f e
-  ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
-  ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
+  ELet ds e0   -> ELet <$> traverse (b2type f) ds <*> expr2type f e0
+  ERec ds e0   -> ERec <$> traverse (b2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
   ETyCoe c e   -> ETyCoe c <$> expr2type f e
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type f e0

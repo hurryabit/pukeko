@@ -12,7 +12,7 @@ import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Altn)
+import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Bind, Altn)
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
@@ -116,11 +116,11 @@ llExpr = \case
   EMat t  cs -> EMat <$> llExpr t <*> traverse llAltn cs
   ELet ds e0 ->
     ELet
-    <$> (traverse . defn2expr) llExpr ds
-    <*> withinEScope (map _defn2bind ds) (llExpr e0)
+    <$> (traverse . b2bound) llExpr ds
+    <*> withinEScope (map _b2binder ds) (llExpr e0)
   ERec ds e0 ->
-    withinEScope (map _defn2bind ds) $
-      ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
+    withinEScope (map _b2binder ds) $
+      ERec <$> (traverse . b2bound) llExpr ds <*> llExpr e0
   elam@ELam{}
     | (oldBinds, ETyAnn t_rhs rhs0) <- unwindELam elam -> do
         rhs1 <- withinEScope oldBinds (llExpr rhs0)

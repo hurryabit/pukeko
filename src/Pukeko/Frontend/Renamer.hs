@@ -188,23 +188,23 @@ rnExpr = \case
   Ps.ELam (toList -> bs0) e0 -> rnELam bs0 e0
   Ps.ELet (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
-          unzip (map (\(Ps.MkDefn binder expr) -> (binder, expr)) binds0)
+          unzip (map (\(Ps.MkBind binder expr) -> (binder, expr)) binds0)
     names <- traverse mkName binders0
     let env = Map.fromList (zipExact (map unlctd binders0) names)
     exprs1 <- traverse rnExpr exprs0
     let binds1 =
-          zipWithExact (\name expr -> MkDefn (name, NoType) expr) names exprs1
+          zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
     body1 <- local (env `Map.union`) (rnExpr body0)
     pure (ELet binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
-          unzip (map (\(Ps.MkDefn binder expr) -> (binder, expr)) binds0)
+          unzip (map (\(Ps.MkBind binder expr) -> (binder, expr)) binds0)
     names <- traverse mkName binders0
     let env = Map.fromList (zipExact (map unlctd binders0) names)
     local (env `Map.union`) $ do
       exprs1 <- traverse rnExpr exprs0
       let binds1 =
-            zipWithExact (\name expr -> MkDefn (name, NoType) expr) names exprs1
+            zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
       body1 <- rnExpr body0
       pure (ERec binds1 body1)
   Ps.ECoe c e -> ETyCoe <$> rnCoercion c <*> rnExpr e
@@ -256,8 +256,8 @@ rnSignDecl env preClose (Ps.MkSignDecl binder typeScheme) = do
 -- | Rename a function declaration. The filled in type is bogus. For top level
 -- functions, we have @tv = Void@. For method definitions, we have @tv = TScope
 -- Int Void@.
-rnFuncDecl :: CanRn effs => Ps.Defn (Ps.LctdName EVar) -> Eff effs (FuncDecl Out tv)
-rnFuncDecl (Ps.MkDefn binder body) = do
+rnFuncDecl :: CanRn effs => Ps.Bind (Ps.LctdName EVar) -> Eff effs (FuncDecl Out tv)
+rnFuncDecl (Ps.MkBind binder body) = do
   name0 <- lookupGlobal evarTab (is _DSign) "undeclared function" binder
   let name1 = set namePos (getPos binder) name0
   MkFuncDecl name1 NoType <$> runReader mempty (rnExpr body)
