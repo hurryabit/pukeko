@@ -1,48 +1,47 @@
 module Pukeko.MiddleEnd.Inliner where
 
--- import Pukeko.Prelude
+import Pukeko.Prelude
 
--- import qualified Data.Map    as Map
--- import qualified Data.Vector as Vec
+import qualified Data.Map    as Map
 -- import           Debug.Trace
 
--- import           Pukeko.AST.SuperCore
+import           Pukeko.AST.SuperCore
 -- import           Pukeko.AST.Expr.Optics
--- import           Pukeko.AST.Name
--- import           Pukeko.AST.Type
--- import           Pukeko.MiddleEnd.CallGraph
--- import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
+import           Pukeko.AST.Name
+import           Pukeko.AST.Type
+import           Pukeko.MiddleEnd.CallGraph
+import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
 -- import           Pukeko.Pretty
 
--- data InState = InState
---   { _inlinables :: Map (Name EVar) (FuncDecl (Only SupC))
---   }
+data InState = InState
+  { _inlinables :: Map (Name EVar) (FuncDecl (Only SupC))
+  }
 
--- type In = Eff '[State InState]
+type In = Eff '[State InState]
 
--- makeLenses ''InState
+makeLenses ''InState
 
--- makeInlinable :: FuncDecl (Only SupC) -> In ()
--- makeInlinable supc = modifying inlinables (Map.insert (nameOf supc) supc)
+makeInlinable :: FuncDecl (Only SupC) -> In ()
+makeInlinable supc = modifying inlinables (Map.insert (nameOf supc) supc)
 
--- unwind :: Expr tv ev -> (Expr tv ev, [Type tv], [Expr tv ev])
--- unwind e0 =
---   let (e1, as) = unwindEApp e0
---       (e2, ts) = goT [] e1
---   in  (e2, ts, as)
---   where
---     goT :: [[Type tv]] -> Expr tv ev -> (Expr tv ev, [Type tv])
---     goT tss = \case
---       ETyApp e ts -> goT (toList ts:tss) e
---       e           -> (e, concat tss)
+unwind :: Expr -> (Expr, [Type], [Expr])
+unwind e0 =
+  let (e1, as) = unwindEApp e0
+      (e2, ts) = goT [] e1
+  in  (e2, ts, as)
+  where
+    goT :: [[Type]] -> Expr -> (Expr, [Type])
+    goT tss = \case
+      ETyApp e ts -> goT (toList ts:tss) e
+      e           -> (e, concat tss)
 
--- -- | Replace a reference to an alias by a reference to the target of the alias.
--- inEVal :: Name EVar -> In (Expr tv ev)
--- inEVal z0 = do
---   fdecl_mb <- uses inlinables (Map.lookup z0)
---   case fdecl_mb of
---     Just (SupCDecl _z0 _t0 [] [] (EVal z1)) -> inEVal z1
---     _ -> pure (EVal z0)
+-- | Replace a reference to an alias by a reference to the target of the alias.
+inEVal :: Name EVar -> In Expr
+inEVal z0 = do
+  fdecl_mb <- uses inlinables (Map.lookup z0)
+  case fdecl_mb of
+    Just (SupCDecl _z0 _t0 [] [] (EVal z1)) -> inEVal z1
+    _ -> pure (EVal z0)
 
 -- inRedex :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
 --   Expr tv ev -> In (Expr tv ev)
@@ -78,42 +77,41 @@ module Pukeko.MiddleEnd.Inliner where
 --         _ -> trace ("NOT INLINING: " ++ render (pretty e0)) continue
 --     _ -> continue
 
--- inExpr :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
---   Expr tv ev -> In (Expr tv ev)
--- inExpr e0 = case e0 of
---   EVal{}     -> inRedex e0
---   EApp{}     -> inRedex e0
---   EVar x     -> pure (EVar x)
---   ECon c     -> pure (ECon c)
---   ENum n     -> pure (ENum n)
---   EApp e  a  -> EApp <$> inExpr e <*> inExpr a
---   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
---   ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
---   ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t
---   ETyCoe d e -> ETyCoe d <$> inExpr e
---   ETyAbs x e -> ETyAbs x <$> inExpr e
---   ETyApp{}   -> inRedex e0
---   ETyAnn t e -> ETyAnn t <$> inExpr e
+inExpr :: Expr -> In Expr
+inExpr e0 = case e0 of
+  EVal z     -> inEVal z
+  EApp e a   -> EApp <$> inExpr e <*> inExpr a
+  EVar x     -> pure (EVar x)
+  ECon c     -> pure (ECon c)
+  ENum n     -> pure (ENum n)
+  EApp e  a  -> EApp <$> inExpr e <*> inExpr a
+  EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
+  ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
+  ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t
+  ETyCoe d e -> ETyCoe d <$> inExpr e
+  ETyAbs x e -> ETyAbs x <$> inExpr e
+  ETyApp e t -> ETyApp <$> inExpr e <*> pure t
+  ETyAnn t e -> ETyAnn t <$> inExpr e
 
--- inSupCDecl :: FuncDecl (Only SupC) -> In (FuncDecl (Only SupC))
--- inSupCDecl = func2expr inExpr
+inSupCDecl :: FuncDecl (Only SupC) -> In (FuncDecl (Only SupC))
+inSupCDecl = func2expr inExpr
 
--- inSCC :: SCC (FuncDecl (Only SupC)) -> In Module
--- inSCC = \case
---   CyclicSCC supcs0 -> do
---     supcs1 <- traverse inSupCDecl supcs0
---     let supcs2 = inlineSupCDecls supcs1
---     for_ supcs2 $ \supc -> when (isJust (isLink supc)) (makeInlinable supc)
---     pure (foldMap mkFuncDecl supcs2)
---   AcyclicSCC supc0 -> do
---     supc1 <- inSupCDecl supc0
---     -- FIXME: Check if the function is actually inlinable.
---     makeInlinable supc1
---     pure (mkFuncDecl supc1)
+inSCC :: SCC (FuncDecl (Only SupC)) -> In Module
+inSCC = \case
+  CyclicSCC supcs0 -> do
+    supcs1 <- traverse inSupCDecl supcs0
+    let supcs2 = inlineSupCDecls supcs1
+    for_ supcs2 $ \supc -> when (isJust (isLink supc)) (makeInlinable supc)
+    pure (foldMap mkFuncDecl supcs2)
+  AcyclicSCC supc0 -> do
+    supc1 <- inSupCDecl supc0
+    -- FIXME: Check if the function is actually inlinable.
+    makeInlinable supc1
+    pure (mkFuncDecl supc1)
 
--- inlineModule :: Module -> Module
--- inlineModule = over mod2supcs $ \supcs0 ->
---   let sccs = scc (makeCallGraph' supcs0)
---       st0  = InState mempty
---       mod1 = run (evalState st0 (fold <$> traverse inSCC sccs))
---   in  _mod2supcs mod1
+inlineModule :: Module -> Module
+inlineModule = over mod2supcs $ \supcs0 ->
+  let sccs = scc (makeCallGraph' supcs0)
+      st0  = InState mempty
+      mod1 = run (evalState st0 (fold <$> traverse inSCC sccs))
+  in  _mod2supcs mod1
