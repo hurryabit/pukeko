@@ -6,17 +6,16 @@ module Pukeko.AST.Type
   ( IsType (..)
   , NoType (..)
   , TypeAtom (..)
+  , TVarBinder
   , GenType (..)
   , Type
-  , QVar (..)
   , CoercionDir (..)
   , Coercion (..)
   , (:::) (..)
   , pattern TArr
   , pattern TCon
-  -- , weakenT
   , closeT
-  , mkTVarsQ
+  -- , mkTVarsQ
   , mkTUni
   , gatherTUni
   , pattern TFun
@@ -24,12 +23,10 @@ module Pukeko.AST.Type
   , (*~>)
   , mkTApp
   , gatherTApp
-  , qvar2cstr
-  , qvar2tvar
   , applyConstraints
   , prettyTypeCstr
   , prettyTUni
-  , prettyQVar
+  , prettyTVarBinder
   )
   where
 
@@ -39,7 +36,6 @@ import Pukeko.Pretty
 import qualified Bound as B
 import qualified Bound.Name as B
 import qualified Bound.Var as B
-import           Control.Lens.Indexed (FunctorWithIndex)
 import           Control.Monad.Extra
 import           Control.Monad.Trans.Class (lift)
 import           Data.Aeson
@@ -63,11 +59,13 @@ data TypeAtom
   | TAInt
   | TACon (Name TCon)
 
+type TVarBinder = (NameTVar, Set NameClss)
+
 data GenType tv
   = TVar tv
   | TAtm TypeAtom
   | TApp (GenType tv) (GenType tv)
-  | TUni (NonEmpty QVar) (B.Scope (B.Name NameTVar Int) GenType tv)
+  | TUni (NonEmpty TVarBinder) (B.Scope (B.Name NameTVar Int) GenType tv)
 
 type Type = GenType (Name TVar)
 
@@ -79,14 +77,6 @@ pattern TCon tcon = TAtm (TACon tcon)
 
 pattern TFun :: GenType tv -> GenType tv -> GenType tv
 pattern TFun tx ty = TApp (TApp TArr tx) ty
-
--- | A type variable which is qualified by some (potentially empty) type class
--- constraints. Used in universal quantification in types.
-data QVar = MkQVar
-  { _qvar2cstr :: Set (Name Clss)
-    -- ^ The set of type class constraints on the type variable.
-  , _qvar2tvar :: Name TVar
-  }
 
 data CoercionDir = Inject | Project
 
@@ -104,16 +94,13 @@ B.makeBound ''GenType
 closeT :: HasCallStack => Type -> GenType Void
 closeT = maybe impossible id . B.closed
 
-mkTVarsQ :: FunctorWithIndex Int t => t QVar -> t Type
-mkTVarsQ = fmap (TVar . _qvar2tvar)
-
-mkTUni :: [QVar] -> Type -> Type
+mkTUni :: [TVarBinder] -> Type -> Type
 mkTUni qvs0 t0 = case qvs0 of
   []     -> t0
   qv:qvs -> TUni (qv :| qvs) (B.abstractName (env Map.!?) t0)
-    where env = Map.fromList (zipWithFrom (\i (MkQVar _ v) -> (v, i)) 0 qvs0)
+    where env = Map.fromList (zipWithFrom (\i (v, _) -> (v, i)) 0 qvs0)
 
-gatherTUni :: GenType tv -> ([QVar], B.Scope (B.Name NameTVar Int) GenType tv)
+gatherTUni :: GenType tv -> ([TVarBinder], B.Scope (B.Name NameTVar Int) GenType tv)
 gatherTUni = \case
   TUni qvs t1 -> (toList qvs, t1)
   t0          -> ([], lift t0)
@@ -138,13 +125,12 @@ gatherTApp = go []
 
 -- * Deep traversals
 applyConstraints :: CanThrowHere effs =>
-  [Name TVar] -> Map (Name TVar) (Set (Name Clss)) -> Eff effs [QVar]
+  [Name TVar] -> Map (Name TVar) (Set (Name Clss)) -> Eff effs [TVarBinder]
 applyConstraints binders constraints = do
   let badNames = Map.keysSet constraints `Set.difference` Set.fromList binders
   whenJust (Set.lookupMin badNames) $ \name ->
     throwHere ("constraints on unbound type variable" <:~> pretty name)
-  let qualBinder binder =
-        MkQVar (Map.findWithDefault mempty binder constraints) binder
+  let qualBinder binder = (binder, Map.findWithDefault Set.empty binder constraints)
   pure (map qualBinder binders)
 
 instance IsType NoType where
@@ -160,7 +146,7 @@ instance Eq1 GenType where
     (TApp tf1 tp1, TApp tf2 tp2) -> liftEq eq tf1 tf2 && liftEq eq tp1 tp2
     (TUni xs1 tq1, TUni xs2 tq2) ->
       length xs1 == length xs2
-      && and (NE.zipWith ((==) `on` _qvar2cstr) xs1 xs2)
+      && and (NE.zipWith ((==) `on` snd) xs1 xs2)
       && liftEq eq tq1 tq2
     (TVar{}, _) -> False
     (TAtm{}, _) -> False
@@ -193,31 +179,31 @@ instance Pretty v => PrettyPrec (GenType v) where
           (go (B.unvar (pretty . B.name) prettyVar) 0 (B.fromScope tq))
           -- (pretty (instantiateN (fmap (TVar . _qvar2tvar) qvs) tq))
 
-prettyTypeCstr :: Foldable t => t QVar -> Doc ann
+prettyTypeCstr :: Foldable t => t TVarBinder -> Doc ann
 prettyTypeCstr qvs
   | null qs   = mempty
   | otherwise = parens (hsep (punctuate "," qs)) <+> "=>"
   where
-    qs = [ pretty c <+> pretty v | MkQVar q v <- toList qvs, c <- toList q ]
+    qs = [ pretty c <+> pretty v | (v, q) <- toList qvs, c <- toList q ]
 
-prettyTUni :: Foldable t => Int -> t QVar -> Doc ann -> Doc ann
+prettyTUni :: Foldable t => Int -> t TVarBinder -> Doc ann -> Doc ann
 prettyTUni prec qvs tq =
   maybeParens (prec > 0)
-  ("∀" <> hsepMap (pretty . _qvar2tvar) qvs <> "." <+> prettyTypeCstr qvs <+> tq)
+  ("∀" <> hsepMap (pretty . fst) qvs <> "." <+> prettyTypeCstr qvs <+> tq)
 
-prettyQVar :: QVar -> Doc ann
-prettyQVar (MkQVar q v)
+prettyTVarBinder :: TVarBinder -> Doc ann
+prettyTVarBinder (v, q)
   | null q    = pretty v
   | otherwise = parens (pretty v <+> "|" <+> hsepMap pretty q)
 
 instance (Pretty a, Pretty t) => Pretty (a ::: t) where
-  pretty (x ::: t) = pretty x <+> ":" <+> pretty t
+instance (Pretty a, Pretty t) => PrettyPrec (a ::: t) where
+  prettyPrec prec (x ::: t) = maybeParens (prec > 0) (pretty x <+> ":" <+> pretty t)
 
 deriving instance Functor     GenType
 deriving instance Foldable    GenType
 deriving instance Traversable GenType
 
-deriving instance Show QVar
 deriving instance Show TypeAtom
 deriving instance Show CoercionDir
 deriving instance Show Coercion
@@ -225,41 +211,9 @@ deriving instance Show Coercion
 deriveShow1 ''GenType
 instance Show tv => Show (GenType tv) where showsPrec = showsPrec1
 
-makeLenses ''QVar
-
--- TODO: We rename types for pretty printing and only when we anticipate the
--- lexical name capture. There should be a principles approach to this in the
--- pretty printer itself.
--- renameType :: (Member NameSource effs, BaseTVar tv, Ord tv) =>
---   GenType tv -> Eff effs (GenType tv)
--- renameType t0 = do
---   let t1 = fmap Box t0
---       vs = setOf traverse t1
---       nvs = Set.fromList [Tagged [c] | c <- ['a' .. 'z']]
---             `Set.difference` Set.map (nameText . baseTVar . unBox) vs
---       -- env0 :: Map tv tv
---       env0 = Map.fromSet id vs
---       sup0 = Set.toList nvs ++ map (\n -> Tagged ('_':show n)) [1::Int ..]
---   fmap unBox <$> evalSupply sup0 (runReader env0 (go t1))
---   where
---     go :: forall tv effs. (Member NameSource effs, HasEnv tv) =>
---       GenType tv ->
---       Eff (Reader (EnvOf tv tv) : Supply (Tagged TVar String) : effs) (GenType tv)
---     go = \case
---       TVar v -> TVar <$> asks (lookupEnv v)
---       TAtm a -> pure (TAtm a)
---       TApp tf tp -> TApp <$> go tf <*> go tp
---       TUni qvs0 tq -> do
---         qvs1 <- forOf (traverse . qvar2tvar) qvs0 $ \tvar ->
---           fresh >>= mkName . Lctd (getPos tvar)
---         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
---         local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
---           TUni qvs1 <$> go tq
-
 deriving instance Eq  TypeAtom
 deriving instance Ord TypeAtom
 
-deriveToJSON defaultOptions ''QVar
 deriveToJSON defaultOptions ''TypeAtom
 deriveToJSON defaultOptions ''CoercionDir
 deriveToJSON defaultOptions ''Coercion

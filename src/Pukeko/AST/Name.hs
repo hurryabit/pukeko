@@ -110,15 +110,19 @@ type family NameSpaceOf (a :: Type) :: NameSpace
 
 type instance NameSpaceOf (Name nsp) = nsp
 type instance NameSpaceOf (Lctd a) = NameSpaceOf a
+type instance NameSpaceOf (a, b) = NameSpaceOf a
 
 class HasName a where
   nameOf :: a -> Name (NameSpaceOf a)
 
--- instance HasName (Name nsp) where
---   name = id
+instance HasName (Name nsp) where
+  nameOf = id
 
 instance HasName a => HasName (Lctd a) where
   nameOf = nameOf . unlctd
+
+instance HasName a => HasName (a, b) where
+  nameOf = nameOf . fst
 
 instance HasPos (Name name) where
   getPos = _pos

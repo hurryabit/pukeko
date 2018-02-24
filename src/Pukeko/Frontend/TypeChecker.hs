@@ -47,14 +47,14 @@ typeOf = \case
       TFun tx ty -> checkExpr arg tx $> ty
       TUni{}     -> throwHere "expected type argument, but found value argument"
       _          -> throwHere "unexpected value argument"
-  ELam (MkBind x t_param) body -> do
-    t_body <- withinEScope1 x t_param (typeOf body)
-    pure (t_param ~> t_body)
+  ELam binder body -> do
+    t_body <- withinEScope1 binder (typeOf body)
+    pure (snd binder ~> t_body)
   ELet ds e0 -> do
     traverse_ checkDefn ds
-    withinEScope (map (unBind . _defn2bind) ds) (typeOf e0)
+    withinEScope (map _defn2bind ds) (typeOf e0)
   ERec ds e0 -> do
-    withinEScope (map (unBind . _defn2bind) ds) $ do
+    withinEScope (map _defn2bind ds) $ do
       traverse_ checkDefn ds
       typeOf e0
   EMat e0 (a1 :| as) -> do
@@ -70,8 +70,9 @@ typeOf = \case
     checkCoercion c t_from t_to
     pure t_to
   ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
-  ETyAbs qvs e0 -> withQVars qvs (TUni qvs . B.abstractName (env Map.!?) <$> typeOf e0)
-    where env = Map.fromList (zipWithFrom (\i (MkQVar _ v) -> (v, i)) 0 (toList qvs))
+  ETyAbs qvs e0 ->
+    withinTScope qvs (TUni qvs . B.abstractName (env Map.!?) <$> typeOf e0)
+    where env = Map.fromList (zipWithFrom (\i (v, _) -> (v, i)) 0 (toList qvs))
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
@@ -86,8 +87,8 @@ typeOf = \case
       _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
 
-satisfiesCstrs :: Type -> QVar -> TC ()
-satisfiesCstrs t (MkQVar q _) = traverse_ (satisfiesCstr t) q
+satisfiesCstrs :: Type -> TVarBinder -> TC ()
+satisfiesCstrs t = traverse_ (satisfiesCstr t) . snd
 
 satisfiesCstr :: Type -> Name Clss -> TC ()
 satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
@@ -99,7 +100,7 @@ satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
         Nothing -> throwNoInst
         Just (SomeInstDecl inst) ->
           -- the kind checker guarantees parameter/argument arity
-          sequence_ (zipWithExact satisfiesCstrs targs (SysF._inst2qvars inst))
+          sequence_ (zipWithExact satisfiesCstrs targs (SysF._inst2params inst))
     TVar v
       | null targs -> do
           qual <- lookupTVar v
@@ -141,7 +142,7 @@ checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
 
 checkDefn :: IsTyped lg => Defn lg -> TC ()
-checkDefn (MkDefn (MkBind _ t) e) = checkExpr e t
+checkDefn (MkDefn (_, t) e) = checkExpr e t
 
 instance IsTyped st => TypeCheckable (SysF.Module st) where
   checkModule (SysF.MkModule decls) = for_ decls $ \case
@@ -151,9 +152,9 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
     SysF.DInst (SysF.MkInstDecl _ _ atom qvs ds) -> do
-      let t_inst = mkTApp (TAtm atom) (map (TVar . _qvar2tvar) qvs)
+      let t_inst = mkTApp (TAtm atom) (map (TVar . fst) qvs)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      withQVars qvs $ for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
+      withinTScope qvs $ for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
         (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
         -- TODO: There might be some lexical name capturing going on here: type
         -- variables with different IDs could still share the same lexical name.
@@ -166,6 +167,6 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
     for_ supcs $ \(Core.SupCDecl z t_decl qvs bs e0) -> do
-        t0 <- withQVars qvs $ withinEScope (map unBind bs) $ typeOf e0
-        match (vacuous t_decl) (mkTUni qvs (fmap _bind2type bs *~> t0))
+        t0 <- withinTScope qvs $ withinEScope bs $ typeOf e0
+        match (vacuous t_decl) (mkTUni qvs (fmap snd bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

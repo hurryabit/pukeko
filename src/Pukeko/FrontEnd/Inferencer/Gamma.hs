@@ -44,9 +44,9 @@ withinTScope = locally (level @s) succ
 -- TODO: It's not entirely clear to me if not changing the level is the right
 -- thing to do for future uses, particularly existential types.
 withQVars :: forall s t effs a. (CanGamma s effs, Foldable t) =>
-  t QVar -> Eff effs a -> Eff effs a
+  t TVarBinder -> Eff effs a -> Eff effs a
 withQVars qvs =
-  let env = Map.fromList (map (\(MkQVar q v) -> (v, q)) (toList qvs))
+  let env = Map.fromList (toList qvs)
   in  locally (qenv @s) (env `Map.union`)
 
 getTLevel :: forall s effs. CanGamma s effs => Eff effs Level

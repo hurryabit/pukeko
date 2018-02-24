@@ -29,6 +29,9 @@ class HasPos a where
 instance HasPos SourcePos where
   getPos = id
 
+instance HasPos a => HasPos (a, b) where
+  getPos = getPos . fst
+
 class Where f where
   where_ :: f SourcePos
   here_ :: SourcePos -> f a -> f a

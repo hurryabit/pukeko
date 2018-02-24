@@ -61,7 +61,7 @@ mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 -- > dict$Eq$List : ∀a. (Eq a) => Dict$Eq (List a)
 instDictInfo :: InstDecl st -> (Name EVar, Type)
 instDictInfo (MkInstDecl inst clss tatom qvs _) =
-    let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TAtm tatom) (mkTVarsQ qvs)))
+    let t_dict = mkTUni qvs (mkTDict clss (mkTApp (TAtm tatom) (map (TVar . fst) qvs)))
     in  (inst, t_dict)
 
 -- | Construct the dictionary data type declaration of a type class declaration.
@@ -94,17 +94,17 @@ dictTConDecl (MkClssDecl clss prm dcon mthds) =
 elimClssDecl :: ClssDecl -> CE [Decl Out]
 elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
-  let qprm = NE.singleton (MkQVar Set.empty prm)
+  let qprm = NE.singleton (prm, Set.empty)
   let prmType = TVar prm
   dictPrm <- mkName (Lctd noPos "dict")
   let sels = do
         (i, MkSignDecl z t0) <- itoList mthds
-        let t1 = mkTUni [MkQVar (Set.singleton clss) prm] t0
+        let t1 = mkTUni [(prm, Set.singleton clss)] t0
         let e_rhs = EVar z
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
         let c_one = MkAltn (PSimple dcon [prmType] c_binds) e_rhs
         let e_cas = EMat (EVar dictPrm) (c_one :| [])
-        let b_lam = MkBind dictPrm (mkTDict clss prmType)
+        let b_lam = (dictPrm, mkTDict clss prmType)
         let e_lam = ELam b_lam (ETyAnn t0 e_cas)
         let e_tyabs = ETyAbs qprm e_lam
         pure (DFunc (MkFuncDecl z t1 e_tyabs))
@@ -128,13 +128,13 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
 -- >   Dict$Traversable @List traverse
 elimInstDecl :: ClssDecl -> InstDecl In -> CE [Decl In]
 elimInstDecl (MkClssDecl _ _ dcon methods0) inst@(MkInstDecl _ _ tatom qvs defns0) = do
-  let t_inst = mkTApp (TAtm tatom) (mkTVarsQ qvs)
+  let t_inst = mkTApp (TAtm tatom) (map (TVar . fst) qvs)
   let (z_dict, t_dict) = instDictInfo inst
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
     let (MkFuncDecl name0 typ_ body) =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
     name1 <- copyName (getPos inst) name0
-    pure (MkDefn (MkBind name1 typ_) body)
+    pure (MkDefn (name1, typ_) body)
   let e_dcon = mkETyApp (ECon dcon) [t_inst]
   let e_body = foldl EApp e_dcon (map (EVar . nameOf) defns1)
   let e_let :: Expr In
@@ -174,7 +174,7 @@ elimETyApp :: Expr Out -> Type -> [Type] -> CE (Expr Out, Type)
 elimETyApp e0 t_e0 ts0 = do
     let (qvs, t_e1) = gatherTUni t_e0
     let dictBldrs = do
-          (MkQVar qual _, t1) <- toList (zip qvs ts0)
+          ((_, qual), t1) <- toList (zip qvs ts0)
           clss <- toList qual
           pure (buildDict clss t1)
     dicts <- sequence dictBldrs
@@ -190,15 +190,15 @@ dictEVar clss tvar = do
 
 -- | Enrich a type abstraction with value abstractions for type class
 -- dictionaries.
-elimETyAbs :: NonEmpty QVar -> Expr In -> CE (Expr Out, Type)
+elimETyAbs :: NonEmpty TVarBinder -> Expr In -> CE (Expr Out, Type)
 elimETyAbs qvs0 e0 = do
-    let cstrs = [ (v, clss) | MkQVar qual v <- toList qvs0, clss <- toList qual ]
+    let cstrs = [ (v, clss) | (v, qual) <- toList qvs0, clss <- toList qual ]
     (dictMap, dictBinders) <- fmap unzip . for cstrs $ \(v, clss) -> do
       x <- dictEVar clss v
-      pure (((v, clss), x), MkBind x (mkTDict clss (TVar v)))
+      pure (((v, clss), x), (x, mkTDict clss (TVar v)))
     (e1, t1) <- local (Map.unionWith impossible (Map.fromList dictMap)) $
-      withQVars qvs0 $ withinEScope (map unBind dictBinders) $ elimExpr e0
-    let qvs1 = fmap (qvar2cstr .~ Set.empty) qvs0
+      withinTScope qvs0 $ withinEScope dictBinders $ elimExpr e0
+    let qvs1 = fmap (_2 .~ Set.empty) qvs0
     pure (ETyAbs qvs1 (mkELam dictBinders t1 e1), mkTUni (toList qvs0) t1)
 
 elimDefn :: Defn In -> CE (Defn Out)
@@ -217,16 +217,15 @@ elimExpr = \case
     case t_fun of
       TFun _ t_res -> pure (EApp fun1 arg1, t_res)
       _            -> impossible  -- type checker catches overapplications
-  ELam binder@(MkBind param t_param) body0 -> do
-    (body1, t_body) <- withinEScope1 param t_param (elimExpr body0)
-    pure (ELam binder body1, t_param ~> t_body)
+  ELam binder body0 -> do
+    (body1, t_body) <- withinEScope1 binder (elimExpr body0)
+    pure (ELam binder body1, snd binder ~> t_body)
   ELet ds0 e0 -> do
     ds1 <- traverse elimDefn ds0
-    (e1, t1) <-
-      withinEScope (map (unBind . _defn2bind) ds1) (elimExpr e0)
+    (e1, t1) <- withinEScope (map _defn2bind ds1) (elimExpr e0)
     pure (ELet ds1 e1, t1)
   ERec ds0 e0 -> do
-    withinEScope (map (unBind . _defn2bind) ds0) $ do
+    withinEScope (map _defn2bind ds0) $ do
       ds1 <- traverse elimDefn ds0
       (e1, t1) <- elimExpr e0
       pure (ERec ds1 e1, t1)
@@ -263,9 +262,9 @@ unclssType = \case
   TAtm a -> TAtm a
   TApp tf tp -> TApp (unclssType tf) (unclssType tp)
   TUni qvs0 tq0 ->
-    let qvs1 = fmap (qvar2cstr .~ Set.empty) qvs0
+    let qvs1 = fmap (_2 .~ Set.empty) qvs0
         dict_prms = do
-          (i, MkQVar qual b) <- itoList qvs0
+          (i, (b, qual)) <- itoList qvs0
           let v = TVar (B.B (B.Name b i))
           clss <- toList qual
           pure (mkTDict clss v)

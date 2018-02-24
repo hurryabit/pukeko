@@ -86,9 +86,9 @@ kcVal = \case
   TUni xs t -> k (toList xs) (B.instantiate (TVar . B.name) t)
   t         -> k [] t
   where
-    k :: [QVar] -> Type -> KC n s ()
+    k :: [TVarBinder] -> Type -> KC n s ()
     k qvs t0 = do
-      let vs = map _qvar2tvar qvs
+      let vs = map fst qvs
       uvars <- traverse (const freshUVar) vs
       let env = Map.fromList (zip vs uvars)
       local (const env) (kcType Star t0)

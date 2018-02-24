@@ -4,9 +4,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.Expr
   ( Expr (..)
+  , EVarBinder
   , Atom (..)
   , Defn (..)
-  , Bind (..)
   , Altn (..)
   , Patn (..)
 
@@ -16,8 +16,6 @@ module Pukeko.AST.Expr
 
   , defn2bind
   , defn2expr
-  , bind2evar
-  , bind2type
   , altn2patn
   , altn2expr
 
@@ -28,7 +26,6 @@ module Pukeko.AST.Expr
   , mkETyAbs
   , unwindEApp
   , unwindELam
-  , unBind
 
   , prettyELam
   , prettyETyAbs
@@ -48,7 +45,7 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 
 data Defn lg = MkDefn
-  { _defn2bind :: Bind (TypeOf lg)
+  { _defn2bind :: EVarBinder (TypeOf lg)
   , _defn2expr :: Expr lg
   }
 
@@ -57,6 +54,8 @@ data Atom
   | ACon (Name DCon)
   | ANum Int
 
+type EVarBinder ty = (NameEVar, ty)
+
 -- NOTE: All constructors added here also NEED TO be added to the COMPLETE
 -- pragma below.
 data Expr lg
@@ -64,19 +63,14 @@ data Expr lg
   |                         EVar (Name EVar)
   |                         EAtm Atom
   |                         EApp (Expr lg) (Expr lg)
-  | IsLambda lg ~ True   => ELam (Bind (TypeOf lg)) (Expr lg)
+  | IsLambda lg ~ True   => ELam (EVarBinder (TypeOf lg)) (Expr lg)
   |                         ELet [Defn lg] (Expr lg)
   |                         ERec [Defn lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ETyCoe Coercion (Expr lg)
-  | TypeOf lg ~ Type     => ETyAbs (NonEmpty QVar) (Expr lg)
+  | TypeOf lg ~ Type     => ETyAbs (NonEmpty TVarBinder) (Expr lg)
   | IsPreTyped lg ~ True => ETyApp (Expr lg) (NonEmpty (TypeOf lg))
   | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg )
-
-data Bind ty = MkBind
-  { _bind2evar :: Name EVar
-  , _bind2type :: ty
-  }
 
 data Altn lg = MkAltn
   { _altn2patn :: Patn lg
@@ -105,7 +99,6 @@ pattern ENum n = EAtm (ANum n)
 -- * Derived optics
 makeLenses ''Altn
 makePrisms ''Atom
-makeLenses ''Bind
 makeLensesFor [("_defn2bind", "defn2bind")] ''Defn
 
 -- NOTE: The generated lens would not be polymorphic in @lg@.
@@ -117,15 +110,15 @@ defn2expr f (MkDefn b e) = MkDefn b <$> f e
 
 mkELam ::
   (IsLambda lg ~ True, IsPreTyped lg ~ True, TypeOf lg ~ Type) =>
-  [Bind (TypeOf lg)] -> Type -> Expr lg -> Expr lg
+  [EVarBinder (TypeOf lg)] -> Type -> Expr lg -> Expr lg
 mkELam bs0 t0 e0 = case bs0 of
   [] -> e0
   _  -> (foldr ELam (ETyAnn t0 e0) bs0)
 
-unwindELam :: (IsLambda lg ~ True) => Expr lg -> ([Bind (TypeOf lg)], Expr lg)
+unwindELam :: (IsLambda lg ~ True) => Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
 unwindELam = go []
   where
-    go :: [Bind (TypeOf lg)] -> Expr lg -> ([Bind (TypeOf lg)], Expr lg)
+    go :: [EVarBinder (TypeOf lg)] -> Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
     go params = \case
       ELam param body -> go (param:params) body
       -- NOTE: We do this only conditional on the inner expression being a
@@ -146,29 +139,23 @@ mkETyApp e0 = \case
   []    -> e0
   t1:ts -> ETyApp e0 (t1 :| ts)
 
-mkETyAbs :: TypeOf lg ~ Type => [QVar] -> Expr lg -> Expr lg
+mkETyAbs :: TypeOf lg ~ Type => [TVarBinder] -> Expr lg -> Expr lg
 mkETyAbs qvs0 e0 = case qvs0 of
   []     -> e0
   qv:qvs -> ETyAbs (qv :| qvs) e0
 
-unBind :: Bind ty -> (NameEVar, ty)
-unBind (MkBind x t) = (x, t)
-
 
 -- * Instances
 
-type instance NameSpaceOf (Bind ty) = EVar
 type instance NameSpaceOf (Defn lg) = EVar
-instance HasName (Bind ty) where nameOf = _bind2evar
 instance HasName (Defn lg) where nameOf = nameOf . _defn2bind
-instance HasPos  (Bind ty) where getPos = getPos . nameOf
 instance HasPos  (Defn lg) where getPos = getPos . nameOf
 
 
 -- * Pretty printing
 instance TypeOf st ~ Type => Pretty (Defn st) where
-  pretty (MkDefn b t) =
-    hang (pretty b <+> "=") 2 (prettyPrec 0 t)
+  pretty (MkDefn (z, t) e) =
+    hang (pretty (z ::: t) <+> "=") 2 (prettyPrec 0 e)
 
 prettyDefns :: TypeOf st ~ Type => Bool -> [Defn st] -> Doc ann
 prettyDefns isrec ds = case ds of
@@ -239,28 +226,28 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     ETyAnn _ e -> prettyPrec prec e
 
 prettyELam :: (TypeOf lg ~ Type, Foldable t) =>
-  Int -> t (Bind (TypeOf lg)) -> Expr lg -> Doc ann
+  Int -> t (EVarBinder (TypeOf lg)) -> Expr lg -> Doc ann
 prettyELam prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
-      maybeParens (prec > 0)
-      $ hang ("fun" <+> hsepMap (prettyPrec 1) bs <+> "->") 2 (pretty e)
+      maybeParens (prec > 0) $
+      hang ("fun" <+> hsepMap (prettyPrec 1 . uncurry (:::)) bs <+> "->") 2 (pretty e)
 
-prettyETyAbs :: (Foldable t) => Int -> t QVar -> Doc ann -> Doc ann
+prettyETyAbs :: (Foldable t) => Int -> t TVarBinder -> Doc ann -> Doc ann
 prettyETyAbs prec qvs d
   | null qvs   = maybeParens (prec > 0) d
   | otherwise =
       maybeParens (prec > 0)
-      $ hang ("fun" <+> prettyAtType prettyQVar qvs <+> "->") 2 d
+      $ hang ("fun" <+> prettyAtType prettyTVarBinder qvs <+> "->") 2 d
 
 prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 
-instance Pretty (Bind Type)
+-- instance Pretty (EVarBinder Type)
 
-instance PrettyPrec (Bind Type) where
-  prettyPrec prec (MkBind z t) =
-    maybeParens (prec > 0) (pretty z <+> ":" <+> pretty t)
+-- instance PrettyPrec (EVarBinder Type) where
+--   prettyPrec prec (z, t) =
+--     maybeParens (prec > 0) (pretty z <+> ":" <+> pretty t)
 
 instance TypeOf lg ~ Type => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)
@@ -287,14 +274,11 @@ deriving instance TypeOf lg ~ Type => Show (Expr lg)
 deriving instance TypeOf lg ~ Type => Show (Altn lg)
 deriving instance                     Show  Atom
 deriving instance TypeOf lg ~ Type => Show (Patn lg)
-deriving instance                                Show (Bind Type)
 
 deriveToJSON defaultOptions ''Atom
 
 instance TypeOf lg ~ Type => ToJSON (Patn lg) where
   toJSON = $(mkToJSON defaultOptions ''Patn)
-instance ToJSON (Bind Type) where
-  toJSON = $(mkToJSON defaultOptions ''Bind)
 instance TypeOf lg ~ Type => ToJSON (Altn lg) where
   toJSON = $(mkToJSON defaultOptions ''Altn)
 instance TypeOf lg ~ Type => ToJSON (Defn lg) where

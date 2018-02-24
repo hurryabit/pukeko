@@ -49,7 +49,7 @@ data UType s
   = UTVar (Name TVar)
   | UTAtm TypeAtom
   | UTApp (UType s) (UType s)
-  | UTUni (NonEmpty QVar) (UType s)
+  | UTUni (NonEmpty TVarBinder) (UType s)
   | UVar (STRef s (UVar s))
 
 pattern UTFun :: UType s -> UType s -> UType s
@@ -64,18 +64,18 @@ uvarIds = map UVarId [1 ..]
 uvarIdName :: UVarId -> Tagged TVar String
 uvarIdName (UVarId n) = Tagged ('_':show n)
 
-mkUTUni :: [QVar] -> UType s -> UType s
+mkUTUni :: [TVarBinder] -> UType s -> UType s
 mkUTUni xs0 t0 = case xs0 of
   [] -> t0
   x:xs -> UTUni (x :| xs) t0
 
 -- TODO: Follow links.
-unUTUni1 :: UType s -> ([QVar], UType s)
+unUTUni1 :: UType s -> ([TVarBinder], UType s)
 unUTUni1 = \case
   UTUni qvs t1 -> (toList qvs, t1)
   t0 -> ([], t0)
 
-unUTUni :: UType s -> ([[QVar]], UType s)
+unUTUni :: UType s -> ([[TVarBinder]], UType s)
 unUTUni = go []
   where
     go qvss = \case

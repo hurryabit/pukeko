@@ -30,7 +30,7 @@ runCC mod0 = run . evalState mempty . runInfo mod0
 name :: In.Name In.EVar -> Name
 name = MkName . untag . In.nameText
 
-bindName :: In.Bind -> Name
+bindName :: In.EVarBinder _ -> Name
 bindName = name . In.nameOf
 
 ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel

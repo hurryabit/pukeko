@@ -164,8 +164,7 @@ rnELam :: CanRn effs =>
 rnELam [] body = rnExpr body
 rnELam (name:names) body = do
   binder <- mkName name
-  ELam (MkBind binder NoType)
-    <$> local (Map.insert (unlctd name) binder) (rnELam names body)
+  ELam (binder, NoType) <$> local (Map.insert (unlctd name) binder) (rnELam names body)
 
 -- | Rename an expression.
 rnExpr :: CanRn effs => Ps.Expr (Ps.LctdName EVar) -> Eff (Env : effs) (Expr Out)
@@ -194,7 +193,7 @@ rnExpr = \case
     let env = Map.fromList (zipExact (map unlctd binders0) names)
     exprs1 <- traverse rnExpr exprs0
     let binds1 =
-          zipWithExact (\name expr -> MkDefn (MkBind name NoType) expr) names exprs1
+          zipWithExact (\name expr -> MkDefn (name, NoType) expr) names exprs1
     body1 <- local (env `Map.union`) (rnExpr body0)
     pure (ELet binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
@@ -205,7 +204,7 @@ rnExpr = \case
     local (env `Map.union`) $ do
       exprs1 <- traverse rnExpr exprs0
       let binds1 =
-            zipWithExact (\name expr -> MkDefn (MkBind name NoType) expr) names exprs1
+            zipWithExact (\name expr -> MkDefn (name, NoType) expr) names exprs1
       body1 <- rnExpr body0
       pure (ERec binds1 body1)
   Ps.ECoe c e -> ETyCoe <$> rnCoercion c <*> rnExpr e
@@ -279,7 +278,7 @@ rnClssDecl (Ps.MkClssDecl name param0 methods0) =
     dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
     param1 <- mkName param0
     let env = Map.singleton (unlctd param0) param1
-    let qvs = [MkQVar (Set.singleton clss) param1]
+    let qvs = [(param1, Set.singleton clss)]
     methods1 <- traverse (rnSignDecl env (mkTUni qvs)) methods0
     pure (MkClssDecl clss param1 dcon methods1)
 

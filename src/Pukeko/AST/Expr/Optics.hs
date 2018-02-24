@@ -24,11 +24,11 @@ subst' f = go Set.empty
         | otherwise            -> f x
       EAtm a      -> pure (EAtm a)
       EApp e  a   -> EApp <$> go bound e <*> go bound a
-      ELam b  e   -> ELam b <$> go (Set.insert (_bind2evar b) bound) e
+      ELam b  e   -> ELam b <$> go (Set.insert (nameOf b) bound) e
       ELet ds e   -> ELet <$> (traverse . defn2expr) (go bound ) ds <*> go bound' e
-        where bound' = bound <> setOf (traverse . defn2bind . bind2evar) ds
+        where bound' = bound <> setOf (traverse . defn2bind . to nameOf) ds
       ERec ds e   -> ERec <$> (traverse . defn2expr) (go bound') ds <*> go bound' e
-        where bound' = bound <> setOf (traverse . defn2bind . bind2evar) ds
+        where bound' = bound <> setOf (traverse . defn2bind . to nameOf) ds
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
       ETyCoe c  e -> ETyCoe c <$> go bound e
       ETyAbs qv e -> ETyAbs qv <$> go bound e
@@ -88,7 +88,7 @@ expr2atom f = \case
 -- | Traverse over all types in a definition, i.e., the type in the binder on
 -- the LHS and the types on the RHS.
 defn2type :: Traversal' (Defn lg) (TypeOf lg)
-defn2type f (MkDefn b e) = MkDefn <$> bind2type f b <*> expr2type f e
+defn2type f (MkDefn b e) = MkDefn <$> _2 f b <*> expr2type f e
 
 -- | Traverse over all types in an expression.
 expr2type :: Traversal' (Expr lg) (TypeOf lg)
@@ -97,7 +97,7 @@ expr2type f = \case
   EVar x       -> pure (EVar x)
   EAtm a       -> pure (EAtm a)
   EApp e a     -> EApp <$> expr2type f e <*> expr2type f a
-  ELam b e     -> ELam <$> bind2type f b <*> expr2type f e
+  ELam b e     -> ELam <$> _2 f b <*> expr2type f e
   ELet ds e0   -> ELet <$> traverse (defn2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (defn2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as

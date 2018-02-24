@@ -95,9 +95,9 @@ splitCstr t0 clss = do
       inst_mb <- lookupInfo info2insts (clss, atom)
       case inst_mb of
         Nothing -> throwNoInst
-        Just (SomeInstDecl MkInstDecl{_inst2qvars = qvs}) -> do
+        Just (SomeInstDecl MkInstDecl{_inst2params = qvs}) -> do
           let cstrs = Seq.fromList
-                [ (tp, c) | (tp, MkQVar q _) <- zipExact tps qual, c <- toList q ]
+                [ (tp, c) | (tp, (_, q)) <- zipExact tps qual, c <- toList q ]
           splitCstrs cstrs
           where qual = toList qvs
     UTApp{} -> impossible  -- we've unwound 'UTApp's
@@ -115,7 +115,7 @@ instantiate :: CanInfer s effs =>
 instantiate e0 t0 = do
   let (qvss, t1) = unUTUni t0
   (env, cstrs) <- fmap unzip . for qvss $ \qvs -> do
-    fmap unzip . for qvs $ \(MkQVar q v) -> do
+    fmap unzip . for qvs $ \(v, q) -> do
       t <- freshUVar
       pure ((v, t), Seq.fromList (map ((,) t) (toList q)))
   t2 <- sendM (substUType (Map.fromList (concat env)) t1)
@@ -147,17 +147,16 @@ inferLet (MkDefn l0 r0) = do
   (r1, t1, cstrs1) <- withinTScope @s (infer r0)
   (t2, vs2) <- generalize t1
   MkSplitCstrs rs1 ds1 <- splitCstrs cstrs1
-  let rs2 = Map.unionWith (<>) rs1 (Map.fromSet (const mempty) vs2)
-  let qvs = map (\(v, q) -> MkQVar q v) (Map.toList rs2)
-  let t3 = mkUTUni qvs t2
-  pure (MkDefn (l0 & bind2type .~ t3) r1, t3, ds1)
+  let rs2 = Map.unionWith (<>) rs1 (Map.fromSet (const Set.empty) vs2)
+  let t3 = mkUTUni (Map.toList rs2) t2
+  pure (MkDefn (l0 & _2 .~ t3) r1, t3, ds1)
 
 -- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
 -- have the same length as the input list.
 inferRec :: forall s effs. CanInfer s effs =>
   [Defn In] -> Eff effs ([Defn (Aux s)], [UType s], Cstrs s)
 inferRec defns0 = do
-  let (ls0, rs0) = unzip (map (\(MkDefn (MkBind l NoType) r) -> (l, r)) defns0)
+  let (ls0, rs0) = unzip (map (\(MkDefn (l, NoType) r) -> (l, r)) defns0)
   (rs1, ts1, cstrs1) <- withinTScope @s $ do
     us <- traverse (const freshUVar) ls0
     (rs1, ts1, cstrs1) <-
@@ -167,14 +166,14 @@ inferRec defns0 = do
   (ts2, vs2) <- second fold . unzip <$> traverse generalize ts1
   MkSplitCstrs cstrs_ret1 cstrs_def <- splitCstrs cstrs1
   let cstrs_ret2 = Map.unionWith (<>) cstrs_ret1 (Map.fromSet (const mempty) vs2)
-  let qvs = map (\(v, q) -> MkQVar q v) (Map.toList cstrs_ret2)
+  let qvs = Map.toList cstrs_ret2
   let ts3 = fmap (mkUTUni qvs) ts2
-  let vs3 = map (UTVar . _qvar2tvar) qvs
+  let vs3 = map (UTVar . fst) qvs
   let addETyApp x
         | x `Set.member` Set.fromList ls0 = mkETyApp (EVar x) vs3
         | otherwise                       = EVar x
   let rs2 = map (subst addETyApp) rs1
-  let defns1 = zipWith3 (\l0 t3 r2 -> MkDefn (MkBind l0 t3) r2) ls0 ts3 rs2
+  let defns1 = zipWith3 (\l0 t3 r2 -> MkDefn (l0, t3) r2) ls0 ts3 rs2
   pure (defns1, ts3, cstrs_def)
 
 infer :: forall s effs. CanInfer s effs =>
@@ -191,10 +190,10 @@ infer = \case
       t_res <- freshUVar
       unify t_fun (t_arg ~> t_res)
       pure (EApp fun1 arg1, t_res, cstrs_fun <> cstrs_arg)
-    ELam (MkBind param NoType) body0 -> do
+    ELam (param, NoType) body0 -> do
       t_param <- freshUVar
       (body1, t_body, cstrs) <- withinEScope1 @s param t_param (infer body0)
-      let binder = MkBind param t_param
+      let binder = (param, t_param)
       pure (ELam binder (ETyAnn t_body body1), t_param ~> t_body, cstrs)
     ELet defns0 rhs0 -> do
       (defns1, t_defns, cstrs_defns) <- unzip3 <$> traverse inferLet defns0
@@ -247,7 +246,7 @@ inferFuncDecl (MkFuncDecl name NoType e0) t_decl = do
     withQVars @s qvs (unify t0 t1)
     MkSplitCstrs rs1 ds1 <- splitCstrs cstrs1
     assertM (null ds1)  -- the renamer catches free type variables in constraints
-    for_ qvs $ \(MkQVar q0 v) -> do
+    for_ qvs $ \(v, q0) -> do
       let q1 = Map.findWithDefault mempty v rs1
       unless (q1 `Set.isSubsetOf` q0) $ do
         let clss = Set.findMin (q1 `Set.difference` q0)
@@ -269,7 +268,7 @@ inferDecl = \case
   DInst (MkInstDecl instName clss atom qvs ds0) -> do
     ds1 <- for ds0 $ \mthd -> do
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
-      let t_inst = mkTApp (TAtm atom) (map (TVar . _qvar2tvar) qvs)
+      let t_inst = mkTApp (TAtm atom) (map (TVar . fst) qvs)
       -- FIXME: renameType
       let t_decl1 = t_decl0 >>= const t_inst
       withQVars @s qvs (inferFuncDecl mthd (open t_decl1))
@@ -293,8 +292,8 @@ type TQEnv = Set NameTVar
 
 type TQ s = Eff [Reader TQEnv, Reader SourcePos, Error Failure, NameSource, ST s]
 
-localizeTQ :: Foldable t => t QVar -> TQ s a -> TQ s a
-localizeTQ qvs = local (setOf (folded . qvar2tvar) qvs <>)
+localizeTQ :: Foldable t => t TVarBinder -> TQ s a -> TQ s a
+localizeTQ qvs = local (setOf (folded . _1) qvs <>)
 
 qualType :: UType s -> TQ s Type
 qualType = \case
@@ -308,12 +307,12 @@ qualType = \case
       UFree{} -> impossible  -- all unification variables have been generalized
 
 qualDefn :: Defn (Aux s) -> TQ s (Defn Out)
-qualDefn (MkDefn (MkBind x t0) e0) = case t0 of
+qualDefn (MkDefn (x, t0) e0) = case t0 of
   UTUni (toList -> qvs) t1 -> localizeTQ qvs $ do
     t2  <- mkTUni qvs <$> qualType t1
     e2  <- mkETyAbs qvs <$> qualExpr e0
-    pure (MkDefn (MkBind x t2) e2)
-  _ -> MkDefn <$> (MkBind x <$> qualType t0) <*> qualExpr e0
+    pure (MkDefn (x, t2) e2)
+  _ -> MkDefn <$> ((x,) <$> qualType t0) <*> qualExpr e0
 
 qualExpr :: Expr (Aux s) -> TQ s (Expr Out)
 qualExpr = \case
@@ -321,7 +320,7 @@ qualExpr = \case
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   EApp fun arg -> EApp <$> qualExpr fun <*> qualExpr arg
-  ELam param body -> ELam <$> bind2type qualType param <*> qualExpr body
+  ELam param body -> ELam <$> _2 qualType param <*> qualExpr body
   ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
@@ -340,7 +339,7 @@ qualPatn = \case
 
 qualFuncDecl :: FuncDecl (Aux s) tv -> TQ s (FuncDecl Out tv)
 qualFuncDecl (MkFuncDecl name type0 body0) = do
-  MkDefn (MkBind _ type1) body1 <- qualDefn (MkDefn (MkBind name type0) body0)
+  MkDefn (_, type1) body1 <- qualDefn (MkDefn (name, type0) body0)
   pure (MkFuncDecl name type1 body1)
 
 qualDecl :: Decl (Aux s) -> TQ s (Decl Out)

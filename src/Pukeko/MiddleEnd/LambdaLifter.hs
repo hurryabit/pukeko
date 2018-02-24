@@ -12,7 +12,7 @@ import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.SystemF
-import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Altn, Bind)
+import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Defn, Altn)
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
@@ -73,22 +73,22 @@ freshEVar = do
 -- Last but not least, note that if we sort the aᵢ and yⱼ by thei de Bruijn
 -- indices in decreasing order, we create more opportunities for η-reduction,
 -- which is good for inlining.
-llELam :: NonEmpty (Bind Type) -> Type -> Expr Out -> LL (Expr Out)
+llELam :: NonEmpty (EVarBinder Type) -> Type -> Expr Out -> LL (Expr Out)
 llELam oldBinds t_rhs rhs1 = do
     let evCaptured0 = Set.toList
           (setOf freeEVar rhs1 `Set.difference` setOf (traverse . to nameOf) oldBinds)
     (evCaptured, newBinds)  <-
       fmap (unzip . map snd . sortOn fst) . for evCaptured0 $ \x -> do
         (t, i) <- lookupEVarIx x
-        bind <- MkBind <$> copyName noPos x <*> pure t
+        bind <- (, t) <$> copyName noPos x
         pure (i, (x, bind))
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
-          (setOf (traverse . bind2type . traverse) allBinds0 <> setOf traverse t_rhs)
+          (setOf (traverse . _2 . traverse) allBinds0 <> setOf traverse t_rhs)
     -- TODO: Sort type variables binders in descreasing de Bruijn index order.
     tyBinds <- for tvCaptured $ \v ->
-      MkQVar <$> lookupTVar v <*> copyName noPos v
-    let tvMap = map _qvar2tvar tyBinds
+      (,) <$> copyName noPos v <*> lookupTVar v
+    let tvMap = map fst tyBinds
                 & zipExact tvCaptured
                 & Map.fromList
     let tvRename :: NameTVar -> NameTVar
@@ -98,10 +98,10 @@ llELam oldBinds t_rhs rhs1 = do
                 & Map.fromList
     let evRename :: NameEVar -> NameEVar
         evRename x = Map.findWithDefault x x evMap
-    let allBinds1 = over (traverse . bind2type . traverse) tvRename allBinds0
+    let allBinds1 = over (traverse . _2 . traverse) tvRename allBinds0
     let rhs2 = over expr2type (fmap tvRename) (over freeEVar evRename rhs1)
     lhs <- freshEVar
-    let t_lhs = mkTUni tyBinds (map _bind2type allBinds1 *~> fmap tvRename t_rhs)
+    let t_lhs = mkTUni tyBinds (map snd allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl lhs (closeT t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @Any supc)
@@ -117,18 +117,18 @@ llExpr = \case
   ELet ds e0 ->
     ELet
     <$> (traverse . defn2expr) llExpr ds
-    <*> withinEScope (map (unBind . _defn2bind) ds) (llExpr e0)
+    <*> withinEScope (map _defn2bind ds) (llExpr e0)
   ERec ds e0 ->
-    withinEScope (map (unBind . _defn2bind) ds) $
+    withinEScope (map _defn2bind ds) $
       ERec <$> (traverse . defn2expr) llExpr ds <*> llExpr e0
   elam@ELam{}
     | (oldBinds, ETyAnn t_rhs rhs0) <- unwindELam elam -> do
-        rhs1 <- withinEScope (map unBind oldBinds) (llExpr rhs0)
+        rhs1 <- withinEScope oldBinds (llExpr rhs0)
         llELam (NE.fromList oldBinds) t_rhs rhs1
   ELam{} -> impossible  -- the type inferencer puts type anns around lambda bodies
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
-  ETyAbs qvs e0 -> ETyAbs qvs <$> withQVars qvs (llExpr e0)
+  ETyAbs qvs e0 -> ETyAbs qvs <$> withinTScope qvs (llExpr e0)
   ETyAnn c e0 -> ETyAnn c <$> llExpr e0
 
 llAltn :: Altn In -> LL (Altn Out)

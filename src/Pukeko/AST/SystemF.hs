@@ -66,7 +66,7 @@ data InstDecl lg = MkInstDecl
     -- named @dict$XZY$ABC@.
   , _inst2clss    :: Name Clss
   , _inst2atom    :: TypeAtom
-  , _inst2qvars   :: [QVar]
+  , _inst2params  :: [TVarBinder]
   , _inst2methods :: [FuncDecl lg (Name TVar)]
   }
 
@@ -148,7 +148,7 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
       "instance" <+> prettyTypeCstr qvs <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where
-        t1 = mkTApp (TAtm t0) (map (TVar . _qvar2tvar) qvs)
+        t1 = mkTApp (TAtm t0) (map (TVar . fst) qvs)
 
 instance TypeOf lg ~ Type => Pretty (Module lg) where
   pretty (MkModule decls) = vcatMap pretty decls

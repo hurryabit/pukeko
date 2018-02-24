@@ -102,7 +102,7 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
       maybe mempty (signInfo func) (isType typ_)
     SysF.DClss clssDecl@(SysF.MkClssDecl clss param _dcon mthds) ->
       let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
-            let typ1 = mkTUni [MkQVar (Set.singleton clss) param] typ0
+            let typ1 = mkTUni [(param, Set.singleton clss)] typ0
             in  signInfo mthd typ1
                 <> itemInfo info2mthds mthd (clssDecl, mthdDecl)
       in  itemInfo info2clsss clss clssDecl <> mthds_info

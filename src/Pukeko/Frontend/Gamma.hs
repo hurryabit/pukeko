@@ -3,7 +3,6 @@ module Pukeko.FrontEnd.Gamma
   , runGamma
   , withinEScope
   , withinEScope1
-  , withQVars
   , withinTScope
   , lookupEVar
   , lookupEVarIx
@@ -14,6 +13,7 @@ import Pukeko.Prelude
 
 import qualified Data.Map.Extended as Map
 
+import           Pukeko.AST.Expr (EVarBinder)
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
@@ -28,20 +28,17 @@ type CanGamma effs = Member (Reader Gamma) effs
 runGamma :: Eff (Reader Gamma : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty Map.empty)
 
-withinEScope1 :: CanGamma effs => NameEVar -> Type -> Eff effs a -> Eff effs a
-withinEScope1 x t = do
+withinEScope1 :: CanGamma effs => EVarBinder Type -> Eff effs a -> Eff effs a
+withinEScope1 (x, t) = do
   locally evars (\evs -> Map.insertWith impossible x (t, Map.size evs) evs)
 
-withinEScope :: CanGamma effs => [(NameEVar, Type)] -> Eff effs a -> Eff effs a
-withinEScope xts act = foldr (uncurry withinEScope1) act xts
+withinEScope :: CanGamma effs => [EVarBinder Type] -> Eff effs a -> Eff effs a
+withinEScope xts act = foldr withinEScope1 act xts
 
-withinTScope :: CanGamma effs => [(NameTVar, Set NameClss)] -> Eff effs a -> Eff effs a
+withinTScope :: (CanGamma effs, Foldable t) => t TVarBinder -> Eff effs a -> Eff effs a
 withinTScope qs =
   -- we try to avoid shadowing everywhere
-  locally tvars (Map.unionWith impossible (Map.fromList qs))
-
-withQVars :: (CanGamma effs, Foldable t) => t QVar -> Eff effs a -> Eff effs a
-withQVars = withinTScope . map (\(MkQVar q v) -> (v, q)) . toList
+  locally tvars (Map.unionWith impossible (Map.fromList (toList qs)))
 
 lookupEVarIx :: CanGamma effs => NameEVar -> Eff effs (Type, Int)
 lookupEVarIx x = views evars (Map.! x)

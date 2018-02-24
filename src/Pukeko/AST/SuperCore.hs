@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Language
-import           Pukeko.AST.Expr hiding (Defn, Expr, Bind, Altn)
+import           Pukeko.AST.Expr hiding (Defn, Expr, Altn)
 import qualified Pukeko.AST.Expr as Expr
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
@@ -28,8 +28,8 @@ data FuncDecl (m :: Super DeclMode)
     SupCDecl
     { _supc2name  :: Name EVar
     , _supc2type  :: GenType Void
-    , _supc2tprms :: [QVar]
-    , _supc2eprms :: [Bind]
+    , _supc2tprms :: [TVarBinder]
+    , _supc2eprms :: [EVarBinder Type]
     , _supc2expr  :: Expr
     }
   | (m ?:> Extn) =>
@@ -47,7 +47,6 @@ data Module = MkModule
 
 type Defn = Expr.Defn SuperCore
 type Expr = Expr.Expr SuperCore
-type Bind = Expr.Bind Type
 type Altn = Expr.Altn SuperCore
 
 makeLenses ''Module

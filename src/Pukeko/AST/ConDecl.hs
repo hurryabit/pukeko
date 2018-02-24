@@ -12,6 +12,7 @@ import Pukeko.Pretty
 
 import           Control.Lens (makeLensesFor)
 import           Data.Aeson.TH
+import qualified Data.Set as Set
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
@@ -35,7 +36,7 @@ typeOfDCon :: TConDecl -> DConDecl -> GenType Void
 typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
   assert (tcon == tconRef) $
   let res = mkTApp (TCon tcon) (map TVar tparams)
-  in  closeT (mkTUni (map (MkQVar mempty) tparams) (fields *~> res))
+  in  closeT (mkTUni (map (, Set.empty) tparams) (fields *~> res))
 
 type instance NameSpaceOf TConDecl = TCon
 type instance NameSpaceOf DConDecl = DCon
