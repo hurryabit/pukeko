@@ -29,13 +29,16 @@ runGamma :: Eff (Reader Gamma : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty Map.empty)
 
 withinEScope1 :: CanGamma effs => NameEVar -> Type -> Eff effs a -> Eff effs a
-withinEScope1 x t = locally evars (\evs -> Map.insert x (t, Map.size evs) evs)
+withinEScope1 x t = do
+  locally evars (\evs -> Map.insertWith impossible x (t, Map.size evs) evs)
 
 withinEScope :: CanGamma effs => [(NameEVar, Type)] -> Eff effs a -> Eff effs a
 withinEScope xts act = foldr (uncurry withinEScope1) act xts
 
 withinTScope :: CanGamma effs => [(NameTVar, Set NameClss)] -> Eff effs a -> Eff effs a
-withinTScope qs = locally tvars (Map.fromList qs <>)
+withinTScope qs =
+  -- we try to avoid shadowing everywhere
+  locally tvars (Map.unionWith impossible (Map.fromList qs))
 
 withQVars :: (CanGamma effs, Foldable t) => t QVar -> Eff effs a -> Eff effs a
 withQVars = withinTScope . map (\(MkQVar q v) -> (v, q)) . toList
