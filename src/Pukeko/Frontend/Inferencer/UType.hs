@@ -25,14 +25,14 @@ module Pukeko.FrontEnd.Inferencer.UType
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import qualified Bound as B
+import qualified Bound.Name as B
 import           Control.Monad.ST
 import           Data.STRef
 import qualified Data.Map.Extended as Map
-import qualified Data.Vector        as Vec
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type       hiding ((~>), (*~>))
-import           Pukeko.AST.Scope
 
 infixr 1 ~>
 
@@ -108,9 +108,7 @@ open1 = \case
   TVar t -> t
   TAtm a -> UTAtm a
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
-  TUni xs tq -> UTUni xs (open1 (fmap (scope id utvar) tq))
-    where
-      utvar = UTVar . _qvar2tvar . (Vec.fromList (toList xs) Vec.!)
+  TUni xs tq -> UTUni xs (open1 (B.instantiate (TVar . UTVar . B.name) tq))
 
 substUType :: Map (Name TVar) (UType s) -> UType s -> ST s (UType s)
 substUType env = go

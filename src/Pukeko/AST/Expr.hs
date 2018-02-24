@@ -32,8 +32,6 @@ module Pukeko.AST.Expr
 
   , prettyELam
   , prettyETyAbs
-
-  , module Pukeko.AST.Scope
   )
   where
 
@@ -48,7 +46,6 @@ import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.AST.Language
-import           Pukeko.AST.Scope
 
 data Defn lg = MkDefn
   { _defn2bind :: Bind (TypeOf lg)

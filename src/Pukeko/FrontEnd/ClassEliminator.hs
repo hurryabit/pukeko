@@ -4,6 +4,8 @@ module Pukeko.FrontEnd.ClassEliminator
 
 import Pukeko.Prelude
 
+import qualified Bound as B
+import qualified Bound.Name as B
 import           Data.Coerce       (coerce)
 import qualified Data.List.NE      as NE
 import qualified Data.Map.Extended as Map
@@ -176,7 +178,7 @@ elimETyApp e0 t_e0 ts0 = do
           clss <- toList qual
           pure (buildDict clss t1)
     dicts <- sequence dictBldrs
-    pure (foldl EApp (mkETyApp e0 ts0) dicts, instantiateN ts0 t_e1)
+    pure (foldl EApp (mkETyApp e0 ts0) dicts, B.instantiateName (ts0 !!) t_e1)
 
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
@@ -264,10 +266,10 @@ unclssType = \case
     let qvs1 = fmap (qvar2cstr .~ Set.empty) qvs0
         dict_prms = do
           (i, MkQVar qual b) <- itoList qvs0
-          let v = TVar (mkBound i b)
+          let v = TVar (B.B (B.Name b i))
           clss <- toList qual
           pure (mkTDict clss v)
-    in  TUni qvs1 (dict_prms *~> unclssType tq0)
+    in  TUni qvs1 (B.toScope (dict_prms *~> unclssType (B.fromScope tq0)))
 
 unclssDecl :: Decl Out -> Decl Out
 unclssDecl = \case

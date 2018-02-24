@@ -14,7 +14,7 @@ module Pukeko.AST.Type
   , (:::) (..)
   , pattern TArr
   , pattern TCon
-  , weakenT
+  -- , weakenT
   , closeT
   , mkTVarsQ
   , mkTUni
@@ -36,17 +36,22 @@ module Pukeko.AST.Type
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import qualified Bound as B
+import qualified Bound.Name as B
+import qualified Bound.Var as B
 import           Control.Lens.Indexed (FunctorWithIndex)
 import           Control.Monad.Extra
+import           Control.Monad.Trans.Class (lift)
+import           Data.Aeson
 import           Data.Aeson.TH
+import           Data.Deriving
+import           Data.Functor.Classes
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
-import           Pukeko.AST.Scope
-
-infixr 1 ~>, *~>
+import           Pukeko.Orphans ()
 
 class IsType t where
   isType :: t -> Maybe Type
@@ -62,7 +67,7 @@ data GenType tv
   = TVar tv
   | TAtm TypeAtom
   | TApp (GenType tv) (GenType tv)
-  | TUni (NonEmpty QVar) (GenType (TScope Int tv))
+  | TUni (NonEmpty QVar) (B.Scope (B.Name NameTVar Int) GenType tv)
 
 type Type = GenType (Name TVar)
 
@@ -77,8 +82,6 @@ pattern TFun tx ty = TApp (TApp TArr tx) ty
 
 -- | A type variable which is qualified by some (potentially empty) type class
 -- constraints. Used in universal quantification in types.
---
--- The set of constraints is not considered in comparison operations.
 data QVar = MkQVar
   { _qvar2cstr :: Set (Name Clss)
     -- ^ The set of type class constraints on the type variable.
@@ -96,33 +99,26 @@ data Coercion = MkCoercion
 -- the for "name : type" easier.
 data a ::: t = a ::: t
 
+B.makeBound ''GenType
+
 closeT :: HasCallStack => Type -> GenType Void
-closeT t0 = case traverse Left t0 of
-  Left  v  -> bugWith "closeT" v
-  Right t1 -> t1
-
-strengthenT0 :: GenType (TScope Int tv) -> GenType tv
-strengthenT0 = fmap strengthenScope0
-
-weakenT :: GenType tv -> GenType (TScope i tv)
-weakenT = fmap weakenScope
+closeT = maybe impossible id . B.closed
 
 mkTVarsQ :: FunctorWithIndex Int t => t QVar -> t Type
 mkTVarsQ = fmap (TVar . _qvar2tvar)
 
 mkTUni :: [QVar] -> Type -> Type
-mkTUni qvs = mkTUniN qvs . fmap (abstract (env Map.!?))
-  where env = Map.fromList (zipWithFrom (\i (MkQVar _ v) -> (v, (i, v))) 0 qvs)
+mkTUni qvs0 t0 = case qvs0 of
+  []     -> t0
+  qv:qvs -> TUni (qv :| qvs) (B.abstractName (env Map.!?) t0)
+    where env = Map.fromList (zipWithFrom (\i (MkQVar _ v) -> (v, i)) 0 qvs0)
 
-mkTUniN :: [QVar] -> GenType (TScope Int tv) -> GenType tv
-mkTUniN qvs0 t0 = case qvs0 of
-  []     -> strengthenT0 t0
-  qv:qvs -> TUni (qv :| qvs) t0
-
-gatherTUni :: GenType tv -> ([QVar], GenType (TScope Int tv))
+gatherTUni :: GenType tv -> ([QVar], B.Scope (B.Name NameTVar Int) GenType tv)
 gatherTUni = \case
   TUni qvs t1 -> (toList qvs, t1)
-  t0          -> ([], weakenT t0)
+  t0          -> ([], lift t0)
+
+infixr 1 ~>, *~>
 
 (~>) :: GenType tv -> GenType tv -> GenType tv
 (~>) = TFun
@@ -157,31 +153,21 @@ instance IsType NoType where
 instance IsType Type where
   isType = Just
 
-instance (Eq tv) => Eq (GenType tv) where
-  t1 == t2 = case (t1, t2) of
-    (TVar x1, TVar x2) -> x1 == x2
+instance Eq1 GenType where
+  liftEq eq t1 t2 = case (t1, t2) of
+    (TVar x1, TVar x2) -> x1 `eq` x2
     (TAtm a1, TAtm a2) -> a1 == a2
-    (TApp tf1 tp1, TApp tf2 tp2) -> tf1 == tf2 && tp1 == tp2
+    (TApp tf1 tp1, TApp tf2 tp2) -> liftEq eq tf1 tf2 && liftEq eq tp1 tp2
     (TUni xs1 tq1, TUni xs2 tq2) ->
       length xs1 == length xs2
       && and (NE.zipWith ((==) `on` _qvar2cstr) xs1 xs2)
-      && tq1 == tq2
+      && liftEq eq tq1 tq2
     (TVar{}, _) -> False
     (TAtm{}, _) -> False
     (TApp{}, _) -> False
     (TUni{}, _) -> False
 
-instance Applicative GenType where
-  pure = TVar
-  (<*>) = ap
-
-instance Monad GenType where
-  return = pure
-  t >>= f = case t of
-    TVar x -> f x
-    TAtm a -> TAtm a
-    TApp tf tp -> TApp (tf >>= f) (tp >>= f)
-    TUni xs tq -> TUni xs (tq >>>= f)
+instance Eq v => Eq (GenType v) where (==) = eq1
 
 instance Pretty TypeAtom where
   pretty = \case
@@ -189,21 +175,23 @@ instance Pretty TypeAtom where
     TAInt   -> "Int"
     TACon c -> pretty c
 
-instance Pretty (GenType Void) where pretty = pretty @Type . vacuous
-instance Pretty Type
+instance Pretty v => Pretty (GenType v)
 
-instance PrettyPrec (GenType Void) where
-  prettyPrec prec = prettyPrec @Type prec . vacuous
-instance PrettyPrec Type where
-  prettyPrec prec = \case
-    TVar x -> pretty x
-    TAtm a -> pretty a
-    TFun tx ty ->
-      maybeParens (prec > 1) (prettyPrec 2 tx <+> "->" <+> prettyPrec 1 ty)
-    TApp tf ta ->
-      maybeParens (prec > 2) (prettyPrec 2 tf <+> prettyPrec 3 ta)
-    TUni qvs tq ->
-      prettyTUni prec qvs (pretty (instantiateN (fmap (TVar . _qvar2tvar) qvs) tq))
+instance Pretty v => PrettyPrec (GenType v) where
+  prettyPrec = go pretty
+    where
+      go :: forall v ann. (v -> Doc ann) -> Int -> GenType v -> Doc ann
+      go prettyVar prec = \case
+        TVar x -> prettyVar x
+        TAtm a -> pretty a
+        TFun tx ty ->
+          maybeParens (prec > 1) (go prettyVar 2 tx <+> "->" <+> go prettyVar 1 ty)
+        TApp tf ta ->
+          maybeParens (prec > 2) (go prettyVar 2 tf <+> go prettyVar 3 ta)
+        TUni qvs tq ->
+          prettyTUni prec qvs
+          (go (B.unvar (pretty . B.name) prettyVar) 0 (B.fromScope tq))
+          -- (pretty (instantiateN (fmap (TVar . _qvar2tvar) qvs) tq))
 
 prettyTypeCstr :: Foldable t => t QVar -> Doc ann
 prettyTypeCstr qvs
@@ -231,9 +219,11 @@ deriving instance Traversable GenType
 
 deriving instance Show QVar
 deriving instance Show TypeAtom
-deriving instance Show tv => Show (GenType tv)
 deriving instance Show CoercionDir
 deriving instance Show Coercion
+
+deriveShow1 ''GenType
+instance Show tv => Show (GenType tv) where showsPrec = showsPrec1
 
 makeLenses ''QVar
 
@@ -271,6 +261,9 @@ deriving instance Ord TypeAtom
 
 deriveToJSON defaultOptions ''QVar
 deriveToJSON defaultOptions ''TypeAtom
-deriveToJSON defaultOptions ''GenType
 deriveToJSON defaultOptions ''CoercionDir
 deriveToJSON defaultOptions ''Coercion
+deriveToJSON1 defaultOptions ''GenType
+
+instance ToJSON v => ToJSON (GenType v) where
+  toJSON = liftToJSON toJSON toJSONList

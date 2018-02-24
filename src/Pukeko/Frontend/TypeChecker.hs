@@ -5,6 +5,7 @@ module Pukeko.FrontEnd.TypeChecker
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import qualified Bound.Name as B
 import qualified Data.List.NE as NE
 import qualified Data.Map.Extended as Map
 import qualified Data.Set     as Set
@@ -69,9 +70,8 @@ typeOf = \case
     checkCoercion c t_from t_to
     pure t_to
   ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
-  ETyAbs qvs e0 -> withQVars qvs (TUni qvs . fmap (abstract (env Map.!?)) <$> typeOf e0)
-    where vs = map _qvar2tvar (toList qvs)
-          env = Map.fromList (zip vs (zipFrom 0 vs))
+  ETyAbs qvs e0 -> withQVars qvs (TUni qvs . B.abstractName (env Map.!?) <$> typeOf e0)
+    where env = Map.fromList (zipWithFrom (\i (MkQVar _ v) -> (v, i)) 0 (toList qvs))
   ETyApp e0 ts1 -> do
     t0 <- typeOf e0
     case t0 of
@@ -80,7 +80,7 @@ typeOf = \case
           throwHere ("expected" <+> pretty (length qvs) <+> "type arguments, but found"
                      <+> pretty (length ts1) <+> "type arguments")
         NE.zipWithM_ satisfiesCstrs ts1 qvs
-        pure (instantiateN ts1 tq)
+        pure (B.instantiateName (toList ts1 !!) tq)
       TFun{} ->
         throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
