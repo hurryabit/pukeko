@@ -81,14 +81,14 @@ dict$Monad$IO : Monad IO =
 input : IO Int = io$ll2 @Unit @Int geti Unit
 dict$Functor$ListF : ∀a. Functor (ListF a) =
   fun @a ->
-    let map : ∀b c. (b -> c) -> ListF a b -> ListF a c =
-          fun @b @c ->
-            bimap$ll1 @ListF dict$Bifunctor$ListF @a @a @b @c (id$ll1 @a)
+    let map : ∀a b. (a -> b) -> ListF a a -> ListF a b =
+          fun @a @b ->
+            bimap$ll1 @ListF dict$Bifunctor$ListF @a @a @a @b (id$ll1 @a)
     in
     Dict$Functor @(ListF a) map
 dict$Bifunctor$ListF : Bifunctor ListF =
-  let bimap : ∀a b c d. (a -> b) -> (c -> d) -> ListF a c -> ListF b d =
-        fun @a @b @c @d -> dict$Bifunctor$ListF$ll1 @a @b @c @d
+  let bimap : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
+        fun @a1 @a2 @b1 @b2 -> dict$Bifunctor$ListF$ll1 @a1 @a2 @b1 @b2
   in
   Dict$Bifunctor @ListF bimap
 toList : ∀a. Fix2 ListF a -> List a =
@@ -236,15 +236,15 @@ fix2$ll1 : ∀a p. p a (Fix2 p a) -> Fix2 p a =
   fun @a @p -> fun (x : p a (Fix2 p a)) -> coerce @(_ -> Fix2) x
 unFix2$ll1 : ∀a p. Fix2 p a -> p a (Fix2 p a) =
   fun @a @p -> fun (x : Fix2 p a) -> coerce @(Fix2 -> _) x
-dict$Functor$Fix2$ll1 : ∀p a b. Bifunctor p -> (a -> b) -> Fix2 p a -> Fix2 p b =
-  fun @p @a @b ->
+dict$Functor$Fix2$ll1 : ∀a b p. Bifunctor p -> (a -> b) -> Fix2 p a -> Fix2 p b =
+  fun @a @b @p ->
     fun (dict$Bifunctor$p : Bifunctor p) (f : a -> b) ->
       compose$ll1 @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (fix2$ll1 @b @p) (compose$ll1 @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) (bimap$ll1 @p dict$Bifunctor$p @a @b @(Fix2 p a) @(Fix2 p b) f (map$ll1 @(Fix2 p) (dict$Functor$Fix2$ll2 @p dict$Bifunctor$p) @a @b f)) (unFix2$ll1 @a @p))
 dict$Functor$Fix2$ll2 : ∀p. Bifunctor p -> Functor (Fix2 p) =
   fun @p ->
     fun (dict$Bifunctor$p : Bifunctor p) ->
       let map : ∀a b. (a -> b) -> Fix2 p a -> Fix2 p b =
-            fun @a @b -> dict$Functor$Fix2$ll1 @p @a @b dict$Bifunctor$p
+            fun @a @b -> dict$Functor$Fix2$ll1 @a @b @p dict$Bifunctor$p
       in
       Dict$Functor @(Fix2 p) map
 poly$ll1 : ∀a p. Bifunctor p -> Fix (p a) -> Fix2 p a =
@@ -255,12 +255,12 @@ mono$ll1 : ∀a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
   fun @a @p ->
     fun (dict$Bifunctor$p : Bifunctor p) ->
       compose$ll1 @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (fix$ll1 @(p a)) (compose$ll1 @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) (bimap$ll1 @p dict$Bifunctor$p @a @a @(Fix2 p a) @(Fix (p a)) (id$ll1 @a) (mono$ll1 @a @p dict$Bifunctor$p)) (unFix2$ll1 @a @p))
-dict$Bifunctor$ListF$ll1 : ∀a b c d. (a -> b) -> (c -> d) -> ListF a c -> ListF b d =
-  fun @a @b @c @d ->
-    fun (f : a -> b) (g : c -> d) (x : ListF a c) ->
+dict$Bifunctor$ListF$ll1 : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
+  fun @a1 @a2 @b1 @b2 ->
+    fun (f : a1 -> a2) (g : b1 -> b2) (x : ListF a1 b1) ->
       match x with
-      | NilF @a @c -> NilF @b @d
-      | ConsF @a @c y z -> ConsF @b @d (f y) (g z)
+      | NilF @a1 @b1 -> NilF @a2 @b2
+      | ConsF @a1 @b1 y z -> ConsF @a2 @b2 (f y) (g z)
 toList$ll1 : ∀a. ListF a (List a) -> List a =
   fun @a ->
     fun (x : ListF a (List a)) ->

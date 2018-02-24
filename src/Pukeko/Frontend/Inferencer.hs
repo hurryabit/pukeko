@@ -8,7 +8,7 @@ where
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import           Control.Lens.Indexed
+import           Control.Lens (folded)
 import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
@@ -271,14 +271,14 @@ inferDecl = \case
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
       let t_inst = mkTApp (TAtm atom) (map (TVar . _qvar2tvar) qvs)
       -- FIXME: renameType
-      t_decl1 <- renameType (t_decl0 >>= const t_inst)
+      let t_decl1 = t_decl0 >>= const t_inst
       withQVars @s qvs (inferFuncDecl mthd (open t_decl1))
     yield (DInst (MkInstDecl instName clss atom qvs ds1))
   where
     yield = pure . Just
 
 inferModule' :: forall s effs.
-  ( LastMember (ST s) effs
+  ( MemberST s effs
   , Members [Reader ModuleInfo, Error Failure, NameSource] effs) =>
   Module In -> Eff effs (Module (Aux s))
 inferModule' = module2decls $ \decls ->
@@ -287,16 +287,14 @@ inferModule' = module2decls $ \decls ->
                                         & evalSupply uvarIds
                                         & runReader (getPos decl)
 
--- FIXME: We use this set make sure there are unintended free type variables
+-- FIXME: We use this set make sure there are /no/ unintended free type variables
 -- left in expressions. Make this intention clear through code.
 type TQEnv = Set NameTVar
 
 type TQ s = Eff [Reader TQEnv, Reader SourcePos, Error Failure, NameSource, ST s]
 
-localizeTQ :: (TraversableWithIndex Int t) => t QVar -> TQ s a -> TQ s a
-localizeTQ qvs =
-  let env = Set.fromList (map _qvar2tvar (toList qvs))
-  in  local' (env <>)
+localizeTQ :: Foldable t => t QVar -> TQ s a -> TQ s a
+localizeTQ qvs = local (setOf (folded . qvar2tvar) qvs <>)
 
 qualType :: UType s -> TQ s Type
 qualType = \case

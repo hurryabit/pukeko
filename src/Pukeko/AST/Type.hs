@@ -25,28 +25,25 @@ module Pukeko.AST.Type
   , mkTApp
   , gatherTApp
   , qvar2cstr
+  , qvar2tvar
   , applyConstraints
   , prettyTypeCstr
   , prettyTUni
   , prettyQVar
-  , renameType
   )
   where
 
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import           Control.Lens (forOf)
 import           Control.Lens.Indexed (FunctorWithIndex)
 import           Control.Monad.Extra
-import           Control.Monad.Freer.Supply
 import           Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
-import           Pukeko.AST.Functor2
 import           Pukeko.AST.Scope
 
 infixr 1 ~>, *~>
@@ -110,7 +107,6 @@ strengthenT0 = fmap strengthenScope0
 weakenT :: GenType tv -> GenType (TScope i tv)
 weakenT = fmap weakenScope
 
--- TODO: Use class 'BaseTVar' to avoid this duplication.
 mkTVarsQ :: FunctorWithIndex Int t => t QVar -> t Type
 mkTVarsQ = fmap (TVar . _qvar2tvar)
 
@@ -239,73 +235,36 @@ deriving instance Show tv => Show (GenType tv)
 deriving instance Show CoercionDir
 deriving instance Show Coercion
 
-newtype Boxed tv = Box{unBox :: tv}
-  deriving (Eq, Ord)
-
-instance (BaseTVar tv, Ord tv) => HasEnv (Boxed tv) where
-  type EnvOf (Boxed tv) = Map (Boxed tv)
-  lookupEnv v env = env Map.!  v
-
-data TypeF typ tv
-  = TVarF tv
-  | TAtmF TypeAtom
-  | TAppF (typ tv) (typ tv)
-  | TUniF (NonEmpty QVar) (typ (TScope Int tv))
-
-type instance Base2 GenType = TypeF
-
-instance Functor2 TypeF
-instance Traversable2 TypeF where
-  traverse2 f = \case
-    TVarF v      -> pure (TVarF v)
-    TAtmF a      -> pure (TAtmF a)
-    TAppF t1 t2  -> TAppF <$> f t1 <*> f t2
-    TUniF qvs t1 -> TUniF qvs <$> f t1
-
-instance Recursive2 GenType where
-  project2 = \case
-    TVar v      -> TVarF v
-    TAtm a      -> TAtmF a
-    TApp t1 t2  -> TAppF t1 t2
-    TUni qvs t1 -> TUniF qvs t1
-
-instance Corecursive2 GenType where
-  embed2 = \case
-    TVarF v      -> TVar v
-    TAtmF a      -> TAtm a
-    TAppF t1 t2  -> TApp t1 t2
-    TUniF qvs t1 -> TUni qvs t1
-
 makeLenses ''QVar
 
 -- TODO: We rename types for pretty printing and only when we anticipate the
 -- lexical name capture. There should be a principles approach to this in the
 -- pretty printer itself.
-renameType :: (Member NameSource effs, BaseTVar tv, Ord tv) =>
-  GenType tv -> Eff effs (GenType tv)
-renameType t0 = do
-  let t1 = fmap Box t0
-      vs = setOf traverse t1
-      nvs = Set.fromList [Tagged [c] | c <- ['a' .. 'z']]
-            `Set.difference` Set.map (nameText . baseTVar . unBox) vs
-      -- env0 :: Map tv tv
-      env0 = Map.fromSet id vs
-      sup0 = Set.toList nvs ++ map (\n -> Tagged ('_':show n)) [1::Int ..]
-  fmap unBox <$> evalSupply sup0 (runReader env0 (go t1))
-  where
-    go :: forall tv effs. (Member NameSource effs, HasEnv tv) =>
-      GenType tv ->
-      Eff (Reader (EnvOf tv tv) : Supply (Tagged TVar String) : effs) (GenType tv)
-    go = \case
-      TVar v -> TVar <$> asks (lookupEnv v)
-      TAtm a -> pure (TAtm a)
-      TApp tf tp -> TApp <$> go tf <*> go tp
-      TUni qvs0 tq -> do
-        qvs1 <- forOf (traverse . qvar2tvar) qvs0 $ \tvar ->
-          fresh >>= mkName . Lctd (getPos tvar)
-        let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
-        local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
-          TUni qvs1 <$> go tq
+-- renameType :: (Member NameSource effs, BaseTVar tv, Ord tv) =>
+--   GenType tv -> Eff effs (GenType tv)
+-- renameType t0 = do
+--   let t1 = fmap Box t0
+--       vs = setOf traverse t1
+--       nvs = Set.fromList [Tagged [c] | c <- ['a' .. 'z']]
+--             `Set.difference` Set.map (nameText . baseTVar . unBox) vs
+--       -- env0 :: Map tv tv
+--       env0 = Map.fromSet id vs
+--       sup0 = Set.toList nvs ++ map (\n -> Tagged ('_':show n)) [1::Int ..]
+--   fmap unBox <$> evalSupply sup0 (runReader env0 (go t1))
+--   where
+--     go :: forall tv effs. (Member NameSource effs, HasEnv tv) =>
+--       GenType tv ->
+--       Eff (Reader (EnvOf tv tv) : Supply (Tagged TVar String) : effs) (GenType tv)
+--     go = \case
+--       TVar v -> TVar <$> asks (lookupEnv v)
+--       TAtm a -> pure (TAtm a)
+--       TApp tf tp -> TApp <$> go tf <*> go tp
+--       TUni qvs0 tq -> do
+--         qvs1 <- forOf (traverse . qvar2tvar) qvs0 $ \tvar ->
+--           fresh >>= mkName . Lctd (getPos tvar)
+--         let env1 = imap (\i (MkQVar _ v) -> mkBound i v) qvs1
+--         local' (\env0 -> extendEnv' @Int @tv env1 (fmap weakenScope env0)) $
+--           TUni qvs1 <$> go tq
 
 deriving instance Eq  TypeAtom
 deriving instance Ord TypeAtom

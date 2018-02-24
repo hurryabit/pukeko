@@ -19,13 +19,15 @@ import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 
-type TC = EffGamma [Reader ModuleInfo, Reader SourcePos, Error Failure]
+type CanTC effs =
+  (CanGamma effs, Members [Reader ModuleInfo, Reader SourcePos, Error Failure] effs)
+type TC a = forall effs. CanTC effs => Eff effs a
 
 class HasModuleInfo m => TypeCheckable m where
   checkModule :: m -> TC ()
 
 check :: (Member (Error Failure) effs, TypeCheckable m) => m -> Eff effs ()
-check m0 = either throwError pure .
+check m0 = either throwFailure pure .
   run . runError . runReader noPos . runInfo m0 . runGamma $ checkModule m0
 
 checkCoercion :: Coercion -> Type -> Type -> TC ()

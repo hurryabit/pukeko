@@ -14,7 +14,7 @@ import           Data.Forget      (Forget (..))
 import qualified Data.Map.Extended as Map
 import           Data.STRef
 
-import           Pukeko.AST.SystemF    hiding (Free)
+import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.ConDecl

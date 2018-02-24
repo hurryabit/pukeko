@@ -2,8 +2,6 @@
 module Pukeko.Prelude
   ( module X
 
-  , local'
-
   , Failure
   , CanThrowHere
   , throwFailure
@@ -115,6 +113,3 @@ traceJSON :: ToJSON a => a -> b -> b
 traceJSON =
   let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
   in  trace . BSL.unpack . Aeson.encodePretty' config . toJSON
-
-local' :: (r1 -> r2) -> Eff (Reader r2 : effs) a -> Eff (Reader r1 : effs) a
-local' f = reinterpret (\Ask -> asks f)

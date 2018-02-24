@@ -21,27 +21,31 @@ import           Pukeko.FrontEnd.Gamma
 type In  = Unnested
 type Out = Unclassy
 
-type CE =
-  EffXGamma (Map (Name Clss) NameEVar) Type
-  [Reader SourcePos, Reader ModuleInfo, NameSource]
+type DictMap = Map (NameTVar, NameClss) NameEVar
+type CanCE effs =
+  ( CanGamma effs
+  , Members [Reader DictMap, Reader SourcePos, Reader ModuleInfo, NameSource] effs
+  )
+type CE a = forall effs. CanCE effs => Eff effs a
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
-elimModule m0@(MkModule decls0) = delayNameSource . runInfo m0 $ do
+elimModule m0@(MkModule decls0) = runInfo m0 $ do
   decls1 <- for decls0 $ \decl0 -> elimDecl decl0
                                    & runGamma
+                                   & runReader @DictMap Map.empty
                                    & runReader (getPos decl0)
   pure (MkModule (map unclssDecl (concat decls1)))
 
 -- | Name of the dictionary type constructor of a type class, e.g., @Dict$Eq@
 -- for type class @Eq@.
-clssTCon :: Name Clss -> Name TCon
+clssTCon :: NameClss -> Name TCon
 clssTCon = coerce
 
 -- | Apply the dictionary type constructor of a type class to a type. For the
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
 --
 -- > TApp (TCon "Dict$Traversable") [TCon "List"]
-mkTDict :: Name Clss -> GenType tv -> GenType tv
+mkTDict :: NameClss -> GenType tv -> GenType tv
 mkTDict clss t = mkTApp (TCon (clssTCon clss)) [t]
 
 -- | Get the name of the dictionary for a type class instance and its type.
@@ -88,7 +92,7 @@ dictTConDecl (MkClssDecl clss prm dcon mthds) =
 elimClssDecl :: ClssDecl -> CE [Decl Out]
 elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
-  let qprm = NE.singleton (MkQVar mempty prm)
+  let qprm = NE.singleton (MkQVar Set.empty prm)
   let prmType = TVar prm
   dictPrm <- mkName (Lctd noPos "dict")
   let sels = do
@@ -152,12 +156,12 @@ elimDecl = here' $ \case
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
 
-buildDict :: Name Clss -> Type -> CE (Expr Out)
+buildDict :: NameClss -> Type -> CE (Expr Out)
 buildDict clss t0 = do
   let (t1, tps) = gatherTApp t0
   case t1 of
     TVar v
-      | null tps -> EVar . (Map.! clss) <$> lookupTVar v
+      | null tps -> EVar <$> asks @DictMap (Map.! (v, clss))
     TAtm tatom -> do
       SomeInstDecl inst <- findInfo info2insts (clss, tatom)
       let (z_dict, t_dict) = instDictInfo inst
@@ -177,7 +181,7 @@ elimETyApp e0 t_e0 ts0 = do
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: Name Clss -> Name TVar -> CE (Name EVar)
+dictEVar :: NameClss -> Name TVar -> CE (Name EVar)
 dictEVar clss tvar = do
   let name0 = "dict$" ++ untag (nameText clss) ++ "$" ++ untag (nameText tvar)
   mkName (Lctd noPos (Tagged name0))
@@ -186,19 +190,14 @@ dictEVar clss tvar = do
 -- dictionaries.
 elimETyAbs :: NonEmpty QVar -> Expr In -> CE (Expr Out, Type)
 elimETyAbs qvs0 e0 = do
-    -- TODO: This is horribly imperative.
-    ixbs <- fmap concat . for (toList qvs0) $ \(MkQVar qual v) ->
-      for (toList qual) $ \clss -> do
-          x <- dictEVar clss v
-          pure ((v, clss, x), MkBind x (mkTDict clss (TVar v)))
-    let (ixs, bs) = unzip ixbs
-    let refs = Map.fromListWith Map.union
-               [ (v, Map.singleton (clss) x)
-               | (v, clss, x) <- toList ixs
-               ]
-    (e1, t1) <- withinTScope refs $ withinEScope (map unBind bs) $ elimExpr e0
-    let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
-    pure (ETyAbs qvs1 (mkELam bs t1 e1), mkTUni (toList qvs0) t1)
+    let cstrs = [ (v, clss) | MkQVar qual v <- toList qvs0, clss <- toList qual ]
+    (dictMap, dictBinders) <- fmap unzip . for cstrs $ \(v, clss) -> do
+      x <- dictEVar clss v
+      pure (((v, clss), x), MkBind x (mkTDict clss (TVar v)))
+    (e1, t1) <- local (Map.unionWith impossible (Map.fromList dictMap)) $
+      withQVars qvs0 $ withinEScope (map unBind dictBinders) $ elimExpr e0
+    let qvs1 = fmap (qvar2cstr .~ Set.empty) qvs0
+    pure (ETyAbs qvs1 (mkELam dictBinders t1 e1), mkTUni (toList qvs0) t1)
 
 elimDefn :: Defn In -> CE (Defn Out)
 elimDefn = defn2expr (fmap fst . elimExpr)
@@ -262,7 +261,7 @@ unclssType = \case
   TAtm a -> TAtm a
   TApp tf tp -> TApp (unclssType tf) (unclssType tp)
   TUni qvs0 tq0 ->
-    let qvs1 = fmap (qvar2cstr .~ mempty) qvs0
+    let qvs1 = fmap (qvar2cstr .~ Set.empty) qvs0
         dict_prms = do
           (i, MkQVar qual b) <- itoList qvs0
           let v = TVar (mkBound i b)

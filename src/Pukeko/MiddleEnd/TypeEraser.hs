@@ -9,7 +9,6 @@ import Pukeko.Prelude
 import qualified Data.Map as Map
 
 import           Pukeko.AST.NoLambda
-import           Pukeko.AST.Scope
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Name       as In
 import qualified Pukeko.AST.SuperCore  as In
@@ -49,7 +48,7 @@ ccDefn (In.MkDefn b t) = MkDefn (bindName b) <$> ccExpr t
 
 ccExpr :: In.Expr -> CC Expr
 ccExpr = \case
-  In.EVar x -> pure (Local (name (baseEVar x)))
+  In.EVar x -> pure (Local (name x))
   In.EVal z -> do
     external <- gets (Map.lookup z)
     case external of

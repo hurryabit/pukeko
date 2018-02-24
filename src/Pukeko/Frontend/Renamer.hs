@@ -73,14 +73,6 @@ lookupGlobal tab isok desc (Lctd pos name) = do
       | isok decl -> pure (nameOf decl)
       | otherwise -> throwAt pos ("not a" <+> desc <:~> pretty name)
 
-localize :: CanRn effs =>
-  Map (Ps.Name EVar) (Name EVar) -> Eff (Env : effs) a -> Eff (Env : effs) a
-localize env = local' (env <>)
-
-localize1 :: CanRn effs =>
-  Ps.Name EVar -> Name EVar -> Eff (Env : effs) a -> Eff (Env : effs) a
-localize1 binder name = localize (Map.singleton binder name)
-
 lookupBinop :: CanRn effs => Op.Binary -> Eff effs (Name EVar)
 lookupBinop op = do
   fun_mb <- uses binopTab (Map.lookup op)
@@ -164,7 +156,7 @@ rnPatn = \case
 rnAltn :: CanRn effs => Ps.Altn (Ps.LctdName EVar) -> Eff (Env : effs) (Altn Out )
 rnAltn (Ps.MkAltn patn0 rhs) = do
   (patn1, env) <- rnPatn patn0
-  MkAltn patn1 <$> localize env (rnExpr rhs)
+  MkAltn patn1 <$> local (env `Map.union`) (rnExpr rhs)
 
 -- | Rename a value abstraction (lambda).
 rnELam :: CanRn effs =>
@@ -172,7 +164,8 @@ rnELam :: CanRn effs =>
 rnELam [] body = rnExpr body
 rnELam (name:names) body = do
   binder <- mkName name
-  ELam (MkBind binder NoType) <$> localize1 (unlctd name) binder (rnELam names body)
+  ELam (MkBind binder NoType)
+    <$> local (Map.insert (unlctd name) binder) (rnELam names body)
 
 -- | Rename an expression.
 rnExpr :: CanRn effs => Ps.Expr (Ps.LctdName EVar) -> Eff (Env : effs) (Expr Out)
@@ -202,14 +195,14 @@ rnExpr = \case
     exprs1 <- traverse rnExpr exprs0
     let binds1 =
           zipWithExact (\name expr -> MkDefn (MkBind name NoType) expr) names exprs1
-    body1 <- localize env (rnExpr body0)
+    body1 <- local (env `Map.union`) (rnExpr body0)
     pure (ELet binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkDefn binder expr) -> (binder, expr)) binds0)
     names <- traverse mkName binders0
     let env = Map.fromList (zipExact (map unlctd binders0) names)
-    localize env $ do
+    local (env `Map.union`) $ do
       exprs1 <- traverse rnExpr exprs0
       let binds1 =
             zipWithExact (\name expr -> MkDefn (MkBind name NoType) expr) names exprs1

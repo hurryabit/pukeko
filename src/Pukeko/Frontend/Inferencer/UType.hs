@@ -13,14 +13,11 @@ module Pukeko.FrontEnd.Inferencer.UType
   , unUTUni
   , unUTUni1
   , (~>)
-  , (*~>)
-  , appN
   , appTCon
   , unUTApp
   , open
   , open1
   , substUType
-  , prettyUVar
   , prettyUType
   )
   where
@@ -37,7 +34,7 @@ import           Pukeko.AST.Name
 import           Pukeko.AST.Type       hiding ((~>), (*~>))
 import           Pukeko.AST.Scope
 
-infixr 1 ~>, *~>
+infixr 1 ~>
 
 newtype Level = Level Int
   deriving (Eq, Ord, Enum)
@@ -88,14 +85,8 @@ unUTUni = go []
 (~>) :: UType s -> UType s -> UType s
 (~>) = UTFun
 
-(*~>) :: Foldable t => t (UType s) -> UType s -> UType s
-t_args *~> t_res = foldr (~>) t_res t_args
-
-appN :: UType s -> [UType s] -> UType s
-appN = foldl UTApp
-
 appTCon :: Name TCon -> [UType s] -> UType s
-appTCon = appN . UTAtm . TACon
+appTCon = foldl UTApp . UTAtm . TACon
 
 unUTApp :: UType s -> ST s (UType s, [UType s])
 unUTApp = go []

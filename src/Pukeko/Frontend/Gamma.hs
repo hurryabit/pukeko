@@ -1,6 +1,5 @@
 module Pukeko.FrontEnd.Gamma
-  ( EffGamma
-  , EffXGamma
+  ( CanGamma
   , runGamma
   , withinEScope
   , withinEScope1
@@ -18,38 +17,34 @@ import qualified Data.Map.Extended as Map
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
-data Gamma ti ei = Gamma
-  { _evars :: Map NameEVar (ei, Int)
-  , _tvars :: Map NameTVar ti
+data Gamma = Gamma
+  { _evars :: Map NameEVar (Type, Int)
+  , _tvars :: Map NameTVar (Set NameClss)
   }
 makeLenses ''Gamma
 
-type EffXGamma ti ei effs = Eff (Reader (Gamma ti ei) : effs)
+type CanGamma effs = Member (Reader Gamma) effs
 
-type EffGamma effs = EffXGamma (Set (Name Clss)) Type effs
-
-runGamma :: EffXGamma ti ei effs a -> Eff effs a
+runGamma :: Eff (Reader Gamma : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty Map.empty)
 
-withinEScope :: [(NameEVar, ei)] -> EffXGamma ti ei effs a -> EffXGamma ti ei effs a
-withinEScope ts act = foldr (uncurry withinEScope1) act ts
+withinEScope1 :: CanGamma effs => NameEVar -> Type -> Eff effs a -> Eff effs a
+withinEScope1 x t = locally evars (\evs -> Map.insert x (t, Map.size evs) evs)
 
-withinEScope1 :: forall ti ei effs a.
-  NameEVar -> ei -> EffXGamma ti ei effs a -> EffXGamma ti ei effs a
-withinEScope1 x t = locally (evars @ti @ei) (\evs -> Map.insert x (t, Map.size evs) evs)
+withinEScope :: CanGamma effs => [(NameEVar, Type)] -> Eff effs a -> Eff effs a
+withinEScope xts act = foldr (uncurry withinEScope1) act xts
 
-withinTScope :: forall ti ei effs a.
-  Map NameTVar ti -> EffXGamma ti ei effs a -> EffXGamma ti ei effs a
-withinTScope qs = locally (tvars @ti @ei) (qs <>)
+withinTScope :: CanGamma effs => [(NameTVar, Set NameClss)] -> Eff effs a -> Eff effs a
+withinTScope qs = locally tvars (Map.fromList qs <>)
 
-withQVars :: Foldable t => t QVar -> EffGamma effs a -> EffGamma effs a
-withQVars = withinTScope . Map.fromList . map (\(MkQVar q v) -> (v, q)) . toList
+withQVars :: (CanGamma effs, Foldable t) => t QVar -> Eff effs a -> Eff effs a
+withQVars = withinTScope . map (\(MkQVar q v) -> (v, q)) . toList
 
-lookupEVarIx :: forall ti ei effs. NameEVar -> EffXGamma ti ei effs (ei, Int)
-lookupEVarIx x = views (evars @ti @ei) (Map.! x)
+lookupEVarIx :: CanGamma effs => NameEVar -> Eff effs (Type, Int)
+lookupEVarIx x = views evars (Map.! x)
 
-lookupEVar :: NameEVar -> EffXGamma ti ei effs ei
+lookupEVar :: CanGamma effs => NameEVar -> Eff effs Type
 lookupEVar = fmap fst . lookupEVarIx
 
-lookupTVar :: forall ti ei effs. NameTVar -> EffXGamma ti ei effs ti
-lookupTVar = views (tvars @ti @ei) . (flip (Map.!))
+lookupTVar :: CanGamma effs => NameTVar -> Eff effs (Set NameClss)
+lookupTVar = views tvars . (flip (Map.!))

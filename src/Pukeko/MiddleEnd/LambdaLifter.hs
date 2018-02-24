@@ -24,13 +24,20 @@ import           Pukeko.AST.Type
 type In  = Unclassy
 type Out = SuperCore
 
-type LL =
-  EffGamma
-    [Supply Int, Reader ModuleInfo, State (Name EVar), Writer Core.Module, NameSource]
+type CanLL effs =
+  ( CanGamma effs
+  , Members [ Supply Int
+            , Reader ModuleInfo
+            , Reader NameEVar
+            , Writer Core.Module, NameSource
+            ]
+    effs
+  )
+type LL a = forall effs. CanLL effs => Eff effs a
 
 freshEVar :: LL (Name EVar)
 freshEVar = do
-  func <- get @(Name EVar)
+  func <- ask @NameEVar
   n <- fresh @Int
   mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
 
@@ -73,7 +80,7 @@ llELam oldBinds t_rhs rhs1 = do
     (evCaptured, newBinds)  <-
       fmap (unzip . map snd . sortOn fst) . for evCaptured0 $ \x -> do
         (t, i) <- lookupEVarIx x
-        bind <- MkBind <$> copyName noPos (baseEVar x) <*> pure t
+        bind <- MkBind <$> copyName noPos x <*> pure t
         pure (i, (x, bind))
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
@@ -133,22 +140,19 @@ llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
   let env = catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bs t_flds)
   MkAltn (PSimple dcon ts0 bs) <$> withinEScope env (llExpr e)
 
-llDecl :: Decl In -> LL ()
+llDecl :: Members [Reader ModuleInfo, Writer Core.Module, NameSource] effs =>
+  Decl In -> Eff effs ()
 llDecl = \case
   DType t -> tell (mkTypeDecl t)
   DFunc (MkFuncDecl lhs t rhs) -> do
-    put @(Name EVar) lhs
-    rhs <- llExpr rhs
+    rhs <- llExpr rhs & runGamma & evalSupply @Int [1 ..] & runReader lhs
     let supc = SupCDecl lhs (closeT t) [] [] rhs
     tell (mkFuncDecl @Any supc)
   DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @Any (ExtnDecl z (closeT t) s))
 
 liftModule :: Member NameSource effs => Module In -> Eff effs Core.Module
 liftModule m0@(MkModule decls) =
-  for_ decls (\decl -> llDecl decl & runGamma & evalSupply [1 ..])
+  traverse_ llDecl decls
   & runInfo m0
-  -- FIXME: Get rid of this 'undefined'.
-  & runState undefined
   & runWriter
-  & delayNameSource
   & fmap snd

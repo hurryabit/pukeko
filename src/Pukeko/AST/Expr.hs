@@ -3,7 +3,36 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.Expr
-  ( module Pukeko.AST.Expr
+  ( Expr (..)
+  , Atom (..)
+  , Defn (..)
+  , Bind (..)
+  , Altn (..)
+  , Patn (..)
+
+  , pattern EVal
+  , pattern ECon
+  , pattern ENum
+
+  , defn2bind
+  , defn2expr
+  , bind2evar
+  , bind2type
+  , altn2patn
+  , altn2expr
+
+  , _AVal
+
+  , mkELam
+  , mkETyApp
+  , mkETyAbs
+  , unwindEApp
+  , unwindELam
+  , unBind
+
+  , prettyELam
+  , prettyETyAbs
+
   , module Pukeko.AST.Scope
   )
   where
@@ -165,7 +194,7 @@ instance TypeOf lg ~ Type => Pretty (Expr lg)
 instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
   prettyPrec prec = \case
     ELoc l -> prettyPrec prec l
-    EVar x -> pretty (baseEVar x)
+    EVar x -> pretty x
     EAtm a -> pretty a
     EApp e a ->
       maybeParens (prec > Op.aprec)

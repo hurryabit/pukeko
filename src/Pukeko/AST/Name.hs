@@ -10,6 +10,7 @@ module Pukeko.AST.Name
   , Clss
   , NameEVar
   , NameTVar
+  , NameClss
   , type (?:>)
   , Super (..)
   , Any
@@ -19,7 +20,6 @@ module Pukeko.AST.Name
   , nameText
   , namePos
   , runNameSource
-  , delayNameSource
   , runSTBelowNameSource
   , mkName
   , copyName
@@ -61,6 +61,7 @@ type Clss = 'TCon
 -- Saves us a few spaces, but more importantly tons of parentheses.
 type NameEVar = Name EVar
 type NameTVar = Name TVar
+type NameClss = Name Clss
 
 data Super s = Any | Only s
 type Any  = 'Any
@@ -87,13 +88,6 @@ newtype NameSource a = NameSource{toState :: State Int a}
 
 runNameSource :: forall effs a. Eff (NameSource : effs) a -> Eff effs a
 runNameSource = evalState 1 . translate toState
-
-delayNameSource :: Member NameSource effs => Eff '[NameSource] a -> Eff effs a
-delayNameSource act = do
-  n1 <- send (NameSource Get)
-  let (res, n2) = act & translate toState & runState n1 & run
-  send (NameSource (Put n2))
-  pure res
 
 runSTBelowNameSource :: Member NameSource effs =>
   (forall s. Eff [NameSource, ST s] a) -> Eff effs a

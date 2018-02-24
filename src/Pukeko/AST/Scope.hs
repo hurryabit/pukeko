@@ -3,37 +3,21 @@
 {-# LANGUAGE ViewPatterns #-}
 -- | Type for encoding DeBruijn style scoping.
 module Pukeko.AST.Scope
-  ( Scope (..)
-  , EScope
+  ( Scope
   , TScope
   , scope
-  , scope'
-  , _Free
   , mkBound
-  , strengthenScope
   , strengthenScope0
-  , unsafeStrengthenScope
   , weakenScope
   , instantiateN
   , abstract
-  , abstract1
   , (>>>=)
-  , voidEnv
-  , extendEnv
-  , extendEnv'
-  , HasEnvLevel (EnvLevelOf)
-  , HasEnv (..)
-  , BaseEVar
-  , BaseTVar
-  , baseEVar
-  , baseTVar
   )
   where
 
 import Pukeko.Prelude
 
 import           Data.Forget
-import qualified Data.Map.Extended as Map
 import qualified Data.Vector       as Vec
 import           Data.Aeson.TH
 
@@ -46,8 +30,6 @@ data Scope b i v
   = Free v
   | Bound i (Forget b)
   deriving (Functor, Foldable, Traversable, Eq, Ord, Show)
-
-type EScope = Scope (Name EVar)
 
 type TScope = Scope (Name TVar)
 
@@ -65,15 +47,8 @@ mkBound i b = Bound i (Forget b)
 strengthenScopeEither :: Scope b i v -> Either (i, b) v
 strengthenScopeEither = scope' Right (\i b -> Left (i, b))
 
-strengthenScope :: Scope b i v -> Maybe v
-strengthenScope = either (const Nothing) Just . strengthenScopeEither
-
 strengthenScope0 :: (HasCallStack, Show b) => Scope b Int v -> v
 strengthenScope0 = either (bugWith "strengthenScope0") id . strengthenScopeEither
-
-unsafeStrengthenScope :: (HasCallStack, Show b) => Scope b i v -> v
-unsafeStrengthenScope =
-  either (bugWith "unsafeStrengthenScope" . snd) id . strengthenScopeEither
 
 weakenScope :: v -> Scope b i v
 weakenScope = Free
@@ -89,12 +64,6 @@ instantiateN xsL = instantiate lk
 
 abstract :: (v -> Maybe (i, b)) -> v -> Scope b i v
 abstract f x = maybe (Free x) (uncurry mkBound) (f x)
-
-abstract1 :: (j -> Maybe i) -> Scope b j v -> Scope b j (Scope b i v)
-abstract1 f = \case
-  Bound (f -> Just i) b -> Free (Bound i b)
-  Bound j             b -> Bound j b
-  Free  x               -> Free (Free x)
 
 dist :: Applicative f => Scope b i (f v) -> f (Scope b i v)
 dist = \case
@@ -116,79 +85,6 @@ _Bound = prism (uncurry mkBound) $ \case
 
 data Pair f g a = Pair (f a) (g a)
   deriving (Functor)
-
-voidEnv :: EnvOf Void a
-voidEnv = Const ()
-
-extendEnv ::
-  forall i v a b.
-  (HasEnvLevel i, HasEnv v) =>
-  EnvLevelOf i a ->
-  EnvOf v a ->
-  EnvOf (Scope b i v) a
-extendEnv env_i env_v = Pair env_i env_v
-
-extendEnv' ::
-  forall i v t a b.
-  (HasEnvLevel i, EnvLevelOf i ~ Vector, HasEnv v, Foldable t) =>
-  t a ->
-  EnvOf v a ->
-  EnvOf (Scope b i v) a
-extendEnv' = extendEnv @i @v . Vec.fromList . toList
-
-class (Functor (EnvLevelOf i)) => HasEnvLevel i where
-  type EnvLevelOf i :: * -> *
-  lookupEnvLevel :: i -> EnvLevelOf i a -> a
-
-instance HasEnvLevel (Name nsp) where
-  type EnvLevelOf (Name nsp) = Map (Name nsp)
-  lookupEnvLevel = flip (Map.!)
-
-instance HasEnvLevel Int where
-  type EnvLevelOf Int = Vec.Vector
-  lookupEnvLevel = flip (Vec.!)
-
-instance HasEnvLevel () where
-  type EnvLevelOf () = Identity
-  lookupEnvLevel () = runIdentity
-
-class (Functor (EnvOf v)) => HasEnv v where
-  type EnvOf v :: * -> *
-  lookupEnv :: v -> EnvOf v a -> a
-
-instance HasEnv Void where
-  type EnvOf Void = Const ()
-  lookupEnv = absurd
-
-instance (HasEnvLevel i, HasEnv v) => HasEnv (Scope b i v) where
-  type EnvOf (Scope b i v) = Pair (EnvLevelOf i) (EnvOf v)
-  lookupEnv i (Pair env_j env_v) = case i of
-    Bound j _ -> lookupEnvLevel j env_j
-    Free  v   -> lookupEnv v env_v
-
-class BaseName b v where
-  baseName :: v -> b
-
-type BaseEVar ev = (BaseName (Name EVar) ev)
-
-type BaseTVar tv = (BaseName (Name TVar) tv)
-
-baseEVar :: BaseEVar ev => ev -> Name EVar
-baseEVar = baseName
-
-baseTVar :: BaseTVar tv => tv -> Name TVar
-baseTVar = baseName
-
-instance BaseName b Void where
-  baseName = absurd
-
-instance BaseName (Name nsp) (Name nsp) where
-  baseName = id
-
-instance (BaseName b v) => BaseName b (Scope b i v) where
-  baseName = \case
-    Bound _ (Forget b) -> b
-    Free  v            -> baseName v
 
 instance Bifunctor (Scope b) where
   bimap f g = \case
