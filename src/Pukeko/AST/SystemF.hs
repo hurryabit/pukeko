@@ -11,6 +11,9 @@ module Pukeko.AST.SystemF
 import Pukeko.Prelude
 import Pukeko.Pretty
 
+import Data.Aeson
+import Data.Aeson.TH
+
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
@@ -66,7 +69,8 @@ data InstDecl lg = MkInstDecl
     -- named @dict$XZY$ABC@.
   , _inst2clss    :: Name Clss
   , _inst2atom    :: TypeAtom
-  , _inst2params  :: [TVarBinder]
+  , _inst2params  :: [NameTVar]
+  , _inst2context :: [TypeCstr]
   , _inst2methods :: [FuncDecl lg (Name TVar)]
   }
 
@@ -144,11 +148,11 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
     DClss (MkClssDecl c v _ ms) ->
       "class" <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
-    DInst (MkInstDecl _ c t0 qvs ds) ->
-      "instance" <+> prettyTypeCstr qvs <+> pretty c <+> prettyPrec 3 t1
+    DInst (MkInstDecl _ c t0 vs cstrs ds) ->
+      "instance" <+> prettyTypeCstrs cstrs <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where
-        t1 = mkTApp (TAtm t0) (map (TVar . fst) qvs)
+        t1 = mkTApp (TAtm t0) (map TVar vs)
 
 instance TypeOf lg ~ Type => Pretty (Module lg) where
   pretty (MkModule decls) = vcatMap pretty decls
@@ -159,3 +163,19 @@ deriving instance (TypeOf lg ~ Type)          => Show (ExtnDecl lg)
 deriving instance                                Show  ClssDecl
 deriving instance (TypeOf lg ~ Type)          => Show (InstDecl lg)
 deriving instance (TypeOf lg ~ Type)          => Show (GenDecl nsp lg)
+
+
+deriveToJSON defaultOptions ''SignDecl
+instance TypeOf lg ~ Type => ToJSON (FuncDecl lg tv) where
+  toJSON = $(mkToJSON defaultOptions ''FuncDecl)
+instance TypeOf lg ~ Type => ToJSON (ExtnDecl lg) where
+  toJSON = $(mkToJSON defaultOptions ''ExtnDecl)
+deriveToJSON defaultOptions ''ClssDecl
+instance TypeOf lg ~ Type => ToJSON (InstDecl lg) where
+  toJSON = $(mkToJSON defaultOptions ''InstDecl)
+
+instance TypeOf lg ~ Type => ToJSON (GenDecl nsp lg) where
+  toJSON = $(mkToJSON defaultOptions ''GenDecl)
+
+instance TypeOf lg ~ Type => ToJSON (Module lg) where
+  toJSON = $(mkToJSON defaultOptions ''Module)

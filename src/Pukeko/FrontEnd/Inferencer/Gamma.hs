@@ -5,8 +5,11 @@ module Pukeko.FrontEnd.Inferencer.Gamma
   , runGamma
   , withinEScope
   , withinEScope1
-  , withinTScope
-  , withQVars
+  , enterLevel
+  , introTVar
+  , introTVars
+  , withinContext1
+  , withinContext
   , getTLevel
   , lookupEVar
   , lookupTVar
@@ -15,15 +18,15 @@ module Pukeko.FrontEnd.Inferencer.Gamma
 import Pukeko.Prelude
 
 import qualified Data.Map.Extended as Map
+import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
-import           Pukeko.AST.Type
 import           Pukeko.FrontEnd.Inferencer.UType
 
 data Gamma s = Gamma
   { _tenv  :: Map NameEVar (UType s)
   , _level :: Level
-  , _qenv  :: Map (Name TVar) (Set (Name Clss))
+  , _qenv  :: Map NameTVar (Set NameClss)
   }
 makeLenses ''Gamma
 
@@ -38,16 +41,26 @@ withinEScope ts = locally tenv (ts `Map.union`)
 withinEScope1 :: CanGamma s effs => NameEVar -> UType s -> Eff effs a -> Eff effs a
 withinEScope1 x t = withinEScope (Map.singleton x t)
 
-withinTScope :: forall s effs a. CanGamma s effs => Eff effs a -> Eff effs a
-withinTScope = locally (level @s) succ
+enterLevel :: forall s effs a. CanGamma s effs => Eff effs a -> Eff effs a
+enterLevel = locally (level @s) succ
 
--- TODO: It's not entirely clear to me if not changing the level is the right
--- thing to do for future uses, particularly existential types.
-withQVars :: forall s t effs a. (CanGamma s effs, Foldable t) =>
-  t TVarBinder -> Eff effs a -> Eff effs a
-withQVars qvs =
-  let env = Map.fromList (toList qvs)
-  in  locally (qenv @s) (env `Map.union`)
+introTVar :: forall s effs a. CanGamma s effs =>
+  NameTVar -> Eff effs a -> Eff effs a
+introTVar v = locally (qenv @s) (Map.insertWith impossible v Set.empty)
+
+introTVars :: forall s t effs a. (CanGamma s effs, Foldable t) =>
+  t NameTVar -> Eff effs a -> Eff effs a
+introTVars vs act = foldr (introTVar @s) act vs
+
+withinContext1 :: forall s effs a. CanGamma s effs =>
+  UTypeCstr s -> Eff effs a -> Eff effs a
+withinContext1 (clss, UTVar v) =
+  locally (qenv @s) (Map.alter (maybe impossible (Just . Set.insert clss)) v)
+withinContext1 _ = impossible
+
+withinContext :: forall s effs a. CanGamma s effs =>
+  [UTypeCstr s] -> Eff effs a -> Eff effs a
+withinContext cstrs act = foldr withinContext1 act cstrs
 
 getTLevel :: forall s effs. CanGamma s effs => Eff effs Level
 getTLevel = view (level @s)

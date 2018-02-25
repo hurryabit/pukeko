@@ -28,7 +28,7 @@ data FuncDecl (m :: Super DeclMode)
     SupCDecl
     { _supc2name  :: Name EVar
     , _supc2type  :: GenType Void
-    , _supc2tprms :: [TVarBinder]
+    , _supc2tprms :: [NameTVar]
     , _supc2eprms :: [EVarBinder Type]
     , _supc2expr  :: Expr
     }

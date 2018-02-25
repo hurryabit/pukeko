@@ -85,12 +85,9 @@ llELam oldBinds t_rhs rhs1 = do
     let allBinds0 = newBinds ++ toList oldBinds
     let tvCaptured = Set.toList
           (setOf (traverse . _2 . traverse) allBinds0 <> setOf traverse t_rhs)
-    -- TODO: Sort type variables binders in descreasing de Bruijn index order.
-    tyBinds <- for tvCaptured $ \v ->
-      (,) <$> copyName noPos v <*> lookupTVar v
-    let tvMap = map fst tyBinds
-                & zipExact tvCaptured
-                & Map.fromList
+    -- TODO: Sort type variable binders in descreasing de Bruijn index order.
+    tyBinds <- traverse (copyName noPos) tvCaptured
+    let tvMap = Map.fromList (zipExact tvCaptured tyBinds)
     let tvRename :: NameTVar -> NameTVar
         tvRename v = Map.findWithDefault v v tvMap
     let evMap = map nameOf newBinds

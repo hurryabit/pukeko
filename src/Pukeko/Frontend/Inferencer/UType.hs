@@ -4,8 +4,12 @@
 module Pukeko.FrontEnd.Inferencer.UType
   ( Level
   , UVarId
-  , UType (..)
   , UVar (..)
+  , UTypeCstr
+  , UType (..)
+
+  , _UTCtx
+
   , topLevel
   , uvarIdName
   , uvarIds
@@ -34,8 +38,6 @@ import qualified Data.Map.Extended as Map
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type       hiding ((~>), (*~>))
 
-infixr 1 ~>
-
 newtype Level = Level Int
   deriving (Eq, Ord, Enum)
 
@@ -45,12 +47,17 @@ data UVar s
   = UFree UVarId Level
   | ULink (UType s)
 
+type UTypeCstr s = (NameClss, UType s)
+
 data UType s
-  = UTVar (Name TVar)
+  = UTVar NameTVar
   | UTAtm TypeAtom
   | UTApp (UType s) (UType s)
-  | UTUni (NonEmpty TVarBinder) (UType s)
+  | UTUni (NonEmpty NameTVar) (UType s)
+  | UTCtx (UTypeCstr s) (UType s)
   | UVar (STRef s (UVar s))
+
+makePrisms ''UType
 
 pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp (UTAtm TAArr) tx) ty
@@ -64,23 +71,21 @@ uvarIds = map UVarId [1 ..]
 uvarIdName :: UVarId -> Tagged TVar String
 uvarIdName (UVarId n) = Tagged ('_':show n)
 
-mkUTUni :: [TVarBinder] -> UType s -> UType s
+mkUTUni :: [NameTVar] -> UType s -> UType s
 mkUTUni xs0 t0 = case xs0 of
   [] -> t0
   x:xs -> UTUni (x :| xs) t0
 
 -- TODO: Follow links.
-unUTUni1 :: UType s -> ([TVarBinder], UType s)
+unUTUni1 :: UType s -> ([NameTVar], UType s)
 unUTUni1 = \case
   UTUni qvs t1 -> (toList qvs, t1)
   t0 -> ([], t0)
 
-unUTUni :: UType s -> ([[TVarBinder]], UType s)
-unUTUni = go []
-  where
-    go qvss = \case
-      UTUni qvs t -> go (toList qvs:qvss) t
-      t -> (reverse qvss, t)
+unUTUni :: UType s -> ([NonEmpty NameTVar], UType s)
+unUTUni = unwindr _UTUni
+
+infixr 1 ~>
 
 (~>) :: UType s -> UType s -> UType s
 (~>) = UTFun
@@ -109,8 +114,9 @@ open1 = \case
   TAtm a -> UTAtm a
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
   TUni xs tq -> UTUni xs (open1 (B.instantiate (TVar . UTVar . B.name) tq))
+  TCtx (clss, tc) tq -> UTCtx (clss, open1 tc) (open1 tq)
 
-substUType :: Map (Name TVar) (UType s) -> UType s -> ST s (UType s)
+substUType :: Map NameTVar (UType s) -> UType s -> ST s (UType s)
 substUType env = go
   where
     go t0 = case t0 of
@@ -118,6 +124,7 @@ substUType env = go
       UTAtm{} -> pure t0
       UTApp tf tp -> UTApp <$> go tf <*> go tp
       UTUni{} -> impossible  -- we have only rank-1 types
+      UTCtx{} -> impossible
       UVar uref ->
         readSTRef uref >>= \case
           UFree{}  -> pure t0
@@ -144,7 +151,11 @@ prettyUType prec = \case
     pf <- prettyUType 2 tf
     px <- prettyUType 3 tx
     pure $ maybeParens (prec > 2) $ pf <+> px
-  UTUni qvs tq -> prettyTUni prec qvs <$> prettyUType 0 tq
+  UTUni vs tq -> prettyTUni prec vs <$> prettyUType 0 tq
+  UTCtx (clss, tc) tq -> do
+    ptc <- prettyUType 3 tc
+    ptq <- prettyUType 0 tq
+    pure $ maybeParens (prec > 0) (parens (pretty clss <+> ptc) <+> "=>" <+> ptq)
   UVar uref -> do
     uvar <- readSTRef uref
     prettyUVar prec uvar

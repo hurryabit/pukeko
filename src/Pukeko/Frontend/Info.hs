@@ -23,8 +23,6 @@ import Pukeko.Prelude
 
 import           Control.Lens                (foldMapOf, _Right)
 import qualified Data.Map.Extended           as Map
-import qualified Data.Set                    as Set
-
 import qualified Pukeko.AST.SystemF    as SysF
 import qualified Pukeko.AST.SuperCore  as Core
 import           Pukeko.AST.Language
@@ -102,11 +100,11 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
       maybe mempty (signInfo func) (isType typ_)
     SysF.DClss clssDecl@(SysF.MkClssDecl clss param _dcon mthds) ->
       let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
-            let typ1 = mkTUni [(param, Set.singleton clss)] typ0
+            let typ1 = mkTUni [param] (TCtx (clss, TVar param) typ0)
             in  signInfo mthd typ1
                 <> itemInfo info2mthds mthd (clssDecl, mthdDecl)
       in  itemInfo info2clsss clss clssDecl <> mthds_info
-    SysF.DInst inst@(SysF.MkInstDecl _ clss t _ _) ->
+    SysF.DInst inst@(SysF.MkInstDecl _ clss t _ _ _) ->
       itemInfo info2insts (clss, t) (SomeInstDecl inst)
 
 instance HasModuleInfo Core.Module where

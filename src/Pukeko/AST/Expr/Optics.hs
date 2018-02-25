@@ -31,9 +31,10 @@ subst' f = go Set.empty
         where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
       ETyCoe c  e -> ETyCoe c <$> go bound e
-      ETyAbs qv e -> ETyAbs qv <$> go bound e
+      ETyAbs v  e -> ETyAbs v <$> go bound e
       ETyApp e  t -> ETyApp <$> go bound e <*> pure t
       ETyAnn t  e -> ETyAnn t <$> go bound e
+      ECxAbs c  e -> ECxAbs c <$> go bound e
     goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnEVar p) e
 
 freeEVar :: Traversal' (Expr lg) NameEVar
@@ -48,22 +49,6 @@ patnEVar f = \case
   PVar x -> PVar <$> f x
   PCon c ts ps -> PCon c ts <$> (traverse . patnEVar) f ps
   PSimple c ts bs -> PSimple c ts <$> (traverse . _Just) f bs
-
--- FIXME: Bring this back as substitution.
--- instance Monad (Expr lg) where
---   expr >>= f = case expr of
---     ELoc l       -> ELoc (fmap (>>= f) l)
---     EVar x       -> f x
---     EAtm a       -> EAtm a
---     EApp e  a    -> EApp (e >>= f) (a >>= f)
---     ELam b  e    -> ELam b (e >>>= f)
---     ELet ds t    -> ELet (over (traverse . b2bound) (>>=  f) ds) (t >>>= f)
---     ERec ds t    -> ERec (over (traverse . b2bound) (>>>= f) ds) (t >>>= f)
---     EMat t  as   -> EMat (t >>= f) (fmap (over altn2expr (>>>= f)) as)
---     ETyCoe c e   -> ETyCoe c (e >>= f)
---     ETyAbs _ _   -> error "FIXME: THIS IS NOT IMPLEMENTED"
---     ETyApp e t   -> ETyApp (e >>= f) t
---     ETyAnn t e   -> ETyAnn t (e >>= f)
 
 -- | Traverse over all the atoms in an expression.
 expr2atom :: Traversal' (Expr lg) Atom
@@ -80,6 +65,7 @@ expr2atom f = \case
   ETyAbs x e   -> ETyAbs x <$> expr2atom f e
   ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
+  ECxAbs c e   -> ECxAbs c <$> expr2atom f e
 
 -- | Traverse over all types in a definition, i.e., the type in the binder on
 -- the LHS and the types on the RHS.
@@ -101,6 +87,7 @@ expr2type f = \case
   ETyAbs vs e0 -> ETyAbs vs <$> expr2type f e0
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse f ts
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0
+  ECxAbs (c, t) e -> ECxAbs <$> ((c,) <$> f t) <*> expr2type f e
 
 -- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a pattern matching alternative, i.e., the types

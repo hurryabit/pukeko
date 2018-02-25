@@ -145,15 +145,15 @@ foldMap$ll1 : ∀a m. Monoid m -> (a -> m) -> a -> m -> m =
   fun @a @m ->
     fun (dict$Monoid$m : Monoid m) (f : a -> m) (x : a) (m : m) ->
       append$ll1 @m dict$Monoid$m (f x) m
-foldMap$ll2 : ∀a m t. Monoid m -> Foldable t -> (a -> m) -> t a -> m =
+foldMap$ll2 : ∀a m t. Foldable t -> Monoid m -> (a -> m) -> t a -> m =
   fun @a @m @t ->
-    fun (dict$Monoid$m : Monoid m) (dict$Foldable$t : Foldable t) (f : a -> m) ->
+    fun (dict$Foldable$t : Foldable t) (dict$Monoid$m : Monoid m) (f : a -> m) ->
       foldr$ll1 @t dict$Foldable$t @a @m (foldMap$ll1 @a @m dict$Monoid$m f) (empty$ll1 @m dict$Monoid$m)
 length$ll1 : ∀a. a -> Int = fun @a -> fun (x : a) -> 1
 length$ll2 : ∀a t. Foldable t -> t a -> Int =
   fun @a @t ->
     fun (dict$Foldable$t : Foldable t) ->
-      foldMap$ll2 @a @Int @t dict$Monoid$Int dict$Foldable$t (length$ll1 @a)
+      foldMap$ll2 @a @Int @t dict$Foldable$t dict$Monoid$Int (length$ll1 @a)
 map$ll1 : ∀f. Functor f -> (∀a b. (a -> b) -> f a -> f b) =
   fun @f ->
     fun (dict : Functor f) ->
@@ -266,7 +266,7 @@ solve_aux$ll3 : List (List Int) -> List (List Int) =
     match kss with
     | Nil @(List Int) -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
     | Cons @(List Int) ks kss ->
-      foldMap$ll2 @Int @(List (List Int)) @List (dict$Monoid$List @(List Int)) dict$Foldable$List (solve_aux$ll2 kss) ks
+      foldMap$ll2 @Int @(List (List Int)) @List dict$Foldable$List (dict$Monoid$List @(List Int)) (solve_aux$ll2 kss) ks
 solve$ll1 : Int -> List (List Int) =
   fun (n : Int) ->
     solve_aux$ll3 (replicate$ll1 @(List Int) n (take$ll1 @Int n ints))

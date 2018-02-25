@@ -12,7 +12,6 @@ import Pukeko.Pretty
 
 import           Control.Lens (makeLensesFor)
 import           Data.Aeson.TH
-import qualified Data.Set as Set
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
@@ -20,7 +19,7 @@ import           Pukeko.AST.Type
 -- TODO: We could make it @Type Int@!?
 data TConDecl = MkTConDecl
   { _tcon2name  :: Name TCon
-  , _tcon2prms  :: [Name TVar]
+  , _tcon2prms  :: [NameTVar]
   , _tcon2dcons :: Either Type [DConDecl]
   }
 
@@ -36,7 +35,7 @@ typeOfDCon :: TConDecl -> DConDecl -> GenType Void
 typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
   assert (tcon == tconRef) $
   let res = mkTApp (TCon tcon) (map TVar tparams)
-  in  closeT (mkTUni (map (, Set.empty) tparams) (fields *~> res))
+  in  closeT (mkTUni tparams (fields *~> res))
 
 type instance NameSpaceOf TConDecl = TCon
 type instance NameSpaceOf DConDecl = DCon

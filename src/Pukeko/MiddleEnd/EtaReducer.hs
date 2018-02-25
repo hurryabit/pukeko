@@ -47,7 +47,7 @@ erSupCDecl = \case
           -- run.
         , nullOf (expr2type . traverse) e1
         , length vs0 == length vs1
-        , map fst vs0 == toList vs1 ->
+        , vs0 == toList vs1 ->
           SupCDecl z tz [] [] e1
       -- Promote type abstraction when the super combinator doesn't contain any
       -- abstractions itself:

@@ -20,6 +20,7 @@ module Pukeko.AST.Expr
   , altn2expr
 
   , _AVal
+  , _ECxAbs
 
   , mkELam
   , mkETyApp
@@ -68,9 +69,10 @@ data Expr lg
   |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ETyCoe Coercion (Expr lg)
-  | TypeOf lg ~ Type     => ETyAbs (NonEmpty TVarBinder) (Expr lg)
+  | TypeOf lg ~ Type     => ETyAbs (NonEmpty NameTVar) (Expr lg)
   | IsPreTyped lg ~ True => ETyApp (Expr lg) (NonEmpty (TypeOf lg))
   | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg )
+  | (IsClassy lg ~ True, TypeOf lg ~ Type) => ECxAbs TypeCstr (Expr lg)
 
 data Altn lg = MkAltn
   { _altn2patn :: Patn lg
@@ -99,6 +101,7 @@ pattern ENum n = EAtm (ANum n)
 -- * Derived optics
 makeLenses ''Altn
 makePrisms ''Atom
+makePrisms ''Expr
 makeLensesFor [("_b2binder", "b2binder")] ''Bind
 
 -- NOTE: The generated lens would not be polymorphic in @lg@.
@@ -138,10 +141,10 @@ mkETyApp e0 = \case
   []    -> e0
   t1:ts -> ETyApp e0 (t1 :| ts)
 
-mkETyAbs :: TypeOf lg ~ Type => [TVarBinder] -> Expr lg -> Expr lg
-mkETyAbs qvs0 e0 = case qvs0 of
-  []     -> e0
-  qv:qvs -> ETyAbs (qv :| qvs) e0
+mkETyAbs :: TypeOf lg ~ Type => [NameTVar] -> Expr lg -> Expr lg
+mkETyAbs vs0 e0 = case vs0 of
+  []   -> e0
+  v:vs -> ETyAbs (v :| vs) e0
 
 
 -- * Instances
@@ -223,6 +226,11 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     -- make a distinction between those given by the user and those generated
     -- during type inference.
     ETyAnn _ e -> prettyPrec prec e
+    ECxAbs (clss, typ) e ->
+      maybeParens (prec > 0) $
+        hang
+          ("fun" <+> parens (pretty clss <+> prettyPrec 3 typ) <+> "->")
+          2 (prettyPrec 0 e)
 
 prettyELam :: (TypeOf lg ~ Type, Foldable t) =>
   Int -> t (EVarBinder (TypeOf lg)) -> Expr lg -> Doc ann
@@ -232,12 +240,12 @@ prettyELam prec bs e
       maybeParens (prec > 0) $
       hang ("fun" <+> hsepMap (prettyPrec 1 . uncurry (:::)) bs <+> "->") 2 (pretty e)
 
-prettyETyAbs :: (Foldable t) => Int -> t TVarBinder -> Doc ann -> Doc ann
-prettyETyAbs prec qvs d
-  | null qvs   = maybeParens (prec > 0) d
+prettyETyAbs :: (Foldable t) => Int -> t NameTVar -> Doc ann -> Doc ann
+prettyETyAbs prec vs d
+  | null vs   = maybeParens (prec > 0) d
   | otherwise =
       maybeParens (prec > 0)
-      $ hang ("fun" <+> prettyAtType prettyTVarBinder qvs <+> "->") 2 d
+      $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 d
 
 prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList

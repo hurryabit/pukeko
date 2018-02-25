@@ -65,6 +65,10 @@ kcType k = \case
     kcType ktp tp
     kcType (Arrow ktp k) tf
   TUni{} -> impossible  -- we have only rank-1 types and no type annotations
+  -- FIXME: The class constraint needs to be checked as well.
+  TCtx _ t1 -> do
+    unify Star k
+    kcType Star t1
 
 kcTConDecl :: TConDecl -> KC n s ()
 kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
@@ -86,9 +90,8 @@ kcVal = \case
   TUni xs t -> k (toList xs) (B.instantiate (TVar . B.name) t)
   t         -> k [] t
   where
-    k :: [TVarBinder] -> Type -> KC n s ()
-    k qvs t0 = do
-      let vs = map fst qvs
+    k :: [NameTVar] -> Type -> KC n s ()
+    k vs t0 = do
       uvars <- traverse (const freshUVar) vs
       let env = Map.fromList (zip vs uvars)
       local (const env) (kcType Star t0)

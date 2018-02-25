@@ -53,6 +53,7 @@ occursCheck uref1 t2 = case t2 of
     pure ()
   UTAtm{} -> pure ()
   UTUni{} -> impossible  -- UVar is assumed to be unwound
+  UTCtx{} -> impossible
   UTApp tf tp -> occursCheck uref1 tf *> occursCheck uref1 tp
 
 unify :: forall s effs. CanUnify s effs => UType s -> UType s -> Eff effs ()

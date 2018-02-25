@@ -311,14 +311,14 @@ g_pop 4
 g_unwind
 
 g_globstart foldMap$ll2, 3
-g_push 0
+g_push 1
 g_pushglobal empty$ll1, 1
 g_mkap 1
 g_push 3
-g_push 2
+g_push 3
 g_pushglobal foldMap$ll1, 4
 g_mkap 2
-g_push 3
+g_push 2
 g_pushglobal foldr$ll1, 1
 g_updap 3, 4
 g_pop 3
@@ -332,8 +332,8 @@ g_return
 
 g_globstart length$ll2, 1
 g_pushglobal length$ll1, 1
-g_push 1
 g_pushglobal dict$Monoid$Int, 0
+g_push 2
 g_pushglobal foldMap$ll2, 3
 g_updap 3, 2
 g_pop 1
@@ -761,8 +761,8 @@ g_push 0
 g_push 2
 g_pushglobal solve_aux$ll2, 2
 g_mkap 1
-g_pushglobal dict$Foldable$List, 0
 g_pushglobal dict$Monoid$List, 0
+g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldMap$ll2, 3
 g_updap 4, 4
 g_pop 3

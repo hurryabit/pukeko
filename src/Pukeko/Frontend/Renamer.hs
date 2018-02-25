@@ -9,8 +9,8 @@ import Pukeko.Prelude
 import           Control.Lens.Extras (is)
 import           Control.Monad.Extra
 import           Data.Bitraversable
+import           Data.List.Extra   (nubOrd)
 import qualified Data.Map.Extended as Map
-import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
@@ -108,25 +108,24 @@ rnType env = go
 -- | Collect all type class/type variable pairs in a type constraint. Rename all
 -- references to type classes.
 rnConstraints :: GlobalEffs effs =>
-  Map (Ps.Name TVar) (Name TVar) -> Ps.TypeCstr ->
-  Eff effs (Map (Name TVar) (Set (Name Clss)))
+  Map (Ps.Name TVar) (Name TVar) -> Ps.TypeCstr -> Eff effs [TypeCstr]
 rnConstraints env (Ps.MkTypeCstr constraints) =
-  fmap (fmap Set.fromList . Map.fromMultiList) $
+  fmap (map (second TVar) . nubOrd) .
   for constraints $ \(clss, unlctd -> tvar0) -> do
     case env Map.!? tvar0 of
       Nothing -> throwHere ("unknown type variable" <:~> pretty tvar0)
       Just tvar1 ->
-        (,) tvar1 <$> lookupGlobal tconTab (is _DClss) "unknown type class" clss
+        (, tvar1) <$> lookupGlobal tconTab (is _DClss) "unknown type class" clss
 
 -- | Rename a type scheme. Fails if there are constraints on type variables
 -- which are contained in the map or not in the type.
 rnTypeScheme :: CanRn effs =>
-  Map (Ps.Name TVar) (Name TVar) -> Ps.TypeScheme -> Eff effs Type
-rnTypeScheme env0 (Ps.MkTypeScheme qs0 t) = do
-  env1 <- traverse mkName (Ps.freeTVars t `Map.difference` env0)
-  qs1 <- rnConstraints env1 qs0
-  qvs <- applyConstraints (Map.elems env1) qs1
-  mkTUni qvs <$> rnType (env1 <> env0) t
+  Map (Ps.Name TVar) NameTVar -> Ps.TypeScheme -> Eff effs Type
+rnTypeScheme env0 (Ps.MkTypeScheme cstrs0 t0) = do
+  env1 <- traverse mkName (Ps.freeTVars t0 `Map.difference` env0)
+  cstrs1 <- rnConstraints env1 cstrs0
+  t1 <- rnType (env1 <> env0) t0
+  pure (mkTUni (Map.elems env1) (rewindr _TCtx cstrs1 t1))
 
 -- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
@@ -278,8 +277,8 @@ rnClssDecl (Ps.MkClssDecl name param0 methods0) =
     dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
     param1 <- mkName param0
     let env = Map.singleton (unlctd param0) param1
-    let qvs = [(param1, Set.singleton clss)]
-    methods1 <- traverse (rnSignDecl env (mkTUni qvs)) methods0
+    let close = mkTUni [param1] . TCtx (clss, TVar param1)
+    methods1 <- traverse (rnSignDecl env close) methods0
     pure (MkClssDecl clss param1 dcon methods1)
 
 -- | Rename an instance definition. There's /no/ check whether an instance for
@@ -294,9 +293,7 @@ rnInstDecl (Ps.MkInstDecl clss0 tatom0 params0 cstrs0 methods0) = do
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)
   cstrs1 <- rnConstraints env cstrs0
-  MkInstDecl name clss1 tatom1
-    <$> applyConstraints params1 cstrs1
-    <*> traverse rnFuncDecl methods0
+  MkInstDecl name clss1 tatom1 params1 cstrs1 <$> traverse rnFuncDecl methods0
 
 -- | Rename an infix operator declaration, i.e., introduce the mapping from the
 -- infix operator to the backing function to the global environment.

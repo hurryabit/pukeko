@@ -5,48 +5,51 @@
 module Pukeko.AST.Type
   ( IsType (..)
   , NoType (..)
+  , GenTypeCstr
+  , TypeCstr
   , TypeAtom (..)
-  , TVarBinder
   , GenType (..)
   , Type
   , CoercionDir (..)
   , Coercion (..)
   , (:::) (..)
+
   , pattern TArr
+  , pattern TInt
   , pattern TCon
+  , pattern TFun
+  , _TApp
+  , _TCtx
+
   , closeT
-  -- , mkTVarsQ
   , mkTUni
   , gatherTUni
-  , pattern TFun
   , (~>)
   , (*~>)
   , mkTApp
   , gatherTApp
-  , applyConstraints
-  , prettyTypeCstr
+  , prettyTypeCstrs
   , prettyTUni
-  , prettyTVarBinder
+
+  , module Pukeko.AST.Unwind
   )
   where
 
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import qualified Bound as B
+import qualified Bound      as B
 import qualified Bound.Name as B
-import qualified Bound.Var as B
-import           Control.Monad.Extra
+import qualified Bound.Var  as B
 import           Control.Monad.Trans.Class (lift)
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Deriving
 import           Data.Functor.Classes
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Extended as Map
-import qualified Data.Set          as Set
 
 import           Pukeko.AST.Name
+import           Pukeko.AST.Unwind
 import           Pukeko.Orphans ()
 
 class IsType t where
@@ -54,23 +57,31 @@ class IsType t where
 
 data NoType = NoType
 
+type GenTypeCstr v = (NameClss, GenType v)
+
+type TypeCstr = GenTypeCstr NameTVar
+
 data TypeAtom
   = TAArr
   | TAInt
   | TACon (Name TCon)
 
-type TVarBinder = (NameTVar, Set NameClss)
-
 data GenType tv
   = TVar tv
   | TAtm TypeAtom
   | TApp (GenType tv) (GenType tv)
-  | TUni (NonEmpty TVarBinder) (B.Scope (B.Name NameTVar Int) GenType tv)
+  | TUni (NonEmpty NameTVar) (B.Scope (B.Name NameTVar Int) GenType tv)
+  | TCtx (NameClss, GenType tv) (GenType tv)
+    -- NOTE: ^ The first pair is actually a @GenTypeCstr tv@. Unfortunately,
+    -- putting the type synonym there breaks @B.makeBound ''GenType@ below.
 
 type Type = GenType (Name TVar)
 
 pattern TArr :: GenType tv
 pattern TArr = TAtm TAArr
+
+pattern TInt :: GenType tv
+pattern TInt = TAtm TAInt
 
 pattern TCon :: Name TCon -> GenType tv
 pattern TCon tcon = TAtm (TACon tcon)
@@ -89,21 +100,22 @@ data Coercion = MkCoercion
 -- the for "name : type" easier.
 data a ::: t = a ::: t
 
+makePrisms ''GenType
 B.makeBound ''GenType
 
 closeT :: HasCallStack => Type -> GenType Void
-closeT = maybe impossible id . B.closed
+closeT t = maybe (traceJSON t impossible) id (B.closed t)
 
-mkTUni :: [TVarBinder] -> Type -> Type
-mkTUni qvs0 t0 = case qvs0 of
-  []     -> t0
-  qv:qvs -> TUni (qv :| qvs) (B.abstractName (env Map.!?) t0)
-    where env = Map.fromList (zipWithFrom (\i (v, _) -> (v, i)) 0 qvs0)
+mkTUni :: [NameTVar] -> Type -> Type
+mkTUni vs0 t0 = case vs0 of
+  []   -> t0
+  v:vs -> TUni (v :| vs) (B.abstractName (env Map.!?) t0)
+    where env = Map.fromList (zip (v:vs) [0 ..])
 
-gatherTUni :: GenType tv -> ([TVarBinder], B.Scope (B.Name NameTVar Int) GenType tv)
+gatherTUni :: GenType tv -> ([NameTVar], B.Scope (B.Name NameTVar Int) GenType tv)
 gatherTUni = \case
-  TUni qvs t1 -> (toList qvs, t1)
-  t0          -> ([], lift t0)
+  TUni vs t1 -> (toList vs, t1)
+  t0         -> ([], lift t0)
 
 infixr 1 ~>, *~>
 
@@ -113,25 +125,12 @@ infixr 1 ~>, *~>
 (*~>) :: Foldable t => t (GenType tv) -> GenType tv -> GenType tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
+-- TODO: Remove 'mkTApp' and 'gatherTApp'.
 mkTApp :: (Foldable t) => GenType tv -> t (GenType tv) -> GenType tv
 mkTApp = foldl TApp
 
 gatherTApp :: GenType tv -> (GenType tv, [GenType tv])
-gatherTApp = go []
-  where
-    go us = \case
-      TApp t u -> go (u:us) t
-      t        -> (t, us)
-
--- * Deep traversals
-applyConstraints :: CanThrowHere effs =>
-  [Name TVar] -> Map (Name TVar) (Set (Name Clss)) -> Eff effs [TVarBinder]
-applyConstraints binders constraints = do
-  let badNames = Map.keysSet constraints `Set.difference` Set.fromList binders
-  whenJust (Set.lookupMin badNames) $ \name ->
-    throwHere ("constraints on unbound type variable" <:~> pretty name)
-  let qualBinder binder = (binder, Map.findWithDefault Set.empty binder constraints)
-  pure (map qualBinder binders)
+gatherTApp = unwindl _TApp
 
 instance IsType NoType where
   isType = const Nothing
@@ -144,14 +143,14 @@ instance Eq1 GenType where
     (TVar x1, TVar x2) -> x1 `eq` x2
     (TAtm a1, TAtm a2) -> a1 == a2
     (TApp tf1 tp1, TApp tf2 tp2) -> liftEq eq tf1 tf2 && liftEq eq tp1 tp2
-    (TUni xs1 tq1, TUni xs2 tq2) ->
-      length xs1 == length xs2
-      && and (NE.zipWith ((==) `on` snd) xs1 xs2)
-      && liftEq eq tq1 tq2
+    (TUni xs1 tq1, TUni xs2 tq2) -> length xs1 == length xs2 && liftEq eq tq1 tq2
+    (TCtx (c1, tc1) tq1, TCtx (c2, tc2) tq2) ->
+      c1 == c2 && liftEq eq tc1 tc2 && liftEq eq tq1 tq2
     (TVar{}, _) -> False
     (TAtm{}, _) -> False
     (TApp{}, _) -> False
     (TUni{}, _) -> False
+    (TCtx{}, _) -> False
 
 instance Eq v => Eq (GenType v) where (==) = eq1
 
@@ -177,24 +176,21 @@ instance Pretty v => PrettyPrec (GenType v) where
         TUni qvs tq ->
           prettyTUni prec qvs
           (go (B.unvar (pretty . B.name) prettyVar) 0 (B.fromScope tq))
-          -- (pretty (instantiateN (fmap (TVar . _qvar2tvar) qvs) tq))
+        t0@TCtx{} ->
+          let (cstrs0, t1) = unwindr _TCtx t0
+              cstrs1 = [ pretty clss <+> go prettyVar 3 typ | (clss, typ) <- cstrs0 ]
+          in  maybeParens (prec > 0)
+              (parens (hsep (punctuate "," cstrs1)) <+> "=>" <+> go prettyVar 0 t1)
 
-prettyTypeCstr :: Foldable t => t TVarBinder -> Doc ann
-prettyTypeCstr qvs
-  | null qs   = mempty
-  | otherwise = parens (hsep (punctuate "," qs)) <+> "=>"
-  where
-    qs = [ pretty c <+> pretty v | (v, q) <- toList qvs, c <- toList q ]
+prettyTypeCstrs :: [TypeCstr] -> Doc ann
+prettyTypeCstrs cstrs0
+  | null cstrs0 = mempty
+  | otherwise   = parens (hsep (punctuate "," cstrs1)) <+> "=>"
+  where cstrs1 = [ pretty clss <+> prettyPrec 3 typ | (clss, typ) <- cstrs0 ]
 
-prettyTUni :: Foldable t => Int -> t TVarBinder -> Doc ann -> Doc ann
-prettyTUni prec qvs tq =
-  maybeParens (prec > 0)
-  ("∀" <> hsepMap (pretty . fst) qvs <> "." <+> prettyTypeCstr qvs <+> tq)
-
-prettyTVarBinder :: TVarBinder -> Doc ann
-prettyTVarBinder (v, q)
-  | null q    = pretty v
-  | otherwise = parens (pretty v <+> "|" <+> hsepMap pretty q)
+prettyTUni :: Foldable t => Int -> t NameTVar -> Doc ann -> Doc ann
+prettyTUni prec vs tq =
+  maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> tq)
 
 instance (Pretty a, Pretty t) => Pretty (a ::: t) where
 instance (Pretty a, Pretty t) => PrettyPrec (a ::: t) where

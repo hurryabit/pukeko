@@ -6,7 +6,6 @@ import Pukeko.Prelude
 import Pukeko.Pretty
 
 import qualified Bound.Name as B
-import qualified Data.List.NE as NE
 import qualified Data.Map.Extended as Map
 import qualified Data.Set     as Set
 
@@ -70,37 +69,39 @@ typeOf = \case
     checkCoercion c t_from t_to
     pure t_to
   ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
-  ETyAbs qvs e0 ->
-    withinTScope qvs (TUni qvs . B.abstractName (env Map.!?) <$> typeOf e0)
-    where env = Map.fromList (zipWithFrom (\i (v, _) -> (v, i)) 0 (toList qvs))
-  ETyApp e0 ts1 -> do
+  ETyAbs vs e0 ->
+    withinTScope vs (TUni vs . B.abstractName (env Map.!?) <$> typeOf e0)
+    where env = Map.fromList (zip (toList vs) [0 ..])
+  ETyApp e0 args -> do
     t0 <- typeOf e0
     case t0 of
-      TUni qvs tq -> do
-        unless (length qvs == length ts1) $
-          throwHere ("expected" <+> pretty (length qvs) <+> "type arguments, but found"
-                     <+> pretty (length ts1) <+> "type arguments")
-        NE.zipWithM_ satisfiesCstrs ts1 qvs
-        pure (B.instantiateName (toList ts1 !!) tq)
+      TUni prms t1 -> do
+        unless (length prms == length args) $
+          throwHere ("expected" <+> pretty (length prms) <+> "type arguments, but found"
+                     <+> pretty (length args) <+> "type arguments")
+        let t2 = B.instantiateName (toList args !!) t1
+        let (cstrs, t3) = unwindr _TCtx t2
+        traverse_ checkCstr cstrs
+        pure t3
       TFun{} ->
         throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
+  ECxAbs cstr e -> TCtx cstr <$> withinContext1 cstr (typeOf e)
 
-satisfiesCstrs :: Type -> TVarBinder -> TC ()
-satisfiesCstrs t = traverse_ (satisfiesCstr t) . snd
-
-satisfiesCstr :: Type -> Name Clss -> TC ()
-satisfiesCstr (gatherTApp -> (t1, targs)) clss = do
+checkCstr :: TypeCstr -> TC ()
+checkCstr (clss, unwindl _TApp -> (t1, targs)) = do
   let throwNoInst =
         throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
   case t1 of
     TAtm atom ->
       lookupInfo info2insts (clss, atom) >>= \case
         Nothing -> throwNoInst
-        Just (SomeInstDecl inst) ->
-          -- the kind checker guarantees parameter/argument arity
-          sequence_ (zipWithExact satisfiesCstrs targs (SysF._inst2params inst))
+        Just (SomeInstDecl (SysF.MkInstDecl _ _ _ prms cstrs0 _)) -> do
+          -- the kind checker guarantees macthing parameter/argument arity
+          let inst = (>>= (Map.fromList (zipExact prms targs) Map.!))
+          let cstrs1 = map (second inst) cstrs0
+          traverse_ checkCstr cstrs1
     TVar v
       | null targs -> do
           qual <- lookupTVar v
@@ -151,18 +152,19 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DFunc (SysF.MkFuncDecl _ typ_ body) -> checkExpr body typ_
     SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
-    SysF.DInst (SysF.MkInstDecl _ _ atom qvs ds) -> do
-      let t_inst = mkTApp (TAtm atom) (map (TVar . fst) qvs)
+    SysF.DInst (SysF.MkInstDecl _ _ atom prms cstrs ds) -> do
+      let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      withinTScope qvs $ for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
-        (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
-        -- TODO: There might be some lexical name capturing going on here: type
-        -- variables with different IDs could still share the same lexical name.
-        -- Since this is a UX thing and all type errors here are compiler bugs,
-        -- we don't put any effort into correcting this until we finally hit
-        -- that problem.
-        let t_decl = t_mthd >>= const t_inst
-        checkExpr body t_decl
+      withinTScope prms $ withinContext cstrs $
+        for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
+          (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
+          -- TODO: There might be some lexical name capturing going on here: type
+          -- variables with different IDs could still share the same lexical name.
+          -- Since this is a UX thing and all type errors here are compiler bugs,
+          -- we don't put any effort into correcting this until we finally hit
+          -- that problem.
+          let t_decl = t_mthd >>= const t_inst
+          checkExpr body t_decl
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
