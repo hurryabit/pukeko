@@ -119,9 +119,9 @@ instantiate = go Map.empty Seq.empty
       UTUni (toList -> vs) t0 -> do
         env1 <- for vs $ \v -> (v,) <$> freshUVar
         go (Map.fromList env1 `Map.union` env0) cstrs0 (mkETyApp e0 (map snd env1)) t0
-      UTCtx (clss, tc0) t0 -> do
-        tc1 <- sendM (substUType env0 tc0)
-        go env0 (cstrs0 Seq.|> (clss, tc1)) e0 t0
+      UTCtx cstr0 t0 -> do
+        cstr1 <- _2 (sendM . substUType env0) cstr0
+        go env0 (cstrs0 Seq.|> cstr1) (ECxApp e0 cstr1) t0
       t0 -> do
         t1 <- sendM (substUType env0 t0)
         pure (e0, t1, cstrs0)
@@ -167,12 +167,13 @@ inferRec defns0 = do
     zipWithM_ unify us ts1
     pure (rs1, ts1, fold cstrs1)
   (ts2, vs2) <- second (toList . fold) . unzip <$> traverse generalize ts1
-  MkSplitCstrs cstrs_ret1 cstrs_def <- splitCstrs cstrs1
-  let qual t2 = mkUTUni vs2 (foldr (UTCtx . second UTVar) t2 cstrs_ret1)
+  MkSplitCstrs rets1 cstrs_def <- splitCstrs cstrs1
+  let rets2 = map (second UTVar) (toList rets1)
+  let qual t2 = mkUTUni vs2 (rewindr _UTCtx rets2 t2)
   let ts3 = fmap qual ts2
   let vs3 = map UTVar vs2
   let addETyApp x
-        | x `Set.member` Set.fromList ls0 = mkETyApp (EVar x) vs3
+        | x `Set.member` Set.fromList ls0 = foldl ECxApp (mkETyApp (EVar x) vs3) rets2
         | otherwise                       = EVar x
   let rs2 = map (subst addETyApp) rs1
   let defns1 = zipWith3 (\l0 t3 r2 -> MkBind (l0, t3) r2) ls0 ts3 rs2
@@ -314,8 +315,9 @@ qualDefn (MkBind (x, t0) e0) = case t0 of
   UTUni (toList -> qvs) (unwindr _UTCtx -> (cstrs0, t1)) ->
     localizeTQ qvs $ do
       cstrs1 <- (traverse . _2) qualType cstrs0
-      t2  <- mkTUni qvs . rewindr _TCtx cstrs1 <$> qualType t1
-      e2  <- mkETyAbs qvs . rewindr _ECxAbs cstrs1 <$> qualExpr e0
+      t1' <- qualType t1
+      let t2  = mkTUni qvs (rewindr _TCtx cstrs1 t1')
+      e2  <- mkETyAbs qvs . rewindr _ECxAbs cstrs1 . ETyAnn t1' <$> qualExpr e0
       pure (MkBind (x, t2) e2)
   _ -> MkBind <$> ((x,) <$> qualType t0) <*> qualExpr e0
 
@@ -332,6 +334,7 @@ qualExpr = \case
   ETyCoe c  e0 -> ETyCoe c <$> qualExpr e0
   ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
+  ECxApp e cstr -> ECxApp <$> qualExpr e <*> _2 qualType cstr
 
 qualAltn :: Altn (Aux s) -> TQ s (Altn Out)
 qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e

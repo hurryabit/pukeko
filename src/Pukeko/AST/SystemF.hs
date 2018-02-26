@@ -149,7 +149,7 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
       "class" <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
     DInst (MkInstDecl _ c t0 vs cstrs ds) ->
-      "instance" <+> prettyTypeCstrs cstrs <+> pretty c <+> prettyPrec 3 t1
+      "instance" <+> prettyContext cstrs <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where
         t1 = mkTApp (TAtm t0) (map TVar vs)

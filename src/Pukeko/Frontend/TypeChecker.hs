@@ -79,20 +79,25 @@ typeOf = \case
         unless (length prms == length args) $
           throwHere ("expected" <+> pretty (length prms) <+> "type arguments, but found"
                      <+> pretty (length args) <+> "type arguments")
-        let t2 = B.instantiateName (toList args !!) t1
-        let (cstrs, t3) = unwindr _TCtx t2
-        traverse_ checkCstr cstrs
-        pure t3
-      TFun{} ->
-        throwHere "expected value argument, but found type argument"
+        pure (B.instantiateName (toList args !!) t1)
+      TFun{} -> throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
   ECxAbs cstr e -> TCtx cstr <$> withinContext1 cstr (typeOf e)
+  ECxApp e0 cstr0 -> do
+    t0 <- typeOf e0
+    case t0 of
+      TCtx cstr1 t1 -> do
+        checkCstr cstr1
+        unless (cstr0 == cstr1) $
+          throwHere ("expected evidence for" <+> prettyCstr cstr1 <>
+                     ", but found evidence for" <+> prettyCstr cstr0)
+        pure t1
+      _ -> throwHere "unexpected constraint argument"
 
 checkCstr :: TypeCstr -> TC ()
-checkCstr (clss, unwindl _TApp -> (t1, targs)) = do
-  let throwNoInst =
-        throwHere ("TC: no instance for" <+> pretty clss <+> parens (pretty t1))
+checkCstr cstr@(clss, unwindl _TApp -> (t1, targs)) = do
+  let throwNoInst = throwHere ("TC: no evidence for" <+> prettyCstr cstr)
   case t1 of
     TAtm atom ->
       lookupInfo info2insts (clss, atom) >>= \case
@@ -146,7 +151,7 @@ checkBind :: IsTyped lg => Bind lg -> TC ()
 checkBind (MkBind (_, t) e) = checkExpr e t
 
 instance IsTyped st => TypeCheckable (SysF.Module st) where
-  checkModule (SysF.MkModule decls) = for_ decls $ \case
+  checkModule (SysF.MkModule decls) = for_ decls $ here' $ \case
     SysF.DType{} -> pure ()
     SysF.DSign{} -> pure ()
     SysF.DFunc (SysF.MkFuncDecl _ typ_ body) -> checkExpr body typ_

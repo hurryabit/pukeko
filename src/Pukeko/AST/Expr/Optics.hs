@@ -35,6 +35,7 @@ subst' f = go Set.empty
       ETyApp e  t -> ETyApp <$> go bound e <*> pure t
       ETyAnn t  e -> ETyAnn t <$> go bound e
       ECxAbs c  e -> ECxAbs c <$> go bound e
+      ECxApp e  c -> ECxApp <$> go bound e <*> pure c
     goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnEVar p) e
 
 freeEVar :: Traversal' (Expr lg) NameEVar
@@ -66,6 +67,7 @@ expr2atom f = \case
   ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
   ECxAbs c e   -> ECxAbs c <$> expr2atom f e
+  ECxApp e c   -> ECxApp <$> expr2atom f e <*> pure c
 
 -- | Traverse over all types in a definition, i.e., the type in the binder on
 -- the LHS and the types on the RHS.
@@ -88,6 +90,7 @@ expr2type f = \case
   ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse f ts
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0
   ECxAbs (c, t) e -> ECxAbs <$> ((c,) <$> f t) <*> expr2type f e
+  ECxApp e (c, t) -> ECxApp <$> expr2type f e <*> ((c,) <$> f t)
 
 -- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a pattern matching alternative, i.e., the types

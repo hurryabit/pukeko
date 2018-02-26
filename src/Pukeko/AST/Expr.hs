@@ -27,6 +27,7 @@ module Pukeko.AST.Expr
   , mkETyAbs
   , unwindEApp
   , unwindELam
+  , unEAnn
 
   , prettyELam
   , prettyETyAbs
@@ -38,6 +39,7 @@ import Pukeko.Prelude
 import           Control.Lens (makeLensesFor)
 import           Data.Aeson
 import           Data.Aeson.TH
+import           Unsafe.Coerce
 
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
@@ -73,6 +75,7 @@ data Expr lg
   | IsPreTyped lg ~ True => ETyApp (Expr lg) (NonEmpty (TypeOf lg))
   | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg )
   | (IsClassy lg ~ True, TypeOf lg ~ Type) => ECxAbs TypeCstr (Expr lg)
+  | (IsClassy lg ~ True, IsPreTyped lg ~ True) => ECxApp (Expr lg) (NameClss, TypeOf lg)
 
 data Altn lg = MkAltn
   { _altn2patn :: Patn lg
@@ -96,17 +99,22 @@ pattern ENum n = EAtm (ANum n)
 
 -- NOTE: Do NOT forget to add new constructors here.
 {-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, EMat,
-             ETyCoe, ETyAbs, ETyApp, ETyAnn #-}
+             ETyCoe, ETyAbs, ETyApp, ETyAnn, ECxAbs, ECxApp #-}
 
 -- * Derived optics
-makeLenses ''Altn
 makePrisms ''Atom
 makePrisms ''Expr
+makeLensesFor [("_altn2patn", "altn2patn")]''Altn
 makeLensesFor [("_b2binder", "b2binder")] ''Bind
 
 -- NOTE: The generated lens would not be polymorphic in @lg@.
 b2bound :: (TypeOf lg1 ~ TypeOf lg2) => Lens (Bind lg1) (Bind lg2) (Expr lg1) (Expr lg2)
 b2bound f (MkBind b e) = MkBind b <$> f e
+
+altn2expr :: (TypeOf lg1 ~ TypeOf lg2, IsNested lg1 ~ IsNested lg2) =>
+  Lens (Altn lg1) (Altn lg2) (Expr lg1) (Expr lg2)
+-- FIXME: This 'unsafeCoerce' must go!
+altn2expr f (MkAltn p e) = MkAltn (unsafeCoerce p) <$> f e
 
 -- * Smart constructors
 
@@ -146,6 +154,10 @@ mkETyAbs vs0 e0 = case vs0 of
   []   -> e0
   v:vs -> ETyAbs (v :| vs) e0
 
+unEAnn :: Expr lg -> Expr lg
+unEAnn = \case
+  ETyAnn _ e -> unEAnn e
+  e          -> e
 
 -- * Instances
 
@@ -229,8 +241,11 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     ECxAbs (clss, typ) e ->
       maybeParens (prec > 0) $
         hang
-          ("fun" <+> parens (pretty clss <+> prettyPrec 3 typ) <+> "->")
+          ("fun" <+> "?" <> parens (pretty clss <+> prettyPrec 3 typ) <+> "->")
           2 (prettyPrec 0 e)
+    ECxApp e0 (clss, typ) ->
+      maybeParens (prec > Op.aprec)
+      $ prettyPrec Op.aprec e0 <+> "?" <> parens (pretty clss <+> prettyPrec 3 typ)
 
 prettyELam :: (TypeOf lg ~ Type, Foldable t) =>
   Int -> t (EVarBinder (TypeOf lg)) -> Expr lg -> Doc ann

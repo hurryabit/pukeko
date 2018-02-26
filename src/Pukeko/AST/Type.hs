@@ -28,7 +28,8 @@ module Pukeko.AST.Type
   , (*~>)
   , mkTApp
   , gatherTApp
-  , prettyTypeCstrs
+  , prettyCstr
+  , prettyContext
   , prettyTUni
 
   , module Pukeko.AST.Unwind
@@ -182,11 +183,13 @@ instance Pretty v => PrettyPrec (GenType v) where
           in  maybeParens (prec > 0)
               (parens (hsep (punctuate "," cstrs1)) <+> "=>" <+> go prettyVar 0 t1)
 
-prettyTypeCstrs :: [TypeCstr] -> Doc ann
-prettyTypeCstrs cstrs0
-  | null cstrs0 = mempty
-  | otherwise   = parens (hsep (punctuate "," cstrs1)) <+> "=>"
-  where cstrs1 = [ pretty clss <+> prettyPrec 3 typ | (clss, typ) <- cstrs0 ]
+prettyCstr :: TypeCstr -> Doc ann
+prettyCstr (clss, typ) = pretty clss <+> prettyPrec 3 typ
+
+prettyContext :: [TypeCstr] -> Doc ann
+prettyContext cstrs
+  | null cstrs = mempty
+  | otherwise  = parens (hsep (punctuate "," (map prettyCstr cstrs))) <+> "=>"
 
 prettyTUni :: Foldable t => Int -> t NameTVar -> Doc ann -> Doc ann
 prettyTUni prec vs tq =

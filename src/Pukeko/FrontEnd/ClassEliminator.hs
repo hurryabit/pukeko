@@ -4,7 +4,7 @@ module Pukeko.FrontEnd.ClassEliminator
 
 import Pukeko.Prelude
 
-import qualified Bound.Name as B
+-- import qualified Bound.Name as B
 import qualified Bound.Scope as B
 import           Data.Coerce       (coerce)
 import qualified Data.List.NE      as NE
@@ -17,22 +17,18 @@ import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.Type
 import           Pukeko.FrontEnd.Info
-import           Pukeko.FrontEnd.Gamma
 
 type In  = Unnested
 type Out = Unclassy
 
 type DictMap = Map (NameTVar, NameClss) NameEVar
 type CanCE effs =
-  ( CanGamma effs
-  , Members [Reader DictMap, Reader SourcePos, Reader ModuleInfo, NameSource] effs
-  )
+  Members [Reader DictMap, Reader SourcePos, Reader ModuleInfo, NameSource] effs
 type CE a = forall effs. CanCE effs => Eff effs a
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
 elimModule m0@(MkModule decls0) = runInfo m0 $ do
   decls1 <- for decls0 $ \decl0 -> elimDecl decl0
-                                   & runGamma
                                    & runReader @DictMap Map.empty
                                    & runReader (getPos decl0)
   pure (MkModule (map unclssDecl (concat decls1)))
@@ -48,22 +44,6 @@ clssTCon = coerce
 -- > TApp (TCon "Dict$Traversable") [TCon "List"]
 mkTDict :: GenTypeCstr tv -> GenType tv
 mkTDict (clss, t) = mkTApp (TCon (clssTCon clss)) [t]
-
--- | Get the name of the dictionary for a type class instance and its type.
---
--- The @List@ instance of @Traversable@ yields
---
--- > dict$Traversable$List : Dict$Traversable List
---
--- The @List@ instance of @Eq@ yields
---
--- > dict$Eq$List : ∀a. (Eq a) => Dict$Eq (List a)
-instDictInfo :: InstDecl st -> (Name EVar, Type)
-instDictInfo (MkInstDecl inst clss tatom prms cstrs _) =
-    let t_dict =
-          mkTUni prms
-          (foldr TCtx (mkTDict (clss, mkTApp (TAtm tatom) (map TVar prms))) cstrs)
-    in  (inst, t_dict)
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
@@ -129,9 +109,10 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
 elimInstDecl :: ClssDecl -> InstDecl In -> CE [Decl In]
 elimInstDecl
   (MkClssDecl _ _ dcon methods0)
-  inst@(MkInstDecl _ _ tatom prms cstrs defns0) = do
+  inst@(MkInstDecl z_dict clss tatom prms cstrs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
-  let (z_dict, t_dict) = instDictInfo inst
+  let t_dict0 = mkTDict (clss, t_inst)
+  let t_dict = mkTUni prms (rewindr _TCtx cstrs t_dict0)
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
     let (MkFuncDecl name0 typ_ body) =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
@@ -142,14 +123,14 @@ elimInstDecl
   let e_let :: Expr In
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In
-      e_rhs = mkETyAbs prms (foldr ECxAbs e_let cstrs)
+      e_rhs = mkETyAbs prms (rewindr _ECxAbs cstrs (ETyAnn t_dict0 e_let))
   pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
 
 elimDecl :: Decl In -> CE [Decl Out]
 elimDecl = here' $ \case
   DType tcons -> pure [DType tcons]
   DFunc (MkFuncDecl name typ_ body) ->
-    (:[]) . DFunc . MkFuncDecl name typ_ . fst <$> elimExpr body
+    (:[]) . DFunc . MkFuncDecl name typ_ <$> elimExpr body
   DExtn (MkExtnDecl name typ_ extn) -> pure [DExtn (MkExtnDecl name typ_ extn)]
   DClss clss  -> elimClssDecl clss
   DInst inst  -> do
@@ -160,26 +141,18 @@ elimDecl = here' $ \case
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
 
-buildDict :: TypeCstr -> CE (Expr Out)
+buildDict :: TypeCstr -> CE (Expr In)
 buildDict (clss, t0) = do
-  let (t1, tps) = gatherTApp t0
+  let (t1, args) = gatherTApp t0
   case t1 of
     TVar v
-      | null tps -> EVar <$> asks @DictMap (Map.! (v, clss))
+      | null args -> EVar <$> asks @DictMap (Map.! (v, clss))
     TAtm tatom -> do
-      SomeInstDecl inst <- findInfo info2insts (clss, tatom)
-      let (z_dict, t_dict) = instDictInfo inst
-      fst <$> elimETyApp (EVal z_dict) (t_dict) tps
+      SomeInstDecl (MkInstDecl inst _ _ pars cstrs _) <-
+        findInfo info2insts (clss, tatom)
+      let instArgs t = t >>= (Map.fromList (zipExact pars args) Map.!)
+      pure (foldl ECxApp (mkETyApp (EVal inst) args) (map (second instArgs) cstrs))
     _ -> impossible  -- type checker would catch this
-
-elimETyApp :: Expr Out -> Type -> [Type] -> CE (Expr Out, Type)
-elimETyApp e0 t_e0 args = do
-    let (prms, t_e1) = gatherTUni t_e0
-    assertM (length prms == length args)
-    let t_e2 = B.instantiateName (args !!) t_e1
-    let (cstrs, t_e3) = unwindr _TCtx t_e2
-    dicts <- traverse buildDict cstrs
-    pure (foldl EApp (mkETyApp e0 args) dicts, t_e3)
 
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
@@ -190,72 +163,37 @@ dictEVar clss tvar = do
   mkName (Lctd noPos (Tagged name0))
 
 -- | Replace a context abstraction by a lambda for the dictionary.
-elimETyCtx :: TypeCstr -> Expr In -> CE (Expr Out, Type)
-elimETyCtx cstr@(clss, TVar v) e0 = do
+elimECxAbs :: TypeCstr -> Expr In -> CE (Expr Out)
+elimECxAbs cstr@(clss, TVar v) e0 = do
   x <- dictEVar clss v
   let dictBinder = (x, mkTDict cstr)
-  (e1, t1) <- local (Map.insertWith impossible (v, clss) x) $
-    withinEScope1 dictBinder $ elimExpr e0
-  pure (mkELam [dictBinder] t1 e1, TCtx cstr t1)
-elimETyCtx _ _ = impossible
+  ELam dictBinder <$> local (Map.insertWith impossible (v, clss) x) (elimExpr e0)
+elimECxAbs _ _ = impossible
 
-elimDefn :: Bind In -> CE (Bind Out)
-elimDefn = b2bound (fmap fst . elimExpr)
+elimECxApp :: Expr In -> TypeCstr -> CE (Expr Out)
+elimECxApp e0 cstr = do
+  e1 <- elimExpr e0
+  dict0 <- buildDict cstr
+  dict1 <- elimExpr dict0
+  pure (EApp e1 dict1)
 
--- TODO: Figure out if we can remove the 'Type' component from the result.
--- Adding type annotations is perhaps a better way to solve this problem.
-elimExpr :: Expr In -> CE (Expr Out, Type)
+elimExpr :: Expr In -> CE (Expr Out)
 elimExpr = \case
-  ELoc (Lctd pos e0) -> here_ pos $ first (ELoc . Lctd pos) <$> elimExpr e0
-  EVar x -> (,) <$> pure (EVar x) <*> lookupEVar x
-  EAtm a -> (,) <$> pure (EAtm a) <*> typeOfAtom a
-  EApp fun0 arg0 -> do
-    (fun1,  t_fun) <- elimExpr fun0
-    (arg1, _t_arg) <- elimExpr arg0
-    case t_fun of
-      TFun _ t_res -> pure (EApp fun1 arg1, t_res)
-      _            -> impossible  -- type checker catches overapplications
-  ELam binder body0 -> do
-    (body1, t_body) <- withinEScope1 binder (elimExpr body0)
-    pure (ELam binder body1, snd binder ~> t_body)
-  ELet ds0 e0 -> do
-    ds1 <- traverse elimDefn ds0
-    (e1, t1) <- withinEScope (map _b2binder ds1) (elimExpr e0)
-    pure (ELet ds1 e1, t1)
-  ERec ds0 e0 -> do
-    withinEScope (map _b2binder ds0) $ do
-      ds1 <- traverse elimDefn ds0
-      (e1, t1) <- elimExpr e0
-      pure (ERec ds1 e1, t1)
-  EMat e0 (a0 :| as0) -> do
-    (e1, _) <- elimExpr e0
-    (a1, t1) <- elimAltn a0
-    as1 <- traverse (fmap fst . elimAltn) as0
-    pure (EMat e1 (a1 :| as1), t1)
-  ETyAnn t_to (ETyCoe c e0) -> do
-    (e1, _) <- elimExpr e0
-    pure (ETyAnn t_to (ETyCoe c e1), t_to)
+  ELoc (Lctd pos e0) -> here_ pos $ elimExpr e0
+  EVar x -> pure (EVar x)
+  EAtm a -> pure (EAtm a)
+  EApp fun arg -> EApp <$> elimExpr fun <*> elimExpr arg
+  ELam binder body0 -> ELam binder <$> elimExpr body0
+  ELet ds0 e0 -> ELet <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
+  ERec ds0 e0 -> ERec <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
+  EMat e0 as -> EMat <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
+  ETyAnn t_to (ETyCoe c e0) -> ETyAnn t_to . ETyCoe c <$> elimExpr e0
   ETyCoe{} -> impossible  -- type inferencer wraps coercions in type annotations
-  ETyApp e0 ts0 -> do
-    (e1, t_e1) <- elimExpr e0
-    elimETyApp e1 t_e1 (toList ts0)
-  ETyAbs vs0 e0 -> do
-    (e1, t1) <- elimExpr e0
-    pure (ETyAbs vs0 e1, mkTUni (toList vs0) t1)
-  ETyAnn t0 e0 -> do
-    (e1, _) <- elimExpr e0
-    pure (ETyAnn t0 e1, t0)
-  ECxAbs cstr e0 -> elimETyCtx cstr e0
-
-elimAltn :: Altn In -> CE (Altn Out, Type)
-elimAltn (MkAltn (PSimple dcon targs0 bnds) e0) = do
-  (MkTConDecl _ tparams _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
-  let env0 = Map.fromList (zipExact tparams targs0)
-  let flds1 = map (>>= (env0 Map.!)) flds0
-  let env = catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bnds flds1)
-  withinEScope env $ do
-    (e1, t1) <- elimExpr e0
-    pure (MkAltn (PSimple dcon targs0 bnds) e1, t1)
+  ETyApp e0 ts0 -> ETyApp <$> elimExpr e0 <*> pure ts0
+  ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
+  ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0
+  ECxAbs cstr e0 -> elimECxAbs cstr e0
+  ECxApp e0 cstr -> elimECxApp e0 cstr
 
 unclssType :: GenType tv -> GenType tv
 unclssType = \case

@@ -49,6 +49,7 @@ pmExpr = \case
   ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
   ETyAnn t  e  -> ETyAnn t <$> pmExpr e
   ECxAbs cstr e0 -> ECxAbs cstr <$> pmExpr e0
+  ECxApp e0 cstr -> ECxApp <$> pmExpr e0 <*> pure cstr
 
 pmFuncDecl :: GlobalEffs effs => FuncDecl In tv -> Eff effs (FuncDecl Out tv)
 pmFuncDecl decl@(MkFuncDecl name typ_ body) =
