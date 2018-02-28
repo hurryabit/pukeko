@@ -7,7 +7,6 @@ import Pukeko.Prelude
 -- import qualified Bound.Name as B
 import qualified Bound.Scope as B
 import           Data.Coerce       (coerce)
-import qualified Data.List.NE      as NE
 import qualified Data.Map.Extended as Map
 import qualified Safe              as Safe
 
@@ -79,14 +78,14 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   dictPrm <- mkName (Lctd noPos "dict")
   let sels = do
         (i, MkSignDecl z t0) <- itoList mthds
-        let t1 = mkTUni [prm] (TCtx (clss, TVar prm) t0)
+        let t1 = TUni' prm (TCtx (clss, TVar prm) t0)
         let e_rhs = EVar z
         let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
         let c_one = MkAltn (PSimple dcon [prmType] c_binds) e_rhs
         let e_cas = EMat (EVar dictPrm) (c_one :| [])
         let b_lam = (dictPrm, mkTDict (clss, prmType))
         let e_lam = ELam b_lam (ETyAnn t0 e_cas)
-        let e_tyabs = ETyAbs (NE.singleton prm) e_lam
+        let e_tyabs = ETyAbs prm e_lam
         pure (DFunc (MkFuncDecl z t1 e_tyabs))
   pure (DType tcon : sels)
 
@@ -112,18 +111,18 @@ elimInstDecl
   inst@(MkInstDecl z_dict clss tatom prms cstrs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
   let t_dict0 = mkTDict (clss, t_inst)
-  let t_dict = mkTUni prms (rewindr _TCtx cstrs t_dict0)
+  let t_dict = rewindr _TUni' prms (rewindr _TCtx cstrs t_dict0)
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
     let (MkFuncDecl name0 typ_ body) =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
     name1 <- copyName (getPos inst) name0
     pure (MkBind (name1, typ_) body)
-  let e_dcon = mkETyApp (ECon dcon) [t_inst]
+  let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
   let e_body = foldl EApp e_dcon (map (EVar . nameOf) defns1)
   let e_let :: Expr In
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In
-      e_rhs = mkETyAbs prms (rewindr _ECxAbs cstrs (ETyAnn t_dict0 e_let))
+      e_rhs = rewindr _ETyAbs prms (rewindr _ECxAbs cstrs (ETyAnn t_dict0 e_let))
   pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
 
 elimDecl :: Decl In -> CE [Decl Out]
@@ -151,7 +150,7 @@ buildDict (clss, t0) = do
       SomeInstDecl (MkInstDecl inst _ _ pars cstrs _) <-
         findInfo info2insts (clss, tatom)
       let instArgs t = t >>= (Map.fromList (zipExact pars args) Map.!)
-      pure (foldl ECxApp (mkETyApp (EVal inst) args) (map (second instArgs) cstrs))
+      pure (foldl ECxApp (foldl ETyApp (EVal inst) args) (map (second instArgs) cstrs))
     _ -> impossible  -- type checker would catch this
 
 -- | Name of the dictionary for a type class instance of either a known type

@@ -4,6 +4,7 @@ module Pukeko.FrontEnd.Gamma
   , withinEScope
   , withinEScope1
   , withinTScope
+  , withinTScope1
   , withinContext1
   , withinContext
   , lookupEVar
@@ -42,6 +43,9 @@ withinTScope :: (CanGamma effs, Foldable t) => t NameTVar -> Eff effs a -> Eff e
 withinTScope (toList -> vs) =
   -- we try to avoid shadowing everywhere
   locally tvars (Map.unionWith impossible (Map.fromList (zip vs (repeat Set.empty))))
+
+withinTScope1 :: CanGamma effs => NameTVar -> Eff effs a -> Eff effs a
+withinTScope1 v = locally tvars (Map.insertWith impossible v Set.empty)
 
 withinContext1 :: CanGamma effs => TypeCstr -> Eff effs a -> Eff effs a
 withinContext1 (clss, TVar v) =

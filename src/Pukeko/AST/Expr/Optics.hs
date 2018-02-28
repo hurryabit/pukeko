@@ -86,8 +86,8 @@ expr2type f = \case
   ERec ds e0   -> ERec <$> traverse (b2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
   ETyCoe c e   -> ETyCoe c <$> expr2type f e
-  ETyAbs vs e0 -> ETyAbs vs <$> expr2type f e0
-  ETyApp e0 ts -> ETyApp <$> expr2type f e0 <*> traverse f ts
+  ETyAbs v  e0 -> ETyAbs v <$> expr2type f e0
+  ETyApp e0 t  -> ETyApp <$> expr2type f e0 <*> f t
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0
   ECxAbs (c, t) e -> ECxAbs <$> ((c,) <$> f t) <*> expr2type f e
   ECxApp e (c, t) -> ECxApp <$> expr2type f e <*> ((c,) <$> f t)

@@ -20,11 +20,11 @@ module Pukeko.AST.Expr
   , altn2expr
 
   , _AVal
+  , _ETyApp
+  , _ETyAbs
   , _ECxAbs
 
   , mkELam
-  , mkETyApp
-  , mkETyAbs
   , unwindEApp
   , unwindELam
   , unEAnn
@@ -71,8 +71,8 @@ data Expr lg
   |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ETyCoe Coercion (Expr lg)
-  | TypeOf lg ~ Type     => ETyAbs (NonEmpty NameTVar) (Expr lg)
-  | IsPreTyped lg ~ True => ETyApp (Expr lg) (NonEmpty (TypeOf lg))
+  | TypeOf lg ~ Type     => ETyAbs NameTVar (Expr lg)
+  | IsPreTyped lg ~ True => ETyApp (Expr lg) (TypeOf lg)
   | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg )
   | (IsClassy lg ~ True, TypeOf lg ~ Type) => ECxAbs TypeCstr (Expr lg)
   | (IsClassy lg ~ True, IsPreTyped lg ~ True) => ECxApp (Expr lg) (NameClss, TypeOf lg)
@@ -143,16 +143,6 @@ unwindEApp = go []
     go args = \case
       EApp fun arg -> go (arg:args) fun
       fun          -> (fun, args)
-
-mkETyApp :: IsPreTyped lg ~ True => Expr lg -> [TypeOf lg] -> Expr lg
-mkETyApp e0 = \case
-  []    -> e0
-  t1:ts -> ETyApp e0 (t1 :| ts)
-
-mkETyAbs :: TypeOf lg ~ Type => [NameTVar] -> Expr lg -> Expr lg
-mkETyAbs vs0 e0 = case vs0 of
-  []   -> e0
-  v:vs -> ETyAbs (v :| vs) e0
 
 unEAnn :: Expr lg -> Expr lg
 unEAnn = \case
@@ -230,10 +220,12 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
         (d_from, d_to) = case dir of
           Inject  -> ("_", pretty tcon)
           Project -> (pretty tcon, "_")
-    ETyAbs vs e -> prettyETyAbs prec vs (pretty e)
-    ETyApp e0 ts ->
+    e0@ETyAbs{} ->
+      let (vs, e1) = unwindr _ETyAbs e0
+      in  prettyETyAbs prec vs (pretty e1)
+    ETyApp e0 t ->
       maybeParens (prec > Op.aprec)
-      $ prettyPrec Op.aprec e0 <+> prettyAtType (prettyPrec 3) ts
+      $ prettyPrec Op.aprec e0 <+> prettyAtType (prettyPrec 3) [t]
     -- TODO: Decide if it's a good idea to swallow type annotations. Probably,
     -- make a distinction between those given by the user and those generated
     -- during type inference.
@@ -262,6 +254,7 @@ prettyETyAbs prec vs d
       maybeParens (prec > 0)
       $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 d
 
+-- FIXME: This should probably be replaced by something more lightweight.
 prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
 

@@ -116,9 +116,9 @@ instantiate :: CanInfer s effs =>
 instantiate = go Map.empty Seq.empty
   where
     go env0 cstrs0 e0 = \case
-      UTUni (toList -> vs) t0 -> do
-        env1 <- for vs $ \v -> (v,) <$> freshUVar
-        go (Map.fromList env1 `Map.union` env0) cstrs0 (mkETyApp e0 (map snd env1)) t0
+      UTUni v t0 -> do
+        tv <- freshUVar
+        go (Map.insert v tv env0) cstrs0 (ETyApp e0 tv) t0
       UTCtx cstr0 t0 -> do
         cstr1 <- _2 (sendM . substUType env0) cstr0
         go env0 (cstrs0 Seq.|> cstr1) (ECxApp e0 cstr1) t0
@@ -151,7 +151,7 @@ inferLet (MkBind (l0, NoType) r0) = do
   (r1, t1, cstrs) <- enterLevel @s (infer r0)
   (t2, vs2) <- generalize t1
   MkSplitCstrs rets defs <- splitCstrs cstrs
-  let t3 = mkUTUni (Set.toList vs2) (foldr (UTCtx . second UTVar) t2 rets)
+  let t3 = rewindr _UTUni (Set.toList vs2) (foldr (UTCtx . second UTVar) t2 rets)
   pure (MkBind (l0, t3) r1, t3, defs)
 
 -- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
@@ -169,12 +169,13 @@ inferRec defns0 = do
   (ts2, vs2) <- second (toList . fold) . unzip <$> traverse generalize ts1
   MkSplitCstrs rets1 cstrs_def <- splitCstrs cstrs1
   let rets2 = map (second UTVar) (toList rets1)
-  let qual t2 = mkUTUni vs2 (rewindr _UTCtx rets2 t2)
+  let qual t2 = rewindr _UTUni vs2 (rewindr _UTCtx rets2 t2)
   let ts3 = fmap qual ts2
   let vs3 = map UTVar vs2
   let addETyApp x
-        | x `Set.member` Set.fromList ls0 = foldl ECxApp (mkETyApp (EVar x) vs3) rets2
-        | otherwise                       = EVar x
+        | x `Set.member` Set.fromList ls0 =
+            foldl ECxApp (foldl ETyApp (EVar x) vs3) rets2
+        | otherwise = EVar x
   let rs2 = map (subst addETyApp) rs1
   let defns1 = zipWith3 (\l0 t3 r2 -> MkBind (l0, t3) r2) ls0 ts3 rs2
   pure (defns1, ts3, cstrs_def)
@@ -242,7 +243,7 @@ inferFuncDecl (MkFuncDecl name NoType e0) t_decl = do
     --
     -- val f : a -> b
     -- let f = fun x -> x
-    let (vs0, unwindr _UTCtx -> (cstrs0, t0)) = unUTUni1 t_decl
+    let (vs0, unwindr _UTCtx -> (cstrs0, t0)) = unwindr _UTUni t_decl
     (e1, t1, cstrs1) <- enterLevel @s (infer e0)
     -- NOTE: This unification should bind all unification variables in @t1@. If
     -- it does not, the quantification step will catch them.
@@ -312,12 +313,13 @@ qualType = \case
 
 qualDefn :: Bind (Aux s) -> TQ s (Bind Out)
 qualDefn (MkBind (x, t0) e0) = case t0 of
-  UTUni (toList -> qvs) (unwindr _UTCtx -> (cstrs0, t1)) ->
+  UTUni{} -> do
+    let (qvs, unwindr _UTCtx -> (cstrs0, t1)) = unwindr _UTUni t0
     localizeTQ qvs $ do
       cstrs1 <- (traverse . _2) qualType cstrs0
       t1' <- qualType t1
-      let t2  = mkTUni qvs (rewindr _TCtx cstrs1 t1')
-      e2  <- mkETyAbs qvs . rewindr _ECxAbs cstrs1 . ETyAnn t1' <$> qualExpr e0
+      let t2  = rewindr _TUni' qvs (rewindr _TCtx cstrs1 t1')
+      e2  <- rewindr _ETyAbs qvs . rewindr _ECxAbs cstrs1 . ETyAnn t1' <$> qualExpr e0
       pure (MkBind (x, t2) e2)
   _ -> MkBind <$> ((x,) <$> qualType t0) <*> qualExpr e0
 
@@ -332,7 +334,7 @@ qualExpr = \case
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
   ETyCoe c  e0 -> ETyCoe c <$> qualExpr e0
-  ETyApp e0 ts -> ETyApp <$> qualExpr e0 <*> traverse qualType ts
+  ETyApp e0 t  -> ETyApp <$> qualExpr e0 <*> qualType t
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
   ECxApp e cstr -> ECxApp <$> qualExpr e <*> _2 qualType cstr
 
@@ -356,7 +358,9 @@ qualDecl = \case
   DFunc func -> DFunc <$> qualFuncDecl func
   DExtn (MkExtnDecl x ts s) -> do
     t1 <- case ts of
-      UTUni (toList -> qvs) t0 -> localizeTQ qvs (mkTUni qvs <$> qualType t0)
+      UTUni{} -> do
+        let (qvs, t0) = unwindr _UTUni ts
+        localizeTQ qvs (rewindr _TUni' qvs <$> qualType t0)
       t0 -> qualType t0
     pure (DExtn (MkExtnDecl x t1 s))
   DClss c -> pure (DClss c)

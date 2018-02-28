@@ -34,8 +34,8 @@ data DConDecl = MkDConDecl
 typeOfDCon :: TConDecl -> DConDecl -> GenType Void
 typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
   assert (tcon == tconRef) $
-  let res = mkTApp (TCon tcon) (map TVar tparams)
-  in  closeT (mkTUni tparams (fields *~> res))
+  let res = rewindl _TApp (TCon tcon) (map TVar tparams)
+  in  closeT (rewindr _TUni' tparams (fields *~> res))
 
 type instance NameSpaceOf TConDecl = TCon
 type instance NameSpaceOf DConDecl = DCon

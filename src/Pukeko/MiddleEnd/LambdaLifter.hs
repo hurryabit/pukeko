@@ -98,11 +98,11 @@ llELam oldBinds t_rhs rhs1 = do
     let allBinds1 = over (traverse . _2 . traverse) tvRename allBinds0
     let rhs2 = over expr2type (fmap tvRename) (over freeEVar evRename rhs1)
     lhs <- freshEVar
-    let t_lhs = mkTUni tyBinds (map snd allBinds1 *~> fmap tvRename t_rhs)
+    let t_lhs = rewindr _TUni' tyBinds (map snd allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl lhs (closeT t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @Any supc)
-    pure (foldl EApp (mkETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
+    pure (foldl EApp (foldl ETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
 
 llExpr :: Expr In -> LL (Expr Out)
 llExpr = \case
@@ -125,7 +125,7 @@ llExpr = \case
   ELam{} -> impossible  -- the type inferencer puts type anns around lambda bodies
   ETyCoe c e0 -> ETyCoe c <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
-  ETyAbs qvs e0 -> ETyAbs qvs <$> withinTScope qvs (llExpr e0)
+  ETyAbs v e0 -> ETyAbs v <$> withinTScope1 v (llExpr e0)
   ETyAnn c e0 -> ETyAnn c <$> llExpr e0
 
 llAltn :: Altn In -> LL (Altn Out)

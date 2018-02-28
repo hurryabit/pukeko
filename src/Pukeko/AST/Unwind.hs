@@ -1,6 +1,7 @@
 module Pukeko.AST.Unwind
   ( unwindl
   , unwindr
+  , rewindl
   , rewindr
   ) where
 
@@ -24,5 +25,8 @@ unwindr p = go []
       Right (param, body) -> go (param:params) body
       Left          body  -> (reverse params, body)
 
+rewindl :: Prism' e (e, a) -> e -> [a] -> e
+rewindl = foldl . curry . (#)
+
 rewindr :: Prism' e (x, e) -> [x] -> e -> e
-rewindr p params body = foldr (\param expr -> p # (param, expr)) body params
+rewindr = flip . foldr . curry . (#)
