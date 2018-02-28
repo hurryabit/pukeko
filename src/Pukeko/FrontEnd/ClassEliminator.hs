@@ -186,8 +186,7 @@ elimExpr = \case
   ELet ds0 e0 -> ELet <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   ERec ds0 e0 -> ERec <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   EMat e0 as -> EMat <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
-  ETyAnn t_to (ETyCoe c e0) -> ETyAnn t_to . ETyCoe c <$> elimExpr e0
-  ETyCoe{} -> impossible  -- type inferencer wraps coercions in type annotations
+  ECast coe e0 -> ECast coe <$> elimExpr e0
   ETyApp e0 ts0 -> ETyApp <$> elimExpr e0 <*> pure ts0
   ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
   ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0

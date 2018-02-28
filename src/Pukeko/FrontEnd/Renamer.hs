@@ -206,7 +206,7 @@ rnExpr = \case
             zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
       body1 <- rnExpr body0
       pure (ERec binds1 body1)
-  Ps.ECoe c e -> ETyCoe <$> rnCoercion c <*> rnExpr e
+  Ps.ECoe c e -> ECast . (, NoType) <$> rnCoercion c <*> rnExpr e
 
 
 -- * Renaming of top level declarations

@@ -65,8 +65,7 @@ ccExpr = \case
   In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)
   In.ETyApp e0 _ts -> ccExpr e0
   In.ETyAbs _vs e0 -> ccExpr e0
-  In.ETyCoe _   e0 -> ccExpr e0
-  In.ETyAnn _   e0 -> ccExpr e0
+  In.ECast  _   e0 -> ccExpr e0
 
 ccAltn :: In.Altn -> CC Altn
 ccAltn (In.MkAltn (In.PSimple _ _ bs) e) = MkAltn (map (fmap name) bs) <$> ccExpr e
