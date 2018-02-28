@@ -36,8 +36,9 @@ erSupCDecl = \case
         , map nameOf bs0 == xs1 ->
           erSupCDecl (SupCDecl z tz vs0 [] e1)
       -- Reduce type paramaters:
-      ETyApp e1 (traverse _TVar -> Just vs1)
-        | nullOf freeEVar e1
+      ETyApp{}
+        | (e1, traverse _TVar -> Just vs1) <- unwindl _ETyApp e0
+        , nullOf freeEVar e1
         , null bs0
           -- FIXME: The condition below /should/ check whether there are type
           -- variables which are ultimately free in @e1@. However, it's actually
@@ -51,12 +52,8 @@ erSupCDecl = \case
           SupCDecl z tz [] [] e1
       -- Promote type abstraction when the super combinator doesn't contain any
       -- abstractions itself:
-      ETyAbs vs1 e1
-        | null vs0 && null bs0
-        , TUni (length -> n) _ <- tz
-          -- NOTE: The check @length vs == n@ is only necessary because our type
-          -- checker distinguishes between the types @∀a b. t[a, b]@ and
-          -- @∀a. ∀b. t[a, b]@, which is clearly a problem.
-        , length vs1 == n ->
-            erSupCDecl (SupCDecl z tz (toList vs1) [] e1)
+      ETyAbs{}
+        | null bs0
+        , (vs1, e1) <- unwindr _ETyAbs e0 ->
+          erSupCDecl (SupCDecl z tz (vs0 ++ vs1) [] e1)
       _ -> supc

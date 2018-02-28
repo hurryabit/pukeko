@@ -125,7 +125,7 @@ rnTypeScheme env0 (Ps.MkTypeScheme cstrs0 t0) = do
   env1 <- traverse mkName (Ps.freeTVars t0 `Map.difference` env0)
   cstrs1 <- rnConstraints env1 cstrs0
   t1 <- rnType (env1 <> env0) t0
-  pure (mkTUni (Map.elems env1) (rewindr _TCtx cstrs1 t1))
+  pure (rewindr _TUni' (Map.elems env1) (rewindr _TCtx cstrs1 t1))
 
 -- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
@@ -277,7 +277,7 @@ rnClssDecl (Ps.MkClssDecl name param0 methods0) =
     dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
     param1 <- mkName param0
     let env = Map.singleton (unlctd param0) param1
-    let close = mkTUni [param1] . TCtx (clss, TVar param1)
+    let close = TUni' param1 . TCtx (clss, TVar param1)
     methods1 <- traverse (rnSignDecl env close) methods0
     pure (MkClssDecl clss param1 dcon methods1)
 

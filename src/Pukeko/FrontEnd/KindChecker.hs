@@ -8,8 +8,6 @@ module Pukeko.FrontEnd.KindChecker
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import qualified Bound as B
-import qualified Bound.Name as B
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
 import           Data.Forget      (Forget (..))
@@ -86,15 +84,11 @@ kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
   close kind
 
 kcVal :: Type -> KC n s ()
-kcVal = \case
-  TUni xs t -> k (toList xs) (B.instantiate (TVar . B.name) t)
-  t         -> k [] t
-  where
-    k :: [NameTVar] -> Type -> KC n s ()
-    k vs t0 = do
-      uvars <- traverse (const freshUVar) vs
-      let env = Map.fromList (zip vs uvars)
-      local (const env) (kcType Star t0)
+kcVal t = do
+  let (vs, t0) = unwindr _TUni' t
+  uvars <- traverse (const freshUVar) vs
+  let env = Map.fromList (zip vs uvars)
+  local (const env) (kcType Star t0)
 
 kcDecl :: Decl In -> KC n s ()
 kcDecl = \case

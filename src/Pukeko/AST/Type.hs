@@ -18,12 +18,12 @@ module Pukeko.AST.Type
   , pattern TInt
   , pattern TCon
   , pattern TFun
+  , pattern TUni'
   , _TApp
   , _TCtx
+  , _TUni'
 
   , closeT
-  , mkTUni
-  , gatherTUni
   , (~>)
   , (*~>)
   , mkTApp
@@ -42,12 +42,11 @@ import Pukeko.Pretty
 import qualified Bound      as B
 import qualified Bound.Name as B
 import qualified Bound.Var  as B
-import           Control.Monad.Trans.Class (lift)
+import           Control.Lens (Iso', iso)
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Deriving
 import           Data.Functor.Classes
-import qualified Data.Map.Extended as Map
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.Unwind
@@ -71,7 +70,7 @@ data GenType tv
   = TVar tv
   | TAtm TypeAtom
   | TApp (GenType tv) (GenType tv)
-  | TUni (NonEmpty NameTVar) (B.Scope (B.Name NameTVar Int) GenType tv)
+  | TUni NameTVar (B.Scope (B.Name NameTVar ()) GenType tv)
   | TCtx (NameClss, GenType tv) (GenType tv)
     -- NOTE: ^ The first pair is actually a @GenTypeCstr tv@. Unfortunately,
     -- putting the type synonym there breaks @B.makeBound ''GenType@ below.
@@ -104,19 +103,20 @@ data a ::: t = a ::: t
 makePrisms ''GenType
 B.makeBound ''GenType
 
+_Scope1Name :: (Monad f, Eq v) => Iso' (v, B.Scope (B.Name v ()) f v) (v, f v)
+_Scope1Name = iso
+  (\(v, s) -> (v, B.instantiate1Name (pure v) s))
+  (\(v, t) -> (v, B.abstract1Name v t))
+
+pattern TUni' :: NameTVar -> Type -> Type
+pattern TUni' v t <- TUni v (B.instantiate1Name (TVar v) -> t)
+  where TUni' v t = TUni v (B.abstract1Name v t)
+
+_TUni' :: Prism' Type (NameTVar, Type)
+_TUni' = _TUni . _Scope1Name
+
 closeT :: HasCallStack => Type -> GenType Void
 closeT t = maybe (traceJSON t impossible) id (B.closed t)
-
-mkTUni :: [NameTVar] -> Type -> Type
-mkTUni vs0 t0 = case vs0 of
-  []   -> t0
-  v:vs -> TUni (v :| vs) (B.abstractName (env Map.!?) t0)
-    where env = Map.fromList (zip (v:vs) [0 ..])
-
-gatherTUni :: GenType tv -> ([NameTVar], B.Scope (B.Name NameTVar Int) GenType tv)
-gatherTUni = \case
-  TUni vs t1 -> (toList vs, t1)
-  t0         -> ([], lift t0)
 
 infixr 1 ~>, *~>
 
@@ -144,7 +144,7 @@ instance Eq1 GenType where
     (TVar x1, TVar x2) -> x1 `eq` x2
     (TAtm a1, TAtm a2) -> a1 == a2
     (TApp tf1 tp1, TApp tf2 tp2) -> liftEq eq tf1 tf2 && liftEq eq tp1 tp2
-    (TUni xs1 tq1, TUni xs2 tq2) -> length xs1 == length xs2 && liftEq eq tq1 tq2
+    (TUni _x1 tq1, TUni _x2 tq2) -> liftEq eq tq1 tq2
     (TCtx (c1, tc1) tq1, TCtx (c2, tc2) tq2) ->
       c1 == c2 && liftEq eq tc1 tc2 && liftEq eq tq1 tq2
     (TVar{}, _) -> False
@@ -174,9 +174,15 @@ instance Pretty v => PrettyPrec (GenType v) where
           maybeParens (prec > 1) (go prettyVar 2 tx <+> "->" <+> go prettyVar 1 ty)
         TApp tf ta ->
           maybeParens (prec > 2) (go prettyVar 2 tf <+> go prettyVar 3 ta)
-        TUni qvs tq ->
-          prettyTUni prec qvs
-          (go (B.unvar (pretty . B.name) prettyVar) 0 (B.fromScope tq))
+        t0@TUni{} ->
+          goUni [] prettyVar t0
+          where
+            goUni :: forall v ann. [NameTVar] -> (v -> Doc ann) -> GenType v -> Doc ann
+            goUni vs prettyVar = \case
+              TUni v t1 ->
+                goUni (v:vs) (B.unvar (pretty . B.name) prettyVar) (B.fromScope t1)
+              t1 ->
+                prettyTUni prec (reverse vs) (go prettyVar 0 t1)
         t0@TCtx{} ->
           let (cstrs0, t1) = unwindr _TCtx t0
               cstrs1 = [ pretty clss <+> go prettyVar 3 typ | (clss, typ) <- cstrs0 ]

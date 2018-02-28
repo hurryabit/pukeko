@@ -69,18 +69,12 @@ typeOf = \case
     checkCoercion c t_from t_to
     pure t_to
   ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
-  ETyAbs vs e0 ->
-    withinTScope vs (TUni vs . B.abstractName (env Map.!?) <$> typeOf e0)
-    where env = Map.fromList (zip (toList vs) [0 ..])
-  ETyApp e0 args -> do
+  ETyAbs v e0 -> withinTScope1 v (TUni' v <$> typeOf e0)
+  ETyApp e0 arg -> do
     t0 <- typeOf e0
     case t0 of
-      TUni prms t1 -> do
-        unless (length prms == length args) $
-          throwHere ("expected" <+> pretty (length prms) <+> "type arguments, but found"
-                     <+> pretty (length args) <+> "type arguments")
-        pure (B.instantiateName (toList args !!) t1)
-      TFun{} -> throwHere "expected value argument, but found type argument"
+      TUni _ t1 -> pure (B.instantiate1Name arg t1)
+      TFun{}    -> throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
   ECxAbs cstr e -> TCtx cstr <$> withinContext1 cstr (typeOf e)
@@ -173,7 +167,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
-    for_ supcs $ \(Core.SupCDecl z t_decl qvs bs e0) -> do
-        t0 <- withinTScope qvs $ withinEScope bs $ typeOf e0
-        match (vacuous t_decl) (mkTUni qvs (fmap snd bs *~> t0))
+    for_ supcs $ \(Core.SupCDecl z t_decl tpars bs e0) -> do
+        t0 <- withinTScope tpars $ withinEScope bs $ typeOf e0
+        match (vacuous t_decl) (rewindr _TUni' tpars (fmap snd bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

@@ -8,14 +8,12 @@ module Pukeko.FrontEnd.Inferencer.UType
   , UTypeCstr
   , UType (..)
 
+  , _UTUni
   , _UTCtx
 
   , topLevel
   , uvarIdName
   , uvarIds
-  , mkUTUni
-  , unUTUni
-  , unUTUni1
   , (~>)
   , appTCon
   , unUTApp
@@ -53,7 +51,7 @@ data UType s
   = UTVar NameTVar
   | UTAtm TypeAtom
   | UTApp (UType s) (UType s)
-  | UTUni (NonEmpty NameTVar) (UType s)
+  | UTUni NameTVar (UType s)
   | UTCtx (UTypeCstr s) (UType s)
   | UVar (STRef s (UVar s))
 
@@ -70,20 +68,6 @@ uvarIds = map UVarId [1 ..]
 
 uvarIdName :: UVarId -> Tagged TVar String
 uvarIdName (UVarId n) = Tagged ('_':show n)
-
-mkUTUni :: [NameTVar] -> UType s -> UType s
-mkUTUni xs0 t0 = case xs0 of
-  [] -> t0
-  x:xs -> UTUni (x :| xs) t0
-
--- TODO: Follow links.
-unUTUni1 :: UType s -> ([NameTVar], UType s)
-unUTUni1 = \case
-  UTUni qvs t1 -> (toList qvs, t1)
-  t0 -> ([], t0)
-
-unUTUni :: UType s -> ([NonEmpty NameTVar], UType s)
-unUTUni = unwindr _UTUni
 
 infixr 1 ~>
 
@@ -151,7 +135,7 @@ prettyUType prec = \case
     pf <- prettyUType 2 tf
     px <- prettyUType 3 tx
     pure $ maybeParens (prec > 2) $ pf <+> px
-  UTUni vs tq -> prettyTUni prec vs <$> prettyUType 0 tq
+  UTUni v tq -> prettyTUni prec [v] <$> prettyUType 0 tq
   UTCtx (clss, tc) tq -> do
     ptc <- prettyUType 3 tc
     ptq <- prettyUType 0 tq

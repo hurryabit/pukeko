@@ -27,13 +27,8 @@ makeInlinable supc = modifying inlinables (Map.insert (nameOf supc) supc)
 unwind :: Expr -> (Expr, [Type], [Expr])
 unwind e0 =
   let (e1, as) = unwindEApp e0
-      (e2, ts) = goT [] e1
+      (e2, ts) = unwindl _ETyApp e1
   in  (e2, ts, as)
-  where
-    goT :: [[Type]] -> Expr -> (Expr, [Type])
-    goT tss = \case
-      ETyApp e ts -> goT (toList ts:tss) e
-      e           -> (e, concat tss)
 
 -- | Replace a reference to an alias by a reference to the target of the alias.
 inEVal :: Name EVar -> In Expr
