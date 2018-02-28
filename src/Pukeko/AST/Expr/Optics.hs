@@ -30,7 +30,7 @@ subst' f = go Set.empty
       ERec ds e   -> ERec <$> (traverse . b2bound) (go bound') ds <*> go bound' e
         where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
-      ETyCoe c  e -> ETyCoe c <$> go bound e
+      ECast coe e -> ECast coe <$> go bound e
       ETyAbs v  e -> ETyAbs v <$> go bound e
       ETyApp e  t -> ETyApp <$> go bound e <*> pure t
       ETyAnn t  e -> ETyAnn t <$> go bound e
@@ -62,7 +62,7 @@ expr2atom f = \case
   ELet ds t    -> ELet <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
-  ETyCoe d e   -> ETyCoe d <$> expr2atom f e
+  ECast coe e  -> ECast coe <$> expr2atom f e
   ETyAbs x e   -> ETyAbs x <$> expr2atom f e
   ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
@@ -85,7 +85,7 @@ expr2type f = \case
   ELet ds e0   -> ELet <$> traverse (b2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (b2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
-  ETyCoe c e   -> ETyCoe c <$> expr2type f e
+  ECast (c, t) e -> ECast . (c, ) <$> f t <*> expr2type f e
   ETyAbs v  e0 -> ETyAbs v <$> expr2type f e0
   ETyApp e0 t  -> ETyApp <$> expr2type f e0 <*> f t
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0

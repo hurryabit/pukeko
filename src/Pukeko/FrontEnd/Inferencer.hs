@@ -218,7 +218,7 @@ infer = \case
         unify t_res t_rhs
         pure (MkAltn patn1 rhs1, cstrs1)
       pure (EMat expr1 altns1, t_res, cstrs0 <> fold cstrss1)
-    ETyCoe c@(MkCoercion dir tcon) e0 -> do
+    ECast (c@(MkCoercion dir tcon), NoType) e0 -> do
       MkTConDecl _ prms dcons <- findInfo info2tcons tcon
       t_rhs0 <- case dcons of
         Right _ -> throwHere ("type constructor" <+> pretty tcon <+> "is not coercible")
@@ -232,7 +232,7 @@ infer = \case
             Project -> (t_rhs, t_lhs)
       (e1, t1, cstrs) <- infer e0
       unify t_from t1
-      pure (ETyAnn t_to (ETyCoe c e1), t_to, cstrs)
+      pure (ECast (c, t_to) e1, t_to, cstrs)
 
 inferFuncDecl :: forall s tv effs. CanInfer s effs =>
   FuncDecl In tv -> UType s -> Eff effs (FuncDecl (Aux s) tv)
@@ -333,7 +333,7 @@ qualExpr = \case
   ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
-  ETyCoe c  e0 -> ETyCoe c <$> qualExpr e0
+  ECast (c, t) e0 -> ECast . (c,) <$> qualType t <*> qualExpr e0
   ETyApp e0 t  -> ETyApp <$> qualExpr e0 <*> qualType t
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
   ECxApp e cstr -> ECxApp <$> qualExpr e <*> _2 qualType cstr

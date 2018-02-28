@@ -123,10 +123,10 @@ llExpr = \case
         rhs1 <- withinEScope oldBinds (llExpr rhs0)
         llELam (NE.fromList oldBinds) t_rhs rhs1
   ELam{} -> impossible  -- the type inferencer puts type anns around lambda bodies
-  ETyCoe c e0 -> ETyCoe c <$> llExpr e0
+  ECast coe e0 -> ECast coe <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs v e0 -> ETyAbs v <$> withinTScope1 v (llExpr e0)
-  ETyAnn c e0 -> ETyAnn c <$> llExpr e0
+  ETyAnn _ e0 -> llExpr e0
 
 llAltn :: Altn In -> LL (Altn Out)
 llAltn (MkAltn (PSimple dcon ts0 bs) e) = do

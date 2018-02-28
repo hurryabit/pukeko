@@ -44,7 +44,7 @@ pmExpr = \case
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch (mkRowMatch1 t1 as1)
-  ETyCoe c e0  -> ETyCoe c <$> pmExpr e0
+  ECast coe e0 -> ECast coe <$> pmExpr e0
   ETyAbs xs e0 -> ETyAbs xs <$> pmExpr e0
   ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
   ETyAnn t  e  -> ETyAnn t <$> pmExpr e

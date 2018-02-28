@@ -70,10 +70,10 @@ data Expr lg
   |                         ELet [Bind lg] (Expr lg)
   |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
-  |                         ETyCoe Coercion (Expr lg)
+  |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | TypeOf lg ~ Type     => ETyAbs NameTVar (Expr lg)
   | IsPreTyped lg ~ True => ETyApp (Expr lg) (TypeOf lg)
-  | IsPreTyped lg ~ True => ETyAnn (TypeOf lg) (Expr lg )
+  | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
   | (IsClassy lg ~ True, TypeOf lg ~ Type) => ECxAbs TypeCstr (Expr lg)
   | (IsClassy lg ~ True, IsPreTyped lg ~ True) => ECxApp (Expr lg) (NameClss, TypeOf lg)
 
@@ -99,7 +99,7 @@ pattern ENum n = EAtm (ANum n)
 
 -- NOTE: Do NOT forget to add new constructors here.
 {-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, EMat,
-             ETyCoe, ETyAbs, ETyApp, ETyAnn, ECxAbs, ECxApp #-}
+             ECast, ETyAbs, ETyApp, ETyAnn, ECxAbs, ECxApp #-}
 
 -- * Derived optics
 makePrisms ''Atom
@@ -212,7 +212,7 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
         $$ vcatMap pretty as
-    ETyCoe (MkCoercion dir tcon) e0 ->
+    ECast (MkCoercion dir tcon, _typ) e0 ->
       maybeParens (prec > Op.aprec) $
         "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
         <+> prettyPrec (Op.aprec+1) e0

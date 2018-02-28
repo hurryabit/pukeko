@@ -64,11 +64,10 @@ typeOf = \case
       unless (t1 == t2) $
         throwHere ("expected type" <+> pretty t1 <> ", but found type" <+> pretty t2)
     pure t1
-  ETyAnn t_to (ETyCoe c e0) -> do
+  ECast (coe, t_to) e0 -> do
     t_from <- typeOf e0
-    checkCoercion c t_from t_to
+    checkCoercion coe t_from t_to
     pure t_to
-  ETyCoe{} -> impossible  -- the type inferencer puts type annotations around coercions
   ETyAbs v e0 -> withinTScope1 v (TUni' v <$> typeOf e0)
   ETyApp e0 arg -> do
     t0 <- typeOf e0
