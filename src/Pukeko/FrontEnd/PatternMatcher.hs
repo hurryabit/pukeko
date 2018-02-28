@@ -96,7 +96,7 @@ bindName = \case
 
 patnToBPatn :: Patn In -> Maybe BPatn
 patnToBPatn = \case
-  PWld   -> Just (BWild)
+  PWld   -> Just BWild
   PVar x -> Just (BName x)
   PCon{} -> Nothing
 
@@ -275,5 +275,5 @@ grpMatchExpr :: CanPM effs => GrpMatch -> Eff effs (Expr Out)
 grpMatchExpr (MkGrpMatch t is) = EMat t <$> traverse grpMatchItemAltn is
 
 grpMatchItemAltn :: CanPM effs => GrpMatchItem -> Eff effs (Altn Out)
-grpMatchItemAltn (MkGrpMatchItem con ts bs rm) = do
+grpMatchItemAltn (MkGrpMatchItem con ts bs rm) =
   MkAltn (PSimple con ts (fmap bindName bs)) <$> pmMatch rm

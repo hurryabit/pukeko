@@ -43,7 +43,7 @@ declareFun = here' $ \(MkSignDecl fun _) -> do
   modifying declared (Map.insert fun pos)
 
 defineFun :: (CanFR effs, NameSpaceOf a ~ EVar, HasName a) => a -> Eff effs ()
-defineFun = \(nameOf -> fun) -> here fun $ do
+defineFun (nameOf -> fun) = here fun $ do
   unlessM (uses declared (Map.member fun)) $
     throwHere ("undeclared function:" <+> pretty fun)
   whenM (uses defined (Set.member fun)) $

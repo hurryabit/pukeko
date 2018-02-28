@@ -31,7 +31,7 @@ erSupCDecl = \case
     case e0 of
       -- Reduce expression parameters:
       EApp{}
-        | (e1, traverse _EVar -> Just xs1) <- unwindEApp e0
+        | (e1, traverse _EVar -> Just xs1) <- unwindl _EApp e0
         , nullOf freeEVar e1
         , map nameOf bs0 == xs1 ->
           erSupCDecl (SupCDecl z tz vs0 [] e1)

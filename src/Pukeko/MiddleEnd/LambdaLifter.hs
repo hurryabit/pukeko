@@ -98,7 +98,7 @@ llELam oldBinds t_rhs rhs1 = do
     let allBinds1 = over (traverse . _2 . traverse) tvRename allBinds0
     let rhs2 = over expr2type (fmap tvRename) (over freeEVar evRename rhs1)
     lhs <- freshEVar
-    let t_lhs = rewindr _TUni' tyBinds (map snd allBinds1 *~> fmap tvRename t_rhs)
+    let t_lhs = rewindr TUni' tyBinds (map snd allBinds1 *~> fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl lhs (closeT t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @Any supc)

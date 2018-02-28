@@ -57,4 +57,4 @@ unionFind xys = runST $ do
   let xs = foldMap (\(x, y) -> Set.singleton x <> Set.singleton y) xys
   ps <- sequence (Map.fromSet UF.fresh xs)
   for_ xys $ \(x, y) -> UF.union (ps Map.! x) (ps Map.! y)
-  for ps $ \p -> UF.repr p >>= UF.descriptor
+  for ps (UF.repr >=> UF.descriptor)

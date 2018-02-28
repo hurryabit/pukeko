@@ -43,7 +43,7 @@ makeLenses ''Tabs
 -- the same namespace and pass the result to the continuation. The continuations
 -- result is finally stored in the declaration table.
 introGlobal :: GlobalEffs effs =>
-  (Lens' Tabs (Map (Ps.Name nsp) decl)) ->
+  Lens' Tabs (Map (Ps.Name nsp) decl) ->
   Failure ->
   Ps.LctdName nsp ->
   (a -> decl) ->
@@ -58,12 +58,12 @@ introGlobal tab desc lname@(Lctd pos name) mkDecl cont = do
   pure res
 
 lookupGlobal :: (GlobalEffs effs, NameSpaceOf decl ~ nsp, HasName decl) =>
-  (Lens' Tabs (Map (Ps.Name nsp) decl)) ->
+  Lens' Tabs (Map (Ps.Name nsp) decl) ->
   (decl -> Bool) ->
   Failure ->
   Ps.LctdName nsp ->
   Eff effs (Name nsp)
-lookupGlobal tab isok desc (Lctd pos name) = do
+lookupGlobal tab isok desc (Lctd pos name) =
   uses tab (Map.lookup name) >>= \case
     Nothing -> throwAt pos (desc <:~> pretty name)
     Just decl
@@ -111,7 +111,7 @@ rnConstraints :: GlobalEffs effs =>
   Map (Ps.Name TVar) (Name TVar) -> Ps.TypeCstr -> Eff effs [TypeCstr]
 rnConstraints env (Ps.MkTypeCstr constraints) =
   fmap (map (second TVar) . nubOrd) .
-  for constraints $ \(clss, unlctd -> tvar0) -> do
+  for constraints $ \(clss, unlctd -> tvar0) ->
     case env Map.!? tvar0 of
       Nothing -> throwHere ("unknown type variable" <:~> pretty tvar0)
       Just tvar1 ->
@@ -125,7 +125,7 @@ rnTypeScheme env0 (Ps.MkTypeScheme cstrs0 t0) = do
   env1 <- traverse mkName (Ps.freeTVars t0 `Map.difference` env0)
   cstrs1 <- rnConstraints env1 cstrs0
   t1 <- rnType (env1 <> env0) t0
-  pure (rewindr _TUni' (Map.elems env1) (rewindr _TCtx cstrs1 t1))
+  pure (rewindr TUni' (Map.elems env1) (rewindr TCtx cstrs1 t1))
 
 -- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
@@ -191,8 +191,7 @@ rnExpr = \case
     names <- traverse mkName binders0
     let env = Map.fromList (zipExact (map unlctd binders0) names)
     exprs1 <- traverse rnExpr exprs0
-    let binds1 =
-          zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
+    let binds1 = zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
     body1 <- local (env `Map.union`) (rnExpr body0)
     pure (ELet binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
@@ -230,10 +229,7 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
   binder <- introGlobal tconTab "type constructor" name mkDummy pure
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)
-  dcons1 <- bitraverse
-            (rnType env)
-            (zipWithM (\tag -> rnDConDecl binder env tag) [0..])
-            dcons0
+  dcons1 <- bitraverse (rnType env) (zipWithM (rnDConDecl binder env) [0..]) dcons0
   let tcon = MkTConDecl binder params1 dcons1
   modifying tconTab (Map.insert (unlctd name) (DType tcon))
   pure tcon
@@ -246,7 +242,7 @@ rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
 rnSignDecl :: CanRn effs =>
   Map (Ps.Name TVar) (Name TVar) -> (Type -> Type) -> Ps.SignDecl ->
   Eff effs (SignDecl tv)
-rnSignDecl env preClose (Ps.MkSignDecl binder typeScheme) = do
+rnSignDecl env preClose (Ps.MkSignDecl binder typeScheme) =
   introGlobal evarTab "function declaration" binder mkDSign $ \name ->
     MkSignDecl name <$> rnTypeScheme env typeScheme
   where
@@ -322,5 +318,5 @@ renameModule (Ps.MkPackage _ modules) =
   let ldecls = concatMap Ps._mod2decls modules
   in  MkModule . catMaybes
       -- FIXME: Figure out the location of the declaration.
-      <$> traverse (\ldecl -> runReader noPos (rnDecl ldecl)) ldecls
+      <$> traverse (runReader noPos . rnDecl) ldecls
       & evalState (Tabs mempty mempty mempty mempty)

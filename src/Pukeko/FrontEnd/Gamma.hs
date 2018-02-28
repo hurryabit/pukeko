@@ -33,7 +33,7 @@ runGamma :: Eff (Reader Gamma : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty Map.empty)
 
 withinEScope1 :: CanGamma effs => EVarBinder Type -> Eff effs a -> Eff effs a
-withinEScope1 (x, t) = do
+withinEScope1 (x, t) =
   locally evars (\evs -> Map.insertWith impossible x (t, Map.size evs) evs)
 
 withinEScope :: CanGamma effs => [EVarBinder Type] -> Eff effs a -> Eff effs a
@@ -62,4 +62,4 @@ lookupEVar :: CanGamma effs => NameEVar -> Eff effs Type
 lookupEVar = fmap fst . lookupEVarIx
 
 lookupTVar :: CanGamma effs => NameTVar -> Eff effs (Set NameClss)
-lookupTVar = views tvars . (flip (Map.!))
+lookupTVar = views tvars . flip (Map.!)

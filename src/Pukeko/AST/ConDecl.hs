@@ -10,7 +10,7 @@ module Pukeko.AST.ConDecl
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import           Control.Lens (makeLensesFor)
+import           Control.Lens (makeLensesFor, folded, nullOf)
 import           Data.Aeson.TH
 
 import           Pukeko.AST.Name
@@ -30,12 +30,12 @@ data DConDecl = MkDConDecl
   , _dcon2fields :: [Type]
   }
 
--- FIXME: Remove 'Void'.
-typeOfDCon :: TConDecl -> DConDecl -> GenType Void
+typeOfDCon :: TConDecl -> DConDecl -> Type
 typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
   assert (tcon == tconRef) $
-  let res = rewindl _TApp (TCon tcon) (map TVar tparams)
-  in  closeT (rewindr _TUni' tparams (fields *~> res))
+  let res = rewindl TApp (TCon tcon) (map TVar tparams)
+      typ = rewindr TUni' tparams (fields *~> res)
+  in  assert (nullOf folded typ) typ
 
 type instance NameSpaceOf TConDecl = TCon
 type instance NameSpaceOf DConDecl = DCon

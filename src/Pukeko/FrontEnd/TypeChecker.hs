@@ -52,7 +52,7 @@ typeOf = \case
   ELet ds e0 -> do
     traverse_ checkBind ds
     withinEScope (map _b2binder ds) (typeOf e0)
-  ERec ds e0 -> do
+  ERec ds e0 ->
     withinEScope (map _b2binder ds) $ do
       traverse_ checkBind ds
       typeOf e0
@@ -75,7 +75,7 @@ typeOf = \case
       TUni _ t1 -> pure (B.instantiate1Name arg t1)
       TFun{}    -> throwHere "expected value argument, but found type argument"
       _ -> throwHere "unexpected type argument"
-  ETyAnn t0 e0 -> checkExpr e0 t0 *> pure t0
+  ETyAnn t0 e0 -> checkExpr e0 t0 $> t0
   ECxAbs cstr e -> TCtx cstr <$> withinContext1 cstr (typeOf e)
   ECxApp e0 cstr0 -> do
     t0 <- typeOf e0
@@ -168,5 +168,5 @@ instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
     for_ supcs $ \(Core.SupCDecl z t_decl tpars bs e0) -> do
         t0 <- withinTScope tpars $ withinEScope bs $ typeOf e0
-        match (vacuous t_decl) (rewindr _TUni' tpars (fmap snd bs *~> t0))
+        match (vacuous t_decl) (rewindr TUni' tpars (fmap snd bs *~> t0))
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

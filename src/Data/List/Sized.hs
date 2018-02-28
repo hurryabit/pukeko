@@ -20,7 +20,7 @@ module Data.List.Sized
   )
 where
 
-import           Prelude        hiding ((++), map, replicate, unzip, zip, zipWith)
+import           Prelude        hiding ((++), map, unzip, zip, zipWith)
 import           Data.Bifunctor (bimap)
 import           Data.List.NonEmpty (NonEmpty (..))
 

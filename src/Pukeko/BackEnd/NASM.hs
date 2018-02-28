@@ -57,7 +57,7 @@ assembleInst arities inst = do
       code "label" [show label]
     PUSH k -> code "push" [show k]
     PUSHINT num -> code "pushint" [show num]
-    PUSHGLOBAL name -> do
+    PUSHGLOBAL name ->
       case Map.lookup name arities of
         Nothing -> throwFailure ("unknown global:" <+> pretty name)
         Just arity -> code "pushglobal" [show name, show arity]

@@ -42,7 +42,7 @@ parseModule file = do
 
 parsePackage ::
   (Member (Error Failure) effs, LastMember IO effs) => FilePath -> Eff effs Package
-parsePackage file = build parseModule file
+parsePackage = build parseModule
 
 type Parser = RWS.RWST (Pos, Ordering) () SourcePos (Parsec Void String)
 
@@ -192,7 +192,7 @@ type_, atype :: Parser Type
 type_ =
   makeExprParser
     (mkTApp <$> atype <*> many atype)
-    [ [ InfixR (arrow *> pure mkTFun) ] ]
+    [ [ InfixR (arrow $> mkTFun) ] ]
   <?> "data"
 atype = choice
   [ TVar <$> tvar
@@ -212,7 +212,7 @@ typeScheme = MkTypeScheme <$> typeCstr <*> type_
 patn, apatn :: Parser Patn
 patn  = PCon <$> dcon <*> many apatn <|>
         apatn
-apatn = symbol "_" *> pure PWld   <|>
+apatn = symbol "_" $> PWld   <|>
         PVar <$> evar             <|>
         PCon <$> dcon <*> pure [] <|>
         parens patn
@@ -244,7 +244,7 @@ let_ ::
   (NonEmpty (Bind (LctdName EVar)) -> a) ->
   Parser a
 let_ mkLet mkRec =
-  (reserved "let" *> (reserved "rec" *> pure mkRec <|> pure mkLet))
+  (reserved "let" *> (reserved "rec" $> mkRec <|> pure mkLet))
   <*> NE.sepBy1 bind (reserved "and")
 
 coercion :: Parser Coercion
@@ -279,7 +279,7 @@ expr =
     operatorTable = map (map f) (reverse Op.table)
       where
         f MkSpec{_sym, _assoc} =
-          g _assoc (try (reservedOp (untag _sym) *> pure (EOpp _sym)))
+          g _assoc (try (reservedOp (untag _sym) $> EOpp _sym))
         g = \case
           Op.AssocLeft  -> InfixL
           Op.AssocRight -> InfixR
@@ -293,7 +293,7 @@ typeDecl = indented_ (reserved "type") $
   MkTConDecl
   <$> tcon
   <*> (many tvar <* equals)
-  <*> (reserved "external" *> pure (Right []) <|> Left <$> type_)
+  <*> (Right [] <$ reserved "external" <|> Left <$> type_)
 
 tconDecl :: Parser TConDecl
 tconDecl = MkTConDecl
@@ -306,7 +306,7 @@ dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
-  (try (indented evar (\z -> colon *> pure z)))
+  (try (indented evar (\z -> colon $> z)))
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl

@@ -21,8 +21,7 @@ deriveToJSON1 defaultOptions ''Scope
 deriveToJSON2 defaultOptions ''Name
 
 instance ToJSON n => ToJSON1 (Name n) where
-  liftToJSON nameToJSON nameToJSONList =
-    liftToJSON2 toJSON toJSONList nameToJSON nameToJSONList
+  liftToJSON = liftToJSON2 toJSON toJSONList
 
 instance (ToJSON n, ToJSON b) => ToJSON (Name n b) where
   toJSON = liftToJSON toJSON toJSONList
