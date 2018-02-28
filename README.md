@@ -1,4 +1,4 @@
-# pukeko
+# pukeko [![Build Status](https://travis-ci.org/hurryabit/pukeko.svg?branch=master)](https://travis-ci.org/hurryabit/pukeko)
 
 ## What is it?
 
