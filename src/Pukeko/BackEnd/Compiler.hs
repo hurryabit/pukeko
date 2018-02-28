@@ -51,7 +51,7 @@ compileTopDefn top = case top of
       ccExpr Redex _body
     let _arity = n
         _code  = GLOBSTART _name _arity : code
-    return $ MkGlobal { _name, _arity, _code }
+    return MkGlobal { _name, _arity, _code }
   Asm{_name} -> Builtins.findGlobal _name
 
 data Mode = Stack | Eval | Redex
@@ -91,10 +91,10 @@ ccExpr mode expr =
         Eval  -> output [EVAL]
         Redex -> continueRedex UNWIND
     External{_name} ->
-      ccExpr mode $ Global{_name = Builtins.externalName _name}
+      ccExpr mode Global{_name = Builtins.externalName _name}
     Pack{ _tag, _arity } -> do
       let _name = Builtins.constructorName _tag _arity
-      ccExpr mode $ Global{_name}
+      ccExpr mode Global{_name}
     Num{ _int } -> do
       output [PUSHINT _int]
       whenRedex mode $ continueRedex RETURN
@@ -155,7 +155,7 @@ ccExpr mode expr =
       case _altns of
         [altn] -> ccAltn mode altn
         _ -> do
-          ls <- mapM (\_ -> freshLabel) _altns
+          ls <- mapM (const freshLabel) _altns
           done <- freshLabel
           output [JUMPCASE ls]
           forM_ (zip ls _altns) $ \(l, altn) -> do
@@ -181,4 +181,4 @@ localDecls binds cc = do
   let n = length binds
   d <- view depth
   let offs = Map.fromList $ zipMaybe binds [d+1 ..]
-  local (offsets %~ Map.union offs) $ local (depth +~ n) $ cc
+  local (offsets %~ Map.union offs) $ local (depth +~ n) cc

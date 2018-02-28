@@ -25,8 +25,8 @@ unwindr p = go []
       Right (param, body) -> go (param:params) body
       Left          body  -> (reverse params, body)
 
-rewindl :: Prism' e (e, a) -> e -> [a] -> e
-rewindl = foldl . curry . (#)
+rewindl :: (e -> a -> e) -> e -> [a] -> e
+rewindl = foldl
 
-rewindr :: Prism' e (x, e) -> [x] -> e -> e
-rewindr = flip . foldr . curry . (#)
+rewindr :: (x -> e -> e) -> [x] -> e -> e
+rewindr = flip . foldr

@@ -8,6 +8,7 @@ module Pukeko.FrontEnd.Inferencer.UType
   , UTypeCstr
   , UType (..)
 
+  , pattern UTCon
   , _UTUni
   , _UTCtx
 
@@ -15,8 +16,7 @@ module Pukeko.FrontEnd.Inferencer.UType
   , uvarIdName
   , uvarIds
   , (~>)
-  , appTCon
-  , unUTApp
+  , unwindUTApp
   , open
   , open1
   , substUType
@@ -34,7 +34,7 @@ import           Data.STRef
 import qualified Data.Map.Extended as Map
 
 import           Pukeko.AST.Name
-import           Pukeko.AST.Type       hiding ((~>), (*~>))
+import           Pukeko.AST.Type       hiding ((~>))
 
 newtype Level = Level Int
   deriving (Eq, Ord, Enum)
@@ -60,6 +60,9 @@ makePrisms ''UType
 pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp (UTAtm TAArr) tx) ty
 
+pattern UTCon :: Name TCon -> UType s
+pattern UTCon tcon = UTAtm (TACon tcon)
+
 topLevel :: Level
 topLevel = Level 0
 
@@ -74,11 +77,8 @@ infixr 1 ~>
 (~>) :: UType s -> UType s -> UType s
 (~>) = UTFun
 
-appTCon :: Name TCon -> [UType s] -> UType s
-appTCon = foldl UTApp . UTAtm . TACon
-
-unUTApp :: UType s -> ST s (UType s, [UType s])
-unUTApp = go []
+unwindUTApp :: UType s -> ST s (UType s, [UType s])
+unwindUTApp = go []
   where
     go tps = \case
       UTApp tf tp -> go (tp:tps) tf

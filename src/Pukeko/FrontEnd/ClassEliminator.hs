@@ -6,9 +6,8 @@ import Pukeko.Prelude
 
 -- import qualified Bound.Name as B
 import qualified Bound.Scope as B
-import           Data.Coerce       (coerce)
 import qualified Data.Map.Extended as Map
-import qualified Safe              as Safe
+import qualified Safe
 
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Name
@@ -32,26 +31,20 @@ elimModule m0@(MkModule decls0) = runInfo m0 $ do
                                    & runReader (getPos decl0)
   pure (MkModule (map unclssDecl (concat decls1)))
 
--- | Name of the dictionary type constructor of a type class, e.g., @Dict$Eq@
--- for type class @Eq@.
-clssTCon :: NameClss -> Name TCon
-clssTCon = coerce
-
 -- | Apply the dictionary type constructor of a type class to a type. For the
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
 --
 -- > TApp (TCon "Dict$Traversable") [TCon "List"]
 mkTDict :: GenTypeCstr tv -> GenType tv
-mkTDict (clss, t) = mkTApp (TCon (clssTCon clss)) [t]
+mkTDict (clss, t) = TApp (TCon clss) t
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
 dictTConDecl :: ClssDecl -> TConDecl
 dictTConDecl (MkClssDecl clss prm dcon mthds) =
-    let tcon = coerce clss
-        flds = map _sign2type mthds
-        dconDecl = MkDConDecl tcon dcon 0 flds
-    in  MkTConDecl tcon [prm] (Right [dconDecl])
+    let flds = map _sign2type mthds
+        dconDecl = MkDConDecl clss dcon 0 flds
+    in  MkTConDecl clss [prm] (Right [dconDecl])
 
 -- | Transform a type class declaration into a data type declaration for the
 -- dictionary and projections from the dictionary to each class method.
@@ -74,19 +67,18 @@ dictTConDecl (MkClssDecl clss prm dcon mthds) =
 elimClssDecl :: ClssDecl -> CE [Decl Out]
 elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
-  let prmType = TVar prm
-  dictPrm <- mkName (Lctd noPos "dict")
-  let sels = do
-        (i, MkSignDecl z t0) <- itoList mthds
-        let t1 = TUni' prm (TCtx (clss, TVar prm) t0)
-        let e_rhs = EVar z
-        let c_binds = imap (\j _ -> guard (i==j) *> pure z) mthds
-        let c_one = MkAltn (PSimple dcon [prmType] c_binds) e_rhs
-        let e_cas = EMat (EVar dictPrm) (c_one :| [])
-        let b_lam = (dictPrm, mkTDict (clss, prmType))
-        let e_lam = ELam b_lam (ETyAnn t0 e_cas)
-        let e_tyabs = ETyAbs prm e_lam
-        pure (DFunc (MkFuncDecl z t1 e_tyabs))
+  let cstr = (clss, TVar prm)
+  sels <- ifor mthds $ \i (MkSignDecl z t0) -> do
+    dictPrm <- mkName (Lctd noPos "dict")
+    let t1 = TUni' prm (TCtx cstr t0)
+    let e_rhs = EVar z
+    let c_binds = imap (\j _ -> guard (i==j) $> z) mthds
+    let c_one = MkAltn (PSimple dcon [TVar prm] c_binds) e_rhs
+    let e_cas = EMat (EVar dictPrm) (c_one :| [])
+    let b_lam = (dictPrm, mkTDict cstr)
+    let e_lam = ELam b_lam (ETyAnn t0 e_cas)
+    let e_tyabs = ETyAbs prm e_lam
+    pure (DFunc (MkFuncDecl z t1 e_tyabs))
   pure (DType tcon : sels)
 
 -- | Transform a class instance definition into a dictionary definition.
@@ -111,7 +103,7 @@ elimInstDecl
   inst@(MkInstDecl z_dict clss tatom prms cstrs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
   let t_dict0 = mkTDict (clss, t_inst)
-  let t_dict = rewindr _TUni' prms (rewindr _TCtx cstrs t_dict0)
+  let t_dict = rewindr TUni' prms (rewindr TCtx cstrs t_dict0)
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
     let (MkFuncDecl name0 typ_ body) =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
@@ -122,7 +114,7 @@ elimInstDecl
   let e_let :: Expr In
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In
-      e_rhs = rewindr _ETyAbs prms (rewindr _ECxAbs cstrs (ETyAnn t_dict0 e_let))
+      e_rhs = rewindr ETyAbs prms (rewindr ECxAbs cstrs (ETyAnn t_dict0 e_let))
   pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
 
 elimDecl :: Decl In -> CE [Decl Out]
@@ -141,8 +133,7 @@ elimDecl = here' $ \case
       concat <$> traverse elimDecl defns
 
 buildDict :: TypeCstr -> CE (Expr In)
-buildDict (clss, t0) = do
-  let (t1, args) = gatherTApp t0
+buildDict (clss, unwindl _TApp -> (t1, args)) =
   case t1 of
     TVar v
       | null args -> EVar <$> asks @DictMap (Map.! (v, clss))

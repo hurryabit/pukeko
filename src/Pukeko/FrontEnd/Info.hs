@@ -64,12 +64,12 @@ findInfo l k = views l (Map.! k)
 
 typeOfFunc :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
   Name EVar -> Eff effs Type
-typeOfFunc func = findInfo info2signs func
+typeOfFunc = findInfo info2signs
 
 typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) => Atom -> Eff effs Type
 typeOfAtom = \case
   AVal z -> typeOfFunc z
-  ACon c -> fmap absurd <$> uncurry typeOfDCon <$> findInfo info2dcons c
+  ACon c -> uncurry typeOfDCon <$> findInfo info2dcons c
   ANum _ -> pure (TAtm TAInt)
 
 itemInfo :: (Ord k) => Lens' ModuleInfo (Map k v) -> k -> v -> ModuleInfo

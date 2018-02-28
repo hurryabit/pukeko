@@ -12,6 +12,7 @@ import           Pukeko.AST.NoLambda
 import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Name       as In
 import qualified Pukeko.AST.SuperCore  as In
+import qualified Pukeko.AST.Unwind     as In
 import           Pukeko.FrontEnd.Info
 
 eraseModule :: In.Module -> Module
@@ -59,7 +60,7 @@ ccExpr = \case
     pure $ Pack tag (length flds)
   In.ENum n     -> pure $ Num n
   e0@In.EApp{}
-    | (e1, as) <- In.unwindEApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
+    | (e1, as) <- In.unwindl In._EApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
   In.ELet ds t  -> Let False <$> traverse ccDefn ds <*> ccExpr t
   In.ERec ds t  -> Let True  <$> traverse ccDefn ds <*> ccExpr t
   In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)

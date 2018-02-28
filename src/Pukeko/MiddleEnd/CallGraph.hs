@@ -48,7 +48,7 @@ scc (CallGraph graph vertex_fn _) = map decode forest
     mentions_itself v = v `elem` (graph A.! v)
 
 renderCallGraph :: CallGraph m -> T.Text
-renderCallGraph g = D.renderDot . D.toDot . D.digraph' $ do
+renderCallGraph g = D.renderDot . D.toDot . D.digraph' $
   ifor_ (graph g) $ \v us -> do
     let decl = toDecl g v
     let shape = case decl of

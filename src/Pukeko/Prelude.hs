@@ -49,7 +49,7 @@ import Data.Functor          as X
 import Data.Functor.Identity as X
 import Data.List             as X (sort)
 import Data.Map              as X (Map)
-import Data.Maybe            as X (catMaybes, isJust, isNothing, mapMaybe)
+import Data.Maybe            as X (catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
 import Data.List.Extra       as X (zipFrom, zipWithFrom)
 import Data.List.NonEmpty    as X (NonEmpty (..))
 import Data.Proxy            as X (Proxy (..))

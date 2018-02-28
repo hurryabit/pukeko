@@ -24,7 +24,7 @@ import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
-import           Pukeko.AST.Type       hiding ((~>), (*~>))
+import           Pukeko.AST.Type       hiding ((~>))
 import           Pukeko.FrontEnd.Inferencer.UType
 import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.Unify
@@ -53,7 +53,7 @@ generalize :: forall s effs. CanInfer s effs =>
   UType s -> Eff effs (UType s, Set NameTVar)
 generalize = go
   where
-    go :: UType s -> Eff effs (UType s, Set (Name TVar))
+    go :: UType s -> Eff effs (UType s, Set NameTVar)
     go t0 = case t0 of
       UVar uref -> do
         curLevel <- getTLevel @s
@@ -79,7 +79,7 @@ generalize = go
 
 splitCstr :: forall s effs. CanInfer s effs => UTypeCstr s -> Eff effs (SplitCstrs s)
 splitCstr (clss, t0) = do
-  (t1, tps) <- sendM (unUTApp t0)
+  (t1, tps) <- sendM (unwindUTApp t0)
   case t1 of
     UVar uref -> do
       cur_level <- getTLevel @s
@@ -138,7 +138,7 @@ inferPatn patn t_expr = case patn of
       throwHere ("data constructor" <+> quotes (pretty dcon) <+>
                  "expects" <+> pretty (length fields) <+> "arguments")
     t_params <- traverse (const freshUVar) params
-    let t_inst = appTCon tcon (toList t_params)
+    let t_inst = rewindl UTApp (UTCon tcon) t_params
     unify t_expr t_inst
     let env = Map.fromList (zipExact params t_params)
     let t_fields = map (open1 . fmap (env Map.!)) fields
@@ -149,9 +149,9 @@ inferLet :: forall s effs.
   CanInfer s effs => Bind In -> Eff effs (Bind (Aux s), UType s, UTypeCstrs s)
 inferLet (MkBind (l0, NoType) r0) = do
   (r1, t1, cstrs) <- enterLevel @s (infer r0)
-  (t2, vs2) <- generalize t1
-  MkSplitCstrs rets defs <- splitCstrs cstrs
-  let t3 = rewindr _UTUni (Set.toList vs2) (foldr (UTCtx . second UTVar) t2 rets)
+  (t2, toList -> vs2) <- generalize t1
+  MkSplitCstrs (toList -> rets) defs <- splitCstrs cstrs
+  let t3 = rewindr UTUni vs2 (rewindr UTCtx (map (second UTVar) rets) t2)
   pure (MkBind (l0, t3) r1, t3, defs)
 
 -- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
@@ -169,7 +169,7 @@ inferRec defns0 = do
   (ts2, vs2) <- second (toList . fold) . unzip <$> traverse generalize ts1
   MkSplitCstrs rets1 cstrs_def <- splitCstrs cstrs1
   let rets2 = map (second UTVar) (toList rets1)
-  let qual t2 = rewindr _UTUni vs2 (rewindr _UTCtx rets2 t2)
+  let qual t2 = rewindr UTUni vs2 (rewindr UTCtx rets2 t2)
   let ts3 = fmap qual ts2
   let vs3 = map UTVar vs2
   let addETyApp x
@@ -224,7 +224,7 @@ infer = \case
         Right _ -> throwHere ("type constructor" <+> pretty tcon <+> "is not coercible")
         Left t_rhs0 -> pure t_rhs0
       t_prms <- traverse (const freshUVar) prms
-      let t_lhs = appTCon tcon (toList t_prms)
+      let t_lhs = rewindl UTApp (UTCon tcon) t_prms
       let env = Map.fromList (zipExact prms t_prms)
       let t_rhs = open1 (fmap (env Map.!) t_rhs0)
       let (t_to, t_from) = case dir of
@@ -271,7 +271,7 @@ inferDecl = \case
   DInst (MkInstDecl instName clss atom prms cstrs ds0) -> do
     ds1 <- for ds0 $ \mthd -> do
       (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
-      let t_inst = mkTApp (TAtm atom) (map TVar prms)
+      let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: renameType
       let t_decl1 = t_decl0 >>= const t_inst
       introTVars @s prms $ withinContext @s (map (second open) cstrs) $
@@ -318,8 +318,8 @@ qualDefn (MkBind (x, t0) e0) = case t0 of
     localizeTQ qvs $ do
       cstrs1 <- (traverse . _2) qualType cstrs0
       t1' <- qualType t1
-      let t2  = rewindr _TUni' qvs (rewindr _TCtx cstrs1 t1')
-      e2  <- rewindr _ETyAbs qvs . rewindr _ECxAbs cstrs1 . ETyAnn t1' <$> qualExpr e0
+      let t2  = rewindr TUni' qvs (rewindr TCtx cstrs1 t1')
+      e2  <- rewindr ETyAbs qvs . rewindr ECxAbs cstrs1 . ETyAnn t1' <$> qualExpr e0
       pure (MkBind (x, t2) e2)
   _ -> MkBind <$> ((x,) <$> qualType t0) <*> qualExpr e0
 
@@ -360,7 +360,7 @@ qualDecl = \case
     t1 <- case ts of
       UTUni{} -> do
         let (qvs, t0) = unwindr _UTUni ts
-        localizeTQ qvs (rewindr _TUni' qvs <$> qualType t0)
+        localizeTQ qvs (rewindr TUni' qvs <$> qualType t0)
       t0 -> qualType t0
     pure (DExtn (MkExtnDecl x t1 s))
   DClss c -> pure (DClss c)

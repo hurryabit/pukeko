@@ -113,7 +113,7 @@ checkModule (MkModule decls) = either throwError pure $ runST $
 
 unwind :: Kind (Open s) -> KC n s (Kind (Open s))
 unwind k0 = case k0 of
-  UVar uref -> do
+  UVar uref ->
     sendM (readSTRef uref) >>= \case
       Free _  -> pure k0
       Link k1 -> do

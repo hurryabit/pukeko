@@ -13,7 +13,7 @@ import           Pukeko.MiddleEnd.CallGraph
 import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
 -- import           Pukeko.Pretty
 
-data InState = InState
+newtype InState = InState
   { _inlinables :: Map (Name EVar) (FuncDecl (Only SupC))
   }
 
@@ -26,7 +26,7 @@ makeInlinable supc = modifying inlinables (Map.insert (nameOf supc) supc)
 
 unwind :: Expr -> (Expr, [Type], [Expr])
 unwind e0 =
-  let (e1, as) = unwindEApp e0
+  let (e1, as) = unwindl _EApp e0
       (e2, ts) = unwindl _ETyApp e1
   in  (e2, ts, as)
 

@@ -27,7 +27,6 @@ module Pukeko.AST.Type
   , (~>)
   , (*~>)
   , mkTApp
-  , gatherTApp
   , prettyCstr
   , prettyContext
   , prettyTUni
@@ -116,7 +115,7 @@ _TUni' :: Prism' Type (NameTVar, Type)
 _TUni' = _TUni . _Scope1Name
 
 closeT :: HasCallStack => Type -> GenType Void
-closeT t = maybe (traceJSON t impossible) id (B.closed t)
+closeT t = fromMaybe (traceJSON t impossible) (B.closed t)
 
 infixr 1 ~>, *~>
 
@@ -126,12 +125,8 @@ infixr 1 ~>, *~>
 (*~>) :: Foldable t => t (GenType tv) -> GenType tv -> GenType tv
 t_args *~> t_res = foldr (~>) t_res t_args
 
--- TODO: Remove 'mkTApp' and 'gatherTApp'.
 mkTApp :: (Foldable t) => GenType tv -> t (GenType tv) -> GenType tv
 mkTApp = foldl TApp
-
-gatherTApp :: GenType tv -> (GenType tv, [GenType tv])
-gatherTApp = unwindl _TApp
 
 instance IsType NoType where
   isType = const Nothing

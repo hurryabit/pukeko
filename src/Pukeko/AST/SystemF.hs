@@ -84,7 +84,7 @@ data GenDecl (nsp :: Super NameSpace) lg
 
 type Decl = GenDecl Any
 
-data Module lg = MkModule
+newtype Module lg = MkModule
   { _module2decls :: [Decl lg]
   }
 

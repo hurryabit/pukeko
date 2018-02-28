@@ -20,12 +20,12 @@ module Pukeko.AST.Expr
   , altn2expr
 
   , _AVal
+  , _EApp
   , _ETyApp
   , _ETyAbs
   , _ECxAbs
 
   , mkELam
-  , unwindEApp
   , unwindELam
   , unEAnn
 
@@ -123,7 +123,7 @@ mkELam ::
   [EVarBinder (TypeOf lg)] -> Type -> Expr lg -> Expr lg
 mkELam bs0 t0 e0 = case bs0 of
   [] -> e0
-  _  -> (foldr ELam (ETyAnn t0 e0) bs0)
+  _  -> rewindr ELam bs0 (ETyAnn t0 e0)
 
 unwindELam :: (IsLambda lg ~ True) => Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
 unwindELam = go []
@@ -136,13 +136,6 @@ unwindELam = go []
       -- lambdas.
       ETyAnn _ e@ELam{} -> go params e
       body -> (reverse params, body)
-
-unwindEApp :: Expr lg -> (Expr lg, [Expr lg])
-unwindEApp = go []
-  where
-    go args = \case
-      EApp fun arg -> go (arg:args) fun
-      fun          -> (fun, args)
 
 unEAnn :: Expr lg -> Expr lg
 unEAnn = \case
@@ -187,27 +180,10 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     EApp e a ->
       maybeParens (prec > Op.aprec)
       $ prettyPrec Op.aprec e <+> prettyPrec (Op.aprec+1) a
-    -- This could be brought back in @EApp@ when @t@ is an operator.
-    -- ApOp   { _op, _arg1, _arg2 } ->
-    --   let MkSpec { _sym, _prec, _assoc } = Operator.findByName _op
-    --       (prec1, prec2) =
-    --         case _assoc of
-    --           AssocLeft  -> (_prec  , _prec+1)
-    --           AssocRight -> (_prec+1, _prec  )
-    --           AssocNone  -> (_prec+1, _prec+1)
-    --   in  maybeParens (prec > _prec) $
-    --         prettyPrec prec1 _arg1 <> text _sym <> prettyPrec prec2 _arg2
     ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
     ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
     -- FIXME: Collect lambdas.
     ELam b e -> prettyELam prec [b] e
-    -- If { _cond, _then, _else } ->
-    --   maybeParens (prec > 0) $ sep
-    --     [ "if"  <+> pretty _cond <+> "then"
-    --     , nest 2 (pretty _then)
-    --     , "else"
-    --     , nest 2 (pretty _else)
-    --     ]
     EMat t as ->
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
@@ -257,12 +233,6 @@ prettyETyAbs prec vs d
 -- FIXME: This should probably be replaced by something more lightweight.
 prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
 prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
-
--- instance Pretty (EVarBinder Type)
-
--- instance PrettyPrec (EVarBinder Type) where
---   prettyPrec prec (z, t) =
---     maybeParens (prec > 0) (pretty z <+> ":" <+> pretty t)
 
 instance TypeOf lg ~ Type => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)

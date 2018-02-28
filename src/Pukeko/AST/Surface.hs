@@ -117,7 +117,7 @@ data Type
   | TAtm TypeAtom
   | TApp Type Type
 
-data TypeCstr = MkTypeCstr [(LctdName Clss, LctdName TVar)]
+newtype TypeCstr = MkTypeCstr [(LctdName Clss, LctdName TVar)]
 
 data TypeScheme = MkTypeScheme TypeCstr Type
 

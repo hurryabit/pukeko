@@ -23,7 +23,7 @@ type CanUnify s effs = (CanThrowHere effs, CanGamma s effs, MemberST s effs)
 -- | Unwind a chain of 'ULink's.
 unwind :: MemberST s effs => UType s -> Eff effs (UType s)
 unwind t0 = case t0 of
-  UVar uref -> do
+  UVar uref ->
     sendM (readSTRef uref) >>= \case
       ULink t1 -> unwind t1
       UFree{}  -> pure t0
@@ -42,7 +42,7 @@ occursCheck :: forall s effs. CanUnify s effs =>
 occursCheck uref1 t2 = case t2 of
   UVar uref2
     | uref1 == uref2 -> throwHere "occurs check"
-    | otherwise -> do
+    | otherwise ->
         sendM (readSTRef uref2) >>= \case
           UFree x2 l2 -> do
             (_, l1) <- readUnwound uref1
