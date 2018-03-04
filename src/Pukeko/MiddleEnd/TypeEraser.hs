@@ -60,13 +60,13 @@ ccExpr = \case
     pure $ Pack tag (length flds)
   In.ENum n     -> pure $ Num n
   In.EAtm{} -> impossible  -- all cases matched above
-  e0@In.ETmApp{}
+  e0@(In.EApp _ In.TmArg{})
     | (e1, as) <- In.unwindl In._ETmApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
   In.ELet ds t  -> Let False <$> traverse ccDefn ds <*> ccExpr t
   In.ERec ds t  -> Let True  <$> traverse ccDefn ds <*> ccExpr t
   In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)
-  In.ETyApp e0 _ts -> ccExpr e0
-  In.ETyAbs _vs e0 -> ccExpr e0
+  In.EApp e0 In.TyArg{} -> ccExpr e0
+  In.EAbs In.TyPar{} e0 -> ccExpr e0
   In.ECast  _   e0 -> ccExpr e0
 
 ccAltn :: In.Altn -> CC Altn

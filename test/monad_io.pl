@@ -67,72 +67,61 @@ input : IO Int = io$ll2 @Unit @Int geti Unit
 main : IO Unit =
   bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll2
 ge$ll1 : ∀a. Ord a -> a -> a -> Bool =
-  fun @a ->
-    fun (dict : Ord a) ->
-      match dict with
-      | Dict$Ord @a ge _ _ _ -> ge
+  fun @a (dict : Ord a) ->
+    match dict with
+    | Dict$Ord @a ge _ _ _ -> ge
 gt$ll1 : ∀a. Ord a -> a -> a -> Bool =
-  fun @a ->
-    fun (dict : Ord a) ->
-      match dict with
-      | Dict$Ord @a _ gt _ _ -> gt
+  fun @a (dict : Ord a) ->
+    match dict with
+    | Dict$Ord @a _ gt _ _ -> gt
 sub$ll1 : ∀a. Ring a -> a -> a -> a =
-  fun @a ->
-    fun (dict : Ring a) ->
-      match dict with
-      | Dict$Ring @a _ _ sub _ -> sub
+  fun @a (dict : Ring a) ->
+    match dict with
+    | Dict$Ring @a _ _ sub _ -> sub
 pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
-  fun @m ->
-    fun (dict : Monad m) ->
-      match dict with
-      | Dict$Monad @m pure _ -> pure
+  fun @m (dict : Monad m) ->
+    match dict with
+    | Dict$Monad @m pure _ -> pure
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
-  fun @m ->
-    fun (dict : Monad m) ->
-      match dict with
-      | Dict$Monad @m _ bind -> bind
+  fun @m (dict : Monad m) ->
+    match dict with
+    | Dict$Monad @m _ bind -> bind
 semi$ll1 : ∀a m. m a -> Unit -> m a =
-  fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
+  fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
-  fun @a @m ->
-    fun (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
-      bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
+  fun @a @m (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
+    bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 when$ll1 : ∀m. Monad m -> Bool -> m Unit -> m Unit =
-  fun @m ->
-    fun (dict$Monad$m : Monad m) (p : Bool) (m : m Unit) ->
-      match p with
-      | False -> pure$ll1 @m dict$Monad$m @Unit Unit
-      | True -> m
+  fun @m (dict$Monad$m : Monad m) (p : Bool) (m : m Unit) ->
+    match p with
+    | False -> pure$ll1 @m dict$Monad$m @Unit Unit
+    | True -> m
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a -> fun (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
+  fun @a (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b ->
-    fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
-      match coerce @(IO -> _) mx world0 with
-      | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+  fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
+    match coerce @(IO -> _) mx world0 with
+    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b ->
-    fun (mx : IO a) (f : a -> IO b) ->
-      coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
+  fun @a @b (mx : IO a) (f : a -> IO b) ->
+    coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) (world : World) ->
-      let y : b = f x in
-      seq @b @(Pair b World) y (Pair @b @World y world)
+  fun @a @b (f : a -> b) (x : a) (world : World) ->
+    let y : b = f x in
+    seq @b @(Pair b World) y (Pair @b @World y world)
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+  fun @a @b (f : a -> b) (x : a) ->
+    coerce @(_ -> IO) (io$ll1 @a @b f x)
 print$ll1 : Int -> IO Unit =
   fun (n : Int) -> io$ll2 @Int @Unit puti n
 count_down$ll1 : Int -> IO Unit =
   fun (k : Int) ->
     when$ll1 @IO dict$Monad$IO (ge$ll1 @Int dict$Ord$Int k 0) (semi$ll2 @Unit @IO dict$Monad$IO (print$ll1 k) (count_down$ll1 (sub$ll1 @Int dict$Ring$Int k 1)))
 repeat$ll1 : ∀m. Monad m -> Int -> m Unit -> m Unit =
-  fun @m ->
-    fun (dict$Monad$m : Monad m) (k : Int) (m : m Unit) ->
-      when$ll1 @m dict$Monad$m (gt$ll1 @Int dict$Ord$Int k 0) (semi$ll2 @Unit @m dict$Monad$m m (repeat$ll1 @m dict$Monad$m (sub$ll1 @Int dict$Ring$Int k 1) m))
+  fun @m (dict$Monad$m : Monad m) (k : Int) (m : m Unit) ->
+    when$ll1 @m dict$Monad$m (gt$ll1 @Int dict$Ord$Int k 0) (semi$ll2 @Unit @m dict$Monad$m m (repeat$ll1 @m dict$Monad$m (sub$ll1 @Int dict$Ring$Int k 1) m))
 main$ll1 : Int -> Int -> IO Unit =
   fun (k : Int) (n : Int) ->
     repeat$ll1 @IO dict$Monad$IO k (count_down$ll1 n)

@@ -23,19 +23,17 @@ subst' f = go Set.empty
         | x `Set.member` bound -> pure (EVar x)
         | otherwise            -> f x
       EAtm a      -> pure (EAtm a)
-      ETmApp e  a   -> ETmApp <$> go bound e <*> go bound a
-      ETmAbs b  e   -> ETmAbs b <$> go (Set.insert (nameOf b) bound) e
+      EApp e (TmArg a) -> ETmApp <$> go bound e <*> go bound a
+      EApp e a         -> EApp   <$> go bound e <*> pure a
+      EAbs (TmPar x) e -> ETmAbs x <$> go (Set.insert (nameOf x) bound) e
+      EAbs p         e -> EAbs   p <$> go bound e
       ELet ds e   -> ELet <$> (traverse . b2bound) (go bound ) ds <*> go bound' e
         where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
       ERec ds e   -> ERec <$> (traverse . b2bound) (go bound') ds <*> go bound' e
         where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
       ECast coe e -> ECast coe <$> go bound e
-      ETyAbs v  e -> ETyAbs v <$> go bound e
-      ETyApp e  t -> ETyApp <$> go bound e <*> pure t
       ETyAnn t  e -> ETyAnn t <$> go bound e
-      ECxAbs c  e -> ECxAbs c <$> go bound e
-      ECxApp e  c -> ECxApp <$> go bound e <*> pure c
     goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnEVar p) e
 
 freeEVar :: Traversal' (Expr lg) NameEVar
@@ -57,22 +55,31 @@ expr2atom f = \case
   ELoc e       -> ELoc <$> lctd (expr2atom f) e
   EVar x       -> pure (EVar x)
   EAtm a       -> EAtm <$> f a
-  ETmApp e  a    -> ETmApp <$> expr2atom f e <*> expr2atom f a
-  ETmAbs bs e    -> ETmAbs bs <$> expr2atom f e
+  EApp e (TmArg a) -> ETmApp <$> expr2atom f e <*> expr2atom f a
+  EApp e a         -> EApp   <$> expr2atom f e <*> pure a
+  EAbs p  e    -> EAbs p <$> expr2atom f e
   ELet ds t    -> ELet <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
   ECast coe e  -> ECast coe <$> expr2atom f e
-  ETyAbs x e   -> ETyAbs x <$> expr2atom f e
-  ETyApp e t   -> ETyApp <$> expr2atom f e <*> pure t
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
-  ECxAbs c e   -> ECxAbs c <$> expr2atom f e
-  ECxApp e c   -> ECxApp <$> expr2atom f e <*> pure c
 
 -- | Traverse over all types in a definition, i.e., the type in the binder on
 -- the LHS and the types on the RHS.
 b2type :: Traversal' (Bind lg) (TypeOf lg)
 b2type f (MkBind b e) = MkBind <$> _2 f b <*> expr2type f e
+
+arg2type :: Traversal' (Arg lg) (TypeOf lg)
+arg2type f = \case
+  TmArg e  -> TmArg <$> expr2type f e
+  TyArg t  -> TyArg <$> f t
+  CxArg cx -> CxArg <$> _2 f cx
+
+par2type :: Traversal' (Par lg) (TypeOf lg)
+par2type f = \case
+  TmPar x  -> TmPar <$> _2 f x
+  TyPar v  -> pure (TyPar v)
+  CxPar cx -> CxPar <$> _2 f cx
 
 -- | Traverse over all types in an expression.
 expr2type :: Traversal' (Expr lg) (TypeOf lg)
@@ -80,17 +87,13 @@ expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
   EVar x       -> pure (EVar x)
   EAtm a       -> pure (EAtm a)
-  ETmApp e a     -> ETmApp <$> expr2type f e <*> expr2type f a
-  ETmAbs b e     -> ETmAbs <$> _2 f b <*> expr2type f e
+  EApp e  a    -> EApp <$> expr2type f e <*> arg2type f a
+  EAbs p  e    -> EAbs <$> par2type f p <*> expr2type f e
   ELet ds e0   -> ELet <$> traverse (b2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (b2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
   ECast (c, t) e -> ECast . (c, ) <$> f t <*> expr2type f e
-  ETyAbs v  e0 -> ETyAbs v <$> expr2type f e0
-  ETyApp e0 t  -> ETyApp <$> expr2type f e0 <*> f t
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0
-  ECxAbs (c, t) e -> ECxAbs <$> ((c,) <$> f t) <*> expr2type f e
-  ECxApp e (c, t) -> ECxApp <$> expr2type f e <*> ((c,) <$> f t)
 
 -- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a pattern matching alternative, i.e., the types

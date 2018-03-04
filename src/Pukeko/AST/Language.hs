@@ -14,6 +14,12 @@ module Pukeko.AST.Language
   , IsNested
   , IsClassy
   , IsLambda
+
+  , HasTmAbs
+  , HasTyApp
+  , HasTyAbs
+  , HasCxApp
+  , HasCxAbs
   )
 
 where
@@ -53,5 +59,11 @@ type IsTyped    lg = ((LangId Typed <=? LangId lg) ~ True, TypeOf lg ~ Type)
 type IsNested   lg = LangId lg <? LangId Unnested
 type IsClassy   lg = LangId lg <? LangId Unclassy
 type IsLambda   lg = LangId lg <? LangId SuperCore
+
+type HasTmAbs lg =  IsLambda lg ~ True
+type HasTyApp lg =                      IsPreTyped lg ~ True
+type HasTyAbs lg =                      TypeOf lg ~ Type
+type HasCxApp lg = (IsClassy lg ~ True, IsPreTyped lg ~ True)
+type HasCxAbs lg = (IsClassy lg ~ True, TypeOf lg ~ Type)
 
 type (<?) m n = m <=? n-1

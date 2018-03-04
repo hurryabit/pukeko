@@ -27,7 +27,7 @@ _TVar = \case
 
 erSupCDecl :: FuncDecl (Only SupC) -> FuncDecl (Only SupC)
 erSupCDecl = \case
-  supc@(SupCDecl z tz vs0 bs0 (unEAnn -> e0)) ->
+  supc@(SupCDecl z tz vs0 bs0 e0) ->
     case e0 of
       -- Reduce expression parameters:
       ETmApp{}

@@ -173,16 +173,18 @@ elimExpr = \case
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   ETmApp fun arg -> ETmApp <$> elimExpr fun <*> elimExpr arg
+  ETyApp e0 ts0 -> ETyApp <$> elimExpr e0 <*> pure ts0
+  ECxApp e0 cstr -> elimECxApp e0 cstr
+  EApp{} -> impossible
   ETmAbs binder body0 -> ETmAbs binder <$> elimExpr body0
+  ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
+  ECxAbs cstr e0 -> elimECxAbs cstr e0
+  EAbs{} -> impossible
   ELet ds0 e0 -> ELet <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   ERec ds0 e0 -> ERec <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   EMat e0 as -> EMat <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
   ECast coe e0 -> ECast coe <$> elimExpr e0
-  ETyApp e0 ts0 -> ETyApp <$> elimExpr e0 <*> pure ts0
-  ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
   ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0
-  ECxAbs cstr e0 -> elimECxAbs cstr e0
-  ECxApp e0 cstr -> elimECxApp e0 cstr
 
 unclssType :: GenType tv -> GenType tv
 unclssType = \case

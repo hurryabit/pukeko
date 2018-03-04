@@ -80,12 +80,12 @@ inExpr e0 = case e0 of
   ENum n     -> pure (ENum n)
   EAtm{} -> impossible  -- all cases matched above
   ETmApp e  a  -> ETmApp <$> inExpr e <*> inExpr a
+  EApp   e  a  -> EApp <$> inExpr e <*> pure a
+  EAbs   p  e  -> EAbs p <$> inExpr e
   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
   ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
   ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t
   ECast coe e -> ECast coe <$> inExpr e
-  ETyAbs x e -> ETyAbs x <$> inExpr e
-  ETyApp e t -> ETyApp <$> inExpr e <*> pure t
 
 inSupCDecl :: FuncDecl (Only SupC) -> In (FuncDecl (Only SupC))
 inSupCDecl = func2expr inExpr
