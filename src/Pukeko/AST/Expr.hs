@@ -20,16 +20,16 @@ module Pukeko.AST.Expr
   , altn2expr
 
   , _AVal
-  , _EApp
+  , _ETmApp
   , _ETyApp
   , _ETyAbs
   , _ECxAbs
 
-  , mkELam
-  , unwindELam
+  , mkETmAbs
+  , unwindETmAbs
   , unEAnn
 
-  , prettyELam
+  , prettyETmAbs
   , prettyETyAbs
   )
   where
@@ -59,14 +59,12 @@ data Bind lg = MkBind
   , _b2bound  :: Expr lg
   }
 
--- NOTE: All constructors added here also NEED TO be added to the COMPLETE
--- pragma below.
 data Expr lg
   = IsLambda lg ~ True   => ELoc (Lctd (Expr lg))
   |                         EVar (Name EVar)
   |                         EAtm Atom
-  |                         EApp (Expr lg) (Expr lg)
-  | IsLambda lg ~ True   => ELam (EVarBinder (TypeOf lg)) (Expr lg)
+  |                         ETmApp (Expr lg) (Expr lg)
+  | IsLambda lg ~ True   => ETmAbs (EVarBinder (TypeOf lg)) (Expr lg)
   |                         ELet [Bind lg] (Expr lg)
   |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
@@ -97,10 +95,6 @@ pattern ECon c = EAtm (ACon c)
 pattern ENum :: Int -> Expr lg
 pattern ENum n = EAtm (ANum n)
 
--- NOTE: Do NOT forget to add new constructors here.
-{-# COMPLETE ELoc, EVar, EVal, ECon, ENum, EApp, ELam, ELet, ERec, EMat,
-             ECast, ETyAbs, ETyApp, ETyAnn, ECxAbs, ECxApp #-}
-
 -- * Derived optics
 makePrisms ''Atom
 makePrisms ''Expr
@@ -118,23 +112,23 @@ altn2expr f (MkAltn p e) = MkAltn (unsafeCoerce p) <$> f e
 
 -- * Smart constructors
 
-mkELam ::
+mkETmAbs ::
   (IsLambda lg ~ True, IsPreTyped lg ~ True, TypeOf lg ~ Type) =>
   [EVarBinder (TypeOf lg)] -> Type -> Expr lg -> Expr lg
-mkELam bs0 t0 e0 = case bs0 of
+mkETmAbs bs0 t0 e0 = case bs0 of
   [] -> e0
-  _  -> rewindr ELam bs0 (ETyAnn t0 e0)
+  _  -> rewindr ETmAbs bs0 (ETyAnn t0 e0)
 
-unwindELam :: (IsLambda lg ~ True) => Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
-unwindELam = go []
+unwindETmAbs :: (IsLambda lg ~ True) => Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
+unwindETmAbs = go []
   where
     go :: [EVarBinder (TypeOf lg)] -> Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
     go params = \case
-      ELam param body -> go (param:params) body
+      ETmAbs param body -> go (param:params) body
       -- NOTE: We do this only conditional on the inner expression being a
       -- lambda to not strip the very last type annotation in a chain of
       -- lambdas.
-      ETyAnn _ e@ELam{} -> go params e
+      ETyAnn _ e@ETmAbs{} -> go params e
       body -> (reverse params, body)
 
 unEAnn :: Expr lg -> Expr lg
@@ -177,13 +171,13 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     ELoc l -> prettyPrec prec l
     EVar x -> pretty x
     EAtm a -> pretty a
-    EApp e a ->
+    ETmApp e a ->
       maybeParens (prec > Op.aprec)
       $ prettyPrec Op.aprec e <+> prettyPrec (Op.aprec+1) a
+    ETmAbs b e -> prettyETmAbs prec [b] e
     ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
     ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
     -- FIXME: Collect lambdas.
-    ELam b e -> prettyELam prec [b] e
     EMat t as ->
       maybeParens (prec > 0) $
         "match" <+> pretty t <+> "with"
@@ -215,9 +209,9 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
       maybeParens (prec > Op.aprec)
       $ prettyPrec Op.aprec e0 <+> "?" <> parens (pretty clss <+> prettyPrec 3 typ)
 
-prettyELam :: (TypeOf lg ~ Type, Foldable t) =>
+prettyETmAbs :: (TypeOf lg ~ Type, Foldable t) =>
   Int -> t (EVarBinder (TypeOf lg)) -> Expr lg -> Doc ann
-prettyELam prec bs e
+prettyETmAbs prec bs e
   | null bs   = prettyPrec prec e
   | otherwise =
       maybeParens (prec > 0) $

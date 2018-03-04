@@ -163,7 +163,7 @@ rnELam :: CanRn effs =>
 rnELam [] body = rnExpr body
 rnELam (name:names) body = do
   binder <- mkName name
-  ELam (binder, NoType) <$> local (Map.insert (unlctd name) binder) (rnELam names body)
+  ETmAbs (binder, NoType) <$> local (Map.insert (unlctd name) binder) (rnELam names body)
 
 -- | Rename an expression.
 rnExpr :: CanRn effs => Ps.Expr (Ps.LctdName EVar) -> Eff (Env : effs) (Expr Out)
@@ -177,9 +177,9 @@ rnExpr = \case
   Ps.ECon name ->
     ECon <$> lookupGlobal dconTab (const True) "unknown data constructor" name
   Ps.ENum n -> pure (ENum n)
-  Ps.EApp e0 es -> foldl EApp <$> rnExpr e0 <*> traverse rnExpr es
+  Ps.EApp e0 es -> foldl ETmApp <$> rnExpr e0 <*> traverse rnExpr es
   Ps.EOpp op e1 e2 ->
-    EApp <$> (EApp <$> (EVal <$> lookupBinop op) <*> rnExpr e1) <*> rnExpr e2
+    ETmApp <$> (ETmApp <$> (EVal <$> lookupBinop op) <*> rnExpr e1) <*> rnExpr e2
   Ps.EMat e0 as0 ->
     case as0 of
       []   -> throwHere "pattern match without alternatives"

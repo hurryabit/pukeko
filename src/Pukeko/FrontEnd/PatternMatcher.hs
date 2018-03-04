@@ -37,8 +37,8 @@ pmExpr = \case
   ELoc le         -> here le $ ELoc <$> lctd pmExpr le
   EVar x          -> pure (EVar x)
   EAtm a          -> pure (EAtm a)
-  EApp e  a       -> EApp <$> pmExpr e <*> pmExpr a
-  ELam b  e       -> ELam b <$> pmExpr e
+  ETmApp e  a       -> ETmApp <$> pmExpr e <*> pmExpr a
+  ETmAbs b  e       -> ETmAbs b <$> pmExpr e
   ELet ds t       -> ELet <$> traverse (b2bound pmExpr) ds <*> pmExpr t
   ERec ds t       -> ERec <$> traverse (b2bound pmExpr) ds <*> pmExpr t
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do

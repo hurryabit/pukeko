@@ -76,7 +76,7 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
     let c_one = MkAltn (PSimple dcon [TVar prm] c_binds) e_rhs
     let e_cas = EMat (EVar dictPrm) (c_one :| [])
     let b_lam = (dictPrm, mkTDict cstr)
-    let e_lam = ELam b_lam (ETyAnn t0 e_cas)
+    let e_lam = ETmAbs b_lam (ETyAnn t0 e_cas)
     let e_tyabs = ETyAbs prm e_lam
     pure (DFunc (MkFuncDecl z t1 e_tyabs))
   pure (DType tcon : sels)
@@ -110,7 +110,7 @@ elimInstDecl
     name1 <- copyName (getPos inst) name0
     pure (MkBind (name1, typ_) body)
   let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
-  let e_body = foldl EApp e_dcon (map (EVar . nameOf) defns1)
+  let e_body = foldl ETmApp e_dcon (map (EVar . nameOf) defns1)
   let e_let :: Expr In
       e_let = ELet defns1 e_body
   let e_rhs :: Expr In
@@ -157,7 +157,7 @@ elimECxAbs :: TypeCstr -> Expr In -> CE (Expr Out)
 elimECxAbs cstr@(clss, TVar v) e0 = do
   x <- dictEVar clss v
   let dictBinder = (x, mkTDict cstr)
-  ELam dictBinder <$> local (Map.insertWith impossible (v, clss) x) (elimExpr e0)
+  ETmAbs dictBinder <$> local (Map.insertWith impossible (v, clss) x) (elimExpr e0)
 elimECxAbs _ _ = impossible
 
 elimECxApp :: Expr In -> TypeCstr -> CE (Expr Out)
@@ -165,15 +165,15 @@ elimECxApp e0 cstr = do
   e1 <- elimExpr e0
   dict0 <- buildDict cstr
   dict1 <- elimExpr dict0
-  pure (EApp e1 dict1)
+  pure (ETmApp e1 dict1)
 
 elimExpr :: Expr In -> CE (Expr Out)
 elimExpr = \case
   ELoc (Lctd pos e0) -> here_ pos $ elimExpr e0
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
-  EApp fun arg -> EApp <$> elimExpr fun <*> elimExpr arg
-  ELam binder body0 -> ELam binder <$> elimExpr body0
+  ETmApp fun arg -> ETmApp <$> elimExpr fun <*> elimExpr arg
+  ETmAbs binder body0 -> ETmAbs binder <$> elimExpr body0
   ELet ds0 e0 -> ELet <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   ERec ds0 e0 -> ERec <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   EMat e0 as -> EMat <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as

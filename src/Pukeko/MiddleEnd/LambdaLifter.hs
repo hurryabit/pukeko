@@ -73,8 +73,8 @@ freshEVar = do
 -- Last but not least, note that if we sort the aᵢ and yⱼ by thei de Bruijn
 -- indices in decreasing order, we create more opportunities for η-reduction,
 -- which is good for inlining.
-llELam :: NonEmpty (EVarBinder Type) -> Type -> Expr Out -> LL (Expr Out)
-llELam oldBinds t_rhs rhs1 = do
+llETmAbs :: NonEmpty (EVarBinder Type) -> Type -> Expr Out -> LL (Expr Out)
+llETmAbs oldBinds t_rhs rhs1 = do
     let evCaptured0 = Set.toList
           (setOf freeEVar rhs1 `Set.difference` setOf (traverse . to nameOf) oldBinds)
     (evCaptured, newBinds)  <-
@@ -102,14 +102,14 @@ llELam oldBinds t_rhs rhs1 = do
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl lhs (closeT t_lhs) tyBinds allBinds1 rhs2
     tell (mkFuncDecl @Any supc)
-    pure (foldl EApp (foldl ETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
+    pure (foldl ETmApp (foldl ETyApp (EVal lhs) (map TVar tvCaptured)) (map EVar evCaptured))
 
 llExpr :: Expr In -> LL (Expr Out)
 llExpr = \case
   ELoc le -> llExpr (unlctd le)
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
-  EApp fun arg -> EApp <$> llExpr fun <*> llExpr arg
+  ETmApp fun arg -> ETmApp <$> llExpr fun <*> llExpr arg
   EMat t  cs -> EMat <$> llExpr t <*> traverse llAltn cs
   ELet ds e0 ->
     ELet
@@ -118,11 +118,11 @@ llExpr = \case
   ERec ds e0 ->
     withinEScope (map _b2binder ds) $
       ERec <$> (traverse . b2bound) llExpr ds <*> llExpr e0
-  elam@ELam{}
-    | (oldBinds, ETyAnn t_rhs rhs0) <- unwindELam elam -> do
+  elam@ETmAbs{}
+    | (oldBinds, ETyAnn t_rhs rhs0) <- unwindETmAbs elam -> do
         rhs1 <- withinEScope oldBinds (llExpr rhs0)
-        llELam (NE.fromList oldBinds) t_rhs rhs1
-  ELam{} -> impossible  -- the type inferencer puts type anns around lambda bodies
+        llETmAbs (NE.fromList oldBinds) t_rhs rhs1
+  ETmAbs{} -> impossible  -- the type inferencer puts type anns around lambda bodies
   ECast coe e0 -> ECast coe <$> llExpr e0
   ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
   ETyAbs v e0 -> ETyAbs v <$> withinTScope1 v (llExpr e0)
