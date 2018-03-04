@@ -96,7 +96,7 @@ instance Monoid Module where
 instance Pretty (FuncDecl m) where
   pretty = \case
     SupCDecl z t qvs bs e ->
-      hang (pretty (z ::: t) <+> "=") 2 (prettyETyAbs 0 qvs (prettyELam 0 bs e))
+      hang (pretty (z ::: t) <+> "=") 2 (prettyETyAbs 0 qvs (prettyETmAbs 0 bs e))
     ExtnDecl z t s ->
       hsep ["external", pretty (z ::: t), "=", doubleQuotes (pretty s)]
 

@@ -40,13 +40,13 @@ typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
   EAtm a -> typeOfAtom a
-  EApp fun arg -> do
+  ETmApp fun arg -> do
     t_fun <- typeOf fun
     case t_fun of
       TFun tx ty -> checkExpr arg tx $> ty
       TUni{}     -> throwHere "expected type argument, but found value argument"
       _          -> throwHere "unexpected value argument"
-  ELam binder body -> do
+  ETmAbs binder body -> do
     t_body <- withinEScope1 binder (typeOf body)
     pure (snd binder ~> t_body)
   ELet ds e0 -> do

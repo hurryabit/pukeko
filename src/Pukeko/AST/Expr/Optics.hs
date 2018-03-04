@@ -23,8 +23,8 @@ subst' f = go Set.empty
         | x `Set.member` bound -> pure (EVar x)
         | otherwise            -> f x
       EAtm a      -> pure (EAtm a)
-      EApp e  a   -> EApp <$> go bound e <*> go bound a
-      ELam b  e   -> ELam b <$> go (Set.insert (nameOf b) bound) e
+      ETmApp e  a   -> ETmApp <$> go bound e <*> go bound a
+      ETmAbs b  e   -> ETmAbs b <$> go (Set.insert (nameOf b) bound) e
       ELet ds e   -> ELet <$> (traverse . b2bound) (go bound ) ds <*> go bound' e
         where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
       ERec ds e   -> ERec <$> (traverse . b2bound) (go bound') ds <*> go bound' e
@@ -57,8 +57,8 @@ expr2atom f = \case
   ELoc e       -> ELoc <$> lctd (expr2atom f) e
   EVar x       -> pure (EVar x)
   EAtm a       -> EAtm <$> f a
-  EApp e  a    -> EApp <$> expr2atom f e <*> expr2atom f a
-  ELam bs e    -> ELam bs <$> expr2atom f e
+  ETmApp e  a    -> ETmApp <$> expr2atom f e <*> expr2atom f a
+  ETmAbs bs e    -> ETmAbs bs <$> expr2atom f e
   ELet ds t    -> ELet <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   ERec ds t    -> ERec <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
@@ -80,8 +80,8 @@ expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
   EVar x       -> pure (EVar x)
   EAtm a       -> pure (EAtm a)
-  EApp e a     -> EApp <$> expr2type f e <*> expr2type f a
-  ELam b e     -> ELam <$> _2 f b <*> expr2type f e
+  ETmApp e a     -> ETmApp <$> expr2type f e <*> expr2type f a
+  ETmAbs b e     -> ETmAbs <$> _2 f b <*> expr2type f e
   ELet ds e0   -> ELet <$> traverse (b2type f) ds <*> expr2type f e0
   ERec ds e0   -> ERec <$> traverse (b2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as

@@ -26,7 +26,7 @@ makeInlinable supc = modifying inlinables (Map.insert (nameOf supc) supc)
 
 unwind :: Expr -> (Expr, [Type], [Expr])
 unwind e0 =
-  let (e1, as) = unwindl _EApp e0
+  let (e1, as) = unwindl _ETmApp e0
       (e2, ts) = unwindl _ETyApp e1
   in  (e2, ts, as)
 
@@ -42,14 +42,14 @@ inEVal z0 = do
 --   Expr tv ev -> In (Expr tv ev)
 -- inRedex e0 = do
 --   let (f, ts, as) = unwind e0
---   let continue = foldl EApp (mkETyApp f ts) <$> traverse inExpr as
+--   let continue = foldl ETmApp (mkETyApp f ts) <$> traverse inExpr as
 --   case f of
 --     EVal z0 -> do
 --       supc_mb <- uses inlinables (Map.lookup z0)
 --       case supc_mb of
 --         Just (SupCDecl _ _ [] [] (EVal z1)) ->
 --           -- trace ("INLINING: " ++ render (pretty e0))
---             (inExpr (foldl EApp (EVal z1 `mkETyApp` ts) as))
+--             (inExpr (foldl ETmApp (EVal z1 `mkETyApp` ts) as))
 --         Just (SupCDecl _ _ vs xs e1)
 --           -- NOTE: We don't want to inline CAFs. That's why we ensure @1 <= n@.
 --           | length vs == length ts && 1 <= n && n <= length as -> do
@@ -66,7 +66,7 @@ inEVal z0 = do
 --                   body = runIdentity (expr2type (Identity . inst) e2)
 --               let let_ = ELet defns body
 --               -- trace ("INLINING: " ++ render (pretty e0))
---               (inExpr (foldl EApp let_ as1))
+--               (inExpr (foldl ETmApp let_ as1))
 --           where n = length xs
 --         Nothing -> continue
 --         _ -> trace ("NOT INLINING: " ++ render (pretty e0)) continue
@@ -75,11 +75,11 @@ inEVal z0 = do
 inExpr :: Expr -> In Expr
 inExpr e0 = case e0 of
   EVal z     -> inEVal z
-  EApp e a   -> EApp <$> inExpr e <*> inExpr a
   EVar x     -> pure (EVar x)
   ECon c     -> pure (ECon c)
   ENum n     -> pure (ENum n)
-  EApp e  a  -> EApp <$> inExpr e <*> inExpr a
+  EAtm{} -> impossible  -- all cases matched above
+  ETmApp e  a  -> ETmApp <$> inExpr e <*> inExpr a
   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
   ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
   ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t
