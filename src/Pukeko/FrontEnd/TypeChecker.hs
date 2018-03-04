@@ -40,15 +40,27 @@ typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
   EAtm a -> typeOfAtom a
-  ETmApp fun arg -> do
-    t_fun <- typeOf fun
-    case t_fun of
-      TFun tx ty -> checkExpr arg tx $> ty
-      TUni{}     -> throwHere "expected type argument, but found value argument"
-      _          -> throwHere "unexpected value argument"
-  ETmAbs binder body -> do
-    t_body <- withinEScope1 binder (typeOf body)
-    pure (snd binder ~> t_body)
+  EApp e0 a -> do
+    t0 <- typeOf e0
+    case (a, t0) of
+      (TmArg e1, TFun tx ty) -> checkExpr e1 tx $> ty
+      (TmArg{}, TUni{}) -> throwHere "expected type argument, but found value argument"
+      (TmArg{}, _)      -> throwHere "unexpected value argument"
+      (TyArg t1, TUni _ tq) -> pure (B.instantiate1Name t1 tq)
+      (TyArg{}, TFun{}) -> throwHere "expected value argument, but found type argument"
+      (TyArg{}, _     ) -> throwHere "unexpected type argument"
+      (CxArg cstr0, TCtx cstr1 t1) -> do
+        checkCstr cstr1
+        unless (cstr0 == cstr1) $
+          throwHere ("expected evidence for" <+> prettyCstr cstr1 <>
+                     ", but found evidence for" <+> prettyCstr cstr0)
+        pure t1
+      (CxArg{}, _) -> throwHere "unexpected constraint argument"
+  EAbs par e0 -> do
+    case par of
+      TmPar binder -> TFun (snd binder) <$> withinEScope1 binder (typeOf e0)
+      TyPar v      -> TUni' v           <$> withinTScope1 v (typeOf e0)
+      CxPar cstr   -> TCtx cstr         <$> withinContext1 cstr (typeOf e0)
   ELet ds e0 -> do
     traverse_ checkBind ds
     withinEScope (map _b2binder ds) (typeOf e0)
@@ -68,25 +80,7 @@ typeOf = \case
     t_from <- typeOf e0
     checkCoercion coe t_from t_to
     pure t_to
-  ETyAbs v e0 -> withinTScope1 v (TUni' v <$> typeOf e0)
-  ETyApp e0 arg -> do
-    t0 <- typeOf e0
-    case t0 of
-      TUni _ t1 -> pure (B.instantiate1Name arg t1)
-      TFun{}    -> throwHere "expected value argument, but found type argument"
-      _ -> throwHere "unexpected type argument"
   ETyAnn t0 e0 -> checkExpr e0 t0 $> t0
-  ECxAbs cstr e -> TCtx cstr <$> withinContext1 cstr (typeOf e)
-  ECxApp e0 cstr0 -> do
-    t0 <- typeOf e0
-    case t0 of
-      TCtx cstr1 t1 -> do
-        checkCstr cstr1
-        unless (cstr0 == cstr1) $
-          throwHere ("expected evidence for" <+> prettyCstr cstr1 <>
-                     ", but found evidence for" <+> prettyCstr cstr0)
-        pure t1
-      _ -> throwHere "unexpected constraint argument"
 
 checkCstr :: TypeCstr -> TC ()
 checkCstr cstr@(clss, unwindl _TApp -> (t1, targs)) = do

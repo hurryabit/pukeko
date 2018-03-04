@@ -45,49 +45,42 @@ input : IO Int = io$ll2 @Unit @Int geti Unit
 main : IO Unit =
   bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll2
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
-  fun @m ->
-    fun (dict : Monad m) ->
-      match dict with
-      | Dict$Monad @m _ bind -> bind
+  fun @m (dict : Monad m) ->
+    match dict with
+    | Dict$Monad @m _ bind -> bind
 semi$ll1 : ∀a m. m a -> Unit -> m a =
-  fun @a @m -> fun (m2 : m a) (x : Unit) -> m2
+  fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
-  fun @a @m ->
-    fun (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
-      bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
+  fun @a @m (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
+    bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a -> fun (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
+  fun @a (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b ->
-    fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
-      match coerce @(IO -> _) mx world0 with
-      | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+  fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
+    match coerce @(IO -> _) mx world0 with
+    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b ->
-    fun (mx : IO a) (f : a -> IO b) ->
-      coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
+  fun @a @b (mx : IO a) (f : a -> IO b) ->
+    coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) (world : World) ->
-      let y : b = f x in
-      seq @b @(Pair b World) y (Pair @b @World y world)
+  fun @a @b (f : a -> b) (x : a) (world : World) ->
+    let y : b = f x in
+    seq @b @(Pair b World) y (Pair @b @World y world)
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
-  fun @a @b ->
-    fun (f : a -> b) (x : a) -> coerce @(_ -> IO) (io$ll1 @a @b f x)
+  fun @a @b (f : a -> b) (x : a) ->
+    coerce @(_ -> IO) (io$ll1 @a @b f x)
 print$ll1 : Int -> IO Unit =
   fun (n : Int) -> io$ll2 @Int @Unit puti n
 fst$ll1 : ∀a b. Pair a b -> a =
-  fun @a @b ->
-    fun (p : Pair a b) ->
-      match p with
-      | Pair @a @b x _ -> x
+  fun @a @b (p : Pair a b) ->
+    match p with
+    | Pair @a @b x _ -> x
 snd$ll1 : ∀a b. Pair a b -> b =
-  fun @a @b ->
-    fun (p : Pair a b) ->
-      match p with
-      | Pair @a @b _ y -> y
+  fun @a @b (p : Pair a b) ->
+    match p with
+    | Pair @a @b _ y -> y
 main$ll1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in

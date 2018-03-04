@@ -188,13 +188,13 @@ infer = \case
       pure (ELoc (Lctd pos e1), t1, cstrs)
     EVar x -> lookupEVar x >>= instantiate (EVar x)
     EAtm a -> typeOfAtom a >>= instantiate (EAtm a) . open
-    ETmApp fun0 arg0 -> do
+    EApp fun0 (TmArg arg0) -> do
       (fun1, t_fun, cstrs_fun) <- infer fun0
       (arg1, t_arg, cstrs_arg) <- infer arg0
       t_res <- freshUVar
       unify t_fun (t_arg ~> t_res)
       pure (ETmApp fun1 arg1, t_res, cstrs_fun <> cstrs_arg)
-    ETmAbs (param, NoType) body0 -> do
+    EAbs (TmPar (param, NoType)) body0 -> do
       t_param <- freshUVar
       (body1, t_body, cstrs) <- withinEScope1 @s param t_param (infer body0)
       let binder = (param, t_param)
@@ -329,14 +329,15 @@ qualExpr = \case
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   ETmApp fun arg -> ETmApp <$> qualExpr fun <*> qualExpr arg
-  ETmAbs param body -> ETmAbs <$> _2 qualType param <*> qualExpr body
+  ETyApp e0 t    -> ETyApp <$> qualExpr e0 <*> qualType t
+  ECxApp e cstr  -> ECxApp <$> qualExpr e <*> _2 qualType cstr
+  EApp{} -> impossible
+  EAbs (TmPar param) body -> ETmAbs <$> _2 qualType param <*> qualExpr body
   ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
   ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
   ECast (c, t) e0 -> ECast . (c,) <$> qualType t <*> qualExpr e0
-  ETyApp e0 t  -> ETyApp <$> qualExpr e0 <*> qualType t
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
-  ECxApp e cstr -> ECxApp <$> qualExpr e <*> _2 qualType cstr
 
 qualAltn :: Altn (Aux s) -> TQ s (Altn Out)
 qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e

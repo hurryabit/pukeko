@@ -7,12 +7,20 @@ module Pukeko.AST.Expr
   , Atom (..)
   , EVarBinder
   , Bind (..)
+  , Arg  (..)
+  , Par  (..)
   , Altn (..)
   , Patn (..)
 
   , pattern EVal
   , pattern ECon
   , pattern ENum
+  , pattern ETmApp
+  , pattern ETyApp
+  , pattern ECxApp
+  , pattern ETmAbs
+  , pattern ETyAbs
+  , pattern ECxAbs
 
   , b2binder
   , b2bound
@@ -23,20 +31,19 @@ module Pukeko.AST.Expr
   , _ETmApp
   , _ETyApp
   , _ETyAbs
-  , _ECxAbs
+  -- , _ECxAbs
 
   , mkETmAbs
   , unwindETmAbs
   , unEAnn
 
-  , prettyETmAbs
-  , prettyETyAbs
+  , prettyEAbs
   )
   where
 
 import Pukeko.Prelude
 
-import           Control.Lens (makeLensesFor)
+import           Control.Lens (makeLensesFor, prism')
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Unsafe.Coerce
@@ -59,21 +66,27 @@ data Bind lg = MkBind
   , _b2bound  :: Expr lg
   }
 
+data Arg lg
+  =                TmArg (Expr lg)
+  | HasTyApp lg => TyArg (TypeOf lg)
+  | HasCxApp lg => CxArg (NameClss, TypeOf lg)
+
+data Par lg
+  = HasTmAbs lg => TmPar (EVarBinder (TypeOf lg))
+  | HasTyAbs lg => TyPar NameTVar
+  | HasCxAbs lg => CxPar TypeCstr
+
 data Expr lg
   = IsLambda lg ~ True   => ELoc (Lctd (Expr lg))
   |                         EVar (Name EVar)
   |                         EAtm Atom
-  |                         ETmApp (Expr lg) (Expr lg)
-  | IsLambda lg ~ True   => ETmAbs (EVarBinder (TypeOf lg)) (Expr lg)
+  |                         EApp (Expr lg) (Arg  lg)
+  |                         EAbs (Par  lg) (Expr lg)
   |                         ELet [Bind lg] (Expr lg)
   |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
-  | TypeOf lg ~ Type     => ETyAbs NameTVar (Expr lg)
-  | IsPreTyped lg ~ True => ETyApp (Expr lg) (TypeOf lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
-  | (IsClassy lg ~ True, TypeOf lg ~ Type) => ECxAbs TypeCstr (Expr lg)
-  | (IsClassy lg ~ True, IsPreTyped lg ~ True) => ECxApp (Expr lg) (NameClss, TypeOf lg)
 
 data Altn lg = MkAltn
   { _altn2patn :: Patn lg
@@ -95,6 +108,24 @@ pattern ECon c = EAtm (ACon c)
 pattern ENum :: Int -> Expr lg
 pattern ENum n = EAtm (ANum n)
 
+pattern ETmApp :: Expr lg -> Expr lg -> Expr lg
+pattern ETmApp fun arg = EApp fun (TmArg arg)
+
+pattern ETyApp :: HasTyApp lg => Expr lg -> TypeOf lg -> Expr lg
+pattern ETyApp fun typ = EApp fun (TyArg typ)
+
+pattern ECxApp :: HasCxApp lg => Expr lg -> (NameClss, TypeOf lg) -> Expr lg
+pattern ECxApp fun cx = EApp fun (CxArg cx)
+
+pattern ETmAbs :: HasTmAbs lg => EVarBinder (TypeOf lg) -> Expr lg -> Expr lg
+pattern ETmAbs par body = EAbs (TmPar par) body
+
+pattern ETyAbs :: HasTyAbs lg => NameTVar -> Expr lg -> Expr lg
+pattern ETyAbs par body = EAbs (TyPar par) body
+
+pattern ECxAbs :: HasCxAbs lg => (NameClss, TypeOf lg) -> Expr lg -> Expr lg
+pattern ECxAbs cx body = EAbs (CxPar cx) body
+
 -- * Derived optics
 makePrisms ''Atom
 makePrisms ''Expr
@@ -110,6 +141,21 @@ altn2expr :: (TypeOf lg1 ~ TypeOf lg2, IsNested lg1 ~ IsNested lg2) =>
 -- FIXME: This 'unsafeCoerce' must go!
 altn2expr f (MkAltn p e) = MkAltn (unsafeCoerce p) <$> f e
 
+_ETmApp :: Prism' (Expr lg) (Expr lg, Expr lg)
+_ETmApp = prism' (uncurry ETmApp) $ \case
+  ETmApp e a -> Just (e, a)
+  _          -> Nothing
+
+_ETyApp :: HasTyApp lg => Prism' (Expr lg) (Expr lg, TypeOf lg)
+_ETyApp = prism' (uncurry ETyApp) $ \case
+  ETyApp e t -> Just (e, t)
+  _          -> Nothing
+
+_ETyAbs :: HasTyAbs lg => Prism' (Expr lg) (NameTVar, Expr lg)
+_ETyAbs = prism' (uncurry ETyAbs) $ \case
+  ETyAbs v e -> Just (v, e)
+  _          -> Nothing
+
 -- * Smart constructors
 
 mkETmAbs ::
@@ -119,7 +165,8 @@ mkETmAbs bs0 t0 e0 = case bs0 of
   [] -> e0
   _  -> rewindr ETmAbs bs0 (ETyAnn t0 e0)
 
-unwindETmAbs :: (IsLambda lg ~ True) => Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
+unwindETmAbs :: forall lg. (IsLambda lg ~ True) =>
+  Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
 unwindETmAbs = go []
   where
     go :: [EVarBinder (TypeOf lg)] -> Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
@@ -131,7 +178,7 @@ unwindETmAbs = go []
       ETyAnn _ e@ETmAbs{} -> go params e
       body -> (reverse params, body)
 
-unEAnn :: Expr lg -> Expr lg
+unEAnn :: IsLambda lg ~ True => Expr lg -> Expr lg
 unEAnn = \case
   ETyAnn _ e -> unEAnn e
   e          -> e
@@ -164,17 +211,34 @@ instance Pretty Atom where
     ACon c -> pretty c
     ANum n -> pretty n
 
+prettyTyArg :: Type -> Doc ann
+prettyTyArg t = "@" <> prettyPrec 3 t
+
+instance TypeOf lg ~ Type => Pretty (Arg lg) where
+  pretty = \case
+    TmArg e  -> prettyPrec (succ Op.aprec) e
+    TyArg t  -> prettyTyArg t
+    CxArg cx -> braces (prettyCstr cx)
+
+instance TypeOf lg ~ Type => Pretty (Par lg) where
+  pretty = \case
+    TmPar (x, t) -> parens (pretty (x ::: t))
+    TyPar v      -> "@" <> pretty v
+    CxPar cx     -> braces (prettyCstr cx)
+
 instance TypeOf lg ~ Type => Pretty (Expr lg)
 
 instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
-  prettyPrec prec = \case
+  prettyPrec prec e0 = case e0 of
     ELoc l -> prettyPrec prec l
     EVar x -> pretty x
     EAtm a -> pretty a
-    ETmApp e a ->
-      maybeParens (prec > Op.aprec)
-      $ prettyPrec Op.aprec e <+> prettyPrec (Op.aprec+1) a
-    ETmAbs b e -> prettyETmAbs prec [b] e
+    EApp{} ->
+      let (e1, as) = unwindl _EApp e0
+      in  maybeParens (prec > Op.aprec) $ prettyPrec Op.aprec e1 <+> hsepMap pretty as
+    EAbs{} ->
+      let (ps, e1) = unwindr _EAbs e0
+      in  prettyEAbs prec ps e1
     ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
     ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
     -- FIXME: Collect lambdas.
@@ -190,43 +254,18 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
         (d_from, d_to) = case dir of
           Inject  -> ("_", pretty tcon)
           Project -> (pretty tcon, "_")
-    e0@ETyAbs{} ->
-      let (vs, e1) = unwindr _ETyAbs e0
-      in  prettyETyAbs prec vs (pretty e1)
-    ETyApp e0 t ->
-      maybeParens (prec > Op.aprec)
-      $ prettyPrec Op.aprec e0 <+> prettyAtType (prettyPrec 3) [t]
     -- TODO: Decide if it's a good idea to swallow type annotations. Probably,
     -- make a distinction between those given by the user and those generated
     -- during type inference.
     ETyAnn _ e -> prettyPrec prec e
-    ECxAbs (clss, typ) e ->
-      maybeParens (prec > 0) $
-        hang
-          ("fun" <+> "?" <> parens (pretty clss <+> prettyPrec 3 typ) <+> "->")
-          2 (prettyPrec 0 e)
-    ECxApp e0 (clss, typ) ->
-      maybeParens (prec > Op.aprec)
-      $ prettyPrec Op.aprec e0 <+> "?" <> parens (pretty clss <+> prettyPrec 3 typ)
 
-prettyETmAbs :: (TypeOf lg ~ Type, Foldable t) =>
-  Int -> t (EVarBinder (TypeOf lg)) -> Expr lg -> Doc ann
-prettyETmAbs prec bs e
-  | null bs   = prettyPrec prec e
+prettyEAbs :: (TypeOf lg1 ~ Type, TypeOf lg2 ~ Type) =>
+  Int -> [Par lg1] -> Expr lg2 -> Doc ann
+prettyEAbs prec pars body
+  | null pars = prettyPrec prec body
   | otherwise =
       maybeParens (prec > 0) $
-      hang ("fun" <+> hsepMap (prettyPrec 1 . uncurry (:::)) bs <+> "->") 2 (pretty e)
-
-prettyETyAbs :: (Foldable t) => Int -> t NameTVar -> Doc ann -> Doc ann
-prettyETyAbs prec vs d
-  | null vs   = maybeParens (prec > 0) d
-  | otherwise =
-      maybeParens (prec > 0)
-      $ hang ("fun" <+> prettyAtType pretty vs <+> "->") 2 d
-
--- FIXME: This should probably be replaced by something more lightweight.
-prettyAtType :: Foldable t => (a -> Doc ann) -> t a -> Doc ann
-prettyAtType p = hsep . map (\x -> "@" <> p x) . toList
+      hang ("fun" <+> hsepMap pretty pars <+> "->") 2 (pretty body)
 
 instance TypeOf lg ~ Type => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)
@@ -239,16 +278,14 @@ instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
     PVar x    -> pretty x
     PCon c ts ps ->
       maybeParens (prec > 0 && (not (null ts) || not (null ps)))
-      $ pretty c
-        <+> prettyAtType (prettyPrec 3) ts
-        <+> hsep (map (prettyPrec 1) ps)
+      $ pretty c <+> hsepMap prettyTyArg ts <+> hsepMap (prettyPrec 1) ps
     PSimple c ts bs ->
       maybeParens (prec > 0 && (not (null ts) || not (null bs)))
-      $ pretty c
-        <+> prettyAtType (prettyPrec 3) ts
-        <+> hsep (map (maybe "_" pretty) bs)
+      $ pretty c <+> hsepMap prettyTyArg ts <+> hsepMap (maybe "_" pretty) bs
 
 deriving instance TypeOf lg ~ Type => Show (Bind lg)
+deriving instance TypeOf lg ~ Type => Show (Arg  lg)
+deriving instance TypeOf lg ~ Type => Show (Par  lg)
 deriving instance TypeOf lg ~ Type => Show (Expr lg)
 deriving instance TypeOf lg ~ Type => Show (Altn lg)
 deriving instance                     Show  Atom
@@ -262,5 +299,9 @@ instance TypeOf lg ~ Type => ToJSON (Altn lg) where
   toJSON = $(mkToJSON defaultOptions ''Altn)
 instance TypeOf lg ~ Type => ToJSON (Bind lg) where
   toJSON = $(mkToJSON defaultOptions ''Bind)
+instance TypeOf lg ~ Type => ToJSON (Arg  lg) where
+  toJSON = $(mkToJSON defaultOptions ''Arg)
+instance TypeOf lg ~ Type => ToJSON (Par  lg) where
+  toJSON = $(mkToJSON defaultOptions ''Par)
 instance TypeOf lg ~ Type => ToJSON (Expr lg) where
   toJSON = $(mkToJSON defaultOptions ''Expr)

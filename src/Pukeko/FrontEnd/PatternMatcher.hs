@@ -37,19 +37,19 @@ pmExpr = \case
   ELoc le         -> here le $ ELoc <$> lctd pmExpr le
   EVar x          -> pure (EVar x)
   EAtm a          -> pure (EAtm a)
-  ETmApp e  a       -> ETmApp <$> pmExpr e <*> pmExpr a
-  ETmAbs b  e       -> ETmAbs b <$> pmExpr e
+  EApp e (TmArg a) -> ETmApp <$> pmExpr e <*> pmExpr a
+  EApp e (TyArg t) -> ETyApp <$> pmExpr e <*> pure t
+  EApp e (CxArg c) -> ECxApp <$> pmExpr e <*> pure c
+  EAbs (TmPar x) e -> ETmAbs x <$> pmExpr e
+  EAbs (TyPar v) e -> ETyAbs v <$> pmExpr e
+  EAbs (CxPar c) e -> ECxAbs c <$> pmExpr e
   ELet ds t       -> ELet <$> traverse (b2bound pmExpr) ds <*> pmExpr t
   ERec ds t       -> ERec <$> traverse (b2bound pmExpr) ds <*> pmExpr t
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch (mkRowMatch1 t1 as1)
   ECast coe e0 -> ECast coe <$> pmExpr e0
-  ETyAbs xs e0 -> ETyAbs xs <$> pmExpr e0
-  ETyApp e0 t  -> ETyApp <$> pmExpr e0 <*> pure t
   ETyAnn t  e  -> ETyAnn t <$> pmExpr e
-  ECxAbs cstr e0 -> ECxAbs cstr <$> pmExpr e0
-  ECxApp e0 cstr -> ECxApp <$> pmExpr e0 <*> pure cstr
 
 pmFuncDecl :: GlobalEffs effs => FuncDecl In tv -> Eff effs (FuncDecl Out tv)
 pmFuncDecl decl@(MkFuncDecl name typ_ body) =

@@ -41,21 +41,18 @@ dict$Monad$IO : Monad IO =
 main : IO Unit =
   pure$ll1 @IO dict$Monad$IO @Unit (h$ll1 @Unit (h$ll1 @Unit Unit))
 pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
-  fun @m ->
-    fun (dict : Monad m) ->
-      match dict with
-      | Dict$Monad @m pure _ -> pure
+  fun @m (dict : Monad m) ->
+    match dict with
+    | Dict$Monad @m pure _ -> pure
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a -> fun (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
+  fun @a (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b ->
-    fun (mx : IO a) (f : a -> IO b) (world0 : World) ->
-      match coerce @(IO -> _) mx world0 with
-      | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+  fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
+    match coerce @(IO -> _) mx world0 with
+    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b ->
-    fun (mx : IO a) (f : a -> IO b) ->
-      coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
-h$ll1 : ∀c. c -> c = fun @c -> fun (u : c) -> u
+  fun @a @b (mx : IO a) (f : a -> IO b) ->
+    coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
+h$ll1 : ∀c. c -> c = fun @c (u : c) -> u

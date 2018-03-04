@@ -109,7 +109,7 @@ llExpr = \case
   ELoc le -> llExpr (unlctd le)
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
-  ETmApp fun arg -> ETmApp <$> llExpr fun <*> llExpr arg
+  EApp fun (TmArg arg) -> ETmApp <$> llExpr fun <*> llExpr arg
   EMat t  cs -> EMat <$> llExpr t <*> traverse llAltn cs
   ELet ds e0 ->
     ELet
@@ -118,14 +118,14 @@ llExpr = \case
   ERec ds e0 ->
     withinEScope (map _b2binder ds) $
       ERec <$> (traverse . b2bound) llExpr ds <*> llExpr e0
-  elam@ETmAbs{}
+  elam@(EAbs TmPar{} _)
     | (oldBinds, ETyAnn t_rhs rhs0) <- unwindETmAbs elam -> do
         rhs1 <- withinEScope oldBinds (llExpr rhs0)
         llETmAbs (NE.fromList oldBinds) t_rhs rhs1
-  ETmAbs{} -> impossible  -- the type inferencer puts type anns around lambda bodies
+  EAbs TmPar{} _ -> impossible  -- the type inferencer puts types around lambda bodies
   ECast coe e0 -> ECast coe <$> llExpr e0
-  ETyApp e0 ts -> ETyApp <$> llExpr e0 <*> pure ts
-  ETyAbs v e0 -> ETyAbs v <$> withinTScope1 v (llExpr e0)
+  EApp e0 (TyArg t) -> ETyApp <$> llExpr e0 <*> pure t
+  EAbs (TyPar v) e0 -> ETyAbs v <$> withinTScope1 v (llExpr e0)
   ETyAnn _ e0 -> llExpr e0
 
 llAltn :: Altn In -> LL (Altn Out)
