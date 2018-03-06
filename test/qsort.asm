@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, dict$Ord$Int, dict$Ring$Int, dict$Monoid$List, dict$Foldable$List, dict$Monad$IO, input, main, dict$Monad$IO$ll1
+g_declare_cafs gm$cons_0_0, dict$Ord$Int, dict$Ring$Int, dict$Foldable$List, dict$Monad$IO, input, main, dict$Monoid$List$ll2, dict$Monad$IO$ll1, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -137,15 +137,6 @@ g_updcons 0, 4, 5
 g_pop 4
 g_return
 
-g_globstart dict$Monoid$List, 0
-g_pushglobal gm$cons_0_0, 0
-g_pushglobal dict$Monoid$List$ll1, 2
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
-g_return
-
 g_globstart dict$Foldable$List, 0
 g_pushglobal dict$Foldable$List$ll1, 3
 g_pushglobal dict$Foldable$List$ll2, 3
@@ -236,6 +227,15 @@ g_pushglobal foldr$ll1, 1
 g_updap 4, 3
 g_pop 2
 g_unwind
+
+g_globstart dict$Monoid$List$ll2, 0
+g_pushglobal gm$cons_0_0, 0
+g_pushglobal dict$Monoid$List$ll1, 2
+g_push 0
+g_push 2
+g_updcons 0, 2, 3
+g_pop 2
+g_return
 
 g_globstart dict$Foldable$List$ll1, 3
 g_push 2
@@ -528,12 +528,10 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 1
-g_push 0
+g_globstart print$ll1, 0
 g_pushglobal gm$puti, 1
 g_pushglobal io$ll2, 2
-g_updap 2, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart qsort$ll1, 2
@@ -573,7 +571,7 @@ g_cons 1, 2
 g_push 1
 g_pushglobal qsort$ll2, 1
 g_mkap 1
-g_pushglobal dict$Monoid$List, 0
+g_pushglobal dict$Monoid$List$ll2, 0
 g_pushglobal append$ll1, 1
 g_updap 3, 6
 g_pop 5
@@ -584,7 +582,7 @@ g_globstart main$ll1, 1
 g_push 0
 g_pushglobal qsort$ll2, 1
 g_mkap 1
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal traverse_$ll2, 3

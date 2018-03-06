@@ -66,28 +66,21 @@ dict$Monoid$Int : Monoid Int =
   and append : Int -> Int -> Int = add_int
   in
   Dict$Monoid @Int empty append
-dict$Monoid$List : ∀a. Monoid (List a) =
-  fun @a ->
-    let empty : List a = Nil @a
-    and append : List a -> List a -> List a = dict$Monoid$List$ll1 @a
-    in
-    Dict$Monoid @(List a) empty append
 dict$Functor$List : Functor List =
   let map : ∀a b. (a -> b) -> List a -> List b =
-        fun @a @b -> dict$Functor$List$ll1 @a @b
+        dict$Functor$List$ll1
   in
   Dict$Functor @List map
 dict$Foldable$List : Foldable List =
   let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll1 @a @b
+        dict$Foldable$List$ll1
   and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll2 @a @b
+        dict$Foldable$List$ll2
   in
   Dict$Foldable @List foldr foldl
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
-        fun @a @b -> dict$Monad$IO$ll4 @a @b
+  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
   in
   Dict$Monad @IO pure bind
 input : IO Int = io$ll2 @Unit @Int geti Unit
@@ -149,6 +142,12 @@ map$ll1 : ∀f. Functor f -> (∀a b. (a -> b) -> f a -> f b) =
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
     foldr$ll1 @List dict$Foldable$List @a @(List a) (Cons @a) ys xs
+dict$Monoid$List$ll2 : ∀a. Monoid (List a) =
+  fun @a ->
+    let empty : List a = Nil @a
+    and append : List a -> List a -> List a = dict$Monoid$List$ll1 @a
+    in
+    Dict$Monoid @(List a) empty append
 dict$Functor$List$ll1 : ∀a b. (a -> b) -> List a -> List b =
   fun @a @b (f : a -> b) (xs : List a) ->
     match xs with
@@ -212,8 +211,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit =
-  fun (n : Int) -> io$ll2 @Int @Unit puti n
+print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 diff$ll1 : List Int -> List Int -> List Int =
   fun (xs : List Int) (ys : List Int) ->
     match xs with
@@ -242,7 +240,7 @@ solve_aux$ll3 : List (List Int) -> List (List Int) =
     match kss with
     | Nil @(List Int) -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
     | Cons @(List Int) ks kss ->
-      foldMap$ll2 @Int @(List (List Int)) @List dict$Foldable$List (dict$Monoid$List @(List Int)) (solve_aux$ll2 kss) ks
+      foldMap$ll2 @Int @(List (List Int)) @List dict$Foldable$List (dict$Monoid$List$ll2 @(List Int)) (solve_aux$ll2 kss) ks
 solve$ll1 : Int -> List (List Int) =
   fun (n : Int) ->
     solve_aux$ll3 (replicate$ll1 @(List Int) n (take$ll1 @Int n ints))

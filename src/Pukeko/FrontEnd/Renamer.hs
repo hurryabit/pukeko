@@ -19,7 +19,6 @@ import           Pukeko.AST.ConDecl
 import qualified Pukeko.AST.Surface    as Ps
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Type
-import           Pukeko.Pretty
 
 type Out = Surface
 
@@ -284,7 +283,7 @@ rnInstDecl (Ps.MkInstDecl clss0 tatom0 params0 cstrs0 methods0) = do
   clss1 <- lookupGlobal tconTab (is _DClss) "unknown class" clss0
   tatom1 <- rnTypeAtom tatom0
   -- FIXME: 'render . pretty' to get a name is an awful hack.
-  let name0 = "dict$" ++ untag (unlctd clss0) ++ "$" ++ render (pretty tatom1)
+  let name0 = "dict$" ++ untag (unlctd clss0) ++ "$" ++ untag (typeAtomText tatom1)
   name <- mkName (Lctd (getPos clss0) (Tagged name0))
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)

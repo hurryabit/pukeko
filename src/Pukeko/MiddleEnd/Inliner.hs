@@ -35,7 +35,7 @@ inEVal :: Name EVar -> In Expr
 inEVal z0 = do
   fdecl_mb <- uses inlinables (Map.lookup z0)
   case fdecl_mb of
-    Just (SupCDecl _z0 _t0 [] [] (EVal z1)) -> inEVal z1
+    Just (SupCDecl _z0 _t0 [] (EVal z1)) -> inEVal z1
     _ -> pure (EVal z0)
 
 -- inRedex :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
@@ -81,7 +81,6 @@ inExpr e0 = case e0 of
   EAtm{} -> impossible  -- all cases matched above
   ETmApp e  a  -> ETmApp <$> inExpr e <*> inExpr a
   EApp   e  a  -> EApp <$> inExpr e <*> pure a
-  EAbs   p  e  -> EAbs p <$> inExpr e
   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
   ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
   ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t

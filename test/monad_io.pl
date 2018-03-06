@@ -58,9 +58,8 @@ dict$Ring$Int : Ring Int =
   in
   Dict$Ring @Int neg add sub mul
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
-        fun @a @b -> dict$Monad$IO$ll4 @a @b
+  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
   in
   Dict$Monad @IO pure bind
 input : IO Int = io$ll2 @Unit @Int geti Unit
@@ -114,8 +113,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit =
-  fun (n : Int) -> io$ll2 @Int @Unit puti n
+print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 count_down$ll1 : Int -> IO Unit =
   fun (k : Int) ->
     when$ll1 @IO dict$Monad$IO (ge$ll1 @Int dict$Ord$Int k 0) (semi$ll2 @Unit @IO dict$Monad$IO (print$ll1 k) (count_down$ll1 (sub$ll1 @Int dict$Ring$Int k 1)))
