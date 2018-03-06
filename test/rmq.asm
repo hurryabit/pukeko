@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, gm$cons_1_0, gm$abort, dict$Ord$Int, dict$Ring$Int, dict$Monad$IO, input, nats, infinity, main, dict$Monad$IO$ll1
+g_declare_cafs gm$cons_0_0, gm$cons_1_0, gm$abort, dict$Ord$Int, dict$Ring$Int, dict$Monad$IO, input, nats, infinity, main, dict$Monad$IO$ll1, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -452,12 +452,10 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 1
-g_push 0
+g_globstart print$ll1, 0
 g_pushglobal gm$puti, 1
 g_pushglobal io$ll2, 2
-g_updap 2, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart nats$ll1, 2
@@ -732,7 +730,7 @@ g_pushglobal infinity, 0
 g_pushglobal query$ll2, 4
 g_mkap 5
 g_push 0
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_updap 1, 5
 g_pop 4
 g_unwind

@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, dict$Ord$Int, dict$Ring$Int, dict$Foldable$List, dict$Monad$IO, input, dict$Functor$ListF, dict$Bifunctor$ListF, toList, fromList, main, dict$Monad$IO$ll1
+g_declare_cafs gm$cons_0_0, dict$Ord$Int, dict$Ring$Int, dict$Foldable$List, dict$Monad$IO, input, dict$Bifunctor$ListF, main, dict$Monad$IO$ll1, print$ll1, dict$Functor$ListF$ll1, dict$Functor$ListF$ll2, toList$ll2, fromList$ll2, main$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -166,46 +166,12 @@ g_pushglobal io$ll2, 2
 g_updap 2, 1
 g_unwind
 
-g_globstart dict$Functor$ListF, 0
-g_pushglobal id$ll1, 1
-g_pushglobal dict$Bifunctor$ListF, 0
-g_pushglobal bimap$ll1, 1
-g_mkap 2
-g_push 0
-g_updcons 0, 1, 2
-g_pop 1
-g_return
-
 g_globstart dict$Bifunctor$ListF, 0
 g_pushglobal dict$Bifunctor$ListF$ll1, 3
 g_push 0
 g_updcons 0, 1, 2
 g_pop 1
 g_return
-
-g_globstart toList, 0
-g_pushglobal dict$Bifunctor$ListF, 0
-g_pushglobal mono$ll1, 1
-g_mkap 1
-g_pushglobal toList$ll1, 1
-g_pushglobal dict$Functor$ListF, 0
-g_pushglobal cata$ll1, 2
-g_mkap 2
-g_pushglobal compose$ll1, 3
-g_updap 2, 1
-g_unwind
-
-g_globstart fromList, 0
-g_pushglobal fromList$ll1, 1
-g_pushglobal dict$Functor$ListF, 0
-g_pushglobal ana$ll1, 2
-g_mkap 2
-g_pushglobal dict$Bifunctor$ListF, 0
-g_pushglobal poly$ll1, 1
-g_mkap 1
-g_pushglobal compose$ll1, 3
-g_updap 2, 1
-g_unwind
 
 g_globstart main, 0
 g_pushglobal main$ll3, 1
@@ -518,12 +484,10 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 1
-g_push 0
+g_globstart print$ll1, 0
 g_pushglobal gm$puti, 1
 g_pushglobal io$ll2, 2
-g_updap 2, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart fix$ll1, 1
@@ -647,6 +611,20 @@ g_updap 2, 2
 g_pop 1
 g_unwind
 
+g_globstart dict$Functor$ListF$ll1, 0
+g_pushglobal id$ll1, 1
+g_pushglobal dict$Bifunctor$ListF, 0
+g_pushglobal bimap$ll1, 1
+g_updap 2, 1
+g_unwind
+
+g_globstart dict$Functor$ListF$ll2, 0
+g_pushglobal dict$Functor$ListF$ll1, 0
+g_push 0
+g_updcons 0, 1, 2
+g_pop 1
+g_return
+
 g_globstart dict$Bifunctor$ListF$ll1, 3
 g_push 2
 g_eval
@@ -691,6 +669,18 @@ g_return
 g_jump .2
 g_label .2
 
+g_globstart toList$ll2, 0
+g_pushglobal dict$Bifunctor$ListF, 0
+g_pushglobal mono$ll1, 1
+g_mkap 1
+g_pushglobal toList$ll1, 1
+g_pushglobal dict$Functor$ListF$ll2, 0
+g_pushglobal cata$ll1, 2
+g_mkap 2
+g_pushglobal compose$ll1, 3
+g_updap 2, 1
+g_unwind
+
 g_globstart fromList$ll1, 1
 g_push 0
 g_eval
@@ -711,28 +701,38 @@ g_return
 g_jump .2
 g_label .2
 
-g_globstart main$ll1, 1
-g_push 0
+g_globstart fromList$ll2, 0
+g_pushglobal fromList$ll1, 1
+g_pushglobal dict$Functor$ListF$ll2, 0
+g_pushglobal ana$ll1, 2
+g_mkap 2
+g_pushglobal dict$Bifunctor$ListF, 0
+g_pushglobal poly$ll1, 1
+g_mkap 1
+g_pushglobal compose$ll1, 3
+g_updap 2, 1
+g_unwind
+
+g_globstart main$ll1, 0
 g_pushint 2
 g_pushglobal dict$Ring$Int, 0
 g_pushglobal mul$ll1, 1
-g_updap 3, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart main$ll2, 1
 g_push 0
-g_pushglobal fromList, 0
+g_pushglobal fromList$ll2, 0
 g_mkap 1
-g_pushglobal main$ll1, 1
+g_pushglobal main$ll1, 0
 g_pushglobal dict$Bifunctor$ListF, 0
 g_pushglobal dict$Functor$Fix2$ll2, 1
 g_mkap 1
 g_pushglobal map$ll1, 1
 g_mkap 3
-g_pushglobal toList, 0
+g_pushglobal toList$ll2, 0
 g_mkap 1
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal traverse_$ll2, 3

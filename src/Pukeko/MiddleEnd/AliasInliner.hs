@@ -46,9 +46,9 @@ inlineSupCDecls decls0 =
 -- If it is, return the pair @(f, g)@.
 isLink :: FuncDecl (Only SupC) -> Maybe (Name EVar, Name EVar)
 isLink = \case
-  SupCDecl z _t vs xs (EVal x)
-    | null vs && null xs -> Just (z, x)
-  _                      -> Nothing
+  SupCDecl z _t ps (EVal x)
+    | null ps -> Just (z, x)
+  _           -> Nothing
 
 -- | Run Tarjan's union find algorithm on a list of equivalences and return a
 -- map from each element to its representative.

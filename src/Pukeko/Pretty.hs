@@ -7,6 +7,7 @@ module Pukeko.Pretty
   , PrettyPrec (..)
   , render
 
+  , (<>)
   , (<+>)
   , (<:~>)
   , hsep

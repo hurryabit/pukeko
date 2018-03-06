@@ -57,23 +57,16 @@ dict$Ring$Int : Ring Int =
   and mul : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg add sub mul
-dict$Monoid$List : ∀a. Monoid (List a) =
-  fun @a ->
-    let empty : List a = Nil @a
-    and append : List a -> List a -> List a = dict$Monoid$List$ll1 @a
-    in
-    Dict$Monoid @(List a) empty append
 dict$Foldable$List : Foldable List =
   let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll1 @a @b
+        dict$Foldable$List$ll1
   and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll2 @a @b
+        dict$Foldable$List$ll2
   in
   Dict$Foldable @List foldr foldl
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
-        fun @a @b -> dict$Monad$IO$ll4 @a @b
+  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
   in
   Dict$Monad @IO pure bind
 input : IO Int = io$ll2 @Unit @Int geti Unit
@@ -106,6 +99,12 @@ foldl$ll1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
     foldr$ll1 @List dict$Foldable$List @a @(List a) (Cons @a) ys xs
+dict$Monoid$List$ll2 : ∀a. Monoid (List a) =
+  fun @a ->
+    let empty : List a = Nil @a
+    and append : List a -> List a -> List a = dict$Monoid$List$ll1 @a
+    in
+    Dict$Monoid @(List a) empty append
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -183,8 +182,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit =
-  fun (n : Int) -> io$ll2 @Int @Unit puti n
+print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 qsort$ll1 : Int -> Int -> Bool =
   fun (x : Int) (y : Int) -> lt$ll1 @Int dict$Ord$Int y x
 qsort$ll2 : List Int -> List Int =
@@ -194,7 +192,7 @@ qsort$ll2 : List Int -> List Int =
     | Cons @Int x xs ->
       match partition$ll1 @Int (qsort$ll1 x) xs with
       | Pair @(List Int) @(List Int) ys zs ->
-        append$ll1 @(List Int) (dict$Monoid$List @Int) (qsort$ll2 ys) (Cons @Int x (qsort$ll2 zs))
+        append$ll1 @(List Int) (dict$Monoid$List$ll2 @Int) (qsort$ll2 ys) (Cons @Int x (qsort$ll2 zs))
 main$ll1 : List Int -> IO Unit =
   fun (xs : List Int) ->
     traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 (qsort$ll2 xs)

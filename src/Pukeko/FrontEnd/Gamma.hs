@@ -7,6 +7,8 @@ module Pukeko.FrontEnd.Gamma
   , withinTScope1
   , withinContext1
   , withinContext
+  , withinScope1
+  , withinScope
   , lookupEVar
   , lookupEVarIx
   , lookupTVar
@@ -17,7 +19,8 @@ import Pukeko.Prelude
 import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
-import           Pukeko.AST.Expr (EVarBinder)
+import           Pukeko.AST.Expr (Par (..), EVarBinder)
+import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
@@ -54,6 +57,15 @@ withinContext1 _ = impossible  -- we only allow constraints of the form @C a@
 
 withinContext :: CanGamma effs => [TypeCstr] -> Eff effs a -> Eff effs a
 withinContext cstrs act = foldr withinContext1 act cstrs
+
+withinScope1 :: (CanGamma effs, TypeOf lg ~ Type) => Par lg -> Eff effs a -> Eff effs a
+withinScope1 = \case
+  TmPar x  -> withinEScope1 x
+  TyPar v  -> withinTScope1 v
+  CxPar cx -> withinContext1 cx
+
+withinScope :: (CanGamma effs, TypeOf lg ~ Type) => [Par lg] -> Eff effs a -> Eff effs a
+withinScope pars act = foldr withinScope1 act pars
 
 lookupEVarIx :: CanGamma effs => NameEVar -> Eff effs (Type, Int)
 lookupEVarIx x = views evars (Map.! x)

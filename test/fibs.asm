@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, gm$abort, dict$Ord$Int, dict$Ring$Int, dict$Monad$IO, input, prime, fibs0, fibs1, main, dict$Monad$IO$ll1
+g_declare_cafs gm$cons_0_0, gm$abort, dict$Ord$Int, dict$Ring$Int, dict$Monad$IO, input, prime, fibs0, fibs1, main, dict$Monad$IO$ll1, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -374,12 +374,10 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 1
-g_push 0
+g_globstart print$ll1, 0
 g_pushglobal gm$puti, 1
 g_pushglobal io$ll2, 2
-g_updap 2, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart add_mod_prime$ll1, 2
@@ -416,7 +414,7 @@ g_push 0
 g_pushglobal fibs0, 0
 g_pushglobal nth_exn$ll1, 2
 g_mkap 2
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_updap 1, 2
 g_pop 1
 g_unwind

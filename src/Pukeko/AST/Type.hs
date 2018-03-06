@@ -27,6 +27,7 @@ module Pukeko.AST.Type
   , (~>)
   , (*~>)
   , mkTApp
+  , typeAtomText
   , prettyCstr
   , prettyContext
   , prettyTUni
@@ -127,6 +128,12 @@ t_args *~> t_res = foldr (~>) t_res t_args
 
 mkTApp :: (Foldable t) => GenType tv -> t (GenType tv) -> GenType tv
 mkTApp = foldl TApp
+
+typeAtomText :: TypeAtom -> Tagged TCon String
+typeAtomText = \case
+  TAArr   -> "Arr"
+  TAInt   -> "Int"
+  TACon c -> nameText c
 
 instance IsType NoType where
   isType = const Nothing
