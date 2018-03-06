@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Language
-import           Pukeko.AST.Expr hiding (Bind, Expr, Altn)
+import           Pukeko.AST.Expr hiding (Bind, Expr, Altn, Arg, Par)
 import qualified Pukeko.AST.Expr as Expr
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
@@ -26,11 +26,10 @@ type Extn = 'Extn
 data FuncDecl (m :: Super DeclMode)
   = (m ?:> SupC) =>
     SupCDecl
-    { _supc2name  :: Name EVar
-    , _supc2type  :: GenType Void
-    , _supc2tprms :: [NameTVar]
-    , _supc2eprms :: [EVarBinder Type]
-    , _supc2expr  :: Expr
+    { _supc2name   :: Name EVar
+    , _supc2type   :: GenType Void
+    , _supc2params :: [Par]
+    , _supc2expr   :: Expr
     }
   | (m ?:> Extn) =>
     ExtnDecl
@@ -48,27 +47,29 @@ data Module = MkModule
 type Bind = Expr.Bind SuperCore
 type Expr = Expr.Expr SuperCore
 type Altn = Expr.Altn SuperCore
+type Arg  = Expr.Arg  SuperCore
+type Par  = Expr.Par  SuperCore
 
 makeLenses ''Module
 
 castAny :: FuncDecl m -> FuncDecl Any
 castAny = \case
-  SupCDecl z t vs xs e -> SupCDecl z t vs xs e
-  ExtnDecl z t s       -> ExtnDecl z t s
+  SupCDecl z t ps e -> SupCDecl z t ps e
+  ExtnDecl z t s    -> ExtnDecl z t s
 
 func2name :: Lens' (FuncDecl m) (Name EVar)
 func2name f = \case
-  SupCDecl z t vs xs e -> fmap (\z' -> SupCDecl z' t vs xs e) (f z)
-  ExtnDecl z t s       -> fmap (\z' -> ExtnDecl z' t s)       (f z)
+  SupCDecl z t ps e -> fmap (\z' -> SupCDecl z' t ps e) (f z)
+  ExtnDecl z t s    -> fmap (\z' -> ExtnDecl z' t s)    (f z)
 
 func2type :: Lens' (FuncDecl m) (GenType Void)
 func2type f = \case
-  SupCDecl z t vs xs e -> fmap (\t' -> SupCDecl z t' vs xs e) (f t)
-  ExtnDecl z t s       -> fmap (\t' -> ExtnDecl z t' s)       (f t)
+  SupCDecl z t ps e -> fmap (\t' -> SupCDecl z t' ps e) (f t)
+  ExtnDecl z t s    -> fmap (\t' -> ExtnDecl z t' s)    (f t)
 
 func2expr :: Traversal' (FuncDecl m) Expr
 func2expr f = \case
-  SupCDecl z t qvs xs e -> SupCDecl z t qvs xs <$> f e
+  SupCDecl z t ps e -> SupCDecl z t ps <$> f e
   func@ExtnDecl{} -> pure func
 
 mkTypeDecl :: TConDecl -> Module
@@ -76,8 +77,8 @@ mkTypeDecl tcon = over mod2types (Map.insert (nameOf tcon) tcon) mempty
 
 mkFuncDecl :: FuncDecl m -> Module
 mkFuncDecl = \case
-  SupCDecl z t vs xs e -> mkDecl mod2supcs z (SupCDecl z t vs xs e)
-  ExtnDecl z t s       -> mkDecl mod2extns z (ExtnDecl z t s)
+  SupCDecl z t ps e -> mkDecl mod2supcs z (SupCDecl z t ps e)
+  ExtnDecl z t s    -> mkDecl mod2extns z (ExtnDecl z t s)
   where
     mkDecl l k v = over l (Map.insert k v) mempty
 
@@ -95,9 +96,8 @@ instance Monoid Module where
 
 instance Pretty (FuncDecl m) where
   pretty = \case
-    SupCDecl z t qvs bs e ->
-      hang (pretty (z ::: t) <+> "=") 2
-      (prettyEAbs 0 (map TyPar qvs ++ map TmPar bs :: [Par Typed]) e)
+    SupCDecl z t ps e ->
+      hang (pretty (z ::: t) <+> "=") 2 (prettyEAbs 0 ps e)
     ExtnDecl z t s ->
       hsep ["external", pretty (z ::: t), "=", doubleQuotes (pretty s)]
 

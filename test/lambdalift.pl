@@ -42,7 +42,6 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit =
-  fun (n : Int) -> io$ll2 @Int @Unit puti n
+print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 g$ll1 : Int -> Int -> Int -> Int -> Int =
   fun (a : Int) (b : Int) (c : Int) (d : Int) -> a

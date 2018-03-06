@@ -160,7 +160,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
-    for_ supcs $ \(Core.SupCDecl z t_decl tpars bs e0) -> do
-        t0 <- withinTScope tpars $ withinEScope bs $ typeOf e0
-        match (vacuous t_decl) (rewindr TUni' tpars (fmap snd bs *~> t0))
+    for_ supcs $ \(Core.SupCDecl z t_decl pars e0) -> do
+        t0 <- withinScope pars $ typeOf e0
+        match (vacuous t_decl) (rewindr mkTAbs pars t0)
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

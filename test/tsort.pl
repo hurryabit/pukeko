@@ -63,33 +63,31 @@ dict$Ring$Int : Ring Int =
   Dict$Ring @Int neg add sub mul
 dict$Foldable$List : Foldable List =
   let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll1 @a @b
+        dict$Foldable$List$ll1
   and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll2 @a @b
+        dict$Foldable$List$ll2
   in
   Dict$Foldable @List foldr foldl
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
-        fun @a @b -> dict$Monad$IO$ll4 @a @b
+  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
   in
   Dict$Monad @IO pure bind
 input : IO Int = io$ll2 @Unit @Int geti Unit
 dict$Foldable$BinTree : Foldable BinTree =
   let foldr : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
-        fun @a @b -> dict$Foldable$BinTree$ll1 @a @b
+        dict$Foldable$BinTree$ll1
   and foldl : ∀a b. (b -> a -> b) -> b -> BinTree a -> b =
-        fun @a @b -> dict$Foldable$BinTree$ll2 @a @b
+        dict$Foldable$BinTree$ll2
   in
   Dict$Foldable @BinTree foldr foldl
 dict$Foldable$Bag : Foldable Bag =
   let foldr : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
-        fun @a @b -> dict$Foldable$Bag$ll1 @a @b
+        dict$Foldable$Bag$ll1
   and foldl : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
-        fun @a @b -> dict$Foldable$Bag$ll2 @a @b
+        dict$Foldable$Bag$ll2
   in
   Dict$Foldable @Bag foldr foldl
-bag_empty : ∀a. Bag a = fun @a -> coerce @(_ -> Bag) (Leaf @a)
 main : IO Unit =
   bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll2
 le$ll1 : ∀a. Ord a -> a -> a -> Bool =
@@ -182,8 +180,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit =
-  fun (n : Int) -> io$ll2 @Int @Unit puti n
+print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 dict$Foldable$BinTree$ll1 : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (t : BinTree a) ->
     match t with
@@ -202,8 +199,9 @@ dict$Foldable$Bag$ll1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
 dict$Foldable$Bag$ll2 : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (bag : Bag a) ->
     foldl$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 (coerce @(Bag -> _) bag)
-bag_insert$ll1 : ∀_14. (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> Ord _14 -> _14 -> BinTree _14 -> BinTree _14 =
-  fun @_14 (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) (dict$Ord$_14 : Ord _14) (x : _14) (t : BinTree _14) ->
+bag_empty$ll1 : ∀a. Bag a = fun @a -> coerce @(_ -> Bag) (Leaf @a)
+bag_insert$ll1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
+  fun (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (dict$Ord$_14 : Ord _14) (x : _14) (t : BinTree _14) ->
     match t with
     | Leaf @_14 -> Branch @_14 (Leaf @_14) x (Leaf @_14)
     | Branch @_14 l y r ->
@@ -213,14 +211,14 @@ bag_insert$ll1 : ∀_14. (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) 
 bag_insert$ll2 : ∀a. Ord a -> a -> Bag a -> Bag a =
   fun @a (dict$Ord$a : Ord a) (x : a) (s : Bag a) ->
     let rec insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14 =
-              fun @_14 -> bag_insert$ll1 @_14 insert
+              bag_insert$ll1 insert
     in
     coerce @(_ -> Bag) (insert @a dict$Ord$a x (coerce @(Bag -> _) s))
 tsort$ll1 : Bag Int -> Int -> Bag Int =
   fun (s : Bag Int) (x : Int) -> bag_insert$ll2 @Int dict$Ord$Int x s
 tsort$ll2 : List Int -> List Int =
   fun (xs : List Int) ->
-    to_list$ll1 @Int @Bag dict$Foldable$Bag (foldl$ll1 @List dict$Foldable$List @Int @(Bag Int) tsort$ll1 (bag_empty @Int) xs)
+    to_list$ll1 @Int @Bag dict$Foldable$Bag (foldl$ll1 @List dict$Foldable$List @Int @(Bag Int) tsort$ll1 (bag_empty$ll1 @Int) xs)
 main$ll1 : List Int -> IO Unit =
   fun (xs : List Int) ->
     traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 (tsort$ll2 xs)

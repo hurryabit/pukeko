@@ -67,36 +67,22 @@ dict$Ring$Int : Ring Int =
   Dict$Ring @Int neg add sub mul
 dict$Foldable$List : Foldable List =
   let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll1 @a @b
+        dict$Foldable$List$ll1
   and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        fun @a @b -> dict$Foldable$List$ll2 @a @b
+        dict$Foldable$List$ll2
   in
   Dict$Foldable @List foldr foldl
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = fun @a -> dict$Monad$IO$ll2 @a
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b =
-        fun @a @b -> dict$Monad$IO$ll4 @a @b
+  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
+  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
   in
   Dict$Monad @IO pure bind
 input : IO Int = io$ll2 @Unit @Int geti Unit
-dict$Functor$ListF : ∀a. Functor (ListF a) =
-  fun @a ->
-    let map : ∀a b. (a -> b) -> ListF a a -> ListF a b =
-          fun @a @b ->
-            bimap$ll1 @ListF dict$Bifunctor$ListF @a @a @a @b (id$ll1 @a)
-    in
-    Dict$Functor @(ListF a) map
 dict$Bifunctor$ListF : Bifunctor ListF =
   let bimap : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
-        fun @a1 @a2 @b1 @b2 -> dict$Bifunctor$ListF$ll1 @a1 @a2 @b1 @b2
+        dict$Bifunctor$ListF$ll1
   in
   Dict$Bifunctor @ListF bimap
-toList : ∀a. Fix2 ListF a -> List a =
-  fun @a ->
-    compose$ll1 @(Fix2 ListF a) @(Fix (ListF a)) @(List a) (cata$ll1 @(List a) @(ListF a) (dict$Functor$ListF @a) (toList$ll1 @a)) (mono$ll1 @a @ListF dict$Bifunctor$ListF)
-fromList : ∀a. List a -> Fix2 ListF a =
-  fun @a ->
-    compose$ll1 @(List a) @(Fix (ListF a)) @(Fix2 ListF a) (poly$ll1 @a @ListF dict$Bifunctor$ListF) (ana$ll1 @(List a) @(ListF a) (dict$Functor$ListF @a) (fromList$ll1 @a))
 main : IO Unit =
   bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll3
 id$ll1 : ∀a. a -> a = fun @a (x : a) -> x
@@ -193,8 +179,7 @@ io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit =
-  fun (n : Int) -> io$ll2 @Int @Unit puti n
+print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 fix$ll1 : ∀f. f (Fix f) -> Fix f =
   fun @f (x : f (Fix f)) -> coerce @(_ -> Fix) x
 unFix$ll1 : ∀f. Fix f -> f (Fix f) =
@@ -213,13 +198,13 @@ fix2$ll1 : ∀a p. p a (Fix2 p a) -> Fix2 p a =
   fun @a @p (x : p a (Fix2 p a)) -> coerce @(_ -> Fix2) x
 unFix2$ll1 : ∀a p. Fix2 p a -> p a (Fix2 p a) =
   fun @a @p (x : Fix2 p a) -> coerce @(Fix2 -> _) x
-dict$Functor$Fix2$ll1 : ∀a b p. Bifunctor p -> (a -> b) -> Fix2 p a -> Fix2 p b =
-  fun @a @b @p (dict$Bifunctor$p : Bifunctor p) (f : a -> b) ->
+dict$Functor$Fix2$ll1 : ∀p. Bifunctor p -> (∀a b. (a -> b) -> Fix2 p a -> Fix2 p b) =
+  fun @p (dict$Bifunctor$p : Bifunctor p) @a @b (f : a -> b) ->
     compose$ll1 @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (fix2$ll1 @b @p) (compose$ll1 @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) (bimap$ll1 @p dict$Bifunctor$p @a @b @(Fix2 p a) @(Fix2 p b) f (map$ll1 @(Fix2 p) (dict$Functor$Fix2$ll2 @p dict$Bifunctor$p) @a @b f)) (unFix2$ll1 @a @p))
 dict$Functor$Fix2$ll2 : ∀p. Bifunctor p -> Functor (Fix2 p) =
   fun @p (dict$Bifunctor$p : Bifunctor p) ->
     let map : ∀a b. (a -> b) -> Fix2 p a -> Fix2 p b =
-          fun @a @b -> dict$Functor$Fix2$ll1 @a @b @p dict$Bifunctor$p
+          dict$Functor$Fix2$ll1 @p dict$Bifunctor$p
     in
     Dict$Functor @(Fix2 p) map
 poly$ll1 : ∀a p. Bifunctor p -> Fix (p a) -> Fix2 p a =
@@ -228,6 +213,15 @@ poly$ll1 : ∀a p. Bifunctor p -> Fix (p a) -> Fix2 p a =
 mono$ll1 : ∀a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
   fun @a @p (dict$Bifunctor$p : Bifunctor p) ->
     compose$ll1 @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (fix$ll1 @(p a)) (compose$ll1 @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) (bimap$ll1 @p dict$Bifunctor$p @a @a @(Fix2 p a) @(Fix (p a)) (id$ll1 @a) (mono$ll1 @a @p dict$Bifunctor$p)) (unFix2$ll1 @a @p))
+dict$Functor$ListF$ll1 : ∀a a b. (a -> b) -> ListF a a -> ListF a b =
+  fun @a @a @b ->
+    bimap$ll1 @ListF dict$Bifunctor$ListF @a @a @a @b (id$ll1 @a)
+dict$Functor$ListF$ll2 : ∀a. Functor (ListF a) =
+  fun @a ->
+    let map : ∀a b. (a -> b) -> ListF a a -> ListF a b =
+          dict$Functor$ListF$ll1 @a
+    in
+    Dict$Functor @(ListF a) map
 dict$Bifunctor$ListF$ll1 : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
   fun @a1 @a2 @b1 @b2 (f : a1 -> a2) (g : b1 -> b2) (x : ListF a1 b1) ->
     match x with
@@ -238,16 +232,21 @@ toList$ll1 : ∀a. ListF a (List a) -> List a =
     match x with
     | NilF @a @(List a) -> Nil @a
     | ConsF @a @(List a) y ys -> Cons @a y ys
+toList$ll2 : ∀a. Fix2 ListF a -> List a =
+  fun @a ->
+    compose$ll1 @(Fix2 ListF a) @(Fix (ListF a)) @(List a) (cata$ll1 @(List a) @(ListF a) (dict$Functor$ListF$ll2 @a) (toList$ll1 @a)) (mono$ll1 @a @ListF dict$Bifunctor$ListF)
 fromList$ll1 : ∀a. List a -> ListF a (List a) =
   fun @a (x : List a) ->
     match x with
     | Nil @a -> NilF @a @(List a)
     | Cons @a y ys -> ConsF @a @(List a) y ys
-main$ll1 : Int -> Int =
-  fun (x : Int) -> mul$ll1 @Int dict$Ring$Int 2 x
+fromList$ll2 : ∀a. List a -> Fix2 ListF a =
+  fun @a ->
+    compose$ll1 @(List a) @(Fix (ListF a)) @(Fix2 ListF a) (poly$ll1 @a @ListF dict$Bifunctor$ListF) (ana$ll1 @(List a) @(ListF a) (dict$Functor$ListF$ll2 @a) (fromList$ll1 @a))
+main$ll1 : Int -> Int = mul$ll1 @Int dict$Ring$Int 2
 main$ll2 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 (toList @Int (map$ll1 @(Fix2 ListF) (dict$Functor$Fix2$ll2 @ListF dict$Bifunctor$ListF) @Int @Int main$ll1 (fromList @Int xs)))
+    traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 (toList$ll2 @Int (map$ll1 @(Fix2 ListF) (dict$Functor$Fix2$ll2 @ListF dict$Bifunctor$ListF) @Int @Int main$ll1 (fromList$ll2 @Int xs)))
 main$ll3 : Int -> IO Unit =
   fun (n : Int) ->
     bind$ll1 @IO dict$Monad$IO @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll2

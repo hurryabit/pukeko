@@ -26,6 +26,7 @@ where
 
 import Pukeko.Prelude
 
+import Data.Kind (Constraint)
 import GHC.TypeLits (Nat, type (<=?), type (-))
 
 import Pukeko.AST.Type (NoType, Type)
@@ -60,7 +61,7 @@ type IsNested   lg = LangId lg <? LangId Unnested
 type IsClassy   lg = LangId lg <? LangId Unclassy
 type IsLambda   lg = LangId lg <? LangId SuperCore
 
-type HasTmAbs lg =  IsLambda lg ~ True
+type HasTmAbs lg = (() :: Constraint)
 type HasTyApp lg =                      IsPreTyped lg ~ True
 type HasTyAbs lg =                      TypeOf lg ~ Type
 type HasCxApp lg = (IsClassy lg ~ True, IsPreTyped lg ~ True)
