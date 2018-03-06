@@ -27,6 +27,8 @@ module Pukeko.AST.Expr
   , altn2patn
   , altn2expr
 
+  , _TmPar
+  , _TyPar
   , _AVal
   , _ETmApp
   , _ETyApp
@@ -34,7 +36,8 @@ module Pukeko.AST.Expr
   -- , _ECxAbs
 
   , mkETmAbs
-  , unwindETmAbs
+  , unwindEAbs
+  , mkTAbs
   , unEAnn
 
   , prettyEAbs
@@ -81,7 +84,7 @@ data Expr lg
   |                         EVar (Name EVar)
   |                         EAtm Atom
   |                         EApp (Expr lg) (Arg  lg)
-  |                         EAbs (Par  lg) (Expr lg)
+  | IsLambda lg ~ True   => EAbs (Par  lg) (Expr lg)
   |                         ELet [Bind lg] (Expr lg)
   |                         ERec [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
@@ -117,18 +120,22 @@ pattern ETyApp fun typ = EApp fun (TyArg typ)
 pattern ECxApp :: HasCxApp lg => Expr lg -> (NameClss, TypeOf lg) -> Expr lg
 pattern ECxApp fun cx = EApp fun (CxArg cx)
 
-pattern ETmAbs :: HasTmAbs lg => EVarBinder (TypeOf lg) -> Expr lg -> Expr lg
+pattern ETmAbs :: (IsLambda lg ~ True, HasTmAbs lg) =>
+  EVarBinder (TypeOf lg) -> Expr lg -> Expr lg
 pattern ETmAbs par body = EAbs (TmPar par) body
 
-pattern ETyAbs :: HasTyAbs lg => NameTVar -> Expr lg -> Expr lg
+pattern ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) =>
+  NameTVar -> Expr lg -> Expr lg
 pattern ETyAbs par body = EAbs (TyPar par) body
 
-pattern ECxAbs :: HasCxAbs lg => (NameClss, TypeOf lg) -> Expr lg -> Expr lg
+pattern ECxAbs :: (IsLambda lg ~ True, HasCxAbs lg) =>
+  (NameClss, TypeOf lg) -> Expr lg -> Expr lg
 pattern ECxAbs cx body = EAbs (CxPar cx) body
 
 -- * Derived optics
 makePrisms ''Atom
 makePrisms ''Expr
+makePrisms ''Par
 makeLensesFor [("_altn2patn", "altn2patn")]''Altn
 makeLensesFor [("_b2binder", "b2binder")] ''Bind
 
@@ -151,7 +158,7 @@ _ETyApp = prism' (uncurry ETyApp) $ \case
   ETyApp e t -> Just (e, t)
   _          -> Nothing
 
-_ETyAbs :: HasTyAbs lg => Prism' (Expr lg) (NameTVar, Expr lg)
+_ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) => Prism' (Expr lg) (NameTVar, Expr lg)
 _ETyAbs = prism' (uncurry ETyAbs) $ \case
   ETyAbs v e -> Just (v, e)
   _          -> Nothing
@@ -165,18 +172,23 @@ mkETmAbs bs0 t0 e0 = case bs0 of
   [] -> e0
   _  -> rewindr ETmAbs bs0 (ETyAnn t0 e0)
 
-unwindETmAbs :: forall lg. (IsLambda lg ~ True) =>
-  Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
-unwindETmAbs = go []
+unwindEAbs :: forall lg. (IsLambda lg ~ True) => Expr lg -> ([Par lg], Expr lg)
+unwindEAbs = go []
   where
-    go :: [EVarBinder (TypeOf lg)] -> Expr lg -> ([EVarBinder (TypeOf lg)], Expr lg)
+    go :: [Par lg] -> Expr lg -> ([Par lg], Expr lg)
     go params = \case
-      ETmAbs param body -> go (param:params) body
+      EAbs param body -> go (param:params) body
       -- NOTE: We do this only conditional on the inner expression being a
       -- lambda to not strip the very last type annotation in a chain of
       -- lambdas.
-      ETyAnn _ e@ETmAbs{} -> go params e
+      ETyAnn _ expr@EAbs{} -> go params expr
       body -> (reverse params, body)
+
+mkTAbs :: TypeOf lg ~ Type => Par lg -> Type -> Type
+mkTAbs = \case
+  TmPar (_, t) -> TFun t
+  TyPar v      -> TUni' v
+  CxPar cx     -> TCtx cx
 
 unEAnn :: IsLambda lg ~ True => Expr lg -> Expr lg
 unEAnn = \case

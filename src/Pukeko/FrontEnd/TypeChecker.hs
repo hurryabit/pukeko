@@ -129,7 +129,8 @@ patnEnvLevel p t0 = case p of
 match :: Type -> Type -> TC ()
 match t0 t1 =
   unless (t0 == t1) $
-    throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
+    -- throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
+    throwHere ("expected type" <+> pretty (show t0) <> ", but found type" <+> pretty (show t1))
 
 checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
@@ -160,7 +161,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
-    for_ supcs $ \(Core.SupCDecl z t_decl tpars bs e0) -> do
-        t0 <- withinTScope tpars $ withinEScope bs $ typeOf e0
-        match (vacuous t_decl) (rewindr TUni' tpars (fmap snd bs *~> t0))
+    for_ supcs $ \(Core.SupCDecl z t_decl pars e0) -> do
+        t0 <- withinScope pars $ typeOf e0
+        match (vacuous t_decl) (rewindr mkTAbs pars t0)
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, dict$Monad$IO, input, main, dict$Monad$IO$ll1
+g_declare_cafs gm$cons_0_0, dict$Monad$IO, input, main, dict$Monad$IO$ll1, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -129,12 +129,10 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 1
-g_push 0
+g_globstart print$ll1, 0
 g_pushglobal gm$puti, 1
 g_pushglobal io$ll2, 2
-g_updap 2, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart fst$ll1, 1
@@ -160,12 +158,12 @@ g_cons 0, 2
 g_push 0
 g_pushglobal snd$ll1, 1
 g_mkap 1
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_mkap 1
 g_push 1
 g_pushglobal fst$ll1, 1
 g_mkap 1
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_mkap 1
 g_pushglobal dict$Monad$IO, 0
 g_pushglobal semi$ll2, 3

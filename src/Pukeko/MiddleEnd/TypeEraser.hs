@@ -35,8 +35,8 @@ bindName :: In.EVarBinder _ -> Name
 bindName = name . In.nameOf
 
 ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel
-ccSupCDecl (In.SupCDecl z _ _ bs e) =
-  Def (name z) (map (Just . bindName) (toList bs)) <$> ccExpr e
+ccSupCDecl (In.SupCDecl z _ bs e) =
+  Def (name z) (map (Just . bindName) (toListOf (traverse . In._TmPar) bs)) <$> ccExpr e
 
 ccExtnDecl :: In.FuncDecl (In.Only In.Extn) -> CC TopLevel
 ccExtnDecl (In.ExtnDecl z _ s) = do
@@ -66,7 +66,6 @@ ccExpr = \case
   In.ERec ds t  -> Let True  <$> traverse ccDefn ds <*> ccExpr t
   In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)
   In.EApp e0 In.TyArg{} -> ccExpr e0
-  In.EAbs In.TyPar{} e0 -> ccExpr e0
   In.ECast  _   e0 -> ccExpr e0
 
 ccAltn :: In.Altn -> CC Altn

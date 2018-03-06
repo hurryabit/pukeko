@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, dict$Eq$Int, dict$Ord$Int, dict$Ring$Int, dict$Monoid$Int, dict$Monoid$List, dict$Functor$List, dict$Foldable$List, dict$Monad$IO, input, ints, main, dict$Monad$IO$ll1
+g_declare_cafs gm$cons_0_0, dict$Eq$Int, dict$Ord$Int, dict$Ring$Int, dict$Monoid$Int, dict$Functor$List, dict$Foldable$List, dict$Monad$IO, input, ints, main, dict$Monoid$List$ll2, dict$Monad$IO$ll1, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -161,15 +161,6 @@ g_return
 g_globstart dict$Monoid$Int, 0
 g_pushint 0
 g_pushglobal gm$add, 2
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
-g_return
-
-g_globstart dict$Monoid$List, 0
-g_pushglobal gm$cons_0_0, 0
-g_pushglobal dict$Monoid$List$ll1, 2
 g_push 0
 g_push 2
 g_updcons 0, 2, 3
@@ -356,6 +347,15 @@ g_pushglobal foldr$ll1, 1
 g_updap 4, 3
 g_pop 2
 g_unwind
+
+g_globstart dict$Monoid$List$ll2, 0
+g_pushglobal gm$cons_0_0, 0
+g_pushglobal dict$Monoid$List$ll1, 2
+g_push 0
+g_push 2
+g_updcons 0, 2, 3
+g_pop 2
+g_return
 
 g_globstart dict$Functor$List$ll1, 2
 g_push 1
@@ -608,12 +608,10 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 1
-g_push 0
+g_globstart print$ll1, 0
 g_pushglobal gm$puti, 1
 g_pushglobal io$ll2, 2
-g_updap 2, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart diff$ll1, 2
@@ -761,7 +759,7 @@ g_push 0
 g_push 2
 g_pushglobal solve_aux$ll2, 2
 g_mkap 1
-g_pushglobal dict$Monoid$List, 0
+g_pushglobal dict$Monoid$List$ll2, 0
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal foldMap$ll2, 3
 g_updap 4, 4
@@ -789,7 +787,7 @@ g_mkap 1
 g_pushglobal dict$Foldable$List, 0
 g_pushglobal length$ll2, 1
 g_mkap 2
-g_pushglobal print$ll1, 1
+g_pushglobal print$ll1, 0
 g_updap 1, 2
 g_pop 1
 g_unwind
