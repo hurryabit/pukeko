@@ -35,7 +35,7 @@ checkCoercion (MkCoercion _dir _tcon) _from _to =
   -- FIXME: Implement the actual check.
   pure ()
 
-typeOf :: IsTyped lg => Expr lg -> TC Type
+typeOf :: TypeOf lg ~ Type => Expr lg -> TC Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupEVar x
@@ -56,11 +56,7 @@ typeOf = \case
                      ", but found evidence for" <+> prettyCstr cstr0)
         pure t1
       (CxArg{}, _) -> throwHere "unexpected constraint argument"
-  EAbs par e0 -> do
-    case par of
-      TmPar binder -> TFun (snd binder) <$> withinEScope1 binder (typeOf e0)
-      TyPar v      -> TUni' v           <$> withinTScope1 v (typeOf e0)
-      CxPar cstr   -> TCtx cstr         <$> withinContext1 cstr (typeOf e0)
+  EAbs par e0 -> withinScope1 par (typeOf e0)
   ELet BindPar ds e0 -> do
     traverse_ checkBind ds
     withinEScope (map _b2binder ds) (typeOf e0)
@@ -100,7 +96,7 @@ checkCstr cstr@(clss, unwindl _TApp -> (t1, targs)) = do
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
-typeOfAltn :: IsTyped lg => Type -> Altn lg -> TC Type
+typeOfAltn :: TypeOf lg ~ Type => Type -> Altn lg -> TC Type
 typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
   withinEScope (Map.toList env) (typeOf e)
@@ -131,13 +127,13 @@ match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
+checkExpr :: TypeOf lg ~ Type => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
 
-checkBind :: IsTyped lg => Bind lg -> TC ()
+checkBind :: TypeOf lg ~ Type => Bind lg -> TC ()
 checkBind (MkBind (_, t) e) = checkExpr e t
 
-instance IsTyped st => TypeCheckable (SysF.Module st) where
+instance TypeOf lg ~ Type => TypeCheckable (SysF.Module lg) where
   checkModule (SysF.MkModule decls) = for_ decls $ here' $ \case
     SysF.DType{} -> pure ()
     SysF.DSign{} -> pure ()
@@ -147,7 +143,7 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DInst (SysF.MkInstDecl _ _ atom prms cstrs ds) -> do
       let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      withinTScope prms $ withinContext cstrs $
+      withinScope (map TyPar prms ++ map CxPar cstrs :: [Par lg]) $
         for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
           (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
           -- TODO: There might be some lexical name capturing going on here: type

@@ -3,10 +3,6 @@ module Pukeko.FrontEnd.Gamma
   , runGamma
   , withinEScope
   , withinEScope1
-  , withinTScope
-  , withinTScope1
-  , withinContext1
-  , withinContext
   , withinScope1
   , withinScope
   , lookupEVar
@@ -42,27 +38,14 @@ withinEScope1 (x, t) =
 withinEScope :: CanGamma effs => [EVarBinder Type] -> Eff effs a -> Eff effs a
 withinEScope xts act = foldr withinEScope1 act xts
 
-withinTScope :: (CanGamma effs, Foldable t) => t NameTVar -> Eff effs a -> Eff effs a
-withinTScope (toList -> vs) =
-  -- we try to avoid shadowing everywhere
-  locally tvars (Map.unionWith impossible (Map.fromList (zip vs (repeat Set.empty))))
-
-withinTScope1 :: CanGamma effs => NameTVar -> Eff effs a -> Eff effs a
-withinTScope1 v = locally tvars (Map.insertWith impossible v Set.empty)
-
-withinContext1 :: CanGamma effs => TypeCstr -> Eff effs a -> Eff effs a
-withinContext1 (clss, TVar v) =
-  locally tvars (Map.alter (maybe impossible (Just . Set.insert clss)) v)
-withinContext1 _ = impossible  -- we only allow constraints of the form @C a@
-
-withinContext :: CanGamma effs => [TypeCstr] -> Eff effs a -> Eff effs a
-withinContext cstrs act = foldr withinContext1 act cstrs
-
 withinScope1 :: (CanGamma effs, TypeOf lg ~ Type) => Par lg -> Eff effs a -> Eff effs a
 withinScope1 = \case
   TmPar x  -> withinEScope1 x
-  TyPar v  -> withinTScope1 v
-  CxPar cx -> withinContext1 cx
+  TyPar v  -> locally tvars (Map.insertWith impossible v Set.empty)
+  CxPar (clss, t)
+    | TVar v <- t ->
+      locally tvars (Map.alter (maybe impossible (Just . Set.insert clss)) v)
+    | otherwise   -> impossible  -- we only allow constraints of the form @C a@
 
 withinScope :: (CanGamma effs, TypeOf lg ~ Type) => [Par lg] -> Eff effs a -> Eff effs a
 withinScope pars act = foldr withinScope1 act pars
