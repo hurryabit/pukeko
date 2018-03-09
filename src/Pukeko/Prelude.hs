@@ -74,13 +74,13 @@ import           Debug.Trace
 import           Pukeko.Pretty
 import           Pukeko.Orphans ()
 
-type Failure = Doc ()
+type Failure = Doc
 
 throwFailure :: (Member (Error Failure) effs) => Failure -> Eff effs a
 throwFailure = throwError
 
 renderFailure :: Failure -> String
-renderFailure = render
+renderFailure = render False
 
 throwAt :: (Member (Error Failure) effs, HasPos x) => x -> Failure -> Eff effs a
 throwAt x msg = throwFailure (pretty (getPos x) <:~> msg)

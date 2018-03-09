@@ -55,10 +55,10 @@ zipMaybe idents = catMaybes . zipWith (\ident x -> (,) <$> ident <*> pure x) ide
 instance Pretty Name where
   pretty (MkName name) = pretty name
 
-prettyBind :: Maybe Name -> Doc ann
+prettyBind :: Maybe Name -> Doc
 prettyBind = maybe "_" pretty
 
-prettyAltn :: Int -> Altn -> Doc ann
+prettyAltn :: Int -> Altn -> Doc
 prettyAltn tag MkAltn{_binds, _rhs} = hang
     (hsep ["|", braces (pretty tag), hsep (map prettyBind _binds), "->"])
     2

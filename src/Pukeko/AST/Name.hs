@@ -134,7 +134,7 @@ instance Ord (Name nsp) where
   compare = compare `on` _id
 
 instance Pretty (Name nsp) where
-  pretty = pretty . _text
+  pretty (Name i t _) = annotateId i (pretty t)
 
 -- NOTE: This is necessary to make ''Name avaliable below.
 $(return [])
