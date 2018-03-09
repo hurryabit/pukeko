@@ -4,6 +4,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.AST.Expr
   ( Expr (..)
+  , BindMode (..)
   , Atom (..)
   , EVarBinder
   , Bind (..)
@@ -70,6 +71,8 @@ data Bind lg = MkBind
   , _b2bound  :: Expr lg
   }
 
+data BindMode = BindPar | BindRec
+
 data Arg lg
   =                TmArg (Expr lg)
   | HasTyApp lg => TyArg (TypeOf lg)
@@ -86,8 +89,7 @@ data Expr lg
   |                         EAtm Atom
   |                         EApp (Expr lg) (Arg  lg)
   | IsLambda lg ~ True   => EAbs (Par  lg) (Expr lg)
-  |                         ELet [Bind lg] (Expr lg)
-  |                         ERec [Bind lg] (Expr lg)
+  |                         ELet BindMode [Bind lg] (Expr lg)
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
@@ -208,15 +210,16 @@ instance TypeOf st ~ Type => Pretty (Bind st) where
   pretty (MkBind (z, t) e) =
     hang (pretty (z ::: t) <+> "=") 2 (prettyPrec 0 e)
 
-prettyDefns :: TypeOf st ~ Type => Bool -> [Bind st] -> Doc ann
-prettyDefns isrec ds = case ds of
+prettyBinds :: TypeOf st ~ Type => BindMode -> [Bind st] -> Doc ann
+prettyBinds mode ds = case ds of
     [] -> impossible  -- maintained invariant
     d0:ds ->
       let_ <+> pretty d0
       $$ vcatMap (\d -> "and" <+> pretty d) ds
     where
-      let_ | isrec     = "let rec"
-           | otherwise = "let"
+      let_ = case mode of
+        BindRec -> "let rec"
+        BindPar -> "let"
 
 instance Pretty Atom where
   pretty = \case
@@ -252,8 +255,7 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     EAbs{} ->
       let (ps, e1) = unwindr _EAbs e0
       in  prettyEAbs prec ps e1
-    ELet ds t -> maybeParens (prec > 0) (sep [prettyDefns False ds, "in"] $$ pretty t)
-    ERec ds t -> maybeParens (prec > 0) (sep [prettyDefns True  ds, "in"] $$ pretty t)
+    ELet m ds t -> maybeParens (prec > 0) (sep [prettyBinds m ds, "in"] $$ pretty t)
     -- FIXME: Collect lambdas.
     EMat t as ->
       maybeParens (prec > 0) $
@@ -296,6 +298,7 @@ instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
       maybeParens (prec > 0 && (not (null ts) || not (null bs)))
       $ pretty c <+> hsepMap prettyTyArg ts <+> hsepMap (maybe "_" pretty) bs
 
+deriving instance                     Show  BindMode
 deriving instance TypeOf lg ~ Type => Show (Bind lg)
 deriving instance TypeOf lg ~ Type => Show (Arg  lg)
 deriving instance TypeOf lg ~ Type => Show (Par  lg)
@@ -304,6 +307,7 @@ deriving instance TypeOf lg ~ Type => Show (Altn lg)
 deriving instance                     Show  Atom
 deriving instance TypeOf lg ~ Type => Show (Patn lg)
 
+deriveToJSON defaultOptions ''BindMode
 deriveToJSON defaultOptions ''Atom
 
 instance TypeOf lg ~ Type => ToJSON (Patn lg) where

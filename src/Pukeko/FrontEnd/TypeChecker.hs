@@ -61,10 +61,10 @@ typeOf = \case
       TmPar binder -> TFun (snd binder) <$> withinEScope1 binder (typeOf e0)
       TyPar v      -> TUni' v           <$> withinTScope1 v (typeOf e0)
       CxPar cstr   -> TCtx cstr         <$> withinContext1 cstr (typeOf e0)
-  ELet ds e0 -> do
+  ELet BindPar ds e0 -> do
     traverse_ checkBind ds
     withinEScope (map _b2binder ds) (typeOf e0)
-  ERec ds e0 ->
+  ELet BindRec ds e0 ->
     withinEScope (map _b2binder ds) $ do
       traverse_ checkBind ds
       typeOf e0

@@ -62,8 +62,10 @@ ccExpr = \case
   In.EAtm{} -> impossible  -- all cases matched above
   e0@(In.EApp _ In.TmArg{})
     | (e1, as) <- In.unwindl In._ETmApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
-  In.ELet ds t  -> Let False <$> traverse ccDefn ds <*> ccExpr t
-  In.ERec ds t  -> Let True  <$> traverse ccDefn ds <*> ccExpr t
+  In.ELet m ds t -> Let isrec <$> traverse ccDefn ds <*> ccExpr t
+    where isrec = case m of
+            In.BindRec -> True
+            In.BindPar -> False
   In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)
   In.EApp e0 In.TyArg{} -> ccExpr e0
   In.ECast  _   e0 -> ccExpr e0

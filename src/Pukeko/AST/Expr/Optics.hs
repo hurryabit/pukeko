@@ -27,10 +27,12 @@ subst' f = go Set.empty
       EApp e a         -> EApp   <$> go bound e <*> pure a
       EAbs (TmPar x) e -> ETmAbs x <$> go (Set.insert (nameOf x) bound) e
       EAbs p         e -> EAbs   p <$> go bound e
-      ELet ds e   -> ELet <$> (traverse . b2bound) (go bound ) ds <*> go bound' e
-        where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
-      ERec ds e   -> ERec <$> (traverse . b2bound) (go bound') ds <*> go bound' e
-        where bound' = bound <> setOf (traverse . b2binder . to nameOf) ds
+      ELet m ds e -> ELet m <$> (traverse . b2bound) (go bound0) ds <*> go bound1 e
+        where
+          bound1 = bound <> setOf (traverse . b2binder . to nameOf) ds
+          bound0 = case m of
+            BindRec -> bound1
+            BindPar -> bound
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
       ECast coe e -> ECast coe <$> go bound e
       ETyAnn t  e -> ETyAnn t <$> go bound e
@@ -58,8 +60,7 @@ expr2atom f = \case
   EApp e (TmArg a) -> ETmApp <$> expr2atom f e <*> expr2atom f a
   EApp e a         -> EApp   <$> expr2atom f e <*> pure a
   EAbs p  e    -> EAbs p <$> expr2atom f e
-  ELet ds t    -> ELet <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
-  ERec ds t    -> ERec <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
+  ELet m ds t  -> ELet m <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
   ECast coe e  -> ECast coe <$> expr2atom f e
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
@@ -89,8 +90,7 @@ expr2type f = \case
   EAtm a       -> pure (EAtm a)
   EApp e  a    -> EApp <$> expr2type f e <*> arg2type f a
   EAbs p  e    -> EAbs <$> par2type f p <*> expr2type f e
-  ELet ds e0   -> ELet <$> traverse (b2type f) ds <*> expr2type f e0
-  ERec ds e0   -> ERec <$> traverse (b2type f) ds <*> expr2type f e0
+  ELet m ds e0 -> ELet m <$> traverse (b2type f) ds <*> expr2type f e0
   EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
   ECast (c, t) e -> ECast . (c, ) <$> f t <*> expr2type f e
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0

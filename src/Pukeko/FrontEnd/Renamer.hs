@@ -192,7 +192,7 @@ rnExpr = \case
     exprs1 <- traverse rnExpr exprs0
     let binds1 = zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
     body1 <- local (env `Map.union`) (rnExpr body0)
-    pure (ELet binds1 body1)
+    pure (ELet BindPar binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkBind binder expr) -> (binder, expr)) binds0)
@@ -203,7 +203,7 @@ rnExpr = \case
       let binds1 =
             zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
       body1 <- rnExpr body0
-      pure (ERec binds1 body1)
+      pure (ELet BindRec binds1 body1)
   Ps.ECoe c e -> ECast . (, NoType) <$> rnCoercion c <*> rnExpr e
 
 
