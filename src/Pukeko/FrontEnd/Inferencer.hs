@@ -199,16 +199,16 @@ infer = \case
       (body1, t_body, cstrs) <- withinEScope1 @s param t_param (infer body0)
       let binder = (param, t_param)
       pure (ETmAbs binder (ETyAnn t_body body1), t_param ~> t_body, cstrs)
-    ELet defns0 rhs0 -> do
+    ELet BindPar defns0 rhs0 -> do
       (defns1, t_defns, cstrs_defns) <- unzip3 <$> traverse inferLet defns0
       (rhs1, t_rhs, cstrs_rhs) <-
         withinEScope (Map.fromList (zipExact (map nameOf defns0) t_defns)) (infer rhs0)
-      pure (ELet defns1 rhs1, t_rhs, fold cstrs_defns <> cstrs_rhs)
-    ERec defns0 rhs0 -> do
+      pure (ELet BindPar defns1 rhs1, t_rhs, fold cstrs_defns <> cstrs_rhs)
+    ELet BindRec defns0 rhs0 -> do
       (defns1, t_defns, cstrs_defns) <- inferRec defns0
       (rhs1, t_rhs, cstrs_rhs) <-
         withinEScope (Map.fromList (zipExact (map nameOf defns0) t_defns)) (infer rhs0)
-      pure (ERec defns1 rhs1, t_rhs, cstrs_defns <> cstrs_rhs)
+      pure (ELet BindRec defns1 rhs1, t_rhs, cstrs_defns <> cstrs_rhs)
     EMat expr0 altns0 -> do
       (expr1, t_expr, cstrs0) <- infer expr0
       t_res <- freshUVar
@@ -333,8 +333,7 @@ qualExpr = \case
   ECxApp e cstr  -> ECxApp <$> qualExpr e <*> _2 qualType cstr
   EApp{} -> impossible
   EAbs (TmPar param) body -> ETmAbs <$> _2 qualType param <*> qualExpr body
-  ELet ds e0 -> ELet <$> traverse qualDefn ds <*> qualExpr e0
-  ERec ds e0 -> ERec <$> traverse qualDefn ds <*> qualExpr e0
+  ELet m ds e0 -> ELet m <$> traverse qualDefn ds <*> qualExpr e0
   EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
   ECast (c, t) e0 -> ECast . (c,) <$> qualType t <*> qualExpr e0
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e

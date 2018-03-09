@@ -82,8 +82,7 @@ inExpr e0 = case e0 of
   ETmApp e  a  -> ETmApp <$> inExpr e <*> inExpr a
   EApp   e  a  -> EApp <$> inExpr e <*> pure a
   EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
-  ELet ds t  -> ELet <$> (traverse . b2bound) inExpr ds <*> inExpr t
-  ERec ds t  -> ERec <$> (traverse . b2bound) inExpr ds <*> inExpr t
+  ELet m ds t -> ELet m <$> (traverse . b2bound) inExpr ds <*> inExpr t
   ECast coe e -> ECast coe <$> inExpr e
 
 inSupCDecl :: FuncDecl (Only SupC) -> In (FuncDecl (Only SupC))

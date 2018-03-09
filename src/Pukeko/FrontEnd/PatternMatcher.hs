@@ -43,8 +43,7 @@ pmExpr = \case
   EAbs (TmPar x) e -> ETmAbs x <$> pmExpr e
   EAbs (TyPar v) e -> ETyAbs v <$> pmExpr e
   EAbs (CxPar c) e -> ECxAbs c <$> pmExpr e
-  ELet ds t       -> ELet <$> traverse (b2bound pmExpr) ds <*> pmExpr t
-  ERec ds t       -> ERec <$> traverse (b2bound pmExpr) ds <*> pmExpr t
+  ELet m ds t      -> ELet m <$> traverse (b2bound pmExpr) ds <*> pmExpr t
   EMat t0 as0     -> LS.withNonEmpty as0 $ \as1 -> do
       t1 <- pmExpr t0
       pmMatch (mkRowMatch1 t1 as1)

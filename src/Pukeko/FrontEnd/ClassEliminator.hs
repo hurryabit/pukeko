@@ -112,7 +112,7 @@ elimInstDecl
   let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
   let e_body = foldl ETmApp e_dcon (map (EVar . nameOf) defns1)
   let e_let :: Expr In
-      e_let = ELet defns1 e_body
+      e_let = ELet BindPar defns1 e_body
   let e_rhs :: Expr In
       e_rhs = rewindr ETyAbs prms (rewindr ECxAbs cstrs (ETyAnn t_dict0 e_let))
   pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
@@ -180,8 +180,7 @@ elimExpr = \case
   ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
   ECxAbs cstr e0 -> elimECxAbs cstr e0
   EAbs{} -> impossible
-  ELet ds0 e0 -> ELet <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
-  ERec ds0 e0 -> ERec <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
+  ELet m ds0 e0 -> ELet m <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   EMat e0 as -> EMat <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
   ECast coe e0 -> ECast coe <$> elimExpr e0
   ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0
