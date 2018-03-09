@@ -30,6 +30,7 @@ module Pukeko.AST.Expr
   , _TmPar
   , _TyPar
   , _AVal
+  , _EApp
   , _ETmApp
   , _ETyApp
   , _ETyAbs

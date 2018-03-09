@@ -6,5 +6,8 @@ g a b c d = a
 f : Int -> Int -> Int -> Int -> Int
 f = fun x -> fun y1 y2 -> fun z -> g x y1 y2 z
 
+h : Int -> Int
+h x = x + x
+
 main : IO Unit
-main = print (f 1 2 3 4)
+main = print (f 1 2 3 (h 2))
