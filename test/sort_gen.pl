@@ -128,8 +128,8 @@ semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
   fun @a @m (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
     bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
 traverse_$ll1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
-  fun @a @m (dict$Monad$m : Monad m) (f : a -> m Unit) (x : a) (m : m Unit) ->
-    semi$ll2 @Unit @m dict$Monad$m (f x) m
+  fun @a @m (dict$Monad$m : Monad m) (f : a -> m Unit) (x : a) ->
+    semi$ll2 @Unit @m dict$Monad$m (f x)
 traverse_$ll2 : ∀a m t. Monad m -> Foldable t -> (a -> m Unit) -> t a -> m Unit =
   fun @a @m @t (dict$Monad$m : Monad m) (dict$Foldable$t : Foldable t) (f : a -> m Unit) ->
     foldr$ll1 @t dict$Foldable$t @a @(m Unit) (traverse_$ll1 @a @m dict$Monad$m f) (pure$ll1 @m dict$Monad$m @Unit Unit)

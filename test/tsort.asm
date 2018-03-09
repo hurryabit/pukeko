@@ -403,15 +403,14 @@ g_pop 4
 g_unwind
 g_label .2
 
-g_globstart traverse_$ll1, 4
-g_push 3
-g_push 3
-g_push 3
-g_mkap 1
+g_globstart traverse_$ll1, 3
 g_push 2
+g_push 2
+g_mkap 1
+g_push 1
 g_pushglobal semi$ll2, 3
-g_updap 3, 5
-g_pop 4
+g_updap 2, 4
+g_pop 3
 g_unwind
 
 g_globstart traverse_$ll2, 3
@@ -421,7 +420,7 @@ g_pushglobal pure$ll1, 1
 g_mkap 2
 g_push 3
 g_push 2
-g_pushglobal traverse_$ll1, 4
+g_pushglobal traverse_$ll1, 3
 g_mkap 2
 g_push 3
 g_pushglobal foldr$ll1, 1

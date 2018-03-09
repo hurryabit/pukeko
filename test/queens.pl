@@ -126,8 +126,8 @@ foldl$ll1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
     match dict with
     | Dict$Foldable @t _ foldl -> foldl
 foldMap$ll1 : ∀a m. Monoid m -> (a -> m) -> a -> m -> m =
-  fun @a @m (dict$Monoid$m : Monoid m) (f : a -> m) (x : a) (m : m) ->
-    append$ll1 @m dict$Monoid$m (f x) m
+  fun @a @m (dict$Monoid$m : Monoid m) (f : a -> m) (x : a) ->
+    append$ll1 @m dict$Monoid$m (f x)
 foldMap$ll2 : ∀a m t. Foldable t -> Monoid m -> (a -> m) -> t a -> m =
   fun @a @m @t (dict$Foldable$t : Foldable t) (dict$Monoid$m : Monoid m) (f : a -> m) ->
     foldr$ll1 @t dict$Foldable$t @a @m (foldMap$ll1 @a @m dict$Monoid$m f) (empty$ll1 @m dict$Monoid$m)
