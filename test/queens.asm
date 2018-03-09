@@ -290,15 +290,14 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart foldMap$ll1, 4
-g_push 3
-g_push 3
-g_push 3
-g_mkap 1
+g_globstart foldMap$ll1, 3
 g_push 2
+g_push 2
+g_mkap 1
+g_push 1
 g_pushglobal append$ll1, 1
-g_updap 3, 5
-g_pop 4
+g_updap 2, 4
+g_pop 3
 g_unwind
 
 g_globstart foldMap$ll2, 3
@@ -307,7 +306,7 @@ g_pushglobal empty$ll1, 1
 g_mkap 1
 g_push 3
 g_push 3
-g_pushglobal foldMap$ll1, 4
+g_pushglobal foldMap$ll1, 3
 g_mkap 2
 g_push 2
 g_pushglobal foldr$ll1, 1

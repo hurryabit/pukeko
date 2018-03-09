@@ -5,10 +5,8 @@ module Pukeko.MiddleEnd.EtaReducer
 
 import Pukeko.Prelude
 
-import           Control.Lens (nullOf)
 import qualified Data.Set     as Set
 
-import           Pukeko.AST.Expr (_TmPar, _EApp)
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore
@@ -37,9 +35,7 @@ etaReduce = \case
   (ps, as) -> (ps, map fst as)
 
 erSupCDecl :: FuncDecl (Only SupC) -> FuncDecl (Only SupC)
-erSupCDecl supc@(SupCDecl z t ps0 e0)
-  | nullOf (traverse . _TmPar) ps1 = (SupCDecl z t (reverse ps1) e2)
-  | otherwise                      = supc
+erSupCDecl (SupCDecl z t ps0 e0) = SupCDecl z t (reverse ps1) e2
   where
     (e1, as0) = unwindl _EApp e0
     fvs = scanl (<>) (freeVars (TmArg e1)) (map freeVars as0)
