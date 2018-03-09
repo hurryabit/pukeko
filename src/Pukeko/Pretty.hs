@@ -6,6 +6,7 @@ module Pukeko.Pretty
   , Pretty (..)
   , PrettyPrec (..)
   , render
+  , annotateId
 
   , (<>)
   , (<+>)
@@ -38,40 +39,51 @@ import           Data.Void
 import           Data.Semigroup (Semigroup (..))
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)
 import qualified Text.PrettyPrint.Annotated as PP
-import           Text.PrettyPrint.Annotated hiding ((<>), (<+>), hsep, vcat)
+import           Text.PrettyPrint.Annotated.HughesPJ hiding
+                 (Doc, (<>), (<+>), render, hsep, vcat)
 
 infixr 6 <+>, <:~>
 
-(<+>), (<:~>) :: Doc ann -> Doc ann -> Doc ann
+(<+>), (<:~>) :: Doc -> Doc -> Doc
 (<+>) = (PP.<+>)
 x <:~> y = x <> ":" <+> y
 {-# INLINE (<+>) #-}
 {-# INLINE (<:~>) #-}
 
+data SrcAnn = NameId Int
+
+type Doc = PP.Doc SrcAnn
+
 class Pretty a where
-  pretty :: a -> Doc ann
-  default pretty :: PrettyPrec a => a -> Doc ann
+  pretty :: a -> Doc
+  default pretty :: PrettyPrec a => a -> Doc
   pretty = prettyPrec 0
 
 class Pretty a => PrettyPrec a where
-  prettyPrec :: Int -> a -> Doc ann
+  prettyPrec :: Int -> a -> Doc
 
-hsep :: (Foldable t) => t (Doc ann) -> Doc ann
+render :: Bool -> Doc -> String
+render = \case
+  False -> PP.render
+  True  -> renderDecorated start end
+  where
+    start = const ""
+    end (NameId i) = PP.render (braces (pretty i))
+
+annotateId :: Int -> Doc -> Doc
+annotateId = annotate . NameId
+
+hsep :: (Foldable t) => t Doc -> Doc
 hsep = PP.hsep . toList
 
-hsepMap :: (Foldable t) => (a -> Doc ann) -> t a -> Doc ann
+hsepMap :: (Foldable t) => (a -> Doc) -> t a -> Doc
 hsepMap f = PP.hsep . map f . toList
 
-vcat :: (Foldable t) => t (Doc ann) -> Doc ann
+vcat :: (Foldable t) => t Doc -> Doc
 vcat = PP.vcat . toList
 
-vcatMap :: (Foldable t) => (a -> Doc ann) -> t a -> Doc ann
+vcatMap :: (Foldable t) => (a -> Doc) -> t a -> Doc
 vcatMap f = PP.vcat . map f . toList
-
-maybeParens :: Bool -> Doc ann -> Doc ann
-maybeParens = \case
-  False -> id
-  True  -> parens
 
 instance Pretty String where
   pretty = PP.text
