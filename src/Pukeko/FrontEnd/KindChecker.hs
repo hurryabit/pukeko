@@ -170,7 +170,7 @@ close k = do
       assertFree uref
       sendM (writeSTRef uref (Link Star))
 
-prettyKind :: Bool -> Kind (Open s) -> ST s (Doc ann)
+prettyKind :: Bool -> Kind (Open s) -> ST s Doc
 prettyKind prec = \case
   Star -> pure "*"
   Arrow kf kp -> do

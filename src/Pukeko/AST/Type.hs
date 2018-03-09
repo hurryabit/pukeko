@@ -168,7 +168,7 @@ instance Pretty v => Pretty (GenType v)
 instance Pretty v => PrettyPrec (GenType v) where
   prettyPrec = go pretty
     where
-      go :: forall v ann. (v -> Doc ann) -> Int -> GenType v -> Doc ann
+      go :: forall v. (v -> Doc) -> Int -> GenType v -> Doc
       go prettyVar prec = \case
         TVar x -> prettyVar x
         TAtm a -> pretty a
@@ -179,7 +179,7 @@ instance Pretty v => PrettyPrec (GenType v) where
         t0@TUni{} ->
           goUni [] prettyVar t0
           where
-            goUni :: forall v ann. [NameTVar] -> (v -> Doc ann) -> GenType v -> Doc ann
+            goUni :: forall v. [NameTVar] -> (v -> Doc) -> GenType v -> Doc
             goUni vs prettyVar = \case
               TUni v t1 ->
                 goUni (v:vs) (B.unvar (pretty . B.name) prettyVar) (B.fromScope t1)
@@ -191,15 +191,15 @@ instance Pretty v => PrettyPrec (GenType v) where
           in  maybeParens (prec > 0)
               (parens (hsep (punctuate "," cstrs1)) <+> "=>" <+> go prettyVar 0 t1)
 
-prettyCstr :: TypeCstr -> Doc ann
+prettyCstr :: TypeCstr -> Doc
 prettyCstr (clss, typ) = pretty clss <+> prettyPrec 3 typ
 
-prettyContext :: [TypeCstr] -> Doc ann
+prettyContext :: [TypeCstr] -> Doc
 prettyContext cstrs
   | null cstrs = mempty
   | otherwise  = parens (hsep (punctuate "," (map prettyCstr cstrs))) <+> "=>"
 
-prettyTUni :: Foldable t => Int -> t NameTVar -> Doc ann -> Doc ann
+prettyTUni :: Foldable t => Int -> t NameTVar -> Doc -> Doc
 prettyTUni prec vs tq =
   maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> tq)
 

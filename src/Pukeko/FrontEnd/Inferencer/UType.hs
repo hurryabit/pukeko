@@ -118,12 +118,12 @@ substUType env = go
 instance Pretty UVarId where
   pretty = pretty . uvarIdName
 
-prettyUVar :: Int -> UVar s -> ST s (Doc ann)
+prettyUVar :: Int -> UVar s -> ST s Doc
 prettyUVar prec = \case
   UFree v _ -> pure (pretty v)
   ULink t   -> prettyUType prec t
 
-prettyUType :: Int -> UType s -> ST s (Doc ann)
+prettyUType :: Int -> UType s -> ST s Doc
 prettyUType prec = \case
   UTVar v -> pure (pretty v)
   UTAtm a -> pure (pretty a)

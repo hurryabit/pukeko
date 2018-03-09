@@ -210,7 +210,7 @@ instance TypeOf st ~ Type => Pretty (Bind st) where
   pretty (MkBind (z, t) e) =
     hang (pretty (z ::: t) <+> "=") 2 (prettyPrec 0 e)
 
-prettyBinds :: TypeOf st ~ Type => BindMode -> [Bind st] -> Doc ann
+prettyBinds :: TypeOf st ~ Type => BindMode -> [Bind st] -> Doc
 prettyBinds mode ds = case ds of
     [] -> impossible  -- maintained invariant
     d0:ds ->
@@ -227,7 +227,7 @@ instance Pretty Atom where
     ACon c -> pretty c
     ANum n -> pretty n
 
-prettyTyArg :: Type -> Doc ann
+prettyTyArg :: Type -> Doc
 prettyTyArg t = "@" <> prettyPrec 3 t
 
 instance TypeOf lg ~ Type => Pretty (Arg lg) where
@@ -275,7 +275,7 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     ETyAnn _ e -> prettyPrec prec e
 
 prettyEAbs :: (TypeOf lg1 ~ Type, TypeOf lg2 ~ Type) =>
-  Int -> [Par lg1] -> Expr lg2 -> Doc ann
+  Int -> [Par lg1] -> Expr lg2 -> Doc
 prettyEAbs prec pars body
   | null pars = prettyPrec prec body
   | otherwise =
