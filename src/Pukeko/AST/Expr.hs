@@ -105,6 +105,7 @@ data Expr lg
   |                         EMat (TypeOf lg) (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
+
 pattern EVal :: TmVar -> Expr lg
 pattern EVal z = EAtm (AVal z)
 
