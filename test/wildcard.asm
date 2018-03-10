@@ -40,26 +40,21 @@ g_updap 1, 1
 g_unwind
 
 g_globstart input, 0
-g_pushglobal B.geti
 g_pushglobal C.0.0
-g_push 0
-g_push 2
+g_pushglobal B.geti
 g_pushglobal io.L1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 1
 g_unwind
 
 g_globstart main, 0
-g_pushglobal monadIO
 g_pushglobal main.L2
 g_pushglobal input
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart semi.L1, 2
@@ -120,50 +115,43 @@ g_globstart main.L1, 2
 g_push 1
 g_push 1
 g_cons 0, 2
-g_pushglobal monadIO
-g_push 1
 g_push 0
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_slide 1
 g_pushglobal print
 g_mkap 1
-g_push 2
-g_push 0
+g_push 1
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_slide 1
 g_pushglobal print
 g_mkap 1
-g_push 2
-g_push 1
+g_push 0
 g_pushglobal semi.L1
 g_mkap 1
-g_push 3
 g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 8
-g_pop 7
+g_updap 2, 6
+g_pop 5
 g_unwind
 
 g_globstart main.L2, 1
-g_pushglobal monadIO
-g_push 1
+g_push 0
 g_pushglobal main.L1
 g_mkap 1
 g_pushglobal input
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 2
+g_pop 1
 g_unwind

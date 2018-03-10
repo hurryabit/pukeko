@@ -37,14 +37,9 @@ external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io.L1 @Unit @Int f x)
+input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
+  (match monadIO with
    | .Monad _ bind -> bind) @Int @Unit input main.L2
 semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -67,21 +62,16 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
 main.L1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in
-    let monad.m : Monad IO = monadIO
-    and m1 : IO Unit =
-          print (let p : Pair Int Int = p in
-                 match p with
+    let m1 : IO Unit =
+          print (match p with
                  | Pair x _ -> x)
     and m2 : IO Unit =
-          print (let p : Pair Int Int = p in
-                 match p with
+          print (match p with
                  | Pair _ y -> y)
     in
-    let dict : Monad IO = monad.m in
-    (match dict with
+    (match monadIO with
      | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
 main.L2 : Int -> IO Unit =
   fun (x : Int) ->
-    let dict : Monad IO = monadIO in
-    (match dict with
+    (match monadIO with
      | .Monad _ bind -> bind) @Int @Unit input (main.L1 x)

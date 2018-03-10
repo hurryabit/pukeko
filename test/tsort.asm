@@ -150,13 +150,10 @@ g_updap 1, 1
 g_unwind
 
 g_globstart input, 0
-g_pushglobal B.geti
 g_pushglobal C.0.0
-g_push 0
-g_push 2
+g_pushglobal B.geti
 g_pushglobal io.L1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 1
 g_unwind
 
 g_globstart foldableBinTree, 0
@@ -172,16 +169,14 @@ g_updcons 0, 2, 1
 g_return
 
 g_globstart main, 0
-g_pushglobal monadIO
 g_pushglobal main.L2
 g_pushglobal input
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart foldableList.foldr.L1, 3
@@ -195,17 +190,15 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
+g_push 1
+g_push 4
+g_push 4
 g_pushglobal foldableList
-g_push 2
-g_push 5
-g_push 5
-g_push 3
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
 g_push 1
 g_push 4
 g_updap 2, 6
@@ -224,49 +217,44 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
-g_pushglobal foldableList
-g_push 2
-g_push 2
-g_push 6
-g_push 6
-g_mkap 2
+g_push 1
+g_push 1
 g_push 5
-g_push 3
+g_push 5
+g_mkap 2
+g_push 4
+g_pushglobal foldableList
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 3, 7
-g_pop 6
+g_updap 3, 6
+g_pop 5
 g_unwind
 g_label .2
 
 g_globstart replicate.L1, 2
-g_pushglobal ordInt
 g_pushint 0
-g_push 2
-g_push 2
+g_push 1
+g_pushglobal ordInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
 g_push 1
-g_pushglobal ringInt
 g_pushint 1
-g_push 3
 g_push 2
+g_pushglobal ringInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_pushglobal replicate.L1
 g_mkap 2
 g_push 2
@@ -288,61 +276,23 @@ g_pop 1
 g_unwind
 
 g_globstart semi.L2, 3
-g_push 0
-g_push 3
+g_push 2
 g_pushglobal semi.L1
 g_mkap 1
-g_push 3
+g_push 2
 g_push 2
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 5
-g_pop 4
+g_updap 2, 4
+g_pop 3
 g_unwind
 
 g_globstart sequence.L1, 3
-g_push 0
-g_push 3
-g_push 3
+g_push 2
+g_push 2
 g_cons 1, 2
-g_push 1
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
-g_updap 1, 5
-g_pop 4
-g_unwind
-
-g_globstart sequence.L2, 3
-g_push 0
-g_push 3
-g_push 2
-g_pushglobal sequence.L1
-g_mkap 2
-g_push 3
-g_push 3
-g_pushglobal sequence.L3
-g_mkap 2
-g_push 2
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
-g_updap 2, 5
-g_pop 4
-g_unwind
-
-g_globstart sequence.L3, 2
-g_push 1
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 1
-g_push 0
-g_pushglobal C.0.0
 g_push 1
 g_eval
 g_proj 0
@@ -351,21 +301,54 @@ g_slide 1
 g_updap 1, 4
 g_pop 3
 g_unwind
-g_label .1
-g_uncons 2
+
+g_globstart sequence.L2, 3
 g_push 2
-g_push 2
-g_push 4
-g_pushglobal sequence.L2
+g_push 1
+g_pushglobal sequence.L1
 g_mkap 2
 g_push 2
+g_push 2
+g_pushglobal sequence.L3
+g_mkap 2
 g_push 2
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 6
-g_pop 5
+g_updap 2, 4
+g_pop 3
+g_unwind
+
+g_globstart sequence.L3, 2
+g_push 1
+g_eval
+g_jumpcase .0, .1
+g_label .0
+g_pop 1
+g_pushglobal C.0.0
+g_push 1
+g_eval
+g_proj 0
+g_push 0
+g_slide 1
+g_updap 1, 3
+g_pop 2
+g_unwind
+g_label .1
+g_uncons 2
+g_push 1
+g_push 3
+g_pushglobal sequence.L2
+g_mkap 2
+g_push 1
+g_push 4
+g_eval
+g_proj 1
+g_push 0
+g_slide 1
+g_updap 2, 5
+g_pop 4
 g_unwind
 g_label .2
 
@@ -439,30 +422,27 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 3
-g_pushglobal foldableBinTree
-g_push 1
-g_pushglobal foldableBinTree
-g_push 5
-g_push 8
-g_push 8
+g_push 0
 g_push 3
+g_push 6
+g_push 6
+g_pushglobal foldableBinTree
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
-g_push 4
-g_push 7
-g_mkap 2
-g_push 6
 g_push 3
+g_push 6
+g_mkap 2
+g_push 5
+g_pushglobal foldableBinTree
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 3, 8
-g_pop 7
+g_updap 3, 7
+g_pop 6
 g_unwind
 g_label .2
 
@@ -477,59 +457,54 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 3
+g_push 2
+g_push 2
+g_push 2
+g_push 7
+g_push 7
 g_pushglobal foldableBinTree
-g_push 3
-g_push 3
-g_pushglobal foldableBinTree
-g_push 4
-g_push 9
-g_push 9
-g_push 3
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
-g_push 7
-g_mkap 2
 g_push 6
-g_push 3
+g_mkap 2
+g_push 5
+g_pushglobal foldableBinTree
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 3, 8
-g_pop 7
+g_updap 3, 7
+g_pop 6
 g_unwind
 g_label .2
 
 g_globstart foldableBag.foldr.L1, 3
+g_push 2
+g_push 2
+g_push 2
 g_pushglobal foldableBinTree
-g_push 3
-g_push 3
-g_push 3
-g_push 3
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 3, 5
-g_pop 4
+g_updap 3, 4
+g_pop 3
 g_unwind
 
 g_globstart foldableBag.foldl.L1, 3
+g_push 2
+g_push 2
+g_push 2
 g_pushglobal foldableBinTree
-g_push 3
-g_push 3
-g_push 3
-g_push 3
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 3, 5
-g_pop 4
+g_updap 3, 4
+g_pop 3
 g_unwind
 
 g_globstart bag_insert.L1, 4
@@ -547,17 +522,15 @@ g_return
 g_jump .2
 g_label .1
 g_uncons 3
-g_push 4
-g_push 2
-g_push 7
-g_push 2
+g_push 1
+g_push 6
+g_push 6
 g_eval
 g_proj 3
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .3, .4
 g_label .3
 g_pop 1
@@ -590,88 +563,70 @@ g_jump .2
 g_label .2
 
 g_globstart tsort.L1, 2
-g_pushglobal ordInt
-g_push 2
-g_push 2
 g_alloc 1
 g_push 0
 g_pushglobal bag_insert.L1
 g_updap 1, 1
 g_push 1
 g_push 3
-g_push 5
+g_pushglobal ordInt
 g_push 3
-g_updap 3, 7
-g_pop 6
+g_updap 3, 4
+g_pop 3
 g_unwind
 
 g_globstart main.L1, 1
-g_pushglobal monadIO
-g_pushglobal foldableList
-g_pushglobal print
-g_push 1
-g_push 4
-g_pushglobal foldableBag
 g_push 0
-g_pushglobal foldableList
-g_push 3
 g_pushglobal C.0.0
 g_pushglobal tsort.L1
-g_push 3
+g_pushglobal foldableList
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
 g_pushglobal C.0.0
 g_pushglobal C.1.2
-g_push 3
+g_pushglobal foldableBag
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
-g_slide 1
-g_slide 1
-g_push 4
 g_pushglobal C.0.0
-g_push 1
+g_pushglobal monadIO
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 1
-g_slide 1
-g_push 3
-g_push 6
+g_pushglobal print
+g_pushglobal monadIO
 g_pushglobal traverse_.L1
 g_mkap 2
-g_push 3
+g_pushglobal foldableList
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 3, 6
-g_pop 5
+g_updap 3, 2
+g_pop 1
 g_unwind
 
 g_globstart main.L2, 1
-g_pushglobal monadIO
 g_pushglobal main.L1
 g_pushglobal input
-g_push 3
+g_push 2
 g_pushglobal replicate.L1
 g_mkap 2
 g_pushglobal monadIO
 g_pushglobal sequence.L3
 g_mkap 2
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 2
+g_pop 1
 g_unwind

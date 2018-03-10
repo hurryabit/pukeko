@@ -34,13 +34,8 @@ data World =
 data IO a = World -> Pair a World
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
-   | .Monad pure _ -> pure) @Unit (let u : Unit =
-                                         let u : Unit = Unit in
-                                         u
-                                   in
-                                   u)
+  (match monadIO with
+   | .Monad pure _ -> pure) @Unit Unit
 monadIO.pure.L2 : ∀a. a -> IO a =
   fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =

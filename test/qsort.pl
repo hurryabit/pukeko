@@ -49,11 +49,7 @@ foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io.L1 @Unit @Int f x)
+input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 qsort : List Int -> List Int =
   fun (xs : List Int) ->
     match xs with
@@ -67,39 +63,33 @@ qsort : List Int -> List Int =
         (match dict with
          | .Monoid _ append -> append) (qsort ys) (Cons @Int x (qsort zs))
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
+  (match monadIO with
    | .Monad _ bind -> bind) @Int @Unit input main.L2
 monoidList.empty : ∀a. List a = Nil
 monoidList.append.L1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
-    let dict : Foldable List = foldableList in
-    (match dict with
+    (match foldableList with
      | .Foldable foldr _ -> foldr) @a @(List a) (Cons @a) ys xs
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      f x (let dict : Foldable List = foldableList in
-           (match dict with
+      f x ((match foldableList with
             | .Foldable foldr _ -> foldr) @a @b f y0 xs)
 foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      let dict : Foldable List = foldableList in
-      (match dict with
+      (match foldableList with
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match let dict : Ord Int = ordInt in
-          (match dict with
+    match (match ordInt with
            | .Ord _ _ le _ -> le) n 0 with
     | False ->
-      Cons @a x (replicate.L1 @a (let dict : Ring Int = ringInt in
-                                  (match dict with
+      Cons @a x (replicate.L1 @a ((match ringInt with
                                    | .Ring _ _ sub _ -> sub) n 1) x)
     | True -> Nil @a
 partition.L1 : ∀a. (a -> Bool) -> List a -> Pair (List a) (List a) =
@@ -116,30 +106,25 @@ semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi.L2 : ∀a m. Monad m -> m Unit -> m a -> m a =
   fun @a @m (monad.m : Monad m) (m1 : m Unit) (m2 : m a) ->
-    let dict : Monad m = monad.m in
-    (match dict with
+    (match monad.m with
      | .Monad _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 : ∀a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (monad.m : Monad m) (x : a) (xs : List a) ->
-    let dict : Monad m = monad.m in
-    (match dict with
+    (match monad.m with
      | .Monad pure _ -> pure) @(List a) (Cons @a x xs)
 sequence.L2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) (x : a) ->
-    let dict : Monad m = monad.m in
-    (match dict with
+    (match monad.m with
      | .Monad _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) ->
     match ms with
     | Nil ->
-      let dict : Monad m = monad.m in
-      (match dict with
+      (match monad.m with
        | .Monad pure _ -> pure) @(List a) (Nil @a)
     | Cons m ms ->
-      let dict : Monad m = monad.m in
-      (match dict with
+      (match monad.m with
        | .Monad _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
@@ -163,27 +148,17 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io.L1 @a @b f x)
 qsort.L1 : Int -> Int -> Bool =
   fun (x : Int) (y : Int) ->
-    let dict : Ord Int = ordInt in
-    (match dict with
+    (match ordInt with
      | .Ord _ _ _ lt -> lt) y x
 main.L1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    let monad.m : Monad IO = monadIO
-    and foldable.t : Foldable List = foldableList
-    and f : Int -> IO Unit = print
-    in
-    let dict : Foldable List = foldable.t in
-    (match dict with
+    (match foldableList with
      | .Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monad.m f) (let dict : Monad IO =
-                                                                       monad.m
-                                                                 in
-                                                                 (match dict with
-                                                                  | .Monad pure _ ->
-                                                                    pure) @Unit Unit) (qsort xs)
+       foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) ((match monadIO with
+                                                                      | .Monad pure _ ->
+                                                                        pure) @Unit Unit) (qsort xs)
 main.L2 : Int -> IO Unit =
   fun (n : Int) ->
-    let dict : Monad IO = monadIO in
-    (match dict with
+    (match monadIO with
      | .Monad _ bind ->
        bind) @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L1

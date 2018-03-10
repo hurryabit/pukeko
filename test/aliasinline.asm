@@ -16,19 +16,13 @@ g_updcons 0, 2, 1
 g_return
 
 g_globstart main, 0
-g_pushglobal monadIO
 g_pushglobal C.0.0
-g_push 0
-g_slide 1
-g_push 0
-g_slide 1
-g_push 1
+g_pushglobal monadIO
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 1, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart monadIO.pure.L2, 1

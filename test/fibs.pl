@@ -48,35 +48,26 @@ ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
 ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io.L1 @Unit @Int f x)
+input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 prime : Int =
-  let dict : Ring Int = ringInt in
-  (match dict with
-   | .Ring _ add _ _ -> add) (let dict : Ring Int = ringInt in
-                              (match dict with
+  (match ringInt with
+   | .Ring _ add _ _ -> add) ((match ringInt with
                                | .Ring _ _ _ mul -> mul) 1000000 1000000) 39
 fibs0 : List Int = Cons @Int 0 fibs1
 fibs1 : List Int =
   Cons @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
+  (match monadIO with
    | .Monad _ bind -> bind) @Int @Unit input main.L1
 nth_exn.L1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match let dict : Ord Int = ordInt in
-            (match dict with
+      match (match ordInt with
              | .Ord _ _ le _ -> le) n 0 with
       | False ->
-        nth_exn.L1 @a xs (let dict : Ring Int = ringInt in
-                          (match dict with
+        nth_exn.L1 @a xs ((match ringInt with
                            | .Ring _ _ sub _ -> sub) n 1)
       | True -> x
 zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
@@ -106,16 +97,13 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
 add_mod_prime.L1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
     let z : Int =
-          let dict : Ring Int = ringInt in
-          (match dict with
+          (match ringInt with
            | .Ring _ add _ _ -> add) x y
     in
-    match let dict : Ord Int = ordInt in
-          (match dict with
+    match (match ordInt with
            | .Ord _ _ _ lt -> lt) z prime with
     | False ->
-      let dict : Ring Int = ringInt in
-      (match dict with
+      (match ringInt with
        | .Ring _ _ sub _ -> sub) z prime
     | True -> z
 main.L1 : Int -> IO Unit =

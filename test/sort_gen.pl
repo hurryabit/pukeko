@@ -50,50 +50,40 @@ foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io.L1 @Unit @Int f x)
+input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
+  (match monadIO with
    | .Monad _ bind -> bind) @Int @Unit input main.L2
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      f x (let dict : Foldable List = foldableList in
-           (match dict with
+      f x ((match foldableList with
             | .Foldable foldr _ -> foldr) @a @b f y0 xs)
 foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      let dict : Foldable List = foldableList in
-      (match dict with
+      (match foldableList with
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 take.L1 : ∀a. Int -> List a -> List a =
   fun @a (n : Int) (xs : List a) ->
-    match let dict : Ord Int = ordInt in
-          (match dict with
+    match (match ordInt with
            | .Ord _ _ le _ -> le) n 0 with
     | False ->
       match xs with
       | Nil -> Nil @a
       | Cons x xs ->
-        Cons @a x (take.L1 @a (let dict : Ring Int = ringInt in
-                               (match dict with
+        Cons @a x (take.L1 @a ((match ringInt with
                                 | .Ring _ _ sub _ -> sub) n 1) xs)
     | True -> Nil @a
 semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi.L2 : ∀a m. Monad m -> m Unit -> m a -> m a =
   fun @a @m (monad.m : Monad m) (m1 : m Unit) (m2 : m a) ->
-    let dict : Monad m = monad.m in
-    (match dict with
+    (match monad.m with
      | .Monad _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
 traverse_.L1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   fun @a @m (monad.m : Monad m) (f : a -> m Unit) (x : a) ->
@@ -118,28 +108,17 @@ gen.L1 : ∀a. (a -> a) -> a -> List a =
   fun @a (f : a -> a) (x : a) -> Cons @a x (gen.L1 @a f (f x))
 main.L1 : Int -> Int =
   fun (x : Int) ->
-    mod (let dict : Ring Int = ringInt in
-         (match dict with
+    mod ((match ringInt with
           | .Ring _ _ _ mul -> mul) 91 x) 1000000007
 main.L2 : Int -> IO Unit =
   fun (n : Int) ->
-    let monad.m : Monad IO = monadIO
-    and m1 : IO Unit = print n
+    let m1 : IO Unit = print n
     and m2 : IO Unit =
-          let monad.m : Monad IO = monadIO
-          and foldable.t : Foldable List = foldableList
-          and f : Int -> IO Unit = print
-          in
-          let dict : Foldable List = foldable.t in
-          (match dict with
+          (match foldableList with
            | .Foldable foldr _ ->
-             foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monad.m f) (let dict : Monad IO =
-                                                                             monad.m
-                                                                       in
-                                                                       (match dict with
-                                                                        | .Monad pure _ ->
-                                                                          pure) @Unit Unit) (take.L1 @Int n (gen.L1 @Int main.L1 1))
+             foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) ((match monadIO with
+                                                                            | .Monad pure _ ->
+                                                                              pure) @Unit Unit) (take.L1 @Int n (gen.L1 @Int main.L1 1))
     in
-    let dict : Monad IO = monad.m in
-    (match dict with
+    (match monadIO with
      | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)

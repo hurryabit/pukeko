@@ -176,13 +176,10 @@ g_updap 1, 1
 g_unwind
 
 g_globstart input, 0
-g_pushglobal B.geti
 g_pushglobal C.0.0
-g_push 0
-g_push 2
+g_pushglobal B.geti
 g_pushglobal io.L1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 1
 g_unwind
 
 g_globstart ints, 0
@@ -210,47 +207,41 @@ g_return
 g_jump .2
 g_label .1
 g_uncons 2
-g_pushglobal foldableList
 g_pushglobal monoidList.append.L1
 g_pushglobal monoidList.empty
 g_cons 0, 2
-g_push 3
+g_push 2
 g_pushglobal solve_aux.L2
 g_mkap 1
 g_push 2
-g_push 4
-g_push 3
-g_push 0
+g_push 2
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_slide 1
-g_push 3
-g_push 5
+g_push 2
+g_push 4
 g_pushglobal foldMap.L1
 g_mkap 2
-g_push 3
+g_pushglobal foldableList
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 3, 8
-g_pop 7
+g_updap 3, 6
+g_pop 5
 g_unwind
 g_label .2
 
 g_globstart main, 0
-g_pushglobal monadIO
 g_pushglobal main.L1
 g_pushglobal input
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart monoidInt.empty, 0
@@ -264,17 +255,16 @@ g_update 1
 g_unwind
 
 g_globstart foldMap.L1, 3
-g_push 0
-g_push 3
-g_push 3
+g_push 2
+g_push 2
 g_mkap 1
 g_push 1
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 1, 5
-g_pop 4
+g_updap 1, 4
+g_pop 3
 g_unwind
 
 g_globstart length.L1, 1
@@ -284,17 +274,16 @@ g_pop 1
 g_return
 
 g_globstart monoidList.append.L1, 2
-g_pushglobal foldableList
-g_push 1
-g_push 3
+g_push 0
+g_push 2
 g_pushglobal C.1.2
-g_push 3
+g_pushglobal foldableList
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 3, 4
-g_pop 3
+g_updap 3, 3
+g_pop 2
 g_unwind
 
 g_globstart functorList.map.L1, 2
@@ -309,16 +298,14 @@ g_pop 2
 g_unwind
 g_label .1
 g_uncons 2
+g_push 1
+g_push 3
 g_pushglobal functorList
-g_push 2
-g_push 4
-g_push 2
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_push 1
 g_push 4
 g_mkap 1
@@ -339,17 +326,15 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
+g_push 1
+g_push 4
+g_push 4
 g_pushglobal foldableList
-g_push 2
-g_push 5
-g_push 5
-g_push 3
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
 g_push 1
 g_push 4
 g_updap 2, 6
@@ -368,35 +353,32 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
-g_pushglobal foldableList
-g_push 2
-g_push 2
-g_push 6
-g_push 6
-g_mkap 2
+g_push 1
+g_push 1
 g_push 5
-g_push 3
+g_push 5
+g_mkap 2
+g_push 4
+g_pushglobal foldableList
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 3, 7
-g_pop 6
+g_updap 3, 6
+g_pop 5
 g_unwind
 g_label .2
 
 g_globstart take.L1, 2
-g_pushglobal ordInt
 g_pushint 0
-g_push 2
-g_push 2
+g_push 1
+g_pushglobal ordInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
@@ -412,16 +394,14 @@ g_unwind
 g_label .4
 g_uncons 2
 g_push 1
-g_pushglobal ringInt
 g_pushint 1
-g_push 5
-g_push 2
+g_push 4
+g_pushglobal ringInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_pushglobal take.L1
 g_mkap 2
 g_push 1
@@ -440,31 +420,27 @@ g_unwind
 g_label .2
 
 g_globstart replicate.L1, 2
-g_pushglobal ordInt
 g_pushint 0
-g_push 2
-g_push 2
+g_push 1
+g_pushglobal ordInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
 g_push 1
-g_pushglobal ringInt
 g_pushint 1
-g_push 3
 g_push 2
+g_pushglobal ringInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_pushglobal replicate.L1
 g_mkap 2
 g_push 2
@@ -591,31 +567,27 @@ g_pop 1
 g_unwind
 g_label .4
 g_uncons 2
+g_push 0
+g_push 3
 g_pushglobal ordInt
-g_push 1
-g_push 4
-g_push 2
 g_eval
 g_proj 3
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .6, .7
 g_label .6
 g_pop 1
+g_push 0
+g_push 3
 g_pushglobal eqInt
-g_push 1
-g_push 4
-g_push 2
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .9, .10
 g_label .9
 g_pop 1
@@ -653,16 +625,14 @@ g_jump .2
 g_label .2
 
 g_globstart ints.L1, 2
-g_pushglobal ringInt
 g_pushint 1
-g_push 3
 g_push 2
+g_pushglobal ringInt
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_push 1
 g_mkap 1
 g_push 2
@@ -672,29 +642,25 @@ g_return
 
 g_globstart solve_aux.L1, 3
 g_pushglobal C.0.0
-g_pushglobal ringInt
-g_push 4
 g_push 3
 g_push 2
+g_pushglobal ringInt
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_cons 1, 2
 g_push 1
 g_cons 1, 2
-g_pushglobal ringInt
-g_push 4
 g_push 3
 g_push 2
+g_pushglobal ringInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_cons 1, 2
 g_push 2
 g_pushglobal diff.L1
@@ -703,64 +669,53 @@ g_pop 3
 g_unwind
 
 g_globstart solve_aux.L2, 2
-g_pushglobal functorList
 g_pushglobal ints
-g_push 2
-g_push 4
+g_push 1
+g_push 3
 g_pushglobal solve_aux.L1
 g_mkap 1
 g_pushglobal zip_with.L1
 g_mkap 3
 g_pushglobal solve_aux
 g_mkap 1
-g_push 3
+g_push 2
 g_pushglobal C.1.2
 g_mkap 1
-g_push 2
+g_pushglobal functorList
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 2, 4
-g_pop 3
+g_updap 2, 3
+g_pop 2
 g_unwind
 
 g_globstart main.L1, 1
-g_pushglobal foldableList
-g_push 0
-g_pushglobal monoidInt
 g_pushglobal length.L1
-g_push 2
-g_push 5
 g_pushglobal ints
-g_push 1
+g_push 2
 g_pushglobal take.L1
 g_mkap 2
-g_push 1
+g_push 2
 g_pushglobal replicate.L1
 g_mkap 2
 g_pushglobal solve_aux
 g_mkap 1
-g_slide 1
-g_push 3
-g_push 0
+g_pushglobal monoidInt
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_slide 1
-g_push 3
-g_push 5
+g_push 2
+g_pushglobal monoidInt
 g_pushglobal foldMap.L1
 g_mkap 2
-g_push 3
+g_pushglobal foldableList
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
-g_slide 3
 g_slide 1
 g_pushglobal print
 g_updap 1, 2

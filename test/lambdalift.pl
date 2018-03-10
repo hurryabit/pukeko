@@ -41,16 +41,11 @@ external puti : Int -> Unit = "puti"
 ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 main : IO Unit =
-  print (let a : Int = 1
-         and b : Int = 2
-         and c : Int = 3
-         and d : Int =
-               let x : Int = 2 in
-               let dict : Ring Int = ringInt in
-               (match dict with
-                | .Ring _ add _ _ -> add) x x
+  print (let d : Int =
+               (match ringInt with
+                | .Ring _ add _ _ -> add) 2 2
          in
-         a)
+         1)
 io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in

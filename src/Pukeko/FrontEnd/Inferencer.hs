@@ -176,7 +176,7 @@ inferRec defns0 = do
         | x `Set.member` Set.fromList ls0 =
             foldl ECxApp (foldl ETyApp (EVar x) vs3) rets2
         | otherwise = EVar x
-  let rs2 = map (subst addETyApp) rs1
+  let rs2 = map (substitute addETyApp) rs1
   let defns1 = zipWith3 (\l0 t3 r2 -> MkBind (l0, t3) r2) ls0 ts3 rs2
   pure (defns1, ts3, cstrs_def)
 

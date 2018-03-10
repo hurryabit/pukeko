@@ -72,23 +72,16 @@ g_updap 1, 1
 g_unwind
 
 g_globstart main, 0
-g_pushint 1
 g_pushint 2
-g_pushint 3
 g_pushint 2
 g_pushglobal ringInt
-g_push 1
-g_push 2
-g_push 2
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
+g_pushint 1
 g_slide 1
-g_slide 1
-g_push 3
-g_slide 4
 g_pushglobal print
 g_updap 1, 1
 g_unwind

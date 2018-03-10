@@ -136,89 +136,75 @@ g_updap 1, 1
 g_unwind
 
 g_globstart input, 0
-g_pushglobal B.geti
 g_pushglobal C.0.0
-g_push 0
-g_push 2
+g_pushglobal B.geti
 g_pushglobal io.L1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 1
 g_unwind
 
 g_globstart count_down, 1
-g_pushglobal monadIO
-g_pushglobal ordInt
 g_pushint 0
-g_push 3
-g_push 2
+g_push 1
+g_pushglobal ordInt
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
-g_pushglobal monadIO
-g_push 3
+g_push 1
 g_pushglobal print
 g_mkap 1
-g_pushglobal ringInt
 g_pushint 1
-g_push 6
-g_push 2
+g_push 3
+g_pushglobal ringInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_pushglobal count_down
 g_mkap 1
-g_push 2
-g_push 1
+g_push 0
 g_pushglobal semi.L1
 g_mkap 1
-g_push 3
 g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
-g_slide 3
+g_slide 2
 g_push 1
 g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_push 2
 g_pushglobal C.0.0
-g_push 1
+g_pushglobal monadIO
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 1, 6
-g_pop 5
+g_updap 1, 4
+g_pop 3
 g_unwind
 g_label .1
 g_pop 1
-g_update 4
-g_pop 3
+g_update 3
+g_pop 2
 g_unwind
 g_label .2
 
 g_globstart main, 0
-g_pushglobal monadIO
 g_pushglobal main.L2
 g_pushglobal input
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart semi.L1, 2
@@ -276,65 +262,55 @@ g_pop 2
 g_unwind
 
 g_globstart repeat.L1, 3
-g_push 0
-g_pushglobal ordInt
 g_pushint 0
-g_push 4
 g_push 2
+g_pushglobal ordInt
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
-g_push 2
-g_push 5
-g_push 6
-g_pushglobal ringInt
+g_push 3
 g_pushint 1
-g_push 8
-g_push 2
+g_push 4
+g_pushglobal ringInt
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
-g_push 6
+g_push 3
 g_pushglobal repeat.L1
 g_mkap 3
-g_push 2
-g_push 1
+g_push 0
 g_pushglobal semi.L1
 g_mkap 1
-g_push 3
-g_push 2
+g_push 5
+g_push 4
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
 g_slide 1
-g_slide 3
 g_push 1
 g_eval
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_push 2
 g_pushglobal C.0.0
-g_push 1
+g_push 3
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 1, 8
-g_pop 7
+g_updap 1, 6
+g_pop 5
 g_unwind
 g_label .1
 g_pop 1
-g_update 6
-g_pop 5
+g_update 5
+g_pop 4
 g_unwind
 g_label .2
 
@@ -350,16 +326,15 @@ g_pop 2
 g_unwind
 
 g_globstart main.L2, 1
-g_pushglobal monadIO
-g_push 1
+g_push 0
 g_pushglobal main.L1
 g_mkap 1
 g_pushglobal input
-g_push 2
+g_pushglobal monadIO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 2
+g_pop 1
 g_unwind

@@ -53,11 +53,7 @@ foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io.L1 @Unit @Int f x)
+input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 psums : List Int -> List Int =
   let rec psums0 : ∀_10. Ring _10 -> _10 -> List _10 -> List _10 =
             psums.L1 psums0
@@ -86,42 +82,36 @@ primes : List Int =
                                                        in
                                                        ys)))))
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
+  (match monadIO with
    | .Monad _ bind -> bind) @Int @Unit input main.L1
 monoidList.empty : ∀a. List a = Nil
 monoidList.append.L1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
-    let dict : Foldable List = foldableList in
-    (match dict with
+    (match foldableList with
      | .Foldable foldr _ -> foldr) @a @(List a) (Cons @a) ys xs
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      f x (let dict : Foldable List = foldableList in
-           (match dict with
+      f x ((match foldableList with
             | .Foldable foldr _ -> foldr) @a @b f y0 xs)
 foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      let dict : Foldable List = foldableList in
-      (match dict with
+      (match foldableList with
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 nth_exn.L1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match let dict : Ord Int = ordInt in
-            (match dict with
+      match (match ordInt with
              | .Ord _ _ le _ -> le) n 0 with
       | False ->
-        nth_exn.L1 @a xs (let dict : Ring Int = ringInt in
-                          (match dict with
+        nth_exn.L1 @a xs ((match ringInt with
                            | .Ring _ _ sub _ -> sub) n 1)
       | True -> x
 monadIO.pure.L2 : ∀a. a -> IO a =
@@ -146,8 +136,7 @@ psums.L1 : (∀_10. Ring _10 -> _10 -> List _10 -> List _10) -> (∀_10. Ring _1
     | Nil -> Nil @_10
     | Cons x xs ->
       let y : _10 =
-            let dict : Ring _10 = ring._10 in
-            (match dict with
+            (match ring._10 with
              | .Ring _ add _ _ -> add) x n
       in
       Cons @_10 y (psums0 @_10 ring._10 y xs)
@@ -162,13 +151,9 @@ filter.L1 : ∀a. (a -> Bool) -> (List a -> List a) -> List a -> List a =
       | True -> Cons @a x ys
 sieve.L1 : Int -> Int -> Bool =
   fun (p : Int) (k : Int) ->
-    let eq.a : Eq Int = eqInt
-    and x : Int = mod k p
-    and y : Int = 0
-    in
-    match let dict : Eq Int = eq.a in
-          (match dict with
-           | .Eq eq -> eq) x y with
+    let x : Int = mod k p in
+    match (match eqInt with
+           | .Eq eq -> eq) x 0 with
     | False -> True
     | True -> False
 main.L1 : Int -> IO Unit =

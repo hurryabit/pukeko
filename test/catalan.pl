@@ -52,66 +52,51 @@ foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io.L1 @Unit @Int f x)
+input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 p : Int = 100000007
 sum_p : List Int -> Int =
-  let dict : Foldable List = foldableList in
-  (match dict with
+  (match foldableList with
    | .Foldable _ foldl -> foldl) @Int @Int add_p.L1 0
 sols : List Int =
-  Cons @Int 1 (let dict : Functor List = functorList in
-               (match dict with
+  Cons @Int 1 ((match functorList with
                 | .Functor map ->
-                  map) @(List Int) @Int sols.L1 (let f : List Int -> Int -> List Int =
-                                                       sols.L2
-                                                 in
-                                                 let rec scanl_f : List Int -> List Int -> List (List Int) =
-                                                           scanl.L1 @Int @(List Int) f scanl_f
+                  map) @(List Int) @Int sols.L1 (let rec scanl_f : List Int -> List Int -> List (List Int) =
+                                                           scanl.L1 @Int @(List Int) sols.L2 scanl_f
                                                  in
                                                  scanl_f (Nil @Int) sols))
 main : IO Unit =
-  let dict : Monad IO = monadIO in
-  (match dict with
+  (match monadIO with
    | .Monad _ bind -> bind) @Int @Unit input main.L1
 functorList.map.L1 : ∀a b. (a -> b) -> List a -> List b =
   fun @a @b (f : a -> b) (xs : List a) ->
     match xs with
     | Nil -> Nil @b
     | Cons x xs ->
-      Cons @b (f x) (let dict : Functor List = functorList in
-                     (match dict with
+      Cons @b (f x) ((match functorList with
                       | .Functor map -> map) @a @b f xs)
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      f x (let dict : Foldable List = foldableList in
-           (match dict with
+      f x ((match foldableList with
             | .Foldable foldr _ -> foldr) @a @b f y0 xs)
 foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      let dict : Foldable List = foldableList in
-      (match dict with
+      (match foldableList with
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 nth_exn.L1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match let dict : Ord Int = ordInt in
-            (match dict with
+      match (match ordInt with
              | .Ord _ _ le _ -> le) n 0 with
       | False ->
-        nth_exn.L1 @a xs (let dict : Ring Int = ringInt in
-                          (match dict with
+        nth_exn.L1 @a xs ((match ringInt with
                            | .Ring _ _ sub _ -> sub) n 1)
       | True -> x
 zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
@@ -140,13 +125,11 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io.L1 @a @b f x)
 mul_p.L1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    mod (let dict : Ring Int = ringInt in
-         (match dict with
+    mod ((match ringInt with
           | .Ring _ _ _ mul -> mul) x y) p
 add_p.L1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    mod (let dict : Ring Int = ringInt in
-         (match dict with
+    mod ((match ringInt with
           | .Ring _ add _ _ -> add) x y) p
 scanl.L1 : ∀a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a -> List b =
   fun @a @b (f : b -> a -> b) (scanl_f : b -> List a -> List b) (y0 : b) (xs : List a) ->
