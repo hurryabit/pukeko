@@ -32,17 +32,17 @@ data Monad m =
 data World =
        | World
 data IO a = World -> Pair a World
-pure : ∀m. Monad m -> (∀a. a -> m a) =
-  fun @m (dict : Monad m) ->
-    match dict with
-    | .Monad pure _ -> pure
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 main : IO Unit =
-  pure @IO monadIO @Unit (h.L1 @Unit (h.L1 @Unit Unit))
-monadIO.pure.L1 : ∀a. a -> World -> Pair a World =
-  fun @a -> Pair @a @World
+  let dict : Monad IO = monadIO in
+  (match dict with
+   | .Monad pure _ -> pure) @Unit (let u : Unit =
+                                         let u : Unit = Unit in
+                                         u
+                                   in
+                                   u)
 monadIO.pure.L2 : ∀a. a -> IO a =
-  fun @a (x : a) -> coerce @(_ -> IO) (monadIO.pure.L1 @a x)
+  fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
@@ -50,4 +50,3 @@ monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
 monadIO.bind.L2 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
-h.L1 : ∀c. c -> c = fun @c (u : c) -> u

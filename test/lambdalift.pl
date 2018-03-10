@@ -38,14 +38,19 @@ external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
-add : ∀a. Ring a -> a -> a -> a =
-  fun @a (dict : Ring a) ->
-    match dict with
-    | .Ring _ add _ _ -> add
 ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 print : Int -> IO Unit = io.L2 @Int @Unit puti
-h : Int -> Int = fun (x : Int) -> add @Int ringInt x x
-main : IO Unit = print (g.L1 1 2 3 (h 2))
+main : IO Unit =
+  print (let a : Int = 1
+         and b : Int = 2
+         and c : Int = 3
+         and d : Int =
+               let x : Int = 2 in
+               let dict : Ring Int = ringInt in
+               (match dict with
+                | .Ring _ add _ _ -> add) x x
+         in
+         a)
 io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
@@ -53,5 +58,3 @@ io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io.L2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
-g.L1 : Int -> Int -> Int -> Int -> Int =
-  fun (a : Int) (b : Int) (c : Int) (d : Int) -> a

@@ -1,4 +1,4 @@
-g_declare_globals C.0.2, 2, C.0.4, 4, B.neg, 1, B.add, 2, B.sub, 2, B.mul, 2, B.seq, 2, B.puti, 1, add, 1, ringInt, 0, print, 0, h, 1, main, 0, io.L1, 3, io.L2, 2, g.L1, 4
+g_declare_globals C.0.2, 2, C.0.4, 4, B.neg, 1, B.add, 2, B.sub, 2, B.mul, 2, B.seq, 2, B.puti, 1, ringInt, 0, print, 0, main, 0, io.L1, 3, io.L2, 2
 g_declare_main main
 
 g_globstart C.0.2, 2
@@ -57,14 +57,6 @@ g_print
 g_updcons 0, 0, 1
 g_return
 
-g_globstart add, 1
-g_push 0
-g_eval
-g_proj 1
-g_update 2
-g_pop 1
-g_unwind
-
 g_globstart ringInt, 0
 g_pushglobal B.mul
 g_pushglobal B.sub
@@ -79,24 +71,24 @@ g_pushglobal io.L2
 g_updap 1, 1
 g_unwind
 
-g_globstart h, 1
-g_push 0
-g_push 1
-g_pushglobal ringInt
-g_pushglobal add
-g_updap 3, 2
-g_pop 1
-g_unwind
-
 g_globstart main, 0
+g_pushint 1
 g_pushint 2
-g_pushglobal h
-g_mkap 1
 g_pushint 3
 g_pushint 2
-g_pushint 1
-g_pushglobal g.L1
-g_mkap 4
+g_pushglobal ringInt
+g_push 1
+g_push 2
+g_push 2
+g_eval
+g_proj 1
+g_push 0
+g_slide 1
+g_mkap 2
+g_slide 1
+g_slide 1
+g_push 3
+g_slide 4
 g_pushglobal print
 g_updap 1, 1
 g_unwind
@@ -120,9 +112,4 @@ g_push 1
 g_pushglobal io.L1
 g_updap 2, 3
 g_pop 2
-g_unwind
-
-g_globstart g.L1, 4
-g_update 4
-g_pop 3
 g_unwind
