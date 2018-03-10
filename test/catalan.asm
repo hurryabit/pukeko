@@ -129,64 +129,43 @@ g_update 1
 g_return
 
 g_globstart dict$Ord$Int, 0
-g_pushglobal gm$ge
-g_pushglobal gm$gt
-g_pushglobal gm$le
 g_pushglobal gm$lt
-g_push 0
-g_push 2
-g_push 4
-g_push 6
-g_updcons 0, 4, 5
-g_pop 4
+g_pushglobal gm$le
+g_pushglobal gm$gt
+g_pushglobal gm$ge
+g_updcons 0, 4, 1
 g_return
 
 g_globstart dict$Ring$Int, 0
-g_pushglobal gm$neg
-g_pushglobal gm$add
-g_pushglobal gm$sub
 g_pushglobal gm$mul
-g_push 0
-g_push 2
-g_push 4
-g_push 6
-g_updcons 0, 4, 5
-g_pop 4
+g_pushglobal gm$sub
+g_pushglobal gm$add
+g_pushglobal gm$neg
+g_updcons 0, 4, 1
 g_return
 
 g_globstart dict$Functor$List, 0
 g_pushglobal dict$Functor$List$ll1
-g_push 0
-g_updcons 0, 1, 2
-g_pop 1
+g_updcons 0, 1, 1
 g_return
 
 g_globstart dict$Foldable$List, 0
-g_pushglobal dict$Foldable$List$ll1
 g_pushglobal dict$Foldable$List$ll2
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
+g_pushglobal dict$Foldable$List$ll1
+g_updcons 0, 2, 1
 g_return
 
 g_globstart dict$Monad$IO, 0
-g_pushglobal dict$Monad$IO$ll2
 g_pushglobal dict$Monad$IO$ll4
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
+g_pushglobal dict$Monad$IO$ll2
+g_updcons 0, 2, 1
 g_return
 
 g_globstart input, 0
-g_pushglobal gm$geti
 g_pushglobal gm$cons_0_0
-g_push 0
-g_push 2
+g_pushglobal gm$geti
 g_pushglobal io$ll1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 1
 g_unwind
 
 g_globstart p, 0
@@ -195,24 +174,20 @@ g_update 1
 g_return
 
 g_globstart sum_p, 0
-g_pushglobal dict$Foldable$List
 g_pushint 0
 g_pushglobal add_p$ll1
-g_push 2
+g_pushglobal dict$Foldable$List
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart sols, 0
-g_pushglobal dict$Functor$List
-g_pushglobal sols$ll2
 g_alloc 1
 g_push 0
-g_push 2
+g_pushglobal sols$ll2
 g_pushglobal scanl$ll1
 g_updap 2, 1
 g_pushglobal sols
@@ -220,30 +195,26 @@ g_pushglobal gm$cons_0_0
 g_push 2
 g_mkap 2
 g_slide 1
-g_slide 1
 g_pushglobal sols$ll1
-g_push 2
+g_pushglobal dict$Functor$List
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_pushint 1
 g_updcons 1, 2, 1
 g_return
 
 g_globstart main, 0
-g_pushglobal dict$Monad$IO
 g_pushglobal main$ll1
 g_pushglobal input
-g_push 2
+g_pushglobal dict$Monad$IO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart dict$Functor$List$ll1, 2
@@ -258,16 +229,14 @@ g_pop 2
 g_unwind
 g_label .1
 g_uncons 2
+g_push 1
+g_push 3
 g_pushglobal dict$Functor$List
-g_push 2
-g_push 4
-g_push 2
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_push 1
 g_push 4
 g_mkap 1
@@ -288,17 +257,15 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
+g_push 1
+g_push 4
+g_push 4
 g_pushglobal dict$Foldable$List
-g_push 2
-g_push 5
-g_push 5
-g_push 3
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
 g_mkap 3
-g_slide 1
 g_push 1
 g_push 4
 g_updap 2, 6
@@ -317,20 +284,19 @@ g_pop 1
 g_unwind
 g_label .1
 g_uncons 2
-g_pushglobal dict$Foldable$List
-g_push 2
-g_push 2
-g_push 6
-g_push 6
-g_mkap 2
+g_push 1
+g_push 1
 g_push 5
-g_push 3
+g_push 5
+g_mkap 2
+g_push 4
+g_pushglobal dict$Foldable$List
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 3, 7
-g_pop 6
+g_updap 3, 6
+g_pop 5
 g_unwind
 g_label .2
 
@@ -346,30 +312,26 @@ g_pop 2
 g_unwind
 g_label .1
 g_uncons 2
-g_pushglobal dict$Ord$Int
 g_pushint 0
-g_push 5
-g_push 2
+g_push 4
+g_pushglobal dict$Ord$Int
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .3, .4
 g_label .3
 g_pop 1
-g_pushglobal dict$Ring$Int
 g_pushint 1
-g_push 5
-g_push 2
+g_push 4
+g_pushglobal dict$Ring$Int
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_push 2
 g_pushglobal nth_exn$ll1
 g_updap 2, 5
@@ -482,17 +444,15 @@ g_unwind
 g_globstart mul_p$ll1, 2
 g_pushglobal p
 g_eval
-g_pushglobal dict$Ring$Int
-g_push 3
-g_push 3
 g_push 2
+g_push 2
+g_pushglobal dict$Ring$Int
 g_eval
 g_proj 3
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_mod
 g_update 3
 g_pop 2
@@ -501,17 +461,15 @@ g_return
 g_globstart add_p$ll1, 2
 g_pushglobal p
 g_eval
-g_pushglobal dict$Ring$Int
-g_push 3
-g_push 3
 g_push 2
+g_push 2
+g_pushglobal dict$Ring$Int
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_mod
 g_update 3
 g_pop 2

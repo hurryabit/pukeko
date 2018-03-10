@@ -43,95 +43,62 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int =
-  let ge : Int -> Int -> Bool = ge_int
-  and gt : Int -> Int -> Bool = gt_int
-  and le : Int -> Int -> Bool = le_int
-  and lt : Int -> Int -> Bool = lt_int
-  in
-  Dict$Ord @Int ge gt le lt
+dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
 dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
+  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Foldable$List : Foldable List =
-  let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        dict$Foldable$List$ll1
-  and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        dict$Foldable$List$ll2
-  in
-  Dict$Foldable @List foldr foldl
+  Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io$ll1 @Unit @Int f x)
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
+input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
+  (match dict$Monad$IO with
    | Dict$Monad _ bind -> bind) @Int @Unit input main$ll2
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      f x (let dict : Foldable List = dict$Foldable$List in
-           (match dict with
+      f x ((match dict$Foldable$List with
             | Dict$Foldable foldr _ -> foldr) @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      let dict : Foldable List = dict$Foldable$List in
-      (match dict with
+      (match dict$Foldable$List with
        | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match let dict : Ord Int = dict$Ord$Int in
-          (match dict with
+    match (match dict$Ord$Int with
            | Dict$Ord _ _ le _ -> le) n 0 with
     | False ->
-      Cons @a x (replicate$ll1 @a (let dict : Ring Int = dict$Ring$Int in
-                                   (match dict with
+      Cons @a x (replicate$ll1 @a ((match dict$Ring$Int with
                                     | Dict$Ring _ _ sub _ -> sub) n 1) x)
     | True -> Nil @a
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
   fun @a @m (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
-    let dict : Monad m = dict$Monad$m in
-    (match dict with
+    (match dict$Monad$m with
      | Dict$Monad _ bind -> bind) @Unit @a m1 (semi$ll1 @a @m m2)
 sequence$ll1 : ∀a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (x : a) (xs : List a) ->
-    let dict : Monad m = dict$Monad$m in
-    (match dict with
+    (match dict$Monad$m with
      | Dict$Monad pure _ -> pure) @(List a) (Cons @a x xs)
 sequence$ll2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) (x : a) ->
-    let dict : Monad m = dict$Monad$m in
-    (match dict with
+    (match dict$Monad$m with
      | Dict$Monad _ bind ->
        bind) @(List a) @(List a) (sequence$ll3 @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
 sequence$ll3 : ∀a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) ->
     match ms with
     | Nil ->
-      let dict : Monad m = dict$Monad$m in
-      (match dict with
+      (match dict$Monad$m with
        | Dict$Monad pure _ -> pure) @(List a) (Nil @a)
     | Cons m ms ->
-      let dict : Monad m = dict$Monad$m in
-      (match dict with
+      (match dict$Monad$m with
        | Dict$Monad _ bind ->
          bind) @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
 traverse_$ll1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
@@ -159,8 +126,7 @@ insert$ll1 : Int -> List Int -> List Int =
     match xs with
     | Nil -> Cons @Int y (Nil @Int)
     | Cons x xs' ->
-      match let dict : Ord Int = dict$Ord$Int in
-            (match dict with
+      match (match dict$Ord$Int with
              | Dict$Ord _ _ le _ -> le) y x with
       | False -> Cons @Int x (insert$ll1 y xs')
       | True -> Cons @Int y xs
@@ -171,22 +137,13 @@ isort$ll1 : List Int -> List Int =
     | Cons x xs -> insert$ll1 x (isort$ll1 xs)
 main$ll1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    let dict$Monad$m : Monad IO = dict$Monad$IO
-    and dict$Foldable$t : Foldable List = dict$Foldable$List
-    and f : Int -> IO Unit = print$ll1
-    in
-    let dict : Foldable List = dict$Foldable$t in
-    (match dict with
+    (match dict$Foldable$List with
      | Dict$Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$m f) (let dict : Monad IO =
-                                                                             dict$Monad$m
-                                                                       in
-                                                                       (match dict with
-                                                                        | Dict$Monad pure _ ->
-                                                                          pure) @Unit Unit) (isort$ll1 xs)
+       foldr) @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) ((match dict$Monad$IO with
+                                                                                 | Dict$Monad pure _ ->
+                                                                                   pure) @Unit Unit) (isort$ll1 xs)
 main$ll2 : Int -> IO Unit =
   fun (n : Int) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad _ bind ->
        bind) @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll1

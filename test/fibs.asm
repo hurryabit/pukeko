@@ -115,70 +115,50 @@ g_update 1
 g_return
 
 g_globstart dict$Ord$Int, 0
-g_pushglobal gm$ge
-g_pushglobal gm$gt
-g_pushglobal gm$le
 g_pushglobal gm$lt
-g_push 0
-g_push 2
-g_push 4
-g_push 6
-g_updcons 0, 4, 5
-g_pop 4
+g_pushglobal gm$le
+g_pushglobal gm$gt
+g_pushglobal gm$ge
+g_updcons 0, 4, 1
 g_return
 
 g_globstart dict$Ring$Int, 0
-g_pushglobal gm$neg
-g_pushglobal gm$add
-g_pushglobal gm$sub
 g_pushglobal gm$mul
-g_push 0
-g_push 2
-g_push 4
-g_push 6
-g_updcons 0, 4, 5
-g_pop 4
+g_pushglobal gm$sub
+g_pushglobal gm$add
+g_pushglobal gm$neg
+g_updcons 0, 4, 1
 g_return
 
 g_globstart dict$Monad$IO, 0
-g_pushglobal dict$Monad$IO$ll2
 g_pushglobal dict$Monad$IO$ll4
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
+g_pushglobal dict$Monad$IO$ll2
+g_updcons 0, 2, 1
 g_return
 
 g_globstart input, 0
-g_pushglobal gm$geti
 g_pushglobal gm$cons_0_0
-g_push 0
-g_push 2
+g_pushglobal gm$geti
 g_pushglobal io$ll1
-g_updap 2, 3
-g_pop 2
+g_updap 2, 1
 g_unwind
 
 g_globstart prime, 0
-g_pushglobal dict$Ring$Int
 g_pushint 39
+g_pushint 1000000
+g_pushint 1000000
 g_pushglobal dict$Ring$Int
-g_pushint 1000000
-g_pushint 1000000
-g_push 2
 g_eval
 g_proj 3
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
-g_push 2
+g_pushglobal dict$Ring$Int
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart fibs0, 0
@@ -198,16 +178,14 @@ g_updcons 1, 2, 1
 g_return
 
 g_globstart main, 0
-g_pushglobal dict$Monad$IO
 g_pushglobal main$ll1
 g_pushglobal input
-g_push 2
+g_pushglobal dict$Monad$IO
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
-g_updap 2, 2
-g_pop 1
+g_updap 2, 1
 g_unwind
 
 g_globstart nth_exn$ll1, 2
@@ -222,30 +200,26 @@ g_pop 2
 g_unwind
 g_label .1
 g_uncons 2
-g_pushglobal dict$Ord$Int
 g_pushint 0
-g_push 5
-g_push 2
+g_push 4
+g_pushglobal dict$Ord$Int
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .3, .4
 g_label .3
 g_pop 1
-g_pushglobal dict$Ring$Int
 g_pushint 1
-g_push 5
-g_push 2
+g_push 4
+g_pushglobal dict$Ring$Int
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
 g_push 2
 g_pushglobal nth_exn$ll1
 g_updap 2, 5
@@ -356,40 +330,35 @@ g_updap 1, 1
 g_unwind
 
 g_globstart add_mod_prime$ll1, 2
+g_push 1
+g_push 1
 g_pushglobal dict$Ring$Int
-g_push 2
-g_push 2
-g_push 2
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
-g_slide 1
-g_pushglobal dict$Ord$Int
 g_pushglobal prime
-g_push 2
-g_push 2
+g_push 1
+g_pushglobal dict$Ord$Int
 g_eval
 g_proj 3
 g_push 0
 g_slide 1
 g_mkap 2
 g_eval
-g_slide 1
 g_jumpcase .0, .1
 g_label .0
 g_pop 1
-g_pushglobal dict$Ring$Int
 g_pushglobal prime
-g_push 2
-g_push 2
+g_push 1
+g_pushglobal dict$Ring$Int
 g_eval
 g_proj 2
 g_push 0
 g_slide 1
-g_updap 2, 5
-g_pop 4
+g_updap 2, 4
+g_pop 3
 g_unwind
 g_label .1
 g_pop 1

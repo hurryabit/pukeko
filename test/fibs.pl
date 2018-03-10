@@ -44,55 +44,31 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int =
-  let ge : Int -> Int -> Bool = ge_int
-  and gt : Int -> Int -> Bool = gt_int
-  and le : Int -> Int -> Bool = le_int
-  and lt : Int -> Int -> Bool = lt_int
-  in
-  Dict$Ord @Int ge gt le lt
+dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
 dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
+  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io$ll1 @Unit @Int f x)
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
+input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 prime : Int =
-  let dict : Ring Int = dict$Ring$Int in
-  (match dict with
-   | Dict$Ring _ add _ _ -> add) (let dict : Ring Int = dict$Ring$Int
-                                  in
-                                  (match dict with
+  (match dict$Ring$Int with
+   | Dict$Ring _ add _ _ -> add) ((match dict$Ring$Int with
                                    | Dict$Ring _ _ _ mul -> mul) 1000000 1000000) 39
 fibs0 : List Int = Cons @Int 0 fibs1
 fibs1 : List Int =
   Cons @Int 1 (zip_with$ll1 @Int @Int @Int add_mod_prime$ll1 fibs0 fibs1)
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
+  (match dict$Monad$IO with
    | Dict$Monad _ bind -> bind) @Int @Unit input main$ll1
 nth_exn$ll1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match let dict : Ord Int = dict$Ord$Int in
-            (match dict with
+      match (match dict$Ord$Int with
              | Dict$Ord _ _ le _ -> le) n 0 with
       | False ->
-        nth_exn$ll1 @a xs (let dict : Ring Int = dict$Ring$Int in
-                           (match dict with
+        nth_exn$ll1 @a xs ((match dict$Ring$Int with
                             | Dict$Ring _ _ sub _ -> sub) n 1)
       | True -> x
 zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
@@ -123,16 +99,13 @@ print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 add_mod_prime$ll1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
     let z : Int =
-          let dict : Ring Int = dict$Ring$Int in
-          (match dict with
+          (match dict$Ring$Int with
            | Dict$Ring _ add _ _ -> add) x y
     in
-    match let dict : Ord Int = dict$Ord$Int in
-          (match dict with
+    match (match dict$Ord$Int with
            | Dict$Ord _ _ _ lt -> lt) z prime with
     | False ->
-      let dict : Ring Int = dict$Ring$Int in
-      (match dict with
+      (match dict$Ring$Int with
        | Dict$Ring _ _ sub _ -> sub) z prime
     | True -> z
 main$ll1 : Int -> IO Unit =

@@ -58,36 +58,24 @@ g_updcons 0, 0, 1
 g_return
 
 g_globstart dict$Ring$Int, 0
-g_pushglobal gm$neg
-g_pushglobal gm$add
-g_pushglobal gm$sub
 g_pushglobal gm$mul
-g_push 0
-g_push 2
-g_push 4
-g_push 6
-g_updcons 0, 4, 5
-g_pop 4
+g_pushglobal gm$sub
+g_pushglobal gm$add
+g_pushglobal gm$neg
+g_updcons 0, 4, 1
 g_return
 
 g_globstart main, 0
-g_pushint 1
 g_pushint 2
-g_pushint 3
 g_pushint 2
 g_pushglobal dict$Ring$Int
-g_push 1
-g_push 2
-g_push 2
 g_eval
 g_proj 1
 g_push 0
 g_slide 1
 g_mkap 2
+g_pushint 1
 g_slide 1
-g_slide 1
-g_push 3
-g_slide 4
 g_pushglobal print$ll1
 g_updap 1, 1
 g_unwind

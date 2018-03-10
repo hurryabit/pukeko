@@ -1,6 +1,6 @@
 module Pukeko.AST.Expr.Optics
   ( freeTmVar
-  , subst
+  , substitute
   , patn2binder
   , patn2type
   , arg2expr
@@ -17,8 +17,8 @@ import           Pukeko.AST.Expr
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 
-subst' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
-subst' f = go Set.empty
+substitute' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
+substitute' f = go Set.empty
   where
     go bound = \case
       ELoc l      -> ELoc <$> lctd (go bound) l
@@ -42,10 +42,10 @@ subst' f = go Set.empty
     goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf (patn2binder . _1) p) e
 
 freeTmVar :: Traversal' (Expr lg) TmVar
-freeTmVar f = subst' (fmap EVar . f)
+freeTmVar f = substitute' (fmap EVar . f)
 
-subst :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
-subst f = runIdentity . subst' (Identity . f)
+substitute :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
+substitute f = runIdentity . substitute' (Identity . f)
 
 patn2binder :: IsNested lg1 ~ IsNested lg2 =>
   Traversal (Patn lg1) (Patn lg2) (TmBinder (TypeOf lg1)) (TmBinder (TypeOf lg2))

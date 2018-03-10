@@ -93,11 +93,26 @@ inline ce0@(gs0, e0, as0) =
     EVar{}  -> pure ce0
     EAtm{}  -> pure ce0
 
+simplifyLets :: [BindGroup] -> (Map TmVar Expr, [BindGroup])
+simplifyLets = mapAccumR step Map.empty
+  where
+    step :: Map TmVar Expr -> BindGroup -> (Map TmVar Expr, BindGroup)
+    step subst0 (m, bs0) = case m of
+      BindRec -> (subst0, (m, bs0))
+      BindPar ->
+        let f b@(MkBind (x, _) e) = case e of
+              EVar y -> Right (x, Map.findWithDefault e y subst0)
+              EAtm{} -> Right (x, e)
+              _      -> Left  b
+            (bs1, subst1) = partitionEithers (map f bs0)
+        in  (Map.unionWith impossible subst0 (Map.fromList subst1), (m, bs1))
 
 inlineExpr :: (CanInline effs, Member (Reader SourcePos) effs) => Expr -> Eff effs Expr
 inlineExpr e0 = do
   (gs1, e1, as1) <- inline ([], e0, [])
-  pure (foldl (\e (m, bs) -> mkELet m bs e) (rewindl EApp e1 as1) gs1)
+  let (subst, gs2) = simplifyLets gs1
+  let e2 = foldl (\e (m, bs) -> mkELet m bs e) (rewindl EApp e1 as1) gs2
+  pure (substitute (\x -> Map.findWithDefault (EVar x) x subst) e2)
 
 inSupCDecl :: CanInline effs => FuncDecl (Only SupC) -> Eff effs (FuncDecl (Only SupC))
 inSupCDecl decl = func2expr inlineExpr decl & runReader (getPos decl)

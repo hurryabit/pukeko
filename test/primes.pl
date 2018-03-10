@@ -46,40 +46,15 @@ external mod : Int -> Int -> Int = "mod"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Eq$Int : Eq Int =
-  let eq : Int -> Int -> Bool = eq_int in
-  Dict$Eq @Int eq
-dict$Ord$Int : Ord Int =
-  let ge : Int -> Int -> Bool = ge_int
-  and gt : Int -> Int -> Bool = gt_int
-  and le : Int -> Int -> Bool = le_int
-  and lt : Int -> Int -> Bool = lt_int
-  in
-  Dict$Ord @Int ge gt le lt
+dict$Eq$Int : Eq Int = Dict$Eq @Int eq_int
+dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
 dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
+  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Foldable$List : Foldable List =
-  let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        dict$Foldable$List$ll1
-  and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        dict$Foldable$List$ll2
-  in
-  Dict$Foldable @List foldr foldl
+  Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io$ll1 @Unit @Int f x)
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
+input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 psums : List Int -> List Int =
   let rec psums0 : ∀_10. Ring _10 -> _10 -> List _10 -> List _10 =
             psums$ll1 psums0
@@ -104,41 +79,35 @@ primes : List Int =
                                                            in
                                                            ys)))))
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
+  (match dict$Monad$IO with
    | Dict$Monad _ bind -> bind) @Int @Unit input main$ll1
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
-    let dict : Foldable List = dict$Foldable$List in
-    (match dict with
+    (match dict$Foldable$List with
      | Dict$Foldable foldr _ -> foldr) @a @(List a) (Cons @a) ys xs
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      f x (let dict : Foldable List = dict$Foldable$List in
-           (match dict with
+      f x ((match dict$Foldable$List with
             | Dict$Foldable foldr _ -> foldr) @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs ->
-      let dict : Foldable List = dict$Foldable$List in
-      (match dict with
+      (match dict$Foldable$List with
        | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 nth_exn$ll1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match let dict : Ord Int = dict$Ord$Int in
-            (match dict with
+      match (match dict$Ord$Int with
              | Dict$Ord _ _ le _ -> le) n 0 with
       | False ->
-        nth_exn$ll1 @a xs (let dict : Ring Int = dict$Ring$Int in
-                           (match dict with
+        nth_exn$ll1 @a xs ((match dict$Ring$Int with
                             | Dict$Ring _ _ sub _ -> sub) n 1)
       | True -> x
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
@@ -164,8 +133,7 @@ psums$ll1 : (∀_10. Ring _10 -> _10 -> List _10 -> List _10) -> (∀_10. Ring _
     | Nil -> Nil @_10
     | Cons x xs ->
       let y : _10 =
-            let dict : Ring _10 = dict$Ring$_10 in
-            (match dict with
+            (match dict$Ring$_10 with
              | Dict$Ring _ add _ _ -> add) x n
       in
       Cons @_10 y (psums0 @_10 dict$Ring$_10 y xs)
@@ -180,13 +148,9 @@ filter$ll1 : ∀a. (a -> Bool) -> (List a -> List a) -> List a -> List a =
       | True -> Cons @a x ys
 sieve$ll1 : Int -> Int -> Bool =
   fun (p : Int) (k : Int) ->
-    let dict$Eq$a : Eq Int = dict$Eq$Int
-    and x : Int = mod k p
-    and y : Int = 0
-    in
-    match let dict : Eq Int = dict$Eq$a in
-          (match dict with
-           | Dict$Eq eq -> eq) x y with
+    let x : Int = mod k p in
+    match (match dict$Eq$Int with
+           | Dict$Eq eq -> eq) x 0 with
     | False -> True
     | True -> False
 sieve$ll2 : List Int -> List Int =

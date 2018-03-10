@@ -10,28 +10,19 @@ g_updcons 0, 2, 1
 g_return
 
 g_globstart dict$Monad$IO, 0
-g_pushglobal dict$Monad$IO$ll2
 g_pushglobal dict$Monad$IO$ll4
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
+g_pushglobal dict$Monad$IO$ll2
+g_updcons 0, 2, 1
 g_return
 
 g_globstart main, 0
-g_pushglobal dict$Monad$IO
 g_pushglobal gm$cons_0_0
-g_push 0
-g_slide 1
-g_push 0
-g_slide 1
-g_push 1
+g_pushglobal dict$Monad$IO
 g_eval
 g_proj 0
 g_push 0
 g_slide 1
-g_updap 1, 2
-g_pop 1
+g_updap 1, 1
 g_unwind
 
 g_globstart dict$Monad$IO$ll2, 1
