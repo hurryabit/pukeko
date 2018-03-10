@@ -35,9 +35,13 @@ type CanGamma effs = Member (Reader Gamma) effs
 runGamma :: Eff (Reader Gamma : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty Map.empty)
 
-introTmVar :: CanGamma effs => TmBinder Type -> Eff effs a -> Eff effs a
+shadowing :: (HasCallStack, Show k) => String -> k -> a -> a -> a
+shadowing s k _ _ = bugWith ("shadowing " ++ s) k
+
+introTmVar :: (HasCallStack, CanGamma effs) => TmBinder Type -> Eff effs a -> Eff effs a
 introTmVar (x, t) =
-  locally tmVars (\yts -> Map.insertWith impossible x (t, Map.size yts) yts)
+  locally tmVars
+    (\yts -> Map.insertWithKey (shadowing "term variable") x (t, Map.size yts) yts)
 
 introTmVars :: CanGamma effs => [TmBinder Type] -> Eff effs a -> Eff effs a
 introTmVars xts act = foldr introTmVar act xts
@@ -68,10 +72,12 @@ introPar = \case
 introPars :: (CanGamma effs, TypeOf lg ~ Type) => [Par lg] -> Eff effs a -> Eff effs a
 introPars pars act = foldr introPar act pars
 
-lookupTmVarIx :: CanGamma effs => TmVar -> Eff effs (Type, Int)
-lookupTmVarIx x = views tmVars (Map.! x)
+lookupTmVarIx :: (HasCallStack, CanGamma effs) => TmVar -> Eff effs (Type, Int)
+lookupTmVarIx x = views tmVars (Map.lookup x) >>= \case
+  Nothing -> bugWith "unknown term variable" x
+  Just t  -> pure t
 
-lookupTmVar :: CanGamma effs => TmVar -> Eff effs Type
+lookupTmVar :: (HasCallStack, CanGamma effs) => TmVar -> Eff effs Type
 lookupTmVar = fmap fst . lookupTmVarIx
 
 lookupTyVar :: CanGamma effs => TyVar -> Eff effs (Set Class)

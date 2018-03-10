@@ -44,21 +44,21 @@ defaultConfig = Config
   , typeChecking  = True
   }
 
-runOptimization :: Optimization -> Core.Module -> Core.Module
+runOptimization :: Member NameSource effs => Optimization -> Core.Module -> Eff effs Core.Module
 runOptimization = \case
-  EtaReduction        -> EtaReducer.reduceModule
-  AliasInlining       -> AliasInliner.inlineModule
+  EtaReduction        -> pure . EtaReducer.reduceModule
+  AliasInlining       -> pure . AliasInliner.inlineModule
   Inlining            -> Inliner.inlineModule
-  DeadCodeElimination -> DeadCode.cleanModule
-  Prettification      -> Prettifier.prettifyModule
+  DeadCodeElimination -> pure . DeadCode.cleanModule
+  Prettification      -> pure . Prettifier.prettifyModule
 
 run :: forall effs. Members [NameSource, Error Failure] effs =>
   Config -> SysF.Module SystemF -> Eff effs (Core.Module, NoLambda.Module)
 run cfg module_sf = do
   let typeChecked ::
-        (Core.Module -> Core.Module) -> (Core.Module -> Eff effs Core.Module)
+        (Core.Module -> Eff effs Core.Module) -> (Core.Module -> Eff effs Core.Module)
       typeChecked f m0 = do
-        let m1 = f m0
+        m1 <- f m0
         when (typeChecking cfg) (TypeChecker.check m1)
         pure m1
   module_ll <- LambdaLifter.liftModule module_sf

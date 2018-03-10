@@ -85,6 +85,7 @@ mkFuncDecl = \case
 type instance NameSpaceOf (FuncDecl m) = 'TmVar
 instance HasName (FuncDecl m) where
   nameOf decl = decl ^. func2name
+instance HasPos (FuncDecl m) where getPos = getPos . nameOf
 
 instance Semigroup Module where
   MkModule t1 e1 s1 <> MkModule t2 e2 s2 =

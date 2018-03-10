@@ -1,10 +1,10 @@
 benchmarking ./qsort < sort400.in > /dev/null
-time                 3.788 s    (3.365 s .. 4.383 s)
-                     0.997 R²   (0.991 R² .. 1.000 R²)
-mean                 3.702 s    (3.598 s .. 3.768 s)
-std dev              98.73 ms   (0.0 s .. 113.4 ms)
+time                 2.850 s    (2.661 s .. 2.948 s)
+                     0.999 R²   (0.999 R² .. 1.000 R²)
+mean                 3.120 s    (3.009 s .. 3.194 s)
+std dev              109.8 ms   (0.0 s .. 126.7 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
-Steps      :   9536007397
-Alloc bytes:   2871315880          (Checks:     81738769)
-GC runs    :           25
+Steps      :   8547918784
+Alloc bytes:   2425018936          (Checks:     81738766)
+GC runs    :           21
