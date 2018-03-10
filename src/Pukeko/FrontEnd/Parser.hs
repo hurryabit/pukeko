@@ -285,24 +285,24 @@ expr =
           Op.AssocRight -> InfixR
           Op.AssocNone  -> InfixN
 
-dataDecl :: Parser TConDecl
+dataDecl :: Parser TyConDecl
 dataDecl = indented_ (reserved "data") tconDecl
 
-typeDecl :: Parser TConDecl
+typeDecl :: Parser TyConDecl
 typeDecl = indented_ (reserved "type") $
-  MkTConDecl
+  MkTyConDecl
   <$> tycon
   <*> (many tyvar <* equals)
   <*> (Right [] <$ reserved "external" <|> Left <$> type_)
 
-tconDecl :: Parser TConDecl
-tconDecl = MkTConDecl
+tconDecl :: Parser TyConDecl
+tconDecl = MkTyConDecl
   <$> tycon
   <*> (many tyvar <* equals)
   <*> (Right <$> aligned (some dconDecl))
 
-dconDecl :: Parser DConDecl
-dconDecl = indented_ bar (MkDConDecl <$> tmcon <*> many atype)
+dconDecl :: Parser TmConDecl
+dconDecl = indented_ bar (MkTmConDecl <$> tmcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented

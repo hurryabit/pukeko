@@ -4,8 +4,8 @@ module Pukeko.AST.Surface
     Package (..)
   , Module (..)
   , Decl (..)
-  , TConDecl (..)
-  , DConDecl (..)
+  , TyConDecl (..)
+  , TmConDecl (..)
   , SignDecl (..)
   , ClssDecl (..)
   , InstDecl (..)
@@ -58,7 +58,7 @@ data Module = MkModule
   }
 
 data Decl
-  = DType TConDecl
+  = DType TyConDecl
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
@@ -66,16 +66,16 @@ data Decl
   | DExtn ExtnDecl
   | DInfx InfxDecl
 
-data TConDecl = MkTConDecl
-  { _tcon2name  :: LctdName 'TyCon
-  , _tcon2prms  :: [LctdName 'TyVar]
+data TyConDecl = MkTyConDecl
+  { _tycon2name   :: LctdName 'TyCon
+  , _tycon2params :: [LctdName 'TyVar]
     -- FIXME: Use a proper type to distinguish between 'type' and 'data'.
-  , _tcon2dcons :: Either Type [DConDecl]
+  , _tycon2tmcons :: Either Type [TmConDecl]
   }
 
-data DConDecl = MkDConDecl
-  { _dcon2name :: LctdName 'TmCon
-  , _dcon2flds :: [Type]
+data TmConDecl = MkTmConDecl
+  { _tmcon2name   :: LctdName 'TmCon
+  , _tmcon2fields :: [Type]
   }
 
 data SignDecl = MkSignDecl
@@ -180,8 +180,8 @@ freeTyVars = \case
 
 deriving instance Show Module
 deriving instance Show Decl
-deriving instance Show TConDecl
-deriving instance Show DConDecl
+deriving instance Show TyConDecl
+deriving instance Show TmConDecl
 deriving instance Show SignDecl
 deriving instance Show ClssDecl
 deriving instance Show InstDecl

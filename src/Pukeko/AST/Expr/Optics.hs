@@ -1,5 +1,5 @@
 module Pukeko.AST.Expr.Optics
-  ( freeEVar
+  ( freeTmVar
   , subst
   , expr2atom
   , expr2type
@@ -36,19 +36,19 @@ subst' f = go Set.empty
       EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
       ECast coe e -> ECast coe <$> go bound e
       ETyAnn t  e -> ETyAnn t <$> go bound e
-    goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnEVar p) e
+    goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnTmVar p) e
 
-freeEVar :: Traversal' (Expr lg) TmVar
-freeEVar f = subst' (fmap EVar . f)
+freeTmVar :: Traversal' (Expr lg) TmVar
+freeTmVar f = subst' (fmap EVar . f)
 
 subst :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
 subst f = runIdentity . subst' (Identity . f)
 
-patnEVar :: Traversal' (Patn lg) TmVar
-patnEVar f = \case
+patnTmVar :: Traversal' (Patn lg) TmVar
+patnTmVar f = \case
   PWld -> pure PWld
   PVar x -> PVar <$> f x
-  PCon c ts ps -> PCon c ts <$> (traverse . patnEVar) f ps
+  PCon c ts ps -> PCon c ts <$> (traverse . patnTmVar) f ps
   PSimple c ts bs -> PSimple c ts <$> (traverse . _Just) f bs
 
 -- | Traverse over all the atoms in an expression.

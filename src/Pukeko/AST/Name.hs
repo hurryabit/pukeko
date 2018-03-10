@@ -47,13 +47,6 @@ data NameSpace
   | TmCon
   | TyCon
 
--- type EVar = 'EVar
--- type Inst = 'EVar
--- type TVar = 'TVar
--- type DCon = 'DCon
--- type TCon = 'TCon
--- type Clss = 'TCon
-
 -- Saves us a few spaces, but more importantly tons of parentheses.
 type TmVar = Name 'TmVar
 type TyVar = Name 'TyVar

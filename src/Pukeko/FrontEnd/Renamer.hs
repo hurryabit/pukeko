@@ -211,22 +211,22 @@ rnExpr = \case
 -- | Rename a data constructor declaration. Assumes that the corresponding type
 -- constructor (or at least some dummy version of it) has already been
 -- introduced to the global environment.
-rnDConDecl :: CanRn effs =>
-  TyCon -> Map (Ps.Name 'TyVar) TyVar -> Int -> Ps.DConDecl -> Eff effs TmConDecl
-rnDConDecl tcon env tag (Ps.MkDConDecl name fields) = here name $
+rnTmConDecl :: CanRn effs =>
+  TyCon -> Map (Ps.Name 'TyVar) TyVar -> Int -> Ps.TmConDecl -> Eff effs TmConDecl
+rnTmConDecl tcon env tag (Ps.MkTmConDecl name fields) = here name $
   introGlobal dconTab "data constructor" name id $ \dcon ->
     MkTmConDecl tcon dcon tag <$> traverse (rnType env) fields
 
 -- | Rename a (potentially) recursive type declaration.
-rnTypeDecl :: GlobalEffs effs => Ps.TConDecl -> Eff effs TyConDecl
-rnTypeDecl (Ps.MkTConDecl name params0 dcons0) = do
+rnTypeDecl :: GlobalEffs effs => Ps.TyConDecl -> Eff effs TyConDecl
+rnTypeDecl (Ps.MkTyConDecl name params0 dcons0) = do
   -- NOTE: Since the type definition might be recursive, we need to introduce a
   -- dummy version of the type constructor first and overwrite it in the end.
   let mkDummy binder = DType (MkTyConDecl binder [] (Right []))
   binder <- introGlobal tconTab "type constructor" name mkDummy pure
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)
-  dcons1 <- bitraverse (rnType env) (zipWithM (rnDConDecl binder env) [0..]) dcons0
+  dcons1 <- bitraverse (rnType env) (zipWithM (rnTmConDecl binder env) [0..]) dcons0
   let tcon = MkTyConDecl binder params1 dcons1
   modifying tconTab (Map.insert (unlctd name) (DType tcon))
   pure tcon

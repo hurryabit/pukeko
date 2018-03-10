@@ -19,7 +19,7 @@ type FreeVars = (Set TyVar, Set TmVar)
 
 freeVars :: Arg -> FreeVars
 freeVars = \case
-  TmArg e -> (setOf (expr2type . traverse) e, setOf freeEVar e)
+  TmArg e -> (setOf (expr2type . traverse) e, setOf freeTmVar e)
   TyArg t -> (setOf traverse t, Set.empty)
 
 -- | Takes a list of abstractions and applications (together with the free

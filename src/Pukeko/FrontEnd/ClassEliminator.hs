@@ -40,8 +40,8 @@ mkTDict (clss, t) = TApp (TCon clss) t
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
-dictTConDecl :: ClassDecl -> TyConDecl
-dictTConDecl (MkClassDecl clss prm dcon mthds) =
+dictTyConDecl :: ClassDecl -> TyConDecl
+dictTyConDecl (MkClassDecl clss prm dcon mthds) =
     let flds = map _sign2type mthds
         dconDecl = MkTmConDecl clss dcon 0 flds
     in  MkTyConDecl clss [prm] (Right [dconDecl])
@@ -66,7 +66,7 @@ dictTConDecl (MkClassDecl clss prm dcon mthds) =
 -- >       | Dict$Traversable @t traverse -> traverse
 elimClssDecl :: ClassDecl -> CE [Decl Out]
 elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
-  let tcon = dictTConDecl clssDecl
+  let tcon = dictTyConDecl clssDecl
   let cstr = (clss, TVar prm)
   sels <- ifor mthds $ \i (MkSignDecl z t0) -> do
     dictPrm <- mkName (Lctd noPos "dict")
@@ -128,7 +128,7 @@ elimDecl = here' $ \case
     -- TODO: Constructing the declaration of the dictionary type again and
     -- putting it in the environment locally is a bit a of a hack.
     clss <- findInfo info2classes (inst^.inst2class)
-    local (<> tyconDeclInfo (dictTConDecl clss)) $ do
+    local (<> tyconDeclInfo (dictTyConDecl clss)) $ do
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
 
@@ -147,15 +147,15 @@ buildDict (clss, unwindl _TApp -> (t1, args)) =
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: Class -> TyVar -> CE TmVar
-dictEVar clss tvar = do
+dictTmVar :: Class -> TyVar -> CE TmVar
+dictTmVar clss tvar = do
   let name0 = "dict$" ++ untag (nameText clss) ++ "$" ++ untag (nameText tvar)
   mkName (Lctd noPos (Tagged name0))
 
 -- | Replace a context abstraction by a lambda for the dictionary.
 elimECxAbs :: TypeCstr -> Expr In -> CE (Expr Out)
 elimECxAbs cstr@(clss, TVar v) e0 = do
-  x <- dictEVar clss v
+  x <- dictTmVar clss v
   let dictBinder = (x, mkTDict cstr)
   ETmAbs dictBinder <$> local (Map.insertWith impossible (v, clss) x) (elimExpr e0)
 elimECxAbs _ _ = impossible

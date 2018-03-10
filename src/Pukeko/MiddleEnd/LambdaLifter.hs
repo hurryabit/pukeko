@@ -34,8 +34,8 @@ type CanLL effs =
   )
 type LL a = forall effs. CanLL effs => Eff effs a
 
-freshEVar :: LL TmVar
-freshEVar = do
+freshTmVar :: LL TmVar
+freshTmVar = do
   func <- ask @TmVar
   n <- fresh @Int
   mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
@@ -80,7 +80,7 @@ coercePar = \case
 llETmAbs :: [Par In] -> Type -> Expr Out -> LL (Expr Out)
 llETmAbs oldPars t_rhs rhs1 = do
     let evCaptured0 = Set.toList
-          (setOf freeEVar rhs1 `Set.difference`
+          (setOf freeTmVar rhs1 `Set.difference`
            setOf (traverse . _TmPar . to nameOf) oldPars)
     (evCaptured, newTmPars)  <-
       fmap (unzip . map snd . sortOn fst) . for evCaptured0 $ \x -> do
@@ -108,8 +108,8 @@ llETmAbs oldPars t_rhs rhs1 = do
         evRename x = Map.findWithDefault x x evMap
     let allPars1 =
           map TyPar tyPars ++ over (traverse . _TmPar . _2 . traverse) tvRename allPars0
-    let rhs2 = over expr2type (fmap tvRename) (over freeEVar evRename rhs1)
-    lhs <- freshEVar
+    let rhs2 = over expr2type (fmap tvRename) (over freeTmVar evRename rhs1)
+    lhs <- freshTmVar
     let t_lhs = rewindr mkTAbs allPars1 (fmap tvRename t_rhs)
     -- TODO: We could use the pos of the lambda for @lhs@.
     let supc = SupCDecl lhs (closeT t_lhs) allPars1 rhs2
