@@ -43,33 +43,14 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int =
-  let ge : Int -> Int -> Bool = ge_int
-  and gt : Int -> Int -> Bool = gt_int
-  and le : Int -> Int -> Bool = le_int
-  and lt : Int -> Int -> Bool = lt_int
-  in
-  Dict$Ord @Int ge gt le lt
+dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
 dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
+  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io$ll1 @Unit @Int f x)
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
+input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
+  (match dict$Monad$IO with
    | Dict$Monad _ bind -> bind) @Int @Unit input main$ll2
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -92,52 +73,39 @@ io$ll2 : ∀a b. (a -> b) -> a -> IO b =
 print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 count_down$ll1 : Int -> IO Unit =
   fun (k : Int) ->
-    let dict$Monad$m : Monad IO = dict$Monad$IO
-    and p : Bool =
-          let dict : Ord Int = dict$Ord$Int in
-          (match dict with
+    let p : Bool =
+          (match dict$Ord$Int with
            | Dict$Ord ge _ _ _ -> ge) k 0
     and m : IO Unit =
-          let dict$Monad$m : Monad IO = dict$Monad$IO
-          and m1 : IO Unit = print$ll1 k
+          let m1 : IO Unit = print$ll1 k
           and m2 : IO Unit =
-                count_down$ll1 (let dict : Ring Int = dict$Ring$Int in
-                                (match dict with
+                count_down$ll1 ((match dict$Ring$Int with
                                  | Dict$Ring _ _ sub _ -> sub) k 1)
           in
-          let dict : Monad IO = dict$Monad$m in
-          (match dict with
+          (match dict$Monad$IO with
            | Dict$Monad _ bind -> bind) @Unit @Unit m1 (semi$ll1 @Unit @IO m2)
     in
     match p with
     | False ->
-      let dict : Monad IO = dict$Monad$m in
-      (match dict with
+      (match dict$Monad$IO with
        | Dict$Monad pure _ -> pure) @Unit Unit
     | True -> m
 repeat$ll1 : ∀m. Monad m -> Int -> m Unit -> m Unit =
   fun @m (dict$Monad$m : Monad m) (k : Int) (m : m Unit) ->
-    let dict$Monad$m : Monad m = dict$Monad$m
-    and p : Bool =
-          let dict : Ord Int = dict$Ord$Int in
-          (match dict with
+    let p : Bool =
+          (match dict$Ord$Int with
            | Dict$Ord _ gt _ _ -> gt) k 0
     and m : m Unit =
-          let dict$Monad$m : Monad m = dict$Monad$m
-          and m1 : m Unit = m
-          and m2 : m Unit =
-                repeat$ll1 @m dict$Monad$m (let dict : Ring Int = dict$Ring$Int in
-                                            (match dict with
+          let m2 : m Unit =
+                repeat$ll1 @m dict$Monad$m ((match dict$Ring$Int with
                                              | Dict$Ring _ _ sub _ -> sub) k 1) m
           in
-          let dict : Monad m = dict$Monad$m in
-          (match dict with
-           | Dict$Monad _ bind -> bind) @Unit @Unit m1 (semi$ll1 @Unit @m m2)
+          (match dict$Monad$m with
+           | Dict$Monad _ bind -> bind) @Unit @Unit m (semi$ll1 @Unit @m m2)
     in
     match p with
     | False ->
-      let dict : Monad m = dict$Monad$m in
-      (match dict with
+      (match dict$Monad$m with
        | Dict$Monad pure _ -> pure) @Unit Unit
     | True -> m
 main$ll1 : Int -> Int -> IO Unit =
@@ -145,6 +113,5 @@ main$ll1 : Int -> Int -> IO Unit =
     repeat$ll1 @IO dict$Monad$IO k (count_down$ll1 n)
 main$ll2 : Int -> IO Unit =
   fun (k : Int) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad _ bind -> bind) @Int @Unit input (main$ll1 k)

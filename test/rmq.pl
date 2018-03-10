@@ -47,46 +47,25 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int =
-  let ge : Int -> Int -> Bool = ge_int
-  and gt : Int -> Int -> Bool = gt_int
-  and le : Int -> Int -> Bool = le_int
-  and lt : Int -> Int -> Bool = lt_int
-  in
-  Dict$Ord @Int ge gt le lt
+dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
 dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
+  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io$ll1 @Unit @Int f x)
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
+input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 nats : List Int =
   let rec nats_from : Int -> List Int = nats$ll1 nats_from in
   nats_from 0
 infinity : Int = 1000000000
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
+  (match dict$Monad$IO with
    | Dict$Monad _ bind -> bind) @Int @Unit input main$ll6
 replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match let dict : Ord Int = dict$Ord$Int in
-          (match dict with
+    match (match dict$Ord$Int with
            | Dict$Ord _ _ le _ -> le) n 0 with
     | False ->
-      Cons @a x (replicate$ll1 @a (let dict : Ring Int = dict$Ring$Int in
-                                   (match dict with
+      Cons @a x (replicate$ll1 @a ((match dict$Ring$Int with
                                     | Dict$Ring _ _ sub _ -> sub) n 1) x)
     | True -> Nil @a
 zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
@@ -99,25 +78,21 @@ zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Cons y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)
 sequence$ll1 : ∀a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (x : a) (xs : List a) ->
-    let dict : Monad m = dict$Monad$m in
-    (match dict with
+    (match dict$Monad$m with
      | Dict$Monad pure _ -> pure) @(List a) (Cons @a x xs)
 sequence$ll2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) (x : a) ->
-    let dict : Monad m = dict$Monad$m in
-    (match dict with
+    (match dict$Monad$m with
      | Dict$Monad _ bind ->
        bind) @(List a) @(List a) (sequence$ll3 @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
 sequence$ll3 : ∀a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) ->
     match ms with
     | Nil ->
-      let dict : Monad m = dict$Monad$m in
-      (match dict with
+      (match dict$Monad$m with
        | Dict$Monad pure _ -> pure) @(List a) (Nil @a)
     | Cons m ms ->
-      let dict : Monad m = dict$Monad$m in
-      (match dict with
+      (match dict$Monad$m with
        | Dict$Monad _ bind ->
          bind) @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
@@ -139,8 +114,7 @@ io$ll2 : ∀a b. (a -> b) -> a -> IO b =
 print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 nats$ll1 : (Int -> List Int) -> Int -> List Int =
   fun (nats_from : Int -> List Int) (n : Int) ->
-    Cons @Int n (nats_from (let dict : Ring Int = dict$Ring$Int in
-                            (match dict with
+    Cons @Int n (nats_from ((match dict$Ring$Int with
                              | Dict$Ring _ add _ _ -> add) n 1))
 pair$ll1 : ∀a. (a -> a -> a) -> List a -> List a =
   fun @a (op : a -> a -> a) (xs1 : List a) ->
@@ -175,12 +149,10 @@ query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTre
     | RmqEmpty -> one
     | RmqNode t_lo t_hi value left right ->
       match let x : Bool =
-                  let dict : Ord Int = dict$Ord$Int in
-                  (match dict with
+                  (match dict$Ord$Int with
                    | Dict$Ord _ _ _ lt -> lt) q_hi t_lo
             and y : Bool =
-                  let dict : Ord Int = dict$Ord$Int in
-                  (match dict with
+                  (match dict$Ord$Int with
                    | Dict$Ord _ gt _ _ -> gt) q_lo t_hi
             in
             match x with
@@ -188,12 +160,10 @@ query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTre
             | True -> True with
       | False ->
         match let x : Bool =
-                    let dict : Ord Int = dict$Ord$Int in
-                    (match dict with
+                    (match dict$Ord$Int with
                      | Dict$Ord _ _ le _ -> le) q_lo t_lo
               and y : Bool =
-                    let dict : Ord Int = dict$Ord$Int in
-                    (match dict with
+                    (match dict$Ord$Int with
                      | Dict$Ord _ _ le _ -> le) t_hi q_hi
               in
               match x with
@@ -204,66 +174,48 @@ query$ll1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTre
       | True -> one
 min$ll1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    match let dict : Ord Int = dict$Ord$Int in
-          (match dict with
+    match (match dict$Ord$Int with
            | Dict$Ord _ _ le _ -> le) x y with
     | False -> y
     | True -> x
 main$ll1 : RmqTree Int -> Int -> Int -> IO Unit =
   fun (t : RmqTree Int) (lo : Int) (hi : Int) ->
     let res : Int =
-          let one : Int = infinity
-          and op : Int -> Int -> Int = min$ll1
-          and q_lo : Int = lo
-          and q_hi : Int = hi
-          in
           let rec aux : RmqTree Int -> Int =
-                    query$ll1 @Int one op q_lo q_hi aux
+                    query$ll1 @Int infinity min$ll1 lo hi aux
           in
           aux t
     in
     print$ll1 res
 main$ll2 : RmqTree Int -> Int -> IO Unit =
   fun (t : RmqTree Int) (lo : Int) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad _ bind -> bind) @Int @Unit input (main$ll1 t lo)
 main$ll3 : List Unit -> IO Unit =
   fun (x : List Unit) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad pure _ -> pure) @Unit Unit
 main$ll4 : Int -> List Int -> IO Unit =
   fun (m : Int) (xs : List Int) ->
     let t : RmqTree Int =
-          let op : Int -> Int -> Int = min$ll1
-          and xs : List Int = xs
-          in
           let rec run : List (RmqTree Int) -> RmqTree Int =
-                    build$ll1 @Int op run
+                    build$ll1 @Int min$ll1 run
           in
           run (zip_with$ll1 @Int @Int @(RmqTree Int) (single$ll1 @Int) nats xs)
     in
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
-     | Dict$Monad _ bind -> bind) @(List Unit) @Unit (let n : Int = m
-                                                      and act : IO Unit =
-                                                            let dict : Monad IO = dict$Monad$IO in
-                                                            (match dict with
-                                                             | Dict$Monad _ bind ->
-                                                               bind) @Int @Unit input (main$ll2 t)
-                                                      in
-                                                      sequence$ll3 @Unit @IO dict$Monad$IO (replicate$ll1 @(IO Unit) n act)) main$ll3
+    (match dict$Monad$IO with
+     | Dict$Monad _ bind ->
+       bind) @(List Unit) @Unit (let act : IO Unit =
+                                       (match dict$Monad$IO with
+                                        | Dict$Monad _ bind -> bind) @Int @Unit input (main$ll2 t)
+                                 in
+                                 sequence$ll3 @Unit @IO dict$Monad$IO (replicate$ll1 @(IO Unit) m act)) main$ll3
 main$ll5 : Int -> Int -> IO Unit =
   fun (n : Int) (m : Int) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
-     | Dict$Monad _ bind -> bind) @(List Int) @Unit (let n : Int = n
-                                                     and act : IO Int = input
-                                                     in
-                                                     sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n act)) (main$ll4 m)
+    (match dict$Monad$IO with
+     | Dict$Monad _ bind ->
+       bind) @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) (main$ll4 m)
 main$ll6 : Int -> IO Unit =
   fun (n : Int) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad _ bind -> bind) @Int @Unit input (main$ll5 n)

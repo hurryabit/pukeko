@@ -33,18 +33,10 @@ data World =
        | World
 data IO a = World -> Pair a World
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
-   | Dict$Monad pure _ -> pure) @Unit (let u : Unit =
-                                             let u : Unit = Unit in
-                                             u
-                                       in
-                                       u)
+  (match dict$Monad$IO with
+   | Dict$Monad pure _ -> pure) @Unit Unit
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
   fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =

@@ -36,18 +36,10 @@ external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int =
-  let f : Unit -> Int = geti
-  and x : Unit = Unit
-  in
-  coerce @(_ -> IO) (io$ll1 @Unit @Int f x)
+  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
+input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 main : IO Unit =
-  let dict : Monad IO = dict$Monad$IO in
-  (match dict with
+  (match dict$Monad$IO with
    | Dict$Monad _ bind -> bind) @Int @Unit input main$ll2
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -71,21 +63,16 @@ print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 main$ll1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in
-    let dict$Monad$m : Monad IO = dict$Monad$IO
-    and m1 : IO Unit =
-          print$ll1 (let p : Pair Int Int = p in
-                     match p with
+    let m1 : IO Unit =
+          print$ll1 (match p with
                      | Pair x _ -> x)
     and m2 : IO Unit =
-          print$ll1 (let p : Pair Int Int = p in
-                     match p with
+          print$ll1 (match p with
                      | Pair _ y -> y)
     in
-    let dict : Monad IO = dict$Monad$m in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad _ bind -> bind) @Unit @Unit m1 (semi$ll1 @Unit @IO m2)
 main$ll2 : Int -> IO Unit =
   fun (x : Int) ->
-    let dict : Monad IO = dict$Monad$IO in
-    (match dict with
+    (match dict$Monad$IO with
      | Dict$Monad _ bind -> bind) @Int @Unit input (main$ll1 x)

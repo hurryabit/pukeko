@@ -39,23 +39,13 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
+  Dict$Ring @Int neg_int add_int sub_int mul_int
 main : IO Unit =
-  print$ll1 (let a : Int = 1
-             and b : Int = 2
-             and c : Int = 3
-             and d : Int =
-                   let x : Int = 2 in
-                   let dict : Ring Int = dict$Ring$Int in
-                   (match dict with
-                    | Dict$Ring _ add _ _ -> add) x x
+  print$ll1 (let d : Int =
+                   (match dict$Ring$Int with
+                    | Dict$Ring _ add _ _ -> add) 2 2
              in
-             a)
+             1)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
