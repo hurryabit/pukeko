@@ -13,7 +13,7 @@ import           Pukeko.AST.Name
 
 prettifyModule :: Module -> Module
 prettifyModule = over mod2supcs $ \supcs0 ->
-  let xs :: Set (Name EVar)
+  let xs :: Set TmVar
       xs = setOf (traverse . func2name) supcs0
       mp = cluster xs
       rename x = Map.findWithDefault x x mp
@@ -25,7 +25,7 @@ prettifyModule = over mod2supcs $ \supcs0 ->
       , let supc2 = over (func2expr . expr2atom . _AVal) rename supc1
       ]
 
-cluster :: Set (Name EVar) -> Map (Name EVar) (Name EVar)
+cluster :: Set TmVar -> Map TmVar TmVar
 cluster xs0 =
   let mp =
         foldl

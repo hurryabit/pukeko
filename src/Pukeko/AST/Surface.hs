@@ -4,8 +4,8 @@ module Pukeko.AST.Surface
     Package (..)
   , Module (..)
   , Decl (..)
-  , TConDecl (..)
-  , DConDecl (..)
+  , TyConDecl (..)
+  , TmConDecl (..)
   , SignDecl (..)
   , ClssDecl (..)
   , InstDecl (..)
@@ -32,7 +32,7 @@ module Pukeko.AST.Surface
   , mkTFun
 
   , extend
-  , freeTVars
+  , freeTyVars
   )
 where
 
@@ -58,84 +58,84 @@ data Module = MkModule
   }
 
 data Decl
-  = DType TConDecl
+  = DType TyConDecl
   | DSign SignDecl
   | DClss ClssDecl
   | DInst InstDecl
-  | DDefn (Bind (LctdName EVar))
+  | DDefn (Bind (LctdName 'TmVar))
   | DExtn ExtnDecl
   | DInfx InfxDecl
 
-data TConDecl = MkTConDecl
-  { _tcon2name  :: LctdName TCon
-  , _tcon2prms  :: [LctdName TVar]
+data TyConDecl = MkTyConDecl
+  { _tycon2name   :: LctdName 'TyCon
+  , _tycon2params :: [LctdName 'TyVar]
     -- FIXME: Use a proper type to distinguish between 'type' and 'data'.
-  , _tcon2dcons :: Either Type [DConDecl]
+  , _tycon2tmcons :: Either Type [TmConDecl]
   }
 
-data DConDecl = MkDConDecl
-  { _dcon2name :: LctdName DCon
-  , _dcon2flds :: [Type]
+data TmConDecl = MkTmConDecl
+  { _tmcon2name   :: LctdName 'TmCon
+  , _tmcon2fields :: [Type]
   }
 
 data SignDecl = MkSignDecl
-  { _sign2func :: LctdName EVar
+  { _sign2func :: LctdName 'TmVar
   , _sign2type :: TypeScheme
   }
 
 data ClssDecl = MkClssDecl
-  { _clss2name  :: LctdName Clss
-  , _clss2prm   :: LctdName TVar
+  { _clss2name  :: LctdName 'TyCon
+  , _clss2prm   :: LctdName 'TyVar
   , _clss2mthds :: [SignDecl]
   }
 
 data InstDecl = MkInstDecl
-  { _inst2clss  :: LctdName Clss
+  { _inst2clss  :: LctdName 'TyCon
   , _inst2atom  :: TypeAtom
-  , _inst2tvars :: [LctdName TVar]
+  , _inst2tvars :: [LctdName 'TyVar]
   , _inst2cstr  :: TypeCstr
-  , _inst2defns :: [Bind (LctdName EVar)]
+  , _inst2defns :: [Bind (LctdName 'TmVar)]
   }
 
 data ExtnDecl = MkExtnDecl
-  { _extn2func :: LctdName EVar
+  { _extn2func :: LctdName 'TmVar
   , _extn2name :: String
   }
 
 data InfxDecl = MkInfxDecl
   { _infx2op   :: Lctd Op.Binary
-  , _infx2func :: LctdName EVar
+  , _infx2func :: LctdName 'TmVar
   }
 
 data TypeAtom
   = TAArr
   | TAInt
-  | TACon (LctdName TCon)
+  | TACon (LctdName 'TyCon)
 
 data Type
-  = TVar (LctdName TVar)
+  = TVar (LctdName 'TyVar)
   | TAtm TypeAtom
   | TApp Type Type
 
-newtype TypeCstr = MkTypeCstr [(LctdName Clss, LctdName TVar)]
+newtype TypeCstr = MkTypeCstr [(LctdName 'TyCon, LctdName 'TyVar)]
 
 data TypeScheme = MkTypeScheme TypeCstr Type
 
 data CoercionDir = Inject | Project
 
-data Coercion = MkCoercion CoercionDir (LctdName TCon)
+data Coercion = MkCoercion CoercionDir (LctdName 'TyCon)
 
-data Bind v = MkBind (LctdName EVar) (Expr v)
+data Bind v = MkBind (LctdName 'TmVar) (Expr v)
 
 data Expr v
   = ELoc (Lctd (Expr v))
   | EVar v
-  | ECon (LctdName DCon)
+  | ECon (LctdName 'TmCon)
   | ENum Int
   | EApp (Expr v) (NonEmpty (Expr v))
   | EOpp Op.Binary (Expr v) (Expr v)
   | EMat (Expr v) [Altn v]
-  | ELam (NonEmpty (LctdName EVar)) (Expr v)
+  | ELam (NonEmpty (LctdName 'TmVar)) (Expr v)
   | ELet (NonEmpty (Bind v)) (Expr v)
   | ERec (NonEmpty (Bind v)) (Expr v)
   | ECoe Coercion (Expr v)
@@ -144,8 +144,8 @@ data Altn v = MkAltn Patn (Expr v)
 
 data Patn
   = PWld
-  | PVar (LctdName EVar)
-  | PCon (LctdName DCon) [Patn]
+  | PVar (LctdName 'TmVar)
+  | PCon (LctdName 'TmCon) [Patn]
 
 extend :: Module -> Package -> Package
 extend mdl (MkPackage _ mdls) = MkPackage (_mod2file mdl) (mdls ++ [mdl])
@@ -161,7 +161,7 @@ mkIf t u v =
          , MkAltn (PCon (Lctd noPos (Tagged "False")) []) v
          ]
 
-mkLam :: [LctdName EVar] -> Expr v -> Expr v
+mkLam :: [LctdName 'TmVar] -> Expr v -> Expr v
 mkLam = \case
   []     -> id
   (b:bs) -> ELam (b :| bs)
@@ -172,16 +172,16 @@ mkTApp = foldl TApp
 mkTFun :: Type -> Type -> Type
 mkTFun tx ty = mkTApp (TAtm TAArr) [tx, ty]
 
-freeTVars :: Type -> Map (Name TVar) (LctdName TVar)
-freeTVars = \case
+freeTyVars :: Type -> Map (Name 'TyVar) (LctdName 'TyVar)
+freeTyVars = \case
   TVar v -> Map.singleton (unlctd v) v
   TAtm _ -> mempty
-  TApp tf ta -> freeTVars tf <> freeTVars ta
+  TApp tf ta -> freeTyVars tf <> freeTyVars ta
 
 deriving instance Show Module
 deriving instance Show Decl
-deriving instance Show TConDecl
-deriving instance Show DConDecl
+deriving instance Show TyConDecl
+deriving instance Show TmConDecl
 deriving instance Show SignDecl
 deriving instance Show ClssDecl
 deriving instance Show InstDecl

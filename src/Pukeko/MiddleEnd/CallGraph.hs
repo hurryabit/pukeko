@@ -19,9 +19,9 @@ import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
 
 data CallGraph m = CallGraph
-  { graph    :: G.Graph
-  , toDecl   :: G.Vertex -> FuncDecl m
-  , fromEVar :: Name EVar -> Maybe G.Vertex
+  { graph     :: G.Graph
+  , toDecl    :: G.Vertex -> FuncDecl m
+  , fromTmVar :: TmVar -> Maybe G.Vertex
   }
 
 makeCallGraph' :: Foldable t => t (FuncDecl m) -> CallGraph m

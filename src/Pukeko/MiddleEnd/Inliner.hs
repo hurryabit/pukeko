@@ -14,7 +14,7 @@ import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
 -- import           Pukeko.Pretty
 
 newtype InState = InState
-  { _inlinables :: Map (Name EVar) (FuncDecl (Only SupC))
+  { _inlinables :: Map TmVar (FuncDecl (Only SupC))
   }
 
 type In = Eff '[State InState]
@@ -31,7 +31,7 @@ unwind e0 =
   in  (e2, ts, as)
 
 -- | Replace a reference to an alias by a reference to the target of the alias.
-inEVal :: Name EVar -> In Expr
+inEVal :: TmVar -> In Expr
 inEVal z0 = do
   fdecl_mb <- uses inlinables (Map.lookup z0)
   case fdecl_mb of

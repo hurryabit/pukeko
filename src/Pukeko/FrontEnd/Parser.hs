@@ -166,26 +166,26 @@ bar     = reservedOp "|"
 name :: Parser String -> Parser (LctdName nsp)
 name p = lctd (Tagged <$> p)
 
-evar :: Parser (LctdName EVar)
-evar = name lIdent <?> "expression variable"
+tmvar :: Parser (LctdName 'TmVar)
+tmvar = name lIdent <?> "expression variable"
 
-tvar :: Parser (LctdName TVar)
-tvar = name lIdent <?> "type variable"
+tyvar :: Parser (LctdName 'TyVar)
+tyvar = name lIdent <?> "type variable"
 
-tcon :: Parser (LctdName TCon)
-tcon = name uIdent <?> "type constructor"
+tycon :: Parser (LctdName 'TyCon)
+tycon = name uIdent <?> "type constructor"
 
-dcon :: Parser (LctdName DCon)
-dcon = name uIdent <?> "data constructor"
+tmcon :: Parser (LctdName 'TmCon)
+tmcon = name uIdent <?> "data constructor"
 
-clss :: Parser (LctdName Clss)
-clss = name uIdent <?> "class name"
+clasz :: Parser (LctdName 'TyCon)
+clasz = name uIdent <?> "class name"
 
 -- TODO: Make 'TAArr' a potential result as well.
 typeAtom :: Parser TypeAtom
 typeAtom = choice
   [ reserved "Int" $> TAInt
-  , TACon <$> tcon
+  , TACon <$> tycon
   ]
 
 type_, atype :: Parser Type
@@ -195,14 +195,14 @@ type_ =
     [ [ InfixR (arrow $> mkTFun) ] ]
   <?> "data"
 atype = choice
-  [ TVar <$> tvar
+  [ TVar <$> tyvar
   , TAtm <$> typeAtom
   , parens type_
   ]
 
 typeCstr :: Parser TypeCstr
 typeCstr = MkTypeCstr
-  <$> option [] (try (parens (sepBy1 ((,) <$> clss <*> tvar) comma) <* darrow))
+  <$> option [] (try (parens (sepBy1 ((,) <$> clasz <*> tyvar) comma) <* darrow))
 
 typeScheme :: Parser TypeScheme
 typeScheme = MkTypeScheme <$> typeCstr <*> type_
@@ -210,17 +210,17 @@ typeScheme = MkTypeScheme <$> typeCstr <*> type_
 -- <patn>  ::= <apatn> | <con> <apatn>*
 -- <apatn> ::= '_' | <evar> | <con> | '(' <patn> ')'
 patn, apatn :: Parser Patn
-patn  = PCon <$> dcon <*> many apatn <|>
+patn  = PCon <$> tmcon <*> many apatn <|>
         apatn
 apatn = symbol "_" $> PWld   <|>
-        PVar <$> evar             <|>
-        PCon <$> dcon <*> pure [] <|>
+        PVar <$> tmvar             <|>
+        PCon <$> tmcon <*> pure [] <|>
         parens patn
 
-bind :: Parser (Bind (LctdName EVar))
-bind = indented evar $ \z -> MkBind z <$> (mkLam <$> many evar <*> (equals *> expr))
+bind :: Parser (Bind (LctdName 'TmVar))
+bind = indented tmvar $ \z -> MkBind z <$> (mkLam <$> many tmvar <*> (equals *> expr))
 
-exprMatch :: Parser (Expr (LctdName EVar))
+exprMatch :: Parser (Expr (LctdName 'TmVar))
 exprMatch = do
   tokCol <- indentGuard
   fstCol <- RWS.gets sourceColumn
@@ -236,12 +236,12 @@ exprMatch = do
       <$> (expr <* reserved "with")
       <*> aligned (some altn)
 
-altn :: Parser (Altn (LctdName EVar))
+altn :: Parser (Altn (LctdName 'TmVar))
 altn = indented_ bar (MkAltn <$> patn <*> (arrow *> expr))
 
 let_ ::
-  (NonEmpty (Bind (LctdName EVar)) -> a) ->
-  (NonEmpty (Bind (LctdName EVar)) -> a) ->
+  (NonEmpty (Bind (LctdName 'TmVar)) -> a) ->
+  (NonEmpty (Bind (LctdName 'TmVar)) -> a) ->
   Parser a
 let_ mkLet mkRec =
   (reserved "let" *> (reserved "rec" $> mkRec <|> pure mkLet))
@@ -249,13 +249,13 @@ let_ mkLet mkRec =
 
 coercion :: Parser Coercion
 coercion =
-  MkCoercion Inject  <$> (symbol "_" *> arrow *> tcon      ) <|>
-  MkCoercion Project <$> (tcon       <* arrow <* symbol "_")
+  MkCoercion Inject  <$> (symbol "_" *> arrow *> tycon     ) <|>
+  MkCoercion Project <$> (tycon      <* arrow <* symbol "_")
 
-expr, aexpr :: Parser (Expr (LctdName EVar))
+expr, aexpr :: Parser (Expr (LctdName 'TmVar))
 aexpr = choice
-  [ EVar <$> evar
-  , ECon <$> dcon
+  [ EVar <$> tmvar
+  , ECon <$> tmcon
   , ENum <$> decimal
   , parens expr
   ]
@@ -269,7 +269,7 @@ expr =
       <*> (reserved "else" *> expr)
     , exprMatch
     , ELam
-      <$> (reserved "fun" *> NE.some evar)
+      <$> (reserved "fun" *> NE.some tmvar)
       <*> (arrow *> expr)
     , let_ ELet ERec <*> (reserved "in" *> expr)
     , ECoe <$> (reserved "coerce" *> char '@' *> parens coercion) <*> aexpr
@@ -285,50 +285,50 @@ expr =
           Op.AssocRight -> InfixR
           Op.AssocNone  -> InfixN
 
-dataDecl :: Parser TConDecl
+dataDecl :: Parser TyConDecl
 dataDecl = indented_ (reserved "data") tconDecl
 
-typeDecl :: Parser TConDecl
+typeDecl :: Parser TyConDecl
 typeDecl = indented_ (reserved "type") $
-  MkTConDecl
-  <$> tcon
-  <*> (many tvar <* equals)
+  MkTyConDecl
+  <$> tycon
+  <*> (many tyvar <* equals)
   <*> (Right [] <$ reserved "external" <|> Left <$> type_)
 
-tconDecl :: Parser TConDecl
-tconDecl = MkTConDecl
-  <$> tcon
-  <*> (many tvar <* equals)
+tconDecl :: Parser TyConDecl
+tconDecl = MkTyConDecl
+  <$> tycon
+  <*> (many tyvar <* equals)
   <*> (Right <$> aligned (some dconDecl))
 
-dconDecl :: Parser DConDecl
-dconDecl = indented_ bar (MkDConDecl <$> dcon <*> many atype)
+dconDecl :: Parser TmConDecl
+dconDecl = indented_ bar (MkTmConDecl <$> tmcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
-  (try (indented evar (\z -> colon $> z)))
+  (try (indented tmvar (\z -> colon $> z)))
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
 clssDecl =
-  MkClssDecl <$> clss <*> tvar <*> (reserved "where" *> aligned (many signDecl))
+  MkClssDecl <$> clasz <*> tyvar <*> (reserved "where" *> aligned (many signDecl))
 
 instDecl :: Parser InstDecl
 instDecl = do
   q       <- typeCstr
-  c       <- clss
+  c       <- clasz
   (t, vs) <- (,) <$> typeAtom <*> pure [] <|>
-             parens ((,) <$> typeAtom <*> many tvar)
+             parens ((,) <$> typeAtom <*> many tyvar)
   ds      <- reserved "where" *> aligned (many bind)
   pure (MkInstDecl c t vs q ds)
 
 extnDecl :: Parser ExtnDecl
 extnDecl = MkExtnDecl
-  <$> evar
+  <$> tmvar
   <*> (equals *> char '\"' *> some (lowerChar <|> char '_') <* symbol "\"")
 
 infxDecl :: Parser InfxDecl
-infxDecl = MkInfxDecl <$> lctd binOp <*> evar
+infxDecl = MkInfxDecl <$> lctd binOp <*> tmvar
 
 import_ :: Parser FilePath
 import_ = indented_ (reserved "import") $ do

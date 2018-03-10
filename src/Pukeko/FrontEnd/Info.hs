@@ -5,18 +5,18 @@ module Pukeko.FrontEnd.Info
   ( ModuleInfo
   , HasModuleInfo
   , SomeInstDecl (..)
-  , info2tcons
-  , info2dcons
+  , info2tycons
+  , info2tmcons
   , info2signs
-  , info2clsss
-  , info2mthds
+  , info2classes
+  , info2methods
   , info2insts
   , runInfo
   , lookupInfo
   , findInfo
   , typeOfFunc
   , typeOfAtom
-  , tconDeclInfo
+  , tyconDeclInfo
   ) where
 
 import Pukeko.Prelude
@@ -33,12 +33,12 @@ import           Pukeko.AST.Type
 
 
 data ModuleInfo = MkModuleInfo
-  { _info2tcons :: Map (Name TCon) TConDecl
-  , _info2dcons :: Map (Name DCon) (TConDecl, DConDecl)
-  , _info2signs :: Map (Name EVar) Type
-  , _info2clsss :: Map (Name Clss) SysF.ClssDecl
-  , _info2mthds :: Map (Name EVar) (SysF.ClssDecl, SysF.SignDecl (Name TVar))
-  , _info2insts :: Map (Name Clss, TypeAtom) SomeInstDecl
+  { _info2tycons  :: Map TyCon TyConDecl
+  , _info2tmcons  :: Map TmCon (TyConDecl, TmConDecl)
+  , _info2signs   :: Map TmVar Type
+  , _info2classes :: Map Class SysF.ClassDecl
+  , _info2methods :: Map TmVar (SysF.ClassDecl, SysF.SignDecl TyVar)
+  , _info2insts   :: Map (Class, TypeAtom) SomeInstDecl
   }
 
 data SomeInstDecl = forall st. SomeInstDecl (SysF.InstDecl st)
@@ -62,34 +62,33 @@ findInfo ::
   Lens' ModuleInfo (Map k v) -> k -> Eff effs v
 findInfo l k = views l (Map.! k)
 
-typeOfFunc :: (HasCallStack, Member (Reader ModuleInfo) effs) =>
-  Name EVar -> Eff effs Type
+typeOfFunc :: (HasCallStack, Member (Reader ModuleInfo) effs) => TmVar -> Eff effs Type
 typeOfFunc = findInfo info2signs
 
 typeOfAtom :: (HasCallStack, Member (Reader ModuleInfo) effs) => Atom -> Eff effs Type
 typeOfAtom = \case
   AVal z -> typeOfFunc z
-  ACon c -> uncurry typeOfDCon <$> findInfo info2dcons c
+  ACon c -> uncurry typeOfTmCon <$> findInfo info2tmcons c
   ANum _ -> pure (TAtm TAInt)
 
 itemInfo :: (Ord k) => Lens' ModuleInfo (Map k v) -> k -> v -> ModuleInfo
 itemInfo l k v = set l (Map.singleton k v) mempty
 
-tconDeclInfo :: TConDecl -> ModuleInfo
-tconDeclInfo tcon =
+tyconDeclInfo :: TyConDecl -> ModuleInfo
+tyconDeclInfo tcon =
   let dis = foldMapOf
-        (tcon2dcons . _Right . traverse)
-        (\dcon -> itemInfo info2dcons (nameOf dcon) (tcon, dcon))
+        (tycon2tmcons . _Right . traverse)
+        (\dcon -> itemInfo info2tmcons (nameOf dcon) (tcon, dcon))
         tcon
-  in  itemInfo info2tcons (nameOf tcon) tcon <> dis
+  in  itemInfo info2tycons (nameOf tcon) tcon <> dis
 
 -- FIXME: Detect multiple definitions.
-signInfo :: Name EVar -> Type -> ModuleInfo
+signInfo :: TmVar -> Type -> ModuleInfo
 signInfo = itemInfo info2signs
 
 instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
   collectInfo (SysF.MkModule decls) = foldFor decls $ \case
-    SysF.DType tcon -> tconDeclInfo tcon
+    SysF.DType tcon -> tyconDeclInfo tcon
     SysF.DSign (SysF.MkSignDecl func typ_) -> signInfo func typ_
     -- NOTE: See the comment for 'SysF._func2type' on why we treat 'TArr' like this.
     -- SysF.DFunc (SysF.MkFuncDecl _    TArr _) -> mempty
@@ -98,18 +97,18 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
     -- SysF.DExtn (SysF.MkExtnDecl _    TArr _) -> mempty
     SysF.DExtn (SysF.MkExtnDecl func typ_ _) ->
       maybe mempty (signInfo func) (isType typ_)
-    SysF.DClss clssDecl@(SysF.MkClssDecl clss param _dcon mthds) ->
+    SysF.DClss clssDecl@(SysF.MkClassDecl clss param _dcon mthds) ->
       let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
             let typ1 = TUni' param (TCtx (clss, TVar param) typ0)
             in  signInfo mthd typ1
-                <> itemInfo info2mthds mthd (clssDecl, mthdDecl)
-      in  itemInfo info2clsss clss clssDecl <> mthds_info
+                <> itemInfo info2methods mthd (clssDecl, mthdDecl)
+      in  itemInfo info2classes clss clssDecl <> mthds_info
     SysF.DInst inst@(SysF.MkInstDecl _ clss t _ _ _) ->
       itemInfo info2insts (clss, t) (SomeInstDecl inst)
 
 instance HasModuleInfo Core.Module where
   collectInfo (Core.MkModule types extns supcs) = fold
-    [ foldMap tconDeclInfo types
+    [ foldMap tyconDeclInfo types
     , foldMap (\extn -> signInfo (nameOf extn) (vacuous (Core._extn2type extn))) extns
     , foldMap (\supc -> signInfo (nameOf supc) (vacuous (Core._supc2type supc))) supcs
     ]

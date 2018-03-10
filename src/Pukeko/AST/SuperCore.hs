@@ -26,22 +26,22 @@ type Extn = 'Extn
 data FuncDecl (m :: Super DeclMode)
   = (m ?:> SupC) =>
     SupCDecl
-    { _supc2name   :: Name EVar
+    { _supc2name   :: TmVar
     , _supc2type   :: GenType Void
     , _supc2params :: [Par]
     , _supc2expr   :: Expr
     }
   | (m ?:> Extn) =>
     ExtnDecl
-    { _extn2name :: Name EVar
+    { _extn2name :: TmVar
     , _extn2type :: GenType Void
     , _extn2extn :: String
     }
 
 data Module = MkModule
-  { _mod2types :: Map (Name TCon) TConDecl
-  , _mod2extns :: Map (Name EVar) (FuncDecl (Only Extn))
-  , _mod2supcs :: Map (Name EVar) (FuncDecl (Only SupC))
+  { _mod2types :: Map TyCon TyConDecl
+  , _mod2extns :: Map TmVar (FuncDecl (Only Extn))
+  , _mod2supcs :: Map TmVar (FuncDecl (Only SupC))
   }
 
 type Bind = Expr.Bind SuperCore
@@ -57,7 +57,7 @@ castAny = \case
   SupCDecl z t ps e -> SupCDecl z t ps e
   ExtnDecl z t s    -> ExtnDecl z t s
 
-func2name :: Lens' (FuncDecl m) (Name EVar)
+func2name :: Lens' (FuncDecl m) TmVar
 func2name f = \case
   SupCDecl z t ps e -> fmap (\z' -> SupCDecl z' t ps e) (f z)
   ExtnDecl z t s    -> fmap (\z' -> ExtnDecl z' t s)    (f z)
@@ -72,7 +72,7 @@ func2expr f = \case
   SupCDecl z t ps e -> SupCDecl z t ps <$> f e
   func@ExtnDecl{} -> pure func
 
-mkTypeDecl :: TConDecl -> Module
+mkTypeDecl :: TyConDecl -> Module
 mkTypeDecl tcon = over mod2types (Map.insert (nameOf tcon) tcon) mempty
 
 mkFuncDecl :: FuncDecl m -> Module
@@ -82,7 +82,7 @@ mkFuncDecl = \case
   where
     mkDecl l k v = over l (Map.insert k v) mempty
 
-type instance NameSpaceOf (FuncDecl m) = EVar
+type instance NameSpaceOf (FuncDecl m) = 'TmVar
 instance HasName (FuncDecl m) where
   nameOf decl = decl ^. func2name
 

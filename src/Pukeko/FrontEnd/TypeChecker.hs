@@ -38,7 +38,7 @@ checkCoercion (MkCoercion _dir _tcon) _from _to =
 typeOf :: IsTyped lg => Expr lg -> TC Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
-  EVar x -> lookupEVar x
+  EVar x -> lookupTmVar x
   EAtm a -> typeOfAtom a
   EApp e0 a -> do
     t0 <- typeOf e0
@@ -58,14 +58,14 @@ typeOf = \case
       (CxArg{}, _) -> throwHere "unexpected constraint argument"
   EAbs par e0 -> do
     case par of
-      TmPar binder -> TFun (snd binder) <$> withinEScope1 binder (typeOf e0)
-      TyPar v      -> TUni' v           <$> withinTScope1 v (typeOf e0)
-      CxPar cstr   -> TCtx cstr         <$> withinContext1 cstr (typeOf e0)
+      TmPar binder -> TFun (snd binder) <$> introTmVar binder (typeOf e0)
+      TyPar v      -> TUni' v           <$> introTyVar v (typeOf e0)
+      CxPar cstr   -> TCtx cstr         <$> introCstr cstr (typeOf e0)
   ELet BindPar ds e0 -> do
     traverse_ checkBind ds
-    withinEScope (map _b2binder ds) (typeOf e0)
+    introTmVars (map _b2binder ds) (typeOf e0)
   ELet BindRec ds e0 ->
-    withinEScope (map _b2binder ds) $ do
+    introTmVars (map _b2binder ds) $ do
       traverse_ checkBind ds
       typeOf e0
   EMat e0 (a1 :| as) -> do
@@ -96,21 +96,21 @@ checkCstr cstr@(clss, unwindl _TApp -> (t1, targs)) = do
           traverse_ checkCstr cstrs1
     TVar v
       | null targs -> do
-          qual <- lookupTVar v
+          qual <- lookupTyVar v
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
 typeOfAltn :: IsTyped lg => Type -> Altn lg -> TC Type
 typeOfAltn t (MkAltn p e) = do
   env <- patnEnvLevel p t
-  withinEScope (Map.toList env) (typeOf e)
+  introTmVars (Map.toList env) (typeOf e)
 
-patnEnvLevel :: TypeOf lg ~ Type => Patn lg -> Type -> TC (Map NameEVar Type)
+patnEnvLevel :: TypeOf lg ~ Type => Patn lg -> Type -> TC (Map TmVar Type)
 patnEnvLevel p t0 = case p of
   PWld -> pure Map.empty
   PVar x -> pure (Map.singleton x t0)
   PCon c ts1 ps -> do
-    (MkTConDecl _ params _, MkDConDecl tcon dcon _tag flds1) <- findInfo info2dcons c
+    (MkTyConDecl _ params _, MkTmConDecl tcon dcon _tag flds1) <- findInfo info2tmcons c
     let t1 = mkTApp (TCon tcon) (toList ts1)
     unless (t0 == t1) $ throwHere
       ("expected pattern of type" <+> pretty t0
@@ -147,9 +147,9 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
     SysF.DInst (SysF.MkInstDecl _ _ atom prms cstrs ds) -> do
       let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      withinTScope prms $ withinContext cstrs $
+      introTyVars prms $ introCstrs cstrs $
         for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
-          (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2mthds name
+          (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2methods name
           -- TODO: There might be some lexical name capturing going on here: type
           -- variables with different IDs could still share the same lexical name.
           -- Since this is a UX thing and all type errors here are compiler bugs,
@@ -161,6 +161,6 @@ instance IsTyped st => TypeCheckable (SysF.Module st) where
 instance TypeCheckable Core.Module where
   checkModule (Core.MkModule _types _extns supcs) =
     for_ supcs $ \(Core.SupCDecl z t_decl pars e0) -> do
-        t0 <- withinScope pars $ typeOf e0
+        t0 <- introPars pars $ typeOf e0
         match (vacuous t_decl) (rewindr mkTAbs pars t0)
       `catchError` \e -> throwFailure ("while type checking" <+> pretty z <+> ":" $$ e)

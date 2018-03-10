@@ -27,8 +27,8 @@ type GlobalEffs effs = Members [Reader ModuleInfo, NameSource, Error Failure] ef
 
 type CanPM effs = (Members [Supply Int, Reader SourcePos] effs, GlobalEffs effs)
 
-freshEVar :: CanPM effs => Eff effs (Name EVar)
-freshEVar = do
+freshTmVar :: CanPM effs => Eff effs TmVar
+freshTmVar = do
   n <- fresh @Int
   mkName (Lctd noPos (Tagged ("pm$" ++ show n)))
 
@@ -86,9 +86,9 @@ pmMatch rowMatch0 = do
 -- | A binding pattern, i.e., not a constructor pattern.
 data BPatn
   = BWild
-  | BName (Name EVar)
+  | BName TmVar
 
-bindName :: BPatn -> Maybe (Name EVar)
+bindName :: BPatn -> Maybe TmVar
 bindName = \case
   BWild   -> Nothing
   BName x -> Just x
@@ -180,12 +180,12 @@ elimBPatnCols (MkColMatch cs0 us0) k = do
                 let replaceYwithX z
                       | z == y    = x
                       | otherwise = z
-                in  over freeEVar replaceYwithX rhs
+                in  over freeTmVar replaceYwithX rhs
         in  pure $ LS.zipWith replacePatnWithX rhss bs
       _ -> throwHere "pattern match too simple, use a let binding instead"
 
 -- | A constructor pattern, i.e., neither a wildcard nor a variable pattern.
-data CPatn = MkCPatn (Name DCon) [Type] [Patn In]
+data CPatn = MkCPatn TmCon [Type] [Patn In]
 
 patnToCPatn :: Patn In -> Maybe CPatn
 patnToCPatn = \case
@@ -210,8 +210,7 @@ findCPatnCol (MkColMatch cs0 us) =
 
 -- | A single group of a grouped pattern match.
 data GrpMatchItem =
-  forall m m' n. m ~ 'LS.Succ m' =>
-  MkGrpMatchItem (Name DCon) [Type] [BPatn] (RowMatch m n)
+  forall m m' n. m ~ 'LS.Succ m' => MkGrpMatchItem TmCon [Type] [BPatn] (RowMatch m n)
 
 -- | A grouped pattern match. They result from the transformation in
 -- 'groupCPatn'.
@@ -243,7 +242,7 @@ groupCPatns :: forall m m' n effs. (CanPM effs, m ~ 'LS.Succ m') =>
   Col m CPatn -> RowMatch m n -> Eff effs GrpMatch
 groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = do
   let drs = toList (LS.zip ds rs)
-  (MkTConDecl _ _params dcons0, _dconDecl) <- findInfo info2dcons dcon0
+  (MkTyConDecl _ _params dcons0, _dconDecl) <- findInfo info2tmcons dcon0
   dcons1 <- case dcons0 of
     Right (d:ds) -> pure (d :| ds)
     _ -> impossible  -- the type checker guarantees that we pattern match only
@@ -260,7 +259,7 @@ groupCPatns (MkCol t ds@(LS.Cons (MkCPatn dcon0 _ts _) _)) (MkRowMatch es rs) = 
 
       drs2@(LS.Cons (MkCPatn con ts ps0, _) _) -> do
         -- TODO: This is overly complicated.
-        ixs0 <- traverse (const freshEVar) ps0
+        ixs0 <- traverse (const freshTmVar) ps0
         LS.withList (toList ixs0) $ \ixs -> do
           grpRows <- for drs2 $ \(MkCPatn _ _ts ps, MkRow qs u) ->
             case LS.match ixs ps of

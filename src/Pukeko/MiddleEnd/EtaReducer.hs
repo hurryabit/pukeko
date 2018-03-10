@@ -15,11 +15,11 @@ import           Pukeko.AST.Type
 reduceModule :: Module -> Module
 reduceModule = over (mod2supcs . traverse) erSupCDecl
 
-type FreeVars = (Set NameTVar, Set NameEVar)
+type FreeVars = (Set TyVar, Set TmVar)
 
 freeVars :: Arg -> FreeVars
 freeVars = \case
-  TmArg e -> (setOf (expr2type . traverse) e, setOf freeEVar e)
+  TmArg e -> (setOf (expr2type . traverse) e, setOf freeTmVar e)
   TyArg t -> (setOf traverse t, Set.empty)
 
 -- | Takes a list of abstractions and applications (together with the free

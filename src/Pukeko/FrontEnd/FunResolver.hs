@@ -18,8 +18,8 @@ import           Pukeko.AST.Name
 type In  = Surface
 
 data FRState = MkFRState
-  { _declared :: Map (Name EVar) SourcePos
-  , _defined  :: Set (Name EVar)
+  { _declared :: Map TmVar SourcePos
+  , _defined  :: Set TmVar
   }
 makeLenses ''FRState
 
@@ -42,7 +42,7 @@ declareFun = here' $ \(MkSignDecl fun _) -> do
   pos <- where_
   modifying declared (Map.insert fun pos)
 
-defineFun :: (CanFR effs, NameSpaceOf a ~ EVar, HasName a) => a -> Eff effs ()
+defineFun :: (CanFR effs, NameSpaceOf a ~ 'TmVar, HasName a) => a -> Eff effs ()
 defineFun (nameOf -> fun) = here fun $ do
   unlessM (uses declared (Map.member fun)) $
     throwHere ("undeclared function:" <+> pretty fun)

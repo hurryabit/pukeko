@@ -1,16 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 module Pukeko.AST.Name
-  ( NameSpace
-  , EVar
-  , Inst
-  , TVar
-  , DCon
-  , TCon
-  , Clss
-  , NameEVar
-  , NameTVar
-  , NameClss
+  ( NameSpace (..)
+  , TmVar
+  , TyVar
+  , TmCon
+  , TyCon
+  , Class
   , type (?:>)
   , Super (..)
   , Any
@@ -46,22 +42,19 @@ import Pukeko.Pretty
 
 -- | The four different name spaces. To be used as a kind.
 data NameSpace
-  = EVar
-  | TVar
-  | DCon
-  | TCon
-
-type EVar = 'EVar
-type Inst = 'EVar
-type TVar = 'TVar
-type DCon = 'DCon
-type TCon = 'TCon
-type Clss = 'TCon
+  = TmVar
+  | TyVar
+  | TmCon
+  | TyCon
 
 -- Saves us a few spaces, but more importantly tons of parentheses.
-type NameEVar = Name EVar
-type NameTVar = Name TVar
-type NameClss = Name Clss
+type TmVar = Name 'TmVar
+type TyVar = Name 'TyVar
+
+type TmCon = Name 'TmCon
+type TyCon = Name 'TyCon
+
+type Class = Name 'TyCon
 
 data Super s = Any | Only s
 type Any  = 'Any

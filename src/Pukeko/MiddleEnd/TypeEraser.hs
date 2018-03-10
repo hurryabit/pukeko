@@ -21,17 +21,17 @@ eraseModule m0@(In.MkModule _types extns supcs) = runCC m0 $ do
   supcs <- traverse ccSupCDecl (toList supcs)
   pure (extns ++ supcs)
 
-type CCState = Map (In.Name In.EVar) Name
+type CCState = Map In.TmVar Name
 
 type CC = Eff [Reader ModuleInfo, State CCState]
 
 runCC :: In.Module -> CC a -> a
 runCC mod0 = run . evalState mempty . runInfo mod0
 
-name :: In.Name In.EVar -> Name
+name :: In.TmVar -> Name
 name = MkName . untag . In.nameText
 
-bindName :: In.EVarBinder _ -> Name
+bindName :: In.TmBinder _ -> Name
 bindName = name . In.nameOf
 
 ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel
@@ -56,7 +56,8 @@ ccExpr = \case
       Nothing -> pure (Global (name z))
       Just s  -> pure (External s)
   In.ECon dcon  -> do
-    (_tcon, MkDConDecl{_dcon2tag = tag, _dcon2fields = flds}) <- findInfo info2dcons dcon
+    (_tcon, MkTmConDecl{_tmcon2tag = tag, _tmcon2fields = flds}) <-
+      findInfo info2tmcons dcon
     pure $ Pack tag (length flds)
   In.ENum n     -> pure $ Num n
   In.EAtm{} -> impossible  -- all cases matched above

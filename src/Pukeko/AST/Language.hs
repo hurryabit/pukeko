@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module Pukeko.AST.Language
   ( Surface
   , PreTyped

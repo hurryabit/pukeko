@@ -33,9 +33,9 @@ data Kind a where
   Arrow :: Kind a -> Kind a -> Kind a
   UVar  :: STRef s (UVar s) -> Kind (Open s)
 
-type KCEnv n s = Map (Name TVar) (Kind (Open s))
+type KCEnv n s = Map TyVar (Kind (Open s))
 
-type KCState s = Map (Name TCon) (Kind (Open s))
+type KCState s = Map TyCon (Kind (Open s))
 
 type KC n s =
   Eff
@@ -68,8 +68,8 @@ kcType k = \case
     unify Star k
     kcType Star t1
 
-kcTConDecl :: TConDecl -> KC n s ()
-kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
+kcTyConDecl :: TyConDecl -> KC n s ()
+kcTyConDecl (MkTyConDecl tcon prms dcons0) = here tcon $ do
   kind <- freshUVar
   modify (Map.insert tcon kind)
   paramKinds <- traverse (const freshUVar) prms
@@ -79,7 +79,7 @@ kcTConDecl (MkTConDecl tcon prms dcons0) = here tcon $ do
     case dcons0 of
       Left typ -> kcType Star typ
       Right dcons ->
-        for_ dcons $ here' $ \MkDConDecl{_dcon2fields = flds} ->
+        for_ dcons $ here' $ \MkTmConDecl{_tmcon2fields = flds} ->
           traverse_ (kcType Star) flds
   close kind
 
@@ -92,7 +92,7 @@ kcVal t = do
 
 kcDecl :: Decl In -> KC n s ()
 kcDecl = \case
-  DType tcon -> kcTConDecl tcon
+  DType tcon -> kcTyConDecl tcon
   DSign (MkSignDecl _ t) -> kcVal t
   DFunc{} -> pure ()
   DExtn{} -> pure ()

@@ -2,6 +2,8 @@
 module Pukeko.Prelude
   ( module X
 
+  , True
+  , False
   , Failure
   , CanThrowHere
   , throwFailure
@@ -73,6 +75,9 @@ import           Debug.Trace
 
 import           Pukeko.Pretty
 import           Pukeko.Orphans ()
+
+type True  = 'True
+type False = 'False
 
 type Failure = Doc
 
