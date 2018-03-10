@@ -38,6 +38,7 @@ module Pukeko.AST.Expr
 
   , mkETmAbs
   , unwindEAbs
+  , mkELet
   , mkTAbs
   , unEAnn
 
@@ -183,6 +184,11 @@ unwindEAbs = go []
       -- lambdas.
       ETyAnn _ expr@EAbs{} -> go params expr
       body -> (reverse params, body)
+
+mkELet :: BindMode -> [Bind lg] -> Expr lg -> Expr lg
+mkELet m bs e
+  | null bs   = e
+  | otherwise = ELet m bs e
 
 mkTAbs :: TypeOf lg ~ Type => Par lg -> Type -> Type
 mkTAbs = \case

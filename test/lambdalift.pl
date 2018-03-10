@@ -45,11 +45,17 @@ dict$Ring$Int : Ring Int =
   and mul : Int -> Int -> Int = mul_int
   in
   Dict$Ring @Int neg add sub mul
-main : IO Unit = print$ll1 (g$ll1 1 2 3 (h$ll1 2))
-add$ll1 : ∀a. Ring a -> a -> a -> a =
-  fun @a (dict : Ring a) ->
-    match dict with
-    | Dict$Ring _ add _ _ -> add
+main : IO Unit =
+  print$ll1 (let a : Int = 1
+             and b : Int = 2
+             and c : Int = 3
+             and d : Int =
+                   let x : Int = 2 in
+                   let dict : Ring Int = dict$Ring$Int in
+                   (match dict with
+                    | Dict$Ring _ add _ _ -> add) x x
+             in
+             a)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
@@ -58,7 +64,3 @@ io$ll2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io$ll1 @a @b f x)
 print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
-g$ll1 : Int -> Int -> Int -> Int -> Int =
-  fun (a : Int) (b : Int) (c : Int) (d : Int) -> a
-h$ll1 : Int -> Int =
-  fun (x : Int) -> add$ll1 @Int dict$Ring$Int x x

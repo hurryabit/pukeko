@@ -2,11 +2,12 @@ module Pukeko.MiddleEnd.Inliner where
 
 import Pukeko.Prelude
 
-import qualified Data.Map    as Map
+import           Control.Lens (_1)
+import qualified Data.Map.Extended as Map
 -- import           Debug.Trace
 
 import           Pukeko.AST.SuperCore
--- import           Pukeko.AST.Expr.Optics
+import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.MiddleEnd.CallGraph
@@ -17,78 +18,91 @@ newtype InState = InState
   { _inlinables :: Map TmVar (FuncDecl (Only SupC))
   }
 
-type In = Eff '[State InState]
+type CanInline effs = Members [State InState, NameSource] effs
+
+type BindGroup = (BindMode, [Bind])
+
+type CtxtExpr = ([BindGroup], Expr, [Arg])
 
 makeLenses ''InState
 
-makeInlinable :: FuncDecl (Only SupC) -> In ()
+makeInlinable :: CanInline effs => FuncDecl (Only SupC) -> Eff effs ()
 makeInlinable supc = modifying inlinables (Map.insert (nameOf supc) supc)
 
-unwind :: Expr -> (Expr, [Type], [Expr])
-unwind e0 =
-  let (e1, as) = unwindl _ETmApp e0
-      (e2, ts) = unwindl _ETyApp e1
-  in  (e2, ts, as)
+copySupCDecl :: Member NameSource effs =>
+  SourcePos -> FuncDecl (Only SupC) -> Eff effs (FuncDecl (Only SupC))
+copySupCDecl pos (SupCDecl z t ps0 e0) = do
+  let xs :: [TmVar]
+      xs = toListOf (traverse . _TmPar . _1) ps0
+  subst <- Map.fromList . zip xs <$> traverse (copyName pos) xs
+  let ps1 = over (traverse . _TmPar . _1) (subst Map.!) ps0
+  let e1 = over freeTmVar (subst Map.!) e0
+  pure (SupCDecl z t ps1 e1)
 
--- | Replace a reference to an alias by a reference to the target of the alias.
-inEVal :: TmVar -> In Expr
-inEVal z0 = do
-  fdecl_mb <- uses inlinables (Map.lookup z0)
-  case fdecl_mb of
-    Just (SupCDecl _z0 _t0 [] (EVal z1)) -> inEVal z1
-    _ -> pure (EVal z0)
+matchArgs :: [(Par, Arg)] -> ([Bind], Map TyVar Type)
+matchArgs pas =
+  let f :: (Par, Arg) -> ([Bind], Map TyVar Type)
+      f = \case
+        (TmPar (x, t), TmArg e) -> ([MkBind (x, t) e], Map.empty)
+        (TyPar v     , TyArg t) -> ([], Map.singleton v t)
+        _ -> impossible
+      (bs, subst) = foldMap f pas
+  in  (over (traverse . b2binder . _2) (>>= (subst Map.!)) bs, subst)
 
--- inRedex :: forall tv ev. (BaseTVar tv, BaseEVar ev) =>
---   Expr tv ev -> In (Expr tv ev)
--- inRedex e0 = do
---   let (f, ts, as) = unwind e0
---   let continue = foldl ETmApp (mkETyApp f ts) <$> traverse inExpr as
---   case f of
---     EVal z0 -> do
---       supc_mb <- uses inlinables (Map.lookup z0)
---       case supc_mb of
---         Just (SupCDecl _ _ [] [] (EVal z1)) ->
---           -- trace ("INLINING: " ++ render (pretty e0))
---             (inExpr (foldl ETmApp (EVal z1 `mkETyApp` ts) as))
---         Just (SupCDecl _ _ vs xs e1)
---           -- NOTE: We don't want to inline CAFs. That's why we ensure @1 <= n@.
---           | length vs == length ts && 1 <= n && n <= length as -> do
---               let (as0, as1) = splitAt n as
---               let tsV = Vec.fromList ts
---               let defns = zipWith
---                           (Bind . over bind2type (instantiate' (tsV Vec.!)))
---                           xs as0
---               let e2 :: Expr (TScope Int tv) (EScope Int ev)
---                   e2 = bimap (over _Free absurd) (over _Free absurd) e1
---               let inst :: Traversable s => Type (s (TScope Int tv)) -> Type (s tv)
---                   inst t = t >>= traverse (scope pure (tsV Vec.!))
---               let body :: Expr tv (EScope Int ev)
---                   body = runIdentity (expr2type (Identity . inst) e2)
---               let let_ = ELet defns body
---               -- trace ("INLINING: " ++ render (pretty e0))
---               (inExpr (foldl ETmApp let_ as1))
---           where n = length xs
---         Nothing -> continue
---         _ -> trace ("NOT INLINING: " ++ render (pretty e0)) continue
---     _ -> continue
+inline :: (CanInline effs, Member (Reader SourcePos) effs) =>
+  CtxtExpr -> Eff effs CtxtExpr
+inline ce0@(gs0, e0, as0) =
+  case e0 of
+    ELet m bs0 e1 -> do
+      bs1 <- (traverse . b2bound) inlineExpr bs0
+      inline ((m, bs1):gs0, e1, as0)
 
-inExpr :: Expr -> In Expr
-inExpr e0 = case e0 of
-  EVal z     -> inEVal z
-  EVar x     -> pure (EVar x)
-  ECon c     -> pure (ECon c)
-  ENum n     -> pure (ENum n)
-  EAtm{} -> impossible  -- all cases matched above
-  ETmApp e  a  -> ETmApp <$> inExpr e <*> inExpr a
-  EApp   e  a  -> EApp <$> inExpr e <*> pure a
-  EMat t e cs -> EMat t <$> inExpr e <*> (traverse . altn2expr) inExpr cs
-  ELet m ds t -> ELet m <$> (traverse . b2bound) inExpr ds <*> inExpr t
-  ECast coe e -> ECast coe <$> inExpr e
+    EApp e1 a0 -> do
+      a1 <- arg2expr inlineExpr a0
+      inline (gs0, e1, a1:as0)
 
-inSupCDecl :: FuncDecl (Only SupC) -> In (FuncDecl (Only SupC))
-inSupCDecl = func2expr inExpr
+    EVal z0 -> do
+      uses inlinables (Map.lookup z0) >>= \case
+        Nothing -> pure ce0
 
-inSCC :: SCC (FuncDecl (Only SupC)) -> In Module
+        Just supc@(SupCDecl _z0 _t0 ps1 e1)
+          -- We only inline CAFs if they are links.
+          | null ps1, EVal{} <- e1  -> inline (gs0, e1, as0)
+          | null ps1                -> pure ce0
+
+          -- We cannot simplify partial applications.
+          | length ps1 > length as0 -> pure ce0
+
+          | otherwise -> do
+              pos <- ask @SourcePos
+              copySupCDecl pos supc >>= \case
+                SupCDecl _z0 _t0 ps1 e1 -> do
+                  let (as1, as2) = splitAt (length ps1) as0
+                      (bs, subst) = matchArgs (zip ps1 as1)
+                      e2 = over expr2type (>>= (subst Map.!)) e1
+                  inline ((BindPar, bs):gs0, e2, as2)
+
+    EMat t scrut altns -> do
+      e1 <- EMat t <$> inlineExpr scrut <*> (traverse . altn2expr) inlineExpr altns
+      pure (gs0, e1, as0)
+
+    ECast c e1 -> do
+      e2 <- inlineExpr e1
+      pure (gs0, ECast c e2, as0)
+
+    EVar{}  -> pure ce0
+    EAtm{}  -> pure ce0
+
+
+inlineExpr :: (CanInline effs, Member (Reader SourcePos) effs) => Expr -> Eff effs Expr
+inlineExpr e0 = do
+  (gs1, e1, as1) <- inline ([], e0, [])
+  pure (foldl (\e (m, bs) -> mkELet m bs e) (rewindl EApp e1 as1) gs1)
+
+inSupCDecl :: CanInline effs => FuncDecl (Only SupC) -> Eff effs (FuncDecl (Only SupC))
+inSupCDecl decl = func2expr inlineExpr decl & runReader (getPos decl)
+
+inSCC :: CanInline effs => SCC (FuncDecl (Only SupC)) -> Eff effs Module
 inSCC = \case
   CyclicSCC supcs0 -> do
     supcs1 <- traverse inSupCDecl supcs0
@@ -101,9 +115,9 @@ inSCC = \case
     makeInlinable supc1
     pure (mkFuncDecl supc1)
 
-inlineModule :: Module -> Module
-inlineModule = over mod2supcs $ \supcs0 ->
+inlineModule :: Member NameSource effs => Module -> Eff effs Module
+inlineModule  = mod2supcs $ \supcs0 -> do
   let sccs = scc (makeCallGraph' supcs0)
       st0  = InState mempty
-      mod1 = run (evalState st0 (fold <$> traverse inSCC sccs))
-  in  _mod2supcs mod1
+  mod1 <- evalState st0 (fold <$> traverse inSCC sccs)
+  pure (_mod2supcs mod1)
