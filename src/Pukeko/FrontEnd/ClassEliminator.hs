@@ -19,7 +19,7 @@ import           Pukeko.FrontEnd.Info
 type In  = Unnested
 type Out = Unclassy
 
-type DictMap = Map (NameTVar, NameClss) NameEVar
+type DictMap = Map (TyVar, Class) TmVar
 type CanCE effs =
   Members [Reader DictMap, Reader SourcePos, Reader ModuleInfo, NameSource] effs
 type CE a = forall effs. CanCE effs => Eff effs a
@@ -40,11 +40,11 @@ mkTDict (clss, t) = TApp (TCon clss) t
 
 -- | Construct the dictionary data type declaration of a type class declaration.
 -- See 'elimClssDecl' for an example.
-dictTConDecl :: ClssDecl -> TConDecl
-dictTConDecl (MkClssDecl clss prm dcon mthds) =
+dictTConDecl :: ClassDecl -> TyConDecl
+dictTConDecl (MkClassDecl clss prm dcon mthds) =
     let flds = map _sign2type mthds
-        dconDecl = MkDConDecl clss dcon 0 flds
-    in  MkTConDecl clss [prm] (Right [dconDecl])
+        dconDecl = MkTmConDecl clss dcon 0 flds
+    in  MkTyConDecl clss [prm] (Right [dconDecl])
 
 -- | Transform a type class declaration into a data type declaration for the
 -- dictionary and projections from the dictionary to each class method.
@@ -64,8 +64,8 @@ dictTConDecl (MkClssDecl clss prm dcon mthds) =
 -- >     fun (dict : Dict$Traversable t) ->
 -- >       match dict with
 -- >       | Dict$Traversable @t traverse -> traverse
-elimClssDecl :: ClssDecl -> CE [Decl Out]
-elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
+elimClssDecl :: ClassDecl -> CE [Decl Out]
+elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
   let tcon = dictTConDecl clssDecl
   let cstr = (clss, TVar prm)
   sels <- ifor mthds $ \i (MkSignDecl z t0) -> do
@@ -97,9 +97,9 @@ elimClssDecl clssDecl@(MkClssDecl clss prm dcon mthds) = do
 -- >         sequence @b @m (map @List @a @(m b) f xs)
 -- >   in
 -- >   Dict$Traversable @List traverse
-elimInstDecl :: ClssDecl -> InstDecl In -> CE [Decl In]
+elimInstDecl :: ClassDecl -> InstDecl In -> CE [Decl In]
 elimInstDecl
-  (MkClssDecl _ _ dcon methods0)
+  (MkClassDecl _ _ dcon methods0)
   inst@(MkInstDecl z_dict clss tatom prms cstrs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
   let t_dict0 = mkTDict (clss, t_inst)
@@ -127,8 +127,8 @@ elimDecl = here' $ \case
   DInst inst  -> do
     -- TODO: Constructing the declaration of the dictionary type again and
     -- putting it in the environment locally is a bit a of a hack.
-    clss <- findInfo info2clsss (inst^.inst2clss)
-    local (<> tconDeclInfo (dictTConDecl clss)) $ do
+    clss <- findInfo info2classes (inst^.inst2class)
+    local (<> tyconDeclInfo (dictTConDecl clss)) $ do
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
 
@@ -147,7 +147,7 @@ buildDict (clss, unwindl _TApp -> (t1, args)) =
 -- | Name of the dictionary for a type class instance of either a known type
 -- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
 -- @dict$Monoid$m@.
-dictEVar :: NameClss -> Name TVar -> CE (Name EVar)
+dictEVar :: Class -> TyVar -> CE TmVar
 dictEVar clss tvar = do
   let name0 = "dict$" ++ untag (nameText clss) ++ "$" ++ untag (nameText tvar)
   mkName (Lctd noPos (Tagged name0))
@@ -198,7 +198,7 @@ unclssDecl = \case
   DType tcon ->
     -- TODO: We're making the asusmption that type synonyms don't contain class
     -- constraints. This might change in the future.
-    let tcon2type = tcon2dcons . _Right . traverse . dcon2fields . traverse
+    let tcon2type = tycon2tmcons . _Right . traverse . tmcon2fields . traverse
     in  DType (over tcon2type unclssType tcon)
   DFunc (MkFuncDecl name typ0 body0) ->
     let body1 = over expr2type unclssType body0

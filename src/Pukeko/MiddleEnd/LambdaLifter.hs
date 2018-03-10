@@ -27,16 +27,16 @@ type CanLL effs =
   ( CanGamma effs
   , Members [ Supply Int
             , Reader ModuleInfo
-            , Reader NameEVar
+            , Reader TmVar
             , Writer Core.Module, NameSource
             ]
     effs
   )
 type LL a = forall effs. CanLL effs => Eff effs a
 
-freshEVar :: LL (Name EVar)
+freshEVar :: LL TmVar
 freshEVar = do
-  func <- ask @NameEVar
+  func <- ask @TmVar
   n <- fresh @Int
   mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
 
@@ -84,7 +84,7 @@ llETmAbs oldPars t_rhs rhs1 = do
            setOf (traverse . _TmPar . to nameOf) oldPars)
     (evCaptured, newTmPars)  <-
       fmap (unzip . map snd . sortOn fst) . for evCaptured0 $ \x -> do
-        (t, i) <- lookupEVarIx x
+        (t, i) <- lookupTmVarIx x
         bind <- (, t) <$> copyName noPos x
         pure (i, (x, bind))
     let allPars0 = map TmPar newTmPars ++ map coercePar oldPars
@@ -99,12 +99,12 @@ llETmAbs oldPars t_rhs rhs1 = do
     -- TODO: Sort type variable binders in descreasing de Bruijn index order.
     tyPars <- traverse (copyName noPos) tvCaptured
     let tvMap = Map.fromList (zipExact tvCaptured tyPars)
-    let tvRename :: NameTVar -> NameTVar
+    let tvRename :: TyVar -> TyVar
         tvRename v = Map.findWithDefault v v tvMap
     let evMap = map nameOf newTmPars
                 & zipExact evCaptured
                 & Map.fromList
-    let evRename :: NameEVar -> NameEVar
+    let evRename :: TmVar -> TmVar
         evRename x = Map.findWithDefault x x evMap
     let allPars1 =
           map TyPar tyPars ++ over (traverse . _TmPar . _2 . traverse) tvRename allPars0
@@ -126,13 +126,13 @@ llExpr = \case
   ELet BindPar ds e0 ->
     ELet BindPar
     <$> (traverse . b2bound) llExpr ds
-    <*> withinEScope (map _b2binder ds) (llExpr e0)
+    <*> introTmVars (map _b2binder ds) (llExpr e0)
   ELet BindRec ds e0 ->
-    withinEScope (map _b2binder ds) $
+    introTmVars (map _b2binder ds) $
       ELet BindRec <$> (traverse . b2bound) llExpr ds <*> llExpr e0
   elam@EAbs{}
     | (pars, ETyAnn t_rhs rhs0) <- unwindEAbs elam -> do
-        rhs1 <- withinScope pars (llExpr rhs0)
+        rhs1 <- introPars pars (llExpr rhs0)
         llETmAbs pars t_rhs rhs1
   EAbs{} -> impossible  -- the type inferencer puts types around lambda bodies
   ECast coe e0 -> ECast coe <$> llExpr e0
@@ -141,12 +141,12 @@ llExpr = \case
 
 llAltn :: Altn In -> LL (Altn Out)
 llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
-  (MkTConDecl _ vs _, MkDConDecl _ _ _ flds0) <- findInfo info2dcons dcon
+  (MkTyConDecl _ vs _, MkTmConDecl _ _ _ flds0) <- findInfo info2tmcons dcon
   assertM (length vs == length ts0)  -- the kind checker guarantees this
   let env0 = Map.fromList (zipExact vs ts0)
   let t_flds = fmap (>>= (env0 Map.!)) flds0
   let env = catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bs t_flds)
-  MkAltn (PSimple dcon ts0 bs) <$> withinEScope env (llExpr e)
+  MkAltn (PSimple dcon ts0 bs) <$> introTmVars env (llExpr e)
 
 llDecl :: Members [Reader ModuleInfo, Writer Core.Module, NameSource] effs =>
   Decl In -> Eff effs ()

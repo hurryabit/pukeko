@@ -45,13 +45,13 @@ data UVar s
   = UFree UVarId Level
   | ULink (UType s)
 
-type UTypeCstr s = (NameClss, UType s)
+type UTypeCstr s = (Class, UType s)
 
 data UType s
-  = UTVar NameTVar
+  = UTVar TyVar
   | UTAtm TypeAtom
   | UTApp (UType s) (UType s)
-  | UTUni NameTVar (UType s)
+  | UTUni TyVar (UType s)
   | UTCtx (UTypeCstr s) (UType s)
   | UVar (STRef s (UVar s))
 
@@ -60,7 +60,7 @@ makePrisms ''UType
 pattern UTFun :: UType s -> UType s -> UType s
 pattern UTFun tx ty = UTApp (UTApp (UTAtm TAArr) tx) ty
 
-pattern UTCon :: Name TCon -> UType s
+pattern UTCon :: TyCon -> UType s
 pattern UTCon tcon = UTAtm (TACon tcon)
 
 topLevel :: Level
@@ -69,7 +69,7 @@ topLevel = Level 0
 uvarIds :: [UVarId]
 uvarIds = map UVarId [1 ..]
 
-uvarIdName :: UVarId -> Tagged TVar String
+uvarIdName :: UVarId -> Tagged 'TyVar String
 uvarIdName (UVarId n) = Tagged ('_':show n)
 
 infixr 1 ~>
@@ -100,7 +100,7 @@ open1 = \case
   TUni xs tq -> UTUni xs (open1 (B.instantiate (TVar . UTVar . B.name) tq))
   TCtx (clss, tc) tq -> UTCtx (clss, open1 tc) (open1 tq)
 
-substUType :: Map NameTVar (UType s) -> UType s -> ST s (UType s)
+substUType :: Map TyVar (UType s) -> UType s -> ST s (UType s)
 substUType env = go
   where
     go t0 = case t0 of

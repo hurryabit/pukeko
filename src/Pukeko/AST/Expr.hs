@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -6,7 +5,7 @@ module Pukeko.AST.Expr
   ( Expr (..)
   , BindMode (..)
   , Atom (..)
-  , EVarBinder
+  , TmBinder
   , Bind (..)
   , Arg  (..)
   , Par  (..)
@@ -60,32 +59,43 @@ import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 
 data Atom
-  = AVal (Name EVar)
-  | ACon (Name DCon)
+  = AVal TmVar
+  | ACon TmCon
   | ANum Int
 
-type EVarBinder ty = (NameEVar, ty)
-
-data Bind lg = MkBind
-  { _b2binder :: EVarBinder (TypeOf lg)
-  , _b2bound  :: Expr lg
-  }
-
-data BindMode = BindPar | BindRec
+type TmBinder ty = (TmVar, ty)
 
 data Arg lg
   =                TmArg (Expr lg)
   | HasTyApp lg => TyArg (TypeOf lg)
-  | HasCxApp lg => CxArg (NameClss, TypeOf lg)
+  | HasCxApp lg => CxArg (Class, TypeOf lg)
 
 data Par lg
-  = HasTmAbs lg => TmPar (EVarBinder (TypeOf lg))
-  | HasTyAbs lg => TyPar NameTVar
+  = HasTmAbs lg => TmPar (TmBinder (TypeOf lg))
+  | HasTyAbs lg => TyPar TyVar
   | HasCxAbs lg => CxPar TypeCstr
+
+data BindMode = BindPar | BindRec
+
+data Bind lg = MkBind
+  { _b2binder :: TmBinder (TypeOf lg)
+  , _b2bound  :: Expr lg
+  }
+
+data Patn lg
+  = IsNested lg ~ True  => PWld
+  | IsNested lg ~ True  => PVar    TmVar
+  | IsNested lg ~ True  => PCon    TmCon [TypeOf lg] [Patn lg]
+  | IsNested lg ~ False => PSimple TmCon [TypeOf lg] [Maybe TmVar]
+
+data Altn lg = MkAltn
+  { _altn2patn :: Patn lg
+  , _altn2expr :: Expr lg
+  }
 
 data Expr lg
   = IsLambda lg ~ True   => ELoc (Lctd (Expr lg))
-  |                         EVar (Name EVar)
+  |                         EVar TmVar
   |                         EAtm Atom
   |                         EApp (Expr lg) (Arg  lg)
   | IsLambda lg ~ True   => EAbs (Par  lg) (Expr lg)
@@ -93,22 +103,10 @@ data Expr lg
   |                         EMat (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
-
-data Altn lg = MkAltn
-  { _altn2patn :: Patn lg
-  , _altn2expr :: Expr lg
-  }
-
-data Patn lg
-  = IsNested lg ~ True  => PWld
-  | IsNested lg ~ True  => PVar    (Name EVar)
-  | IsNested lg ~ True  => PCon    (Name DCon) [TypeOf lg] [Patn lg]
-  | IsNested lg ~ False => PSimple (Name DCon) [TypeOf lg] [Maybe (Name EVar)]
-
-pattern EVal :: Name EVar -> Expr lg
+pattern EVal :: TmVar -> Expr lg
 pattern EVal z = EAtm (AVal z)
 
-pattern ECon :: Name DCon -> Expr lg
+pattern ECon :: TmCon -> Expr lg
 pattern ECon c = EAtm (ACon c)
 
 pattern ENum :: Int -> Expr lg
@@ -120,19 +118,18 @@ pattern ETmApp fun arg = EApp fun (TmArg arg)
 pattern ETyApp :: HasTyApp lg => Expr lg -> TypeOf lg -> Expr lg
 pattern ETyApp fun typ = EApp fun (TyArg typ)
 
-pattern ECxApp :: HasCxApp lg => Expr lg -> (NameClss, TypeOf lg) -> Expr lg
+pattern ECxApp :: HasCxApp lg => Expr lg -> (Class, TypeOf lg) -> Expr lg
 pattern ECxApp fun cx = EApp fun (CxArg cx)
 
 pattern ETmAbs :: (IsLambda lg ~ True, HasTmAbs lg) =>
-  EVarBinder (TypeOf lg) -> Expr lg -> Expr lg
+  TmBinder (TypeOf lg) -> Expr lg -> Expr lg
 pattern ETmAbs par body = EAbs (TmPar par) body
 
-pattern ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) =>
-  NameTVar -> Expr lg -> Expr lg
+pattern ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) => TyVar -> Expr lg -> Expr lg
 pattern ETyAbs par body = EAbs (TyPar par) body
 
 pattern ECxAbs :: (IsLambda lg ~ True, HasCxAbs lg) =>
-  (NameClss, TypeOf lg) -> Expr lg -> Expr lg
+  (Class, TypeOf lg) -> Expr lg -> Expr lg
 pattern ECxAbs cx body = EAbs (CxPar cx) body
 
 -- * Derived optics
@@ -161,7 +158,7 @@ _ETyApp = prism' (uncurry ETyApp) $ \case
   ETyApp e t -> Just (e, t)
   _          -> Nothing
 
-_ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) => Prism' (Expr lg) (NameTVar, Expr lg)
+_ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) => Prism' (Expr lg) (TyVar, Expr lg)
 _ETyAbs = prism' (uncurry ETyAbs) $ \case
   ETyAbs v e -> Just (v, e)
   _          -> Nothing
@@ -170,7 +167,7 @@ _ETyAbs = prism' (uncurry ETyAbs) $ \case
 
 mkETmAbs ::
   (IsLambda lg ~ True, IsPreTyped lg ~ True, TypeOf lg ~ Type) =>
-  [EVarBinder (TypeOf lg)] -> Type -> Expr lg -> Expr lg
+  [TmBinder (TypeOf lg)] -> Type -> Expr lg -> Expr lg
 mkETmAbs bs0 t0 e0 = case bs0 of
   [] -> e0
   _  -> rewindr ETmAbs bs0 (ETyAnn t0 e0)
@@ -200,7 +197,7 @@ unEAnn = \case
 
 -- * Instances
 
-type instance NameSpaceOf (Bind lg) = EVar
+type instance NameSpaceOf (Bind lg) = 'TmVar
 instance HasName (Bind lg) where nameOf = nameOf . _b2binder
 instance HasPos  (Bind lg) where getPos = getPos . nameOf
 

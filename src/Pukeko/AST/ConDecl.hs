@@ -1,10 +1,10 @@
 {-# LANGUAGE ViewPatterns #-}
 module Pukeko.AST.ConDecl
-  ( TConDecl (..)
-  , DConDecl (..)
-  , tcon2dcons
-  , dcon2fields
-  , typeOfDCon
+  ( TyConDecl (..)
+  , TmConDecl (..)
+  , tycon2tmcons
+  , tmcon2fields
+  , typeOfTmCon
   ) where
 
 import Pukeko.Prelude
@@ -17,35 +17,35 @@ import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
 -- TODO: We could make it @Type Int@!?
-data TConDecl = MkTConDecl
-  { _tcon2name  :: Name TCon
-  , _tcon2prms  :: [NameTVar]
-  , _tcon2dcons :: Either Type [DConDecl]
+data TyConDecl = MkTyConDecl
+  { _tycon2name   :: TyCon
+  , _tycon2params :: [TyVar]
+  , _tycon2tmcons :: Either Type [TmConDecl]
   }
 
-data DConDecl = MkDConDecl
-  { _dcon2tcon   :: Name TCon
-  , _dcon2name   :: Name DCon
-  , _dcon2tag    :: Int
-  , _dcon2fields :: [Type]
+data TmConDecl = MkTmConDecl
+  { _tmcon2tycon  :: TyCon
+  , _tmcon2name   :: TmCon
+  , _tmcon2tag    :: Int
+  , _tmcon2fields :: [Type]
   }
 
-typeOfDCon :: TConDecl -> DConDecl -> Type
-typeOfDCon (MkTConDecl tcon tparams _) (MkDConDecl tconRef _  _ fields) =
-  assert (tcon == tconRef) $
-  let res = rewindl TApp (TCon tcon) (map TVar tparams)
-      typ = rewindr TUni' tparams (fields *~> res)
+typeOfTmCon :: TyConDecl -> TmConDecl -> Type
+typeOfTmCon (MkTyConDecl tycon params _) (MkTmConDecl tyconRef _  _ fields) =
+  assert (tycon == tyconRef) $
+  let res = rewindl TApp (TCon tycon) (map TVar params)
+      typ = rewindr TUni' params (fields *~> res)
   in  assert (nullOf folded typ) typ
 
-type instance NameSpaceOf TConDecl = TCon
-type instance NameSpaceOf DConDecl = DCon
-instance HasName   TConDecl where nameOf = _tcon2name
-instance HasName   DConDecl where nameOf = _dcon2name
-instance HasPos    TConDecl where getPos = getPos . nameOf
-instance HasPos    DConDecl where getPos = getPos . _dcon2name
+type instance NameSpaceOf TyConDecl = 'TyCon
+type instance NameSpaceOf TmConDecl = 'TmCon
+instance HasName   TyConDecl where nameOf = _tycon2name
+instance HasName   TmConDecl where nameOf = _tmcon2name
+instance HasPos    TyConDecl where getPos = getPos . nameOf
+instance HasPos    TmConDecl where getPos = getPos . nameOf
 
-instance Pretty TConDecl where
-  pretty (MkTConDecl tname prms dcons0) =
+instance Pretty TyConDecl where
+  pretty (MkTyConDecl tname prms dcons0) =
     case dcons0 of
       Left typ -> lhs <+> "=" <+> pretty typ
       Right dcons
@@ -54,15 +54,15 @@ instance Pretty TConDecl where
     where
       lhs = pretty tname <+> hsepMap pretty prms
 
-instance Pretty DConDecl where
-  pretty (MkDConDecl _ dname _ flds) =
+instance Pretty TmConDecl where
+  pretty (MkTmConDecl _ dname _ flds) =
     "|" <+> pretty dname <+> hsepMap (prettyPrec 3) flds
 
-deriving instance Show TConDecl
-deriving instance Show DConDecl
+deriving instance Show TyConDecl
+deriving instance Show TmConDecl
 
-makeLensesFor [("_tcon2dcons" , "tcon2dcons" )] ''TConDecl
-makeLensesFor [("_dcon2fields", "dcon2fields")] ''DConDecl
+makeLensesFor [("_tycon2tmcons", "tycon2tmcons")] ''TyConDecl
+makeLensesFor [("_tmcon2fields", "tmcon2fields")] ''TmConDecl
 
-deriveToJSON defaultOptions ''TConDecl
-deriveToJSON defaultOptions ''DConDecl
+deriveToJSON defaultOptions ''TyConDecl
+deriveToJSON defaultOptions ''TmConDecl

@@ -15,7 +15,7 @@ import           Pukeko.AST.Type
 reduceModule :: Module -> Module
 reduceModule = over (mod2supcs . traverse) erSupCDecl
 
-type FreeVars = (Set NameTVar, Set NameEVar)
+type FreeVars = (Set TyVar, Set TmVar)
 
 freeVars :: Arg -> FreeVars
 freeVars = \case

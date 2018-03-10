@@ -57,25 +57,25 @@ class IsType t where
 
 data NoType = NoType
 
-type GenTypeCstr v = (NameClss, GenType v)
+type GenTypeCstr v = (Class, GenType v)
 
-type TypeCstr = GenTypeCstr NameTVar
+type TypeCstr = GenTypeCstr TyVar
 
 data TypeAtom
   = TAArr
   | TAInt
-  | TACon (Name TCon)
+  | TACon TyCon
 
 data GenType tv
   = TVar tv
   | TAtm TypeAtom
   | TApp (GenType tv) (GenType tv)
-  | TUni NameTVar (B.Scope (B.Name NameTVar ()) GenType tv)
-  | TCtx (NameClss, GenType tv) (GenType tv)
+  | TUni TyVar (B.Scope (B.Name TyVar ()) GenType tv)
+  | TCtx (Class, GenType tv) (GenType tv)
     -- NOTE: ^ The first pair is actually a @GenTypeCstr tv@. Unfortunately,
     -- putting the type synonym there breaks @B.makeBound ''GenType@ below.
 
-type Type = GenType (Name TVar)
+type Type = GenType TyVar
 
 pattern TArr :: GenType tv
 pattern TArr = TAtm TAArr
@@ -83,7 +83,7 @@ pattern TArr = TAtm TAArr
 pattern TInt :: GenType tv
 pattern TInt = TAtm TAInt
 
-pattern TCon :: Name TCon -> GenType tv
+pattern TCon :: TyCon -> GenType tv
 pattern TCon tcon = TAtm (TACon tcon)
 
 pattern TFun :: GenType tv -> GenType tv -> GenType tv
@@ -93,7 +93,7 @@ data CoercionDir = Inject | Project
 
 data Coercion = MkCoercion
   { _coeDir  :: CoercionDir
-  , _coeTCon :: Name TCon
+  , _coeTCon :: TyCon
   }
 
 -- | A convenience data type to make pretty printing of (name, type) pairs in
@@ -108,11 +108,11 @@ _Scope1Name = iso
   (\(v, s) -> (v, B.instantiate1Name (pure v) s))
   (\(v, t) -> (v, B.abstract1Name v t))
 
-pattern TUni' :: NameTVar -> Type -> Type
+pattern TUni' :: TyVar -> Type -> Type
 pattern TUni' v t <- TUni v (B.instantiate1Name (TVar v) -> t)
   where TUni' v t = TUni v (B.abstract1Name v t)
 
-_TUni' :: Prism' Type (NameTVar, Type)
+_TUni' :: Prism' Type (TyVar, Type)
 _TUni' = _TUni . _Scope1Name
 
 closeT :: HasCallStack => Type -> GenType Void
@@ -129,7 +129,7 @@ t_args *~> t_res = foldr (~>) t_res t_args
 mkTApp :: (Foldable t) => GenType tv -> t (GenType tv) -> GenType tv
 mkTApp = foldl TApp
 
-typeAtomText :: TypeAtom -> Tagged TCon String
+typeAtomText :: TypeAtom -> Tagged 'TyCon String
 typeAtomText = \case
   TAArr   -> "Arr"
   TAInt   -> "Int"
@@ -179,7 +179,7 @@ instance Pretty v => PrettyPrec (GenType v) where
         t0@TUni{} ->
           goUni [] prettyVar t0
           where
-            goUni :: forall v. [NameTVar] -> (v -> Doc) -> GenType v -> Doc
+            goUni :: forall v. [TyVar] -> (v -> Doc) -> GenType v -> Doc
             goUni vs prettyVar = \case
               TUni v t1 ->
                 goUni (v:vs) (B.unvar (pretty . B.name) prettyVar) (B.fromScope t1)
@@ -199,7 +199,7 @@ prettyContext cstrs
   | null cstrs = mempty
   | otherwise  = parens (hsep (punctuate "," (map prettyCstr cstrs))) <+> "=>"
 
-prettyTUni :: Foldable t => Int -> t NameTVar -> Doc -> Doc
+prettyTUni :: Foldable t => Int -> t TyVar -> Doc -> Doc
 prettyTUni prec vs tq =
   maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> tq)
 

@@ -14,7 +14,7 @@ import           Pukeko.AST.Expr
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 
-subst' :: Applicative f => (NameEVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
+subst' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
 subst' f = go Set.empty
   where
     go bound = \case
@@ -38,13 +38,13 @@ subst' f = go Set.empty
       ETyAnn t  e -> ETyAnn t <$> go bound e
     goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnEVar p) e
 
-freeEVar :: Traversal' (Expr lg) NameEVar
+freeEVar :: Traversal' (Expr lg) TmVar
 freeEVar f = subst' (fmap EVar . f)
 
-subst :: (NameEVar -> Expr lg) -> Expr lg -> Expr lg
+subst :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
 subst f = runIdentity . subst' (Identity . f)
 
-patnEVar :: Traversal' (Patn lg) NameEVar
+patnEVar :: Traversal' (Patn lg) TmVar
 patnEVar f = \case
   PWld -> pure PWld
   PVar x -> PVar <$> f x

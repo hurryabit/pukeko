@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -24,14 +23,14 @@ import           Pukeko.AST.ConDecl
 -- | Declaration of a function signature (@SignDecl Void@) or a method signature
 -- (@SignDecl (TScope Int Void)@).
 data SignDecl tv = MkSignDecl
-  { _sign2name :: Name EVar
+  { _sign2name :: TmVar
   , _sign2type :: Type
   }
 
 -- | Definition of a function (@FuncDecl lg Void@) or an instance method
 -- (@FuncDecl lg (TScope Int Void)@).
 data FuncDecl lg tv = MkFuncDecl
-  { _func2name :: Name EVar
+  { _func2name :: TmVar
   , _func2type :: TypeOf lg
     -- ^ Before type inference, this is 'TArr' and hence bogus. Since 'TArr'
     -- doesn't have kind '*', it will never be there after type inference. This
@@ -41,7 +40,7 @@ data FuncDecl lg tv = MkFuncDecl
 
 -- | Declaration of an external function.
 data ExtnDecl lg = MkExtnDecl
-  { _extn2name :: Name EVar
+  { _extn2name :: TmVar
   , _extn2type :: TypeOf lg
     -- ^ Before type inference, this is 'TArr' for the same reason given for
     -- '_func2type'.
@@ -49,38 +48,38 @@ data ExtnDecl lg = MkExtnDecl
   }
 
 -- | Declaration of a class.
-data ClssDecl = MkClssDecl
-  { _clss2name    :: Name Clss
-  , _clss2param   :: Name TVar
-  , _clss2dcon    :: Name DCon
+data ClassDecl = MkClassDecl
+  { _class2name    :: Class
+  , _class2param   :: TyVar
+  , _class2tmcon   :: TmCon
     -- ^ During type class elimination, we introduce a data constructor for the
     -- dictionary type. The easiest way to get and distribute a 'Name' for this
     -- constructor is to get it during renaming and carry it around afterwards.
     -- For class @XYZ@ this constructor is called @Dict$XZY@.
-  , _clss2methods :: [SignDecl (Name TVar)]
+  , _clss2methods :: [SignDecl TyVar]
   }
 
 -- | Definition of an instance of a class.
 data InstDecl lg = MkInstDecl
-  { _inst2name    :: Name Inst
+  { _inst2name    :: TmVar
     -- ^ During type class elimination, we introduce a top level value for the
     -- dictionary. We generate the name for this value during renaming, cf.
     -- '_clss2dcon'. For class @XZY@ and type constructor @ABC@ this value is
     -- named @dict$XZY$ABC@.
-  , _inst2clss    :: Name Clss
-  , _inst2atom    :: TypeAtom
-  , _inst2params  :: [NameTVar]
+  , _inst2class   :: Class
+  , _inst2type    :: TypeAtom
+  , _inst2params  :: [TyVar]
   , _inst2context :: [TypeCstr]
-  , _inst2methods :: [FuncDecl lg (Name TVar)]
+  , _inst2methods :: [FuncDecl lg TyVar]
   }
 
 data GenDecl (nsp :: Super NameSpace) lg
-  = (nsp ?:> TCon)                        => DType  TConDecl
-  | (nsp ?:> EVar, IsPreTyped lg ~ False) => DSign (SignDecl Void)
-  | (nsp ?:> EVar)                        => DFunc (FuncDecl lg Void)
-  | (nsp ?:> EVar)                        => DExtn (ExtnDecl lg)
-  | (nsp ?:> Clss, IsClassy   lg ~ True ) => DClss  ClssDecl
-  | (nsp ?:> Inst, IsClassy   lg ~ True ) => DInst (InstDecl lg)
+  = (nsp ?:> 'TyCon)                        => DType TyConDecl
+  | (nsp ?:> 'TmVar, IsPreTyped lg ~ False) => DSign (SignDecl Void)
+  | (nsp ?:> 'TmVar)                        => DFunc (FuncDecl lg Void)
+  | (nsp ?:> 'TmVar)                        => DExtn (ExtnDecl lg)
+  | (nsp ?:> 'TyCon, IsClassy   lg ~ True ) => DClss ClassDecl
+  | (nsp ?:> 'TmVar, IsClassy   lg ~ True ) => DInst (InstDecl lg)
 
 type Decl = GenDecl Any
 
@@ -91,22 +90,22 @@ newtype Module lg = MkModule
 makeLenses ''SignDecl
 makeLenses ''FuncDecl
 makeLenses ''ExtnDecl
-makeLenses ''ClssDecl
+makeLenses ''ClassDecl
 makeLenses ''InstDecl
 makePrisms ''GenDecl
 makeLenses ''Module
 
-type instance NameSpaceOf (SignDecl    tv) = EVar
-type instance NameSpaceOf (FuncDecl lg tv) = EVar
-type instance NameSpaceOf (ExtnDecl lg   ) = EVar
-type instance NameSpaceOf  ClssDecl        = Clss
-type instance NameSpaceOf (InstDecl lg   ) = Inst
+type instance NameSpaceOf (SignDecl    tv) = 'TmVar
+type instance NameSpaceOf (FuncDecl lg tv) = 'TmVar
+type instance NameSpaceOf (ExtnDecl lg   ) = 'TmVar
+type instance NameSpaceOf ClassDecl        = 'TyCon
+type instance NameSpaceOf (InstDecl lg   ) = 'TmVar
 type instance NameSpaceOf (GenDecl (Only nsp) lg) = nsp
 
 instance HasName (SignDecl    tv) where nameOf = _sign2name
 instance HasName (FuncDecl lg tv) where nameOf = _func2name
 instance HasName (ExtnDecl lg   ) where nameOf = _extn2name
-instance HasName  ClssDecl        where nameOf = _clss2name
+instance HasName ClassDecl        where nameOf = _class2name
 instance HasName (InstDecl lg   ) where nameOf = _inst2name
 instance HasName (GenDecl (Only nsp) lg) where
   nameOf = \case
@@ -120,7 +119,7 @@ instance HasName (GenDecl (Only nsp) lg) where
 instance HasPos (SignDecl    tv) where getPos = getPos . nameOf
 instance HasPos (FuncDecl lg tv) where getPos = getPos . nameOf
 instance HasPos (ExtnDecl lg   ) where getPos = getPos . nameOf
-instance HasPos  ClssDecl        where getPos = getPos . nameOf
+instance HasPos ClassDecl        where getPos = getPos . nameOf
 instance HasPos (InstDecl lg   ) where getPos = getPos . nameOf
 instance HasPos (GenDecl nsp st) where
   getPos = \case
@@ -145,7 +144,7 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
     DFunc func -> pretty func
     DExtn (MkExtnDecl name typ_ extn) ->
       hsep ["external", pretty (name ::: typ_), "=", doubleQuotes (pretty extn)]
-    DClss (MkClssDecl c v _ ms) ->
+    DClss (MkClassDecl c v _ ms) ->
       "class" <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
     DInst (MkInstDecl _ c t0 vs cstrs ds) ->
@@ -160,7 +159,7 @@ instance TypeOf lg ~ Type => Pretty (Module lg) where
 deriving instance                   (Show tv) => Show (SignDecl tv)
 deriving instance (TypeOf lg ~ Type, Show tv) => Show (FuncDecl lg tv)
 deriving instance (TypeOf lg ~ Type)          => Show (ExtnDecl lg)
-deriving instance                                Show  ClssDecl
+deriving instance                                Show ClassDecl
 deriving instance (TypeOf lg ~ Type)          => Show (InstDecl lg)
 deriving instance (TypeOf lg ~ Type)          => Show (GenDecl nsp lg)
 
@@ -170,7 +169,7 @@ instance TypeOf lg ~ Type => ToJSON (FuncDecl lg tv) where
   toJSON = $(mkToJSON defaultOptions ''FuncDecl)
 instance TypeOf lg ~ Type => ToJSON (ExtnDecl lg) where
   toJSON = $(mkToJSON defaultOptions ''ExtnDecl)
-deriveToJSON defaultOptions ''ClssDecl
+deriveToJSON defaultOptions ''ClassDecl
 instance TypeOf lg ~ Type => ToJSON (InstDecl lg) where
   toJSON = $(mkToJSON defaultOptions ''InstDecl)
 

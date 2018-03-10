@@ -19,7 +19,7 @@ cleanModule mod0@(MkModule types extns supcs) =
       g = CG.makeCallGraph mod0
       reach = Set.fromList
               $ map (nameOf . CG.toDecl g)
-              $ maybe [] (G.reachable (CG.graph g)) (CG.fromEVar g main)
-      clean :: Map (Name EVar) a -> Map (Name EVar) a
+              $ maybe [] (G.reachable (CG.graph g)) (CG.fromTmVar g main)
+      clean :: Map TmVar a -> Map TmVar a
       clean = Map.filterWithKey (\z _ -> z `Set.member` reach)
   in  MkModule types (clean extns) (clean supcs)

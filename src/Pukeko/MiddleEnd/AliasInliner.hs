@@ -44,7 +44,7 @@ inlineSupCDecls decls0 =
 -- > f = g
 --
 -- If it is, return the pair @(f, g)@.
-isLink :: FuncDecl (Only SupC) -> Maybe (Name EVar, Name EVar)
+isLink :: FuncDecl (Only SupC) -> Maybe (TmVar, TmVar)
 isLink = \case
   SupCDecl z _t ps (EVal x)
     | null ps -> Just (z, x)

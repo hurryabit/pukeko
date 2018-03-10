@@ -36,7 +36,7 @@ type Aux s = PreTyped (UType s)
 type UTypeCstrs s = Seq (UTypeCstr s)
 
 data SplitCstrs s = MkSplitCstrs
-  { _retained :: Set (NameClss, NameTVar)
+  { _retained :: Set (Class, TyVar)
   , _deferred :: UTypeCstrs s
   }
 
@@ -50,10 +50,10 @@ freshUVar = do
   UVar <$> sendM (newSTRef (UFree v l))
 
 generalize :: forall s effs. CanInfer s effs =>
-  UType s -> Eff effs (UType s, Set NameTVar)
+  UType s -> Eff effs (UType s, Set TyVar)
 generalize = go
   where
-    go :: UType s -> Eff effs (UType s, Set NameTVar)
+    go :: UType s -> Eff effs (UType s, Set TyVar)
     go t0 = case t0 of
       UVar uref -> do
         curLevel <- getTLevel @s
@@ -127,13 +127,13 @@ instantiate = go Map.empty Seq.empty
         pure (e0, t1, cstrs0)
 
 inferPatn :: CanInfer s effs =>
-  Patn In -> UType s -> Eff effs (Patn (Aux s), Map (Name EVar) (UType s))
+  Patn In -> UType s -> Eff effs (Patn (Aux s), Map TmVar (UType s))
 inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
   PVar x -> pure (PVar x, Map.singleton x t_expr)
   PCon dcon (_ :: [NoType]) ps0 -> do
-    (MkTConDecl tcon params _dcons, MkDConDecl{_dcon2fields = fields})
-      <- findInfo info2dcons dcon
+    (MkTyConDecl tcon params _dcons, MkTmConDecl{_tmcon2fields = fields})
+      <- findInfo info2tmcons dcon
     when (length ps0 /= length fields) $
       throwHere ("data constructor" <+> quotes (pretty dcon) <+>
                  "expects" <+> pretty (length fields) <+> "arguments")
@@ -219,7 +219,7 @@ infer = \case
         pure (MkAltn patn1 rhs1, cstrs1)
       pure (EMat expr1 altns1, t_res, cstrs0 <> fold cstrss1)
     ECast (c@(MkCoercion dir tcon), NoType) e0 -> do
-      MkTConDecl _ prms dcons <- findInfo info2tcons tcon
+      MkTyConDecl _ prms dcons <- findInfo info2tycons tcon
       t_rhs0 <- case dcons of
         Right _ -> throwHere ("type constructor" <+> pretty tcon <+> "is not coercible")
         Left t_rhs0 -> pure t_rhs0
@@ -270,7 +270,7 @@ inferDecl = \case
   DClss c -> yield (DClss c)
   DInst (MkInstDecl instName clss atom prms cstrs ds0) -> do
     ds1 <- for ds0 $ \mthd -> do
-      (_, MkSignDecl _ t_decl0) <- findInfo info2mthds (nameOf mthd)
+      (_, MkSignDecl _ t_decl0) <- findInfo info2methods (nameOf mthd)
       let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: renameType
       let t_decl1 = t_decl0 >>= const t_inst
@@ -292,11 +292,11 @@ inferModule' = module2decls $ \decls ->
 
 -- FIXME: We use this set make sure there are /no/ unintended free type variables
 -- left in expressions. Make this intention clear through code.
-type TQEnv = Set NameTVar
+type TQEnv = Set TyVar
 
 type TQ s = Eff [Reader TQEnv, Reader SourcePos, Error Failure, NameSource, ST s]
 
-localizeTQ :: Foldable t => t NameTVar -> TQ s a -> TQ s a
+localizeTQ :: Foldable t => t TyVar -> TQ s a -> TQ s a
 localizeTQ qvs = local (setOf folded qvs <>)
 
 qualType :: UType s -> TQ s Type

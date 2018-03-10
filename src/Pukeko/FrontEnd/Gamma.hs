@@ -1,17 +1,17 @@
 module Pukeko.FrontEnd.Gamma
   ( CanGamma
   , runGamma
-  , withinEScope
-  , withinEScope1
-  , withinTScope
-  , withinTScope1
-  , withinContext1
-  , withinContext
-  , withinScope1
-  , withinScope
-  , lookupEVar
-  , lookupEVarIx
-  , lookupTVar
+  , introTmVar
+  , introTmVars
+  , introTyVar
+  , introTyVars
+  , introCstr
+  , introCstrs
+  , introPar
+  , introPars
+  , lookupTmVar
+  , lookupTmVarIx
+  , lookupTyVar
   ) where
 
 import Pukeko.Prelude
@@ -19,14 +19,14 @@ import Pukeko.Prelude
 import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
-import           Pukeko.AST.Expr (Par (..), EVarBinder)
+import           Pukeko.AST.Expr (Par (..), TmBinder)
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 
 data Gamma = Gamma
-  { _evars :: Map NameEVar (Type, Int)
-  , _tvars :: Map NameTVar (Set NameClss)
+  { _tmVars :: Map TmVar (Type, Int)
+  , _tyVars :: Map TyVar (Set Class)
   }
 makeLenses ''Gamma
 
@@ -35,43 +35,44 @@ type CanGamma effs = Member (Reader Gamma) effs
 runGamma :: Eff (Reader Gamma : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty Map.empty)
 
-withinEScope1 :: CanGamma effs => EVarBinder Type -> Eff effs a -> Eff effs a
-withinEScope1 (x, t) =
-  locally evars (\evs -> Map.insertWith impossible x (t, Map.size evs) evs)
+introTmVar :: CanGamma effs => TmBinder Type -> Eff effs a -> Eff effs a
+introTmVar (x, t) =
+  locally tmVars (\yts -> Map.insertWith impossible x (t, Map.size yts) yts)
 
-withinEScope :: CanGamma effs => [EVarBinder Type] -> Eff effs a -> Eff effs a
-withinEScope xts act = foldr withinEScope1 act xts
+introTmVars :: CanGamma effs => [TmBinder Type] -> Eff effs a -> Eff effs a
+introTmVars xts act = foldr introTmVar act xts
 
-withinTScope :: (CanGamma effs, Foldable t) => t NameTVar -> Eff effs a -> Eff effs a
-withinTScope (toList -> vs) =
+introTyVar :: CanGamma effs => TyVar -> Eff effs a -> Eff effs a
+introTyVar v = locally tyVars (Map.insertWith impossible v Set.empty)
+
+introTyVars :: (CanGamma effs, Foldable t) => t TyVar -> Eff effs a -> Eff effs a
+introTyVars (toList -> vs) =
+  -- TODO: fold over 'introTyVar'
   -- we try to avoid shadowing everywhere
-  locally tvars (Map.unionWith impossible (Map.fromList (zip vs (repeat Set.empty))))
+  locally tyVars (Map.unionWith impossible (Map.fromList (zip vs (repeat Set.empty))))
 
-withinTScope1 :: CanGamma effs => NameTVar -> Eff effs a -> Eff effs a
-withinTScope1 v = locally tvars (Map.insertWith impossible v Set.empty)
+introCstr :: CanGamma effs => TypeCstr -> Eff effs a -> Eff effs a
+introCstr (clss, TVar v) =
+  locally tyVars (Map.alter (maybe impossible (Just . Set.insert clss)) v)
+introCstr _ = impossible  -- we only allow constraints of the form @C a@
 
-withinContext1 :: CanGamma effs => TypeCstr -> Eff effs a -> Eff effs a
-withinContext1 (clss, TVar v) =
-  locally tvars (Map.alter (maybe impossible (Just . Set.insert clss)) v)
-withinContext1 _ = impossible  -- we only allow constraints of the form @C a@
+introCstrs :: CanGamma effs => [TypeCstr] -> Eff effs a -> Eff effs a
+introCstrs cstrs act = foldr introCstr act cstrs
 
-withinContext :: CanGamma effs => [TypeCstr] -> Eff effs a -> Eff effs a
-withinContext cstrs act = foldr withinContext1 act cstrs
+introPar :: (CanGamma effs, TypeOf lg ~ Type) => Par lg -> Eff effs a -> Eff effs a
+introPar = \case
+  TmPar xt -> introTmVar xt
+  TyPar v  -> introTyVar v
+  CxPar cx -> introCstr  cx
 
-withinScope1 :: (CanGamma effs, TypeOf lg ~ Type) => Par lg -> Eff effs a -> Eff effs a
-withinScope1 = \case
-  TmPar x  -> withinEScope1 x
-  TyPar v  -> withinTScope1 v
-  CxPar cx -> withinContext1 cx
+introPars :: (CanGamma effs, TypeOf lg ~ Type) => [Par lg] -> Eff effs a -> Eff effs a
+introPars pars act = foldr introPar act pars
 
-withinScope :: (CanGamma effs, TypeOf lg ~ Type) => [Par lg] -> Eff effs a -> Eff effs a
-withinScope pars act = foldr withinScope1 act pars
+lookupTmVarIx :: CanGamma effs => TmVar -> Eff effs (Type, Int)
+lookupTmVarIx x = views tmVars (Map.! x)
 
-lookupEVarIx :: CanGamma effs => NameEVar -> Eff effs (Type, Int)
-lookupEVarIx x = views evars (Map.! x)
+lookupTmVar :: CanGamma effs => TmVar -> Eff effs Type
+lookupTmVar = fmap fst . lookupTmVarIx
 
-lookupEVar :: CanGamma effs => NameEVar -> Eff effs Type
-lookupEVar = fmap fst . lookupEVarIx
-
-lookupTVar :: CanGamma effs => NameTVar -> Eff effs (Set NameClss)
-lookupTVar = views tvars . flip (Map.!)
+lookupTyVar :: CanGamma effs => TyVar -> Eff effs (Set Class)
+lookupTyVar = views tyVars . flip (Map.!)
