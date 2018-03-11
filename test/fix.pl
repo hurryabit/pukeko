@@ -46,8 +46,6 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Foldable$List : Foldable List =
-  Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 dict$Monad$IO : Monad IO =
   Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
 input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
@@ -62,16 +60,7 @@ dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      f x ((match dict$Foldable$List with
-            | Dict$Foldable foldr _ -> foldr) @a @b f y0 xs)
-dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
-  fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
-    match xs with
-    | Nil -> y0
-    | Cons x xs ->
-      (match dict$Foldable$List with
-       | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
+    | Cons x xs -> f x (dict$Foldable$List$ll1 @a @b f y0 xs)
 replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
     match le_int n 0 with

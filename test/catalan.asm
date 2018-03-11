@@ -1,12 +1,8 @@
-g_declare_globals gm$cons_0_0, 0, gm$cons_0_1, 1, gm$cons_0_2, 2, gm$cons_1_2, 2, gm$abort, 0, gm$le, 2, gm$add, 2, gm$sub, 2, gm$mul, 2, gm$mod, 2, gm$seq, 2, gm$puti, 1, gm$geti, 1, dict$Functor$List, 0, dict$Foldable$List, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, dict$Functor$List$ll1, 2, dict$Foldable$List$ll1, 3, dict$Foldable$List$ll2, 3, nth_exn$ll1, 2, zip_with$ll1, 3, dict$Monad$IO$ll3, 3, io$ll1, 3, io$ll2, 2, print$ll1, 0, mul_p$ll1, 2, add_p$ll1, 2, scanl$ll1, 4, sols$ll1, 1, sols$ll2, 2, main$ll1, 1
+g_declare_globals gm$cons_0_0, 0, gm$cons_0_2, 2, gm$cons_1_2, 2, gm$abort, 0, gm$le, 2, gm$add, 2, gm$sub, 2, gm$mul, 2, gm$mod, 2, gm$seq, 2, gm$puti, 1, gm$geti, 1, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, dict$Functor$List$ll1, 2, dict$Foldable$List$ll2, 3, nth_exn$ll1, 2, zip_with$ll1, 3, dict$Monad$IO$ll3, 3, io$ll1, 3, io$ll2, 2, print$ll1, 0, mul_p$ll1, 2, add_p$ll1, 2, scanl$ll1, 4, sols$ll1, 1, sols$ll2, 2, main$ll1, 1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
 g_updcons 0, 0, 1
-g_return
-
-g_globstart gm$cons_0_1, 1
-g_updcons 0, 1, 1
 g_return
 
 g_globstart gm$cons_0_2, 2
@@ -88,17 +84,6 @@ g_input
 g_update 1
 g_return
 
-g_globstart dict$Functor$List, 0
-g_pushglobal dict$Functor$List$ll1
-g_updcons 0, 1, 1
-g_return
-
-g_globstart dict$Foldable$List, 0
-g_pushglobal dict$Foldable$List$ll2
-g_pushglobal dict$Foldable$List$ll1
-g_updcons 0, 2, 1
-g_return
-
 g_globstart input, 0
 g_pushglobal gm$cons_0_0
 g_pushglobal gm$geti
@@ -157,11 +142,7 @@ g_label .1
 g_uncons 2
 g_push 1
 g_push 3
-g_pushglobal dict$Functor$List
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal dict$Functor$List$ll1
 g_mkap 2
 g_push 1
 g_push 4
@@ -170,33 +151,6 @@ g_updcons 1, 2, 5
 g_pop 4
 g_return
 g_jump .2
-g_label .2
-
-g_globstart dict$Foldable$List$ll1, 3
-g_push 2
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 2
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
-g_uncons 2
-g_push 1
-g_push 4
-g_push 4
-g_pushglobal dict$Foldable$List
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
-g_mkap 3
-g_push 1
-g_push 4
-g_updap 2, 6
-g_pop 5
-g_unwind
 g_label .2
 
 g_globstart dict$Foldable$List$ll2, 3
@@ -216,11 +170,7 @@ g_push 5
 g_push 5
 g_mkap 2
 g_push 4
-g_pushglobal dict$Foldable$List
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal dict$Foldable$List$ll2
 g_updap 3, 6
 g_pop 5
 g_unwind
