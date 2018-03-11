@@ -76,9 +76,9 @@ main : IO Unit =
                                                         100000
                                                   in
                                                   semi$ll2 @Unit @IO dict$Monad$IO (print$ll1 m) (match split_at$ll1 @Int n random with
-                                                                                                  | Pair @(List Int) @(List Int) xs random ->
+                                                                                                  | Pair xs random ->
                                                                                                     semi$ll2 @Unit @IO dict$Monad$IO (traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 xs) (match split_at$ll1 @Int m random with
-                                                                                                                                                                                                                   | Pair @(List Int) @(List Int) ys random ->
+                                                                                                                                                                                                                   | Pair ys random ->
                                                                                                                                                                                                                      let zs : List Int =
                                                                                                                                                                                                                            take$ll1 @Int m random
                                                                                                                                                                                                                      in
@@ -86,64 +86,64 @@ main : IO Unit =
 le$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ _ le _ -> le
+    | Dict$Ord _ _ le _ -> le
 lt$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ _ _ lt -> lt
+    | Dict$Ord _ _ _ lt -> lt
 sub$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ _ sub _ -> sub
+    | Dict$Ring _ _ sub _ -> sub
 mul$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ _ _ mul -> mul
+    | Dict$Ring _ _ _ mul -> mul
 foldr$ll1 : ∀t. Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
-    | Dict$Foldable @t foldr _ -> foldr
+    | Dict$Foldable foldr _ -> foldr
 foldl$ll1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
-    | Dict$Foldable @t _ foldl -> foldl
+    | Dict$Foldable _ foldl -> foldl
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
-    | Nil @a -> y0
-    | Cons @a x xs ->
+    | Nil -> y0
+    | Cons x xs ->
       f x (foldr$ll1 @List dict$Foldable$List @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
-    | Nil @a -> y0
-    | Cons @a x xs ->
+    | Nil -> y0
+    | Cons x xs ->
       foldl$ll1 @List dict$Foldable$List @a @b f (f y0 x) xs
 take$ll1 : ∀a. Int -> List a -> List a =
   fun @a (n : Int) (xs : List a) ->
     match le$ll1 @Int dict$Ord$Int n 0 with
     | False ->
       match xs with
-      | Nil @a -> Nil @a
-      | Cons @a x xs ->
+      | Nil -> Nil @a
+      | Cons x xs ->
         Cons @a x (take$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) xs)
     | True -> Nil @a
 zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
     match xs with
-    | Nil @a -> Nil @c
-    | Cons @a x xs ->
+    | Nil -> Nil @c
+    | Cons x xs ->
       match ys with
-      | Nil @b -> Nil @c
-      | Cons @b y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)
+      | Nil -> Nil @c
+      | Cons y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)
 pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m pure _ -> pure
+    | Dict$Monad pure _ -> pure
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m _ bind -> bind
+    | Dict$Monad _ bind -> bind
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
@@ -158,8 +158,8 @@ sequence$ll2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
 sequence$ll3 : ∀a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) ->
     match ms with
-    | Nil @(m a) -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
-    | Cons @(m a) m ms ->
+    | Nil -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
+    | Cons m ms ->
       bind$ll1 @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
 traverse_$ll1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   fun @a @m (dict$Monad$m : Monad m) (f : a -> m Unit) (x : a) ->
@@ -174,7 +174,7 @@ dict$Monad$IO$ll2 : ∀a. a -> IO a =
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
-    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+    | Pair x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
@@ -193,11 +193,10 @@ split_at$ll1 : ∀a. Int -> List a -> Pair (List a) (List a) =
     match le$ll1 @Int dict$Ord$Int n 0 with
     | False ->
       match xs with
-      | Nil @a -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
-      | Cons @a x xs ->
+      | Nil -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
+      | Cons x xs ->
         match split_at$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) xs with
-        | Pair @(List a) @(List a) ys zs ->
-          Pair @(List a) @(List a) (Cons @a x ys) zs
+        | Pair ys zs -> Pair @(List a) @(List a) (Cons @a x ys) zs
     | True -> Pair @(List a) @(List a) (Nil @a) xs
 random$ll1 : Int -> Int =
   fun (x : Int) -> mod (mul$ll1 @Int dict$Ring$Int 91 x) 1000000007

@@ -49,7 +49,7 @@ main : IO Unit = print$ll1 (g$ll1 1 2 3 (h$ll1 2))
 add$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ add _ _ -> add
+    | Dict$Ring _ add _ _ -> add
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in

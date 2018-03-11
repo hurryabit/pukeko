@@ -46,7 +46,7 @@ main : IO Unit =
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m _ bind -> bind
+    | Dict$Monad _ bind -> bind
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
@@ -59,7 +59,7 @@ dict$Monad$IO$ll2 : ∀a. a -> IO a =
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
-    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+    | Pair x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
@@ -74,11 +74,11 @@ print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 fst$ll1 : ∀a b. Pair a b -> a =
   fun @a @b (p : Pair a b) ->
     match p with
-    | Pair @a @b x _ -> x
+    | Pair x _ -> x
 snd$ll1 : ∀a b. Pair a b -> b =
   fun @a @b (p : Pair a b) ->
     match p with
-    | Pair @a @b _ y -> y
+    | Pair _ y -> y
 main$ll1 : Int -> Int -> IO Unit =
   fun (x : Int) (y : Int) ->
     let p : Pair Int Int = Pair @Int @Int x y in

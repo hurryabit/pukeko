@@ -67,9 +67,10 @@ ccExpr = \case
     where isrec = case m of
             In.BindRec -> True
             In.BindPar -> False
-  In.EMat t  cs -> Match <$> ccExpr t <*> traverse ccAltn (toList cs)
+  In.EMat _ e cs -> Match <$> ccExpr e <*> traverse ccAltn (toList cs)
   In.EApp e0 In.TyArg{} -> ccExpr e0
   In.ECast  _   e0 -> ccExpr e0
 
 ccAltn :: In.Altn -> CC Altn
-ccAltn (In.MkAltn (In.PSimple _ _ bs) e) = MkAltn (map (fmap name) bs) <$> ccExpr e
+ccAltn (In.MkAltn (In.PSimple _ bs) e) =
+  MkAltn (map (fmap (name . fst)) bs) <$> ccExpr e

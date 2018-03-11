@@ -74,43 +74,43 @@ main : IO Unit =
 le$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ _ le _ -> le
+    | Dict$Ord _ _ le _ -> le
 lt$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ _ _ lt -> lt
+    | Dict$Ord _ _ _ lt -> lt
 add$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ add _ _ -> add
+    | Dict$Ring _ add _ _ -> add
 sub$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ _ sub _ -> sub
+    | Dict$Ring _ _ sub _ -> sub
 mul$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ _ _ mul -> mul
+    | Dict$Ring _ _ _ mul -> mul
 nth_exn$ll1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
-    | Nil @a -> abort @a
-    | Cons @a x xs ->
+    | Nil -> abort @a
+    | Cons x xs ->
       match le$ll1 @Int dict$Ord$Int n 0 with
       | False -> nth_exn$ll1 @a xs (sub$ll1 @Int dict$Ring$Int n 1)
       | True -> x
 zip_with$ll1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
     match xs with
-    | Nil @a -> Nil @c
-    | Cons @a x xs ->
+    | Nil -> Nil @c
+    | Cons x xs ->
       match ys with
-      | Nil @b -> Nil @c
-      | Cons @b y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)
+      | Nil -> Nil @c
+      | Cons y ys -> Cons @c (f x y) (zip_with$ll1 @a @b @c f xs ys)
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m _ bind -> bind
+    | Dict$Monad _ bind -> bind
 dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 dict$Monad$IO$ll2 : ∀a. a -> IO a =
@@ -118,7 +118,7 @@ dict$Monad$IO$ll2 : ∀a. a -> IO a =
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
-    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+    | Pair x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)

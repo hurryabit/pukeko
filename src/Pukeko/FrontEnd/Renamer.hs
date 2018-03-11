@@ -143,11 +143,11 @@ rnPatn = \case
   Ps.PWld -> pure (PWld, mempty)
   Ps.PVar name -> do
     binder <- mkName name
-    pure (PVar binder, Map.singleton (unlctd name) binder)
+    pure (PVar (binder, NoType), Map.singleton (unlctd name) binder)
   Ps.PCon dcon0 patns0 -> do
     dcon1 <- lookupGlobal dconTab (const True) "unknown data constructor" dcon0
     (patns1, envs) <- unzip <$> traverse rnPatn patns0
-    pure (PCon dcon1 [] patns1, fold envs)
+    pure (PCon dcon1 patns1, fold envs)
 
 -- | Rename a pattern match alternative.
 rnAltn :: CanRn effs => Ps.Altn (Ps.LctdName 'TmVar) -> Eff (Env : effs) (Altn Out )
@@ -181,7 +181,7 @@ rnExpr = \case
   Ps.EMat e0 as0 ->
     case as0 of
       []   -> throwHere "pattern match without alternatives"
-      a:as -> EMat <$> rnExpr e0 <*> traverse rnAltn (a :| as)
+      a:as -> EMat NoType <$> rnExpr e0 <*> traverse rnAltn (a :| as)
   Ps.ELam (toList -> bs0) e0 -> rnELam bs0 e0
   Ps.ELet (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
