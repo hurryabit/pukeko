@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.le, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, foldableList, 0, monadIO, 0, print, 0, input, 0, isort, 1, main, 0, foldableList.foldr.L1, 3, foldableList.foldl.L1, 3, replicate.L1, 2, semi.L1, 2, semi.L2, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, traverse_.L1, 3, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, insert.L1, 2, main.L1, 1, main.L2, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.le, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, monadIO, 0, print, 0, input, 0, isort, 1, main, 0, foldableList.foldr.L1, 3, replicate.L1, 2, semi.L1, 2, semi.L2, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, traverse_.L1, 3, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, insert.L1, 2, main.L1, 1, main.L2, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -49,12 +49,6 @@ g_globstart B.geti, 1
 g_pop 1
 g_input
 g_update 1
-g_return
-
-g_globstart foldableList, 0
-g_pushglobal foldableList.foldl.L1
-g_pushglobal foldableList.foldr.L1
-g_updcons 0, 2, 1
 g_return
 
 g_globstart monadIO, 0
@@ -119,42 +113,11 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 4
-g_pushglobal foldableList
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal foldableList.foldr.L1
 g_mkap 3
 g_push 1
 g_push 4
 g_updap 2, 6
-g_pop 5
-g_unwind
-g_label .2
-
-g_globstart foldableList.foldl.L1, 3
-g_push 2
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 2
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
-g_uncons 2
-g_push 1
-g_push 1
-g_push 5
-g_push 5
-g_mkap 2
-g_push 4
-g_pushglobal foldableList
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
-g_updap 3, 6
 g_pop 5
 g_unwind
 g_label .2

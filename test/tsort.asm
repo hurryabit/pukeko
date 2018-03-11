@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.2, 2, C.0.4, 4, C.1.2, 2, C.1.3, 3, B.lt, 2, B.le, 2, B.ge, 2, B.gt, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, ordInt, 0, foldableList, 0, monadIO, 0, print, 0, input, 0, foldableBinTree, 0, main, 0, foldableList.foldr.L1, 3, foldableList.foldl.L1, 3, replicate.L1, 2, semi.L1, 2, semi.L2, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, traverse_.L1, 3, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, foldableBinTree.foldr.L1, 3, foldableBinTree.foldl.L1, 3, bag_insert.L1, 4, tsort.L1, 2, main.L1, 1, main.L2, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, C.0.4, 4, C.1.2, 2, C.1.3, 3, B.lt, 2, B.le, 2, B.ge, 2, B.gt, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, ordInt, 0, monadIO, 0, print, 0, input, 0, main, 0, foldableList.foldr.L1, 3, foldableList.foldl.L1, 3, replicate.L1, 2, semi.L1, 2, semi.L2, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, traverse_.L1, 3, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, foldableBinTree.foldr.L1, 3, bag_insert.L1, 4, tsort.L1, 2, main.L1, 1, main.L2, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -97,12 +97,6 @@ g_pushglobal B.ge
 g_updcons 0, 4, 1
 g_return
 
-g_globstart foldableList, 0
-g_pushglobal foldableList.foldl.L1
-g_pushglobal foldableList.foldr.L1
-g_updcons 0, 2, 1
-g_return
-
 g_globstart monadIO, 0
 g_pushglobal monadIO.bind.L2
 g_pushglobal monadIO.pure.L2
@@ -121,12 +115,6 @@ g_pushglobal B.geti
 g_pushglobal io.L1
 g_updap 2, 1
 g_unwind
-
-g_globstart foldableBinTree, 0
-g_pushglobal foldableBinTree.foldl.L1
-g_pushglobal foldableBinTree.foldr.L1
-g_updcons 0, 2, 1
-g_return
 
 g_globstart main, 0
 g_pushglobal main.L2
@@ -149,11 +137,7 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 4
-g_pushglobal foldableList
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal foldableList.foldr.L1
 g_mkap 3
 g_push 1
 g_push 4
@@ -179,11 +163,7 @@ g_push 5
 g_push 5
 g_mkap 2
 g_push 4
-g_pushglobal foldableList
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal foldableList.foldl.L1
 g_updap 3, 6
 g_pop 5
 g_unwind
@@ -373,56 +353,13 @@ g_push 0
 g_push 3
 g_push 6
 g_push 6
-g_pushglobal foldableBinTree
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal foldableBinTree.foldr.L1
 g_mkap 3
 g_push 3
 g_push 6
 g_mkap 2
 g_push 5
-g_pushglobal foldableBinTree
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
-g_updap 3, 7
-g_pop 6
-g_unwind
-g_label .2
-
-g_globstart foldableBinTree.foldl.L1, 3
-g_push 2
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 2
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
-g_uncons 3
-g_push 2
-g_push 2
-g_push 2
-g_push 7
-g_push 7
-g_pushglobal foldableBinTree
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
-g_mkap 3
-g_push 6
-g_mkap 2
-g_push 5
-g_pushglobal foldableBinTree
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal foldableBinTree.foldr.L1
 g_updap 3, 7
 g_pop 6
 g_unwind

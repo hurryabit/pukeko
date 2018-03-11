@@ -45,29 +45,21 @@ external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-foldableList : Foldable List =
-  .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
-foldableBinTree : Foldable BinTree =
-  .Foldable @BinTree foldableBinTree.foldr.L1 foldableBinTree.foldl.L1
 main : IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      f x ((match foldableList with
-            | .Foldable foldr _ -> foldr) @a @b f y0 xs)
+    | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
 foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      (match foldableList with
-       | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
+    | Cons x xs -> foldableList.foldl.L1 @a @b f (f y0 x) xs
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
     match le_int n 0 with
@@ -122,19 +114,7 @@ foldableBinTree.foldr.L1 : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
     match t with
     | Leaf -> y0
     | Branch l x r ->
-      (match foldableBinTree with
-       | .Foldable foldr _ ->
-         foldr) @a @b f (f x ((match foldableBinTree with
-                               | .Foldable foldr _ -> foldr) @a @b f y0 r)) l
-foldableBinTree.foldl.L1 : ∀a b. (b -> a -> b) -> b -> BinTree a -> b =
-  fun @a @b (f : b -> a -> b) (y0 : b) (t : BinTree a) ->
-    match t with
-    | Leaf -> y0
-    | Branch l x r ->
-      (match foldableBinTree with
-       | .Foldable _ foldl ->
-         foldl) @a @b f (f ((match foldableBinTree with
-                             | .Foldable _ foldl -> foldl) @a @b f y0 l) x) r
+      foldableBinTree.foldr.L1 @a @b f (f x (foldableBinTree.foldr.L1 @a @b f y0 r)) l
 bag_insert.L1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
   fun (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (ord._14 : Ord _14) (x : _14) (t : BinTree _14) ->
     match t with

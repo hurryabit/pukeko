@@ -1,12 +1,8 @@
-g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.1.2, 2, B.abort, 0, B.le, 2, B.add, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, B.geti, 1, functorList, 0, foldableList, 0, print, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, functorList.map.L1, 2, foldableList.foldr.L1, 3, foldableList.foldl.L1, 3, nth_exn.L1, 2, zip_with.L1, 3, monadIO.bind.L1, 3, io.L1, 3, io.L2, 2, mul_p.L1, 2, add_p.L1, 2, scanl.L1, 4, sols.L1, 1, sols.L2, 2, main.L1, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.abort, 0, B.le, 2, B.add, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, B.geti, 1, print, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, functorList.map.L1, 2, foldableList.foldl.L1, 3, nth_exn.L1, 2, zip_with.L1, 3, monadIO.bind.L1, 3, io.L1, 3, io.L2, 2, mul_p.L1, 2, add_p.L1, 2, scanl.L1, 4, sols.L1, 1, sols.L2, 2, main.L1, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
 g_updcons 0, 0, 1
-g_return
-
-g_globstart C.0.1, 1
-g_updcons 0, 1, 1
 g_return
 
 g_globstart C.0.2, 2
@@ -88,17 +84,6 @@ g_input
 g_update 1
 g_return
 
-g_globstart functorList, 0
-g_pushglobal functorList.map.L1
-g_updcons 0, 1, 1
-g_return
-
-g_globstart foldableList, 0
-g_pushglobal foldableList.foldl.L1
-g_pushglobal foldableList.foldr.L1
-g_updcons 0, 2, 1
-g_return
-
 g_globstart print, 0
 g_pushglobal B.puti
 g_pushglobal io.L2
@@ -163,11 +148,7 @@ g_label .1
 g_uncons 2
 g_push 1
 g_push 3
-g_pushglobal functorList
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal functorList.map.L1
 g_mkap 2
 g_push 1
 g_push 4
@@ -176,33 +157,6 @@ g_updcons 1, 2, 5
 g_pop 4
 g_return
 g_jump .2
-g_label .2
-
-g_globstart foldableList.foldr.L1, 3
-g_push 2
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 2
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
-g_uncons 2
-g_push 1
-g_push 4
-g_push 4
-g_pushglobal foldableList
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
-g_mkap 3
-g_push 1
-g_push 4
-g_updap 2, 6
-g_pop 5
-g_unwind
 g_label .2
 
 g_globstart foldableList.foldl.L1, 3
@@ -222,11 +176,7 @@ g_push 5
 g_push 5
 g_mkap 2
 g_push 4
-g_pushglobal foldableList
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal foldableList.foldl.L1
 g_updap 3, 6
 g_pop 5
 g_unwind

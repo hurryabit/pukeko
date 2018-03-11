@@ -39,8 +39,6 @@ external mul_int : Int -> Int -> Int = "mul"
 external mod : Int -> Int -> Int = "mod"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
-foldableList : Foldable List =
-  .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 random : List Int = gen.L1 @Int random.L1 1
@@ -74,16 +72,7 @@ foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      f x ((match foldableList with
-            | .Foldable foldr _ -> foldr) @a @b f y0 xs)
-foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
-  fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
-    match xs with
-    | Nil -> y0
-    | Cons x xs ->
-      (match foldableList with
-       | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
+    | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
 take.L1 : ∀a. Int -> List a -> List a =
   fun @a (n : Int) (xs : List a) ->
     match le_int n 0 with
