@@ -1,6 +1,7 @@
 module Pukeko.AST.Expr.Optics
   ( freeTmVar
   , subst
+  , patn2binder
   , expr2atom
   , expr2type
   ) where
@@ -33,10 +34,10 @@ subst' f = go Set.empty
           bound0 = case m of
             BindRec -> bound1
             BindPar -> bound
-      EMat e  as  -> EMat <$> go bound e <*> traverse (goAltn bound) as
+      EMat t e as -> EMat t <$> go bound e <*> traverse (goAltn bound) as
       ECast coe e -> ECast coe <$> go bound e
       ETyAnn t  e -> ETyAnn t <$> go bound e
-    goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf patnTmVar p) e
+    goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf (patn2binder . _1) p) e
 
 freeTmVar :: Traversal' (Expr lg) TmVar
 freeTmVar f = subst' (fmap EVar . f)
@@ -44,12 +45,12 @@ freeTmVar f = subst' (fmap EVar . f)
 subst :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
 subst f = runIdentity . subst' (Identity . f)
 
-patnTmVar :: Traversal' (Patn lg) TmVar
-patnTmVar f = \case
+patn2binder :: Traversal' (Patn lg) (TmBinder (TypeOf lg))
+patn2binder f = \case
   PWld -> pure PWld
-  PVar x -> PVar <$> f x
-  PCon c ts ps -> PCon c ts <$> (traverse . patnTmVar) f ps
-  PSimple c ts bs -> PSimple c ts <$> (traverse . _Just) f bs
+  PVar b -> PVar <$> f b
+  PCon c ps -> PCon c <$> (traverse . patn2binder) f ps
+  PSimple c bs -> PSimple c <$> (traverse . _Just) f bs
 
 -- | Traverse over all the atoms in an expression.
 expr2atom :: Traversal' (Expr lg) Atom
@@ -61,7 +62,7 @@ expr2atom f = \case
   EApp e a         -> EApp   <$> expr2atom f e <*> pure a
   EAbs p  e    -> EAbs p <$> expr2atom f e
   ELet m ds t  -> ELet m <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
-  EMat t  as   -> EMat <$> expr2atom f t <*> (traverse . altn2expr . expr2atom) f as
+  EMat t e as  -> EMat t <$> expr2atom f e <*> (traverse . altn2expr . expr2atom) f as
   ECast coe e  -> ECast coe <$> expr2atom f e
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
 
@@ -91,11 +92,10 @@ expr2type f = \case
   EApp e  a    -> EApp <$> expr2type f e <*> arg2type f a
   EAbs p  e    -> EAbs <$> par2type f p <*> expr2type f e
   ELet m ds e0 -> ELet m <$> traverse (b2type f) ds <*> expr2type f e0
-  EMat e0 as   -> EMat <$> expr2type f e0 <*> traverse (altn2type f) as
+  EMat t e0 as -> EMat <$> f t <*> expr2type f e0 <*> traverse (altn2type f) as
   ECast (c, t) e -> ECast . (c, ) <$> f t <*> expr2type f e
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0
 
--- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a pattern matching alternative, i.e., the types
 -- in the pattern and the types on the RHS.
 altn2type :: Traversal' (Altn lg) (TypeOf lg)
@@ -107,8 +107,6 @@ altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0
 patn2type :: Traversal' (Patn lg) (TypeOf lg)
 patn2type f = \case
   PWld -> pure PWld
-  PVar x -> pure (PVar x)
-  PCon dcon targs patns ->
-    PCon dcon <$> traverse f targs <*> traverse (patn2type f) patns
-  PSimple dcon targs binds ->
-    PSimple dcon <$> traverse f targs <*> pure binds
+  PVar xt -> PVar <$> _2 f xt
+  PCon dcon patns -> PCon dcon <$> traverse (patn2type f) patns
+  PSimple dcon binds -> PSimple dcon <$> (traverse . _Just . _2) f binds

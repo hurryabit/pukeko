@@ -70,12 +70,13 @@ elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
   let cstr = (clss, TVar prm)
   sels <- ifor mthds $ \i (MkSignDecl z t0) -> do
     dictPrm <- mkName (Lctd noPos "dict")
+    let dictType = mkTDict cstr
     let t1 = TUni' prm (TCtx cstr t0)
     let e_rhs = EVar z
-    let c_binds = imap (\j _ -> guard (i==j) $> z) mthds
-    let c_one = MkAltn (PSimple dcon [TVar prm] c_binds) e_rhs
-    let e_cas = EMat (EVar dictPrm) (c_one :| [])
-    let b_lam = (dictPrm, mkTDict cstr)
+    let c_binds = imap (\j _ -> guard (i==j) $> (z, t0)) mthds
+    let c_one = MkAltn (PSimple dcon c_binds) e_rhs
+    let e_cas = EMat dictType (EVar dictPrm) (c_one :| [])
+    let b_lam = (dictPrm, dictType)
     let e_lam = ETmAbs b_lam (ETyAnn t0 e_cas)
     let e_tyabs = ETyAbs prm e_lam
     pure (DFunc (MkFuncDecl z t1 e_tyabs))
@@ -181,7 +182,7 @@ elimExpr = \case
   ECxAbs cstr e0 -> elimECxAbs cstr e0
   EAbs{} -> impossible
   ELet m ds0 e0 -> ELet m <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
-  EMat e0 as -> EMat <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
+  EMat t e0 as -> EMat t <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
   ECast coe e0 -> ECast coe <$> elimExpr e0
   ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0
 

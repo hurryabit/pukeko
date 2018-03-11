@@ -68,23 +68,23 @@ main : IO Unit =
 ge$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a ge _ _ _ -> ge
+    | Dict$Ord ge _ _ _ -> ge
 gt$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ gt _ _ -> gt
+    | Dict$Ord _ gt _ _ -> gt
 sub$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ _ sub _ -> sub
+    | Dict$Ring _ _ sub _ -> sub
 pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m pure _ -> pure
+    | Dict$Monad pure _ -> pure
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m _ bind -> bind
+    | Dict$Monad _ bind -> bind
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
@@ -102,7 +102,7 @@ dict$Monad$IO$ll2 : ∀a. a -> IO a =
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
-    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+    | Pair x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)

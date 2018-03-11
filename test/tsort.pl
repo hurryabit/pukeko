@@ -93,34 +93,34 @@ main : IO Unit =
 le$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ _ le _ -> le
+    | Dict$Ord _ _ le _ -> le
 lt$ll1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord @a _ _ _ lt -> lt
+    | Dict$Ord _ _ _ lt -> lt
 sub$ll1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring @a _ _ sub _ -> sub
+    | Dict$Ring _ _ sub _ -> sub
 foldr$ll1 : ∀t. Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
-    | Dict$Foldable @t foldr _ -> foldr
+    | Dict$Foldable foldr _ -> foldr
 foldl$ll1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
-    | Dict$Foldable @t _ foldl -> foldl
+    | Dict$Foldable _ foldl -> foldl
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
-    | Nil @a -> y0
-    | Cons @a x xs ->
+    | Nil -> y0
+    | Cons x xs ->
       f x (foldr$ll1 @List dict$Foldable$List @a @b f y0 xs)
 dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
-    | Nil @a -> y0
-    | Cons @a x xs ->
+    | Nil -> y0
+    | Cons x xs ->
       foldl$ll1 @List dict$Foldable$List @a @b f (f y0 x) xs
 to_list$ll1 : ∀a t. Foldable t -> t a -> List a =
   fun @a @t (dict$Foldable$t : Foldable t) ->
@@ -134,11 +134,11 @@ replicate$ll1 : ∀a. Int -> a -> List a =
 pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m pure _ -> pure
+    | Dict$Monad pure _ -> pure
 bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad @m _ bind -> bind
+    | Dict$Monad _ bind -> bind
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
@@ -153,8 +153,8 @@ sequence$ll2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
 sequence$ll3 : ∀a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) ->
     match ms with
-    | Nil @(m a) -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
-    | Cons @(m a) m ms ->
+    | Nil -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
+    | Cons m ms ->
       bind$ll1 @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
 traverse_$ll1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   fun @a @m (dict$Monad$m : Monad m) (f : a -> m Unit) (x : a) ->
@@ -169,7 +169,7 @@ dict$Monad$IO$ll2 : ∀a. a -> IO a =
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
-    | Pair @a @World x world1 -> coerce @(IO -> _) (f x) world1
+    | Pair x world1 -> coerce @(IO -> _) (f x) world1
 dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
@@ -184,14 +184,14 @@ print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 dict$Foldable$BinTree$ll1 : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (t : BinTree a) ->
     match t with
-    | Leaf @a -> y0
-    | Branch @a l x r ->
+    | Leaf -> y0
+    | Branch l x r ->
       foldr$ll1 @BinTree dict$Foldable$BinTree @a @b f (f x (foldr$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 r)) l
 dict$Foldable$BinTree$ll2 : ∀a b. (b -> a -> b) -> b -> BinTree a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (t : BinTree a) ->
     match t with
-    | Leaf @a -> y0
-    | Branch @a l x r ->
+    | Leaf -> y0
+    | Branch l x r ->
       foldl$ll1 @BinTree dict$Foldable$BinTree @a @b f (f (foldl$ll1 @BinTree dict$Foldable$BinTree @a @b f y0 l) x) r
 dict$Foldable$Bag$ll1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (bag : Bag a) ->
@@ -203,8 +203,8 @@ bag_empty$ll1 : ∀a. Bag a = fun @a -> coerce @(_ -> Bag) (Leaf @a)
 bag_insert$ll1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
   fun (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (dict$Ord$_14 : Ord _14) (x : _14) (t : BinTree _14) ->
     match t with
-    | Leaf @_14 -> Branch @_14 (Leaf @_14) x (Leaf @_14)
-    | Branch @_14 l y r ->
+    | Leaf -> Branch @_14 (Leaf @_14) x (Leaf @_14)
+    | Branch l y r ->
       match lt$ll1 @_14 dict$Ord$_14 x y with
       | False -> Branch @_14 l y (insert @_14 dict$Ord$_14 x r)
       | True -> Branch @_14 (insert @_14 dict$Ord$_14 x l) y r

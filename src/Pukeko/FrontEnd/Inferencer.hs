@@ -126,12 +126,13 @@ instantiate = go Map.empty Seq.empty
         t1 <- sendM (substUType env0 t0)
         pure (e0, t1, cstrs0)
 
+-- TODO: Try removing the returned map.
 inferPatn :: CanInfer s effs =>
   Patn In -> UType s -> Eff effs (Patn (Aux s), Map TmVar (UType s))
 inferPatn patn t_expr = case patn of
   PWld -> pure (PWld, Map.empty)
-  PVar x -> pure (PVar x, Map.singleton x t_expr)
-  PCon dcon (_ :: [NoType]) ps0 -> do
+  PVar (x, NoType) -> pure (PVar (x, t_expr), Map.singleton x t_expr)
+  PCon dcon ps0 -> do
     (MkTyConDecl tcon params _dcons, MkTmConDecl{_tmcon2fields = fields})
       <- findInfo info2tmcons dcon
     when (length ps0 /= length fields) $
@@ -143,7 +144,7 @@ inferPatn patn t_expr = case patn of
     let env = Map.fromList (zipExact params t_params)
     let t_fields = map (open1 . fmap (env Map.!)) fields
     (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
-    pure (PCon dcon (toList t_params) ps1, Map.unions binds)
+    pure (PCon dcon ps1, Map.unions binds)
 
 inferLet :: forall s effs.
   CanInfer s effs => Bind In -> Eff effs (Bind (Aux s), UType s, UTypeCstrs s)
@@ -209,7 +210,7 @@ infer = \case
       (rhs1, t_rhs, cstrs_rhs) <-
         withinEScope (Map.fromList (zipExact (map nameOf defns0) t_defns)) (infer rhs0)
       pure (ELet BindRec defns1 rhs1, t_rhs, cstrs_defns <> cstrs_rhs)
-    EMat expr0 altns0 -> do
+    EMat NoType expr0 altns0 -> do
       (expr1, t_expr, cstrs0) <- infer expr0
       t_res <- freshUVar
       (altns1, cstrss1) <- fmap NE.unzip . for altns0 $ \(MkAltn patn0 rhs0) -> do
@@ -217,7 +218,7 @@ infer = \case
         (rhs1, t_rhs, cstrs1) <- withinEScope t_binds (infer rhs0)
         unify t_res t_rhs
         pure (MkAltn patn1 rhs1, cstrs1)
-      pure (EMat expr1 altns1, t_res, cstrs0 <> fold cstrss1)
+      pure (EMat t_expr expr1 altns1, t_res, cstrs0 <> fold cstrss1)
     ECast (c@(MkCoercion dir tcon), NoType) e0 -> do
       MkTyConDecl _ prms dcons <- findInfo info2tycons tcon
       t_rhs0 <- case dcons of
@@ -311,6 +312,7 @@ qualType = \case
       ULink t -> qualType t
       UFree{} -> impossible  -- all unification variables have been generalized
 
+-- TODO: Rename to 'qualBind'.
 qualDefn :: Bind (Aux s) -> TQ s (Bind Out)
 qualDefn (MkBind (x, t0) e0) = case t0 of
   UTUni{} -> do
@@ -323,6 +325,7 @@ qualDefn (MkBind (x, t0) e0) = case t0 of
       pure (MkBind (x, t2) e2)
   _ -> MkBind <$> ((x,) <$> qualType t0) <*> qualExpr e0
 
+-- TODO: Write 'qualArg'.
 qualExpr :: Expr (Aux s) -> TQ s (Expr Out)
 qualExpr = \case
   ELoc le -> here le $ ELoc <$> lctd qualExpr le
@@ -334,18 +337,19 @@ qualExpr = \case
   EApp{} -> impossible
   EAbs (TmPar param) body -> ETmAbs <$> _2 qualType param <*> qualExpr body
   ELet m ds e0 -> ELet m <$> traverse qualDefn ds <*> qualExpr e0
-  EMat e0 as -> EMat <$> qualExpr e0 <*> traverse qualAltn as
+  EMat t e0 as -> EMat <$> qualType t <*> qualExpr e0 <*> traverse qualAltn as
   ECast (c, t) e0 -> ECast . (c,) <$> qualType t <*> qualExpr e0
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
 
 qualAltn :: Altn (Aux s) -> TQ s (Altn Out)
 qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e
 
+-- TODO: Use 'patn2type'.
 qualPatn :: Patn (Aux s) -> TQ s (Patn Out)
 qualPatn = \case
   PWld -> pure PWld
-  PVar x -> pure (PVar x)
-  PCon c ts ps -> PCon c <$> traverse qualType ts <*> traverse qualPatn ps
+  PVar (x, t) -> PVar . (x,) <$> qualType t
+  PCon c ps -> PCon c <$> traverse qualPatn ps
 
 qualFuncDecl :: FuncDecl (Aux s) tv -> TQ s (FuncDecl Out tv)
 qualFuncDecl (MkFuncDecl name type0 body0) = do

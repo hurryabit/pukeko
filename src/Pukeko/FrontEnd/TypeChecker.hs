@@ -12,11 +12,10 @@ import qualified Data.Set     as Set
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Expr
-import           Pukeko.AST.Name
+import           Pukeko.AST.Expr.Optics (patn2binder)
 import qualified Pukeko.AST.SystemF   as SysF
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
-import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Type
 
 type CanTC effs =
@@ -35,7 +34,7 @@ checkCoercion (MkCoercion _dir _tcon) _from _to =
   -- FIXME: Implement the actual check.
   pure ()
 
-typeOf :: IsTyped lg => Expr lg -> TC Type
+typeOf :: TypeOf lg ~ Type => Expr lg -> TC Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupTmVar x
@@ -68,11 +67,11 @@ typeOf = \case
     introTmVars (map _b2binder ds) $ do
       traverse_ checkBind ds
       typeOf e0
-  EMat e0 (a1 :| as) -> do
-    t0 <- typeOf e0
-    t1 <- typeOfAltn t0 a1
+  EMat t0 e0 (a1 :| as) -> do
+    checkExpr e0 t0
+    t1 <- typeOfAltn a1
     for_ as $ \a2 -> do
-      t2 <- typeOfAltn t0 a2
+      t2 <- typeOfAltn a2
       unless (t1 == t2) $
         throwHere ("expected type" <+> pretty t1 <> ", but found type" <+> pretty t2)
     pure t1
@@ -100,41 +99,19 @@ checkCstr cstr@(clss, unwindl _TApp -> (t1, targs)) = do
           unless (clss `Set.member` qual) throwNoInst
     _ -> throwNoInst
 
-typeOfAltn :: IsTyped lg => Type -> Altn lg -> TC Type
-typeOfAltn t (MkAltn p e) = do
-  env <- patnEnvLevel p t
-  introTmVars (Map.toList env) (typeOf e)
-
-patnEnvLevel :: TypeOf lg ~ Type => Patn lg -> Type -> TC (Map TmVar Type)
-patnEnvLevel p t0 = case p of
-  PWld -> pure Map.empty
-  PVar x -> pure (Map.singleton x t0)
-  PCon c ts1 ps -> do
-    (MkTyConDecl _ params _, MkTmConDecl tcon dcon _tag flds1) <- findInfo info2tmcons c
-    let t1 = mkTApp (TCon tcon) (toList ts1)
-    unless (t0 == t1) $ throwHere
-      ("expected pattern of type" <+> pretty t0
-       <> ", but found pattern of type" <+> pretty t1)
-    unless (length flds1 == length ps) $ throwHere
-      ("expected" <+> pretty (length flds1) <+> "pattern arguments of" <+> pretty dcon
-       <> ", but found" <+> pretty (length ps) <+> "pattern arguments")
-    let env = Map.fromList (zipExact params ts1)
-    -- NOTE: If the instantiation fails, the field type contains type
-    -- variables not mentioned in the parameter list of the type constructor.
-    -- The renamer should have caught this.
-    let t_ps = map (>>= (env Map.!)) flds1
-    Map.unions <$> zipWithM patnEnvLevel ps t_ps
-  PSimple c ts1 bs -> patnEnvLevel @Typed (PCon c ts1 (map (maybe PWld PVar) bs)) t0
+typeOfAltn :: TypeOf lg ~ Type => Altn lg -> TC Type
+typeOfAltn (MkAltn p e) = do
+  introTmVars (toListOf patn2binder p) (typeOf e)
 
 match :: Type -> Type -> TC ()
 match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
+checkExpr :: TypeOf lg ~ Type => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
 
-checkBind :: IsTyped lg => Bind lg -> TC ()
+checkBind :: TypeOf lg ~ Type => Bind lg -> TC ()
 checkBind (MkBind (_, t) e) = checkExpr e t
 
 instance IsTyped st => TypeCheckable (SysF.Module st) where

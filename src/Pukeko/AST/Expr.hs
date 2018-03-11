@@ -84,9 +84,9 @@ data Bind lg = MkBind
 
 data Patn lg
   = IsNested lg ~ True  => PWld
-  | IsNested lg ~ True  => PVar    TmVar
-  | IsNested lg ~ True  => PCon    TmCon [TypeOf lg] [Patn lg]
-  | IsNested lg ~ False => PSimple TmCon [TypeOf lg] [Maybe TmVar]
+  | IsNested lg ~ True  => PVar    (TmBinder (TypeOf lg))
+  | IsNested lg ~ True  => PCon    TmCon [Patn lg]
+  | IsNested lg ~ False => PSimple TmCon [Maybe (TmBinder (TypeOf lg))]
 
 data Altn lg = MkAltn
   { _altn2patn :: Patn lg
@@ -100,7 +100,7 @@ data Expr lg
   |                         EApp (Expr lg) (Arg  lg)
   | IsLambda lg ~ True   => EAbs (Par  lg) (Expr lg)
   |                         ELet BindMode [Bind lg] (Expr lg)
-  |                         EMat (Expr lg) (NonEmpty (Altn lg))
+  |                         EMat (TypeOf lg) (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
 pattern EVal :: TmVar -> Expr lg
@@ -254,9 +254,9 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
       in  prettyEAbs prec ps e1
     ELet m ds t -> maybeParens (prec > 0) (sep [prettyBinds m ds, "in"] $$ pretty t)
     -- FIXME: Collect lambdas.
-    EMat t as ->
+    EMat _ e as ->
       maybeParens (prec > 0) $
-        "match" <+> pretty t <+> "with"
+        "match" <+> pretty e <+> "with"
         $$ vcatMap pretty as
     ECast (MkCoercion dir tcon, _typ) e0 ->
       maybeParens (prec > Op.aprec) $
@@ -284,16 +284,16 @@ instance TypeOf lg ~ Type => Pretty (Altn lg) where
 
 instance TypeOf lg ~ Type => Pretty (Patn lg)
 
+-- TODO: Print types of binders as well.
 instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
   prettyPrec prec = \case
     PWld -> "_"
-    PVar x    -> pretty x
-    PCon c ts ps ->
-      maybeParens (prec > 0 && (not (null ts) || not (null ps)))
-      $ pretty c <+> hsepMap prettyTyArg ts <+> hsepMap (prettyPrec 1) ps
-    PSimple c ts bs ->
-      maybeParens (prec > 0 && (not (null ts) || not (null bs)))
-      $ pretty c <+> hsepMap prettyTyArg ts <+> hsepMap (maybe "_" pretty) bs
+    PVar x    -> pretty (fst x)
+    PCon c ps ->
+      maybeParens (prec > 0 && not (null ps)) $ pretty c <+> hsepMap (prettyPrec 1) ps
+    PSimple c bs ->
+      maybeParens (prec > 0 && not (null bs))
+      $ pretty c <+> hsepMap (maybe "_" (pretty . fst)) bs
 
 deriving instance                     Show  BindMode
 deriving instance TypeOf lg ~ Type => Show (Bind lg)

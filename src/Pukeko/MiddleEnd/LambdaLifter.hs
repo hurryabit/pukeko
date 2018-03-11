@@ -15,7 +15,6 @@ import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Bind, Altn, Par
 import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
-import           Pukeko.AST.ConDecl
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Type
@@ -122,7 +121,7 @@ llExpr = \case
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   EApp fun (TmArg arg) -> ETmApp <$> llExpr fun <*> llExpr arg
-  EMat t  cs -> EMat <$> llExpr t <*> traverse llAltn cs
+  EMat t e cs -> EMat t <$> llExpr e <*> traverse llAltn cs
   ELet BindPar ds e0 ->
     ELet BindPar
     <$> (traverse . b2bound) llExpr ds
@@ -140,13 +139,8 @@ llExpr = \case
   ETyAnn _ e0 -> llExpr e0
 
 llAltn :: Altn In -> LL (Altn Out)
-llAltn (MkAltn (PSimple dcon ts0 bs) e) = do
-  (MkTyConDecl _ vs _, MkTmConDecl _ _ _ flds0) <- findInfo info2tmcons dcon
-  assertM (length vs == length ts0)  -- the kind checker guarantees this
-  let env0 = Map.fromList (zipExact vs ts0)
-  let t_flds = fmap (>>= (env0 Map.!)) flds0
-  let env = catMaybes (zipWithExact (\b t -> (,) <$> b <*> pure t) bs t_flds)
-  MkAltn (PSimple dcon ts0 bs) <$> introTmVars env (llExpr e)
+llAltn (MkAltn (PSimple dcon bs) e) =
+  MkAltn (PSimple dcon bs) <$> introTmVars (catMaybes bs) (llExpr e)
 
 llDecl :: Members [Reader ModuleInfo, Writer Core.Module, NameSource] effs =>
   Decl In -> Eff effs ()

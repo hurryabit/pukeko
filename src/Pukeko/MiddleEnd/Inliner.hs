@@ -81,7 +81,7 @@ inExpr e0 = case e0 of
   EAtm{} -> impossible  -- all cases matched above
   ETmApp e  a  -> ETmApp <$> inExpr e <*> inExpr a
   EApp   e  a  -> EApp <$> inExpr e <*> pure a
-  EMat t  cs -> EMat <$> inExpr t <*> (traverse . altn2expr) inExpr cs
+  EMat t e cs -> EMat t <$> inExpr e <*> (traverse . altn2expr) inExpr cs
   ELet m ds t -> ELet m <$> (traverse . b2bound) inExpr ds <*> inExpr t
   ECast coe e -> ECast coe <$> inExpr e
 
