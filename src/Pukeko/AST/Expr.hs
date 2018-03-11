@@ -27,9 +27,12 @@ module Pukeko.AST.Expr
   , altn2patn
   , altn2expr
 
+  , _TmArg
+  , _TyArg
   , _TmPar
   , _TyPar
   , _AVal
+  , _EAtm
   , _EApp
   , _ETmApp
   , _ETyApp
@@ -137,6 +140,7 @@ pattern ECxAbs cx body = EAbs (CxPar cx) body
 -- * Derived optics
 makePrisms ''Atom
 makePrisms ''Expr
+makePrisms ''Arg
 makePrisms ''Par
 makeLensesFor [("_altn2patn", "altn2patn")]''Altn
 makeLensesFor [("_b2binder", "b2binder")] ''Bind

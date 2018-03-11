@@ -40,16 +40,11 @@ external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
-dict$Ring$Int : Ring Int =
-  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Foldable$List : Foldable List =
   Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 dict$Monad$IO : Monad IO =
@@ -57,11 +52,8 @@ dict$Monad$IO : Monad IO =
 input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 dict$Foldable$BinTree : Foldable BinTree =
   Dict$Foldable @BinTree dict$Foldable$BinTree$ll1 dict$Foldable$BinTree$ll2
-dict$Foldable$Bag : Foldable Bag =
-  Dict$Foldable @Bag dict$Foldable$Bag$ll1 dict$Foldable$Bag$ll2
 main : IO Unit =
-  (match dict$Monad$IO with
-   | Dict$Monad _ bind -> bind) @Int @Unit input main$ll2
+  coerce @(_ -> IO) (dict$Monad$IO$ll3 @Int @Unit input main$ll2)
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -78,11 +70,8 @@ dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match dict$Ord$Int with
-           | Dict$Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate$ll1 @a ((match dict$Ring$Int with
-                                    | Dict$Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate$ll1 @a (sub_int n 1) x)
     | True -> Nil @a
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -147,16 +136,6 @@ dict$Foldable$BinTree$ll2 : ∀a b. (b -> a -> b) -> b -> BinTree a -> b =
        | Dict$Foldable _ foldl ->
          foldl) @a @b f (f ((match dict$Foldable$BinTree with
                              | Dict$Foldable _ foldl -> foldl) @a @b f y0 l) x) r
-dict$Foldable$Bag$ll1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
-  fun @a @b (f : a -> b -> b) (y0 : b) (bag : Bag a) ->
-    (match dict$Foldable$BinTree with
-     | Dict$Foldable foldr _ ->
-       foldr) @a @b f y0 (coerce @(Bag -> _) bag)
-dict$Foldable$Bag$ll2 : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
-  fun @a @b (f : b -> a -> b) (y0 : b) (bag : Bag a) ->
-    (match dict$Foldable$BinTree with
-     | Dict$Foldable _ foldl ->
-       foldl) @a @b f y0 (coerce @(Bag -> _) bag)
 bag_insert$ll1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
   fun (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (dict$Ord$_14 : Ord _14) (x : _14) (t : BinTree _14) ->
     match t with
@@ -174,17 +153,17 @@ tsort$ll1 : Bag Int -> Int -> Bag Int =
     coerce @(_ -> Bag) (insert @Int dict$Ord$Int x (coerce @(Bag -> _) s))
 main$ll1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    (match dict$Foldable$List with
-     | Dict$Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) ((match dict$Monad$IO with
-                                                                                 | Dict$Monad pure _ ->
-                                                                                   pure) @Unit Unit) ((match dict$Foldable$Bag with
-                                                                                                       | Dict$Foldable foldr _ ->
-                                                                                                         foldr) @Int @(List Int) (Cons @Int) (Nil @Int) ((match dict$Foldable$List with
-                                                                                                                                                          | Dict$Foldable _ foldl ->
-                                                                                                                                                            foldl) @Int @(Bag Int) tsort$ll1 (coerce @(_ -> Bag) (Leaf @Int)) xs))
+    dict$Foldable$List$ll1 @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f : Int -> List Int -> List Int =
+                                                                                                                                                Cons @Int
+                                                                                                                                          and y0 : List Int =
+                                                                                                                                                Nil @Int
+                                                                                                                                          and bag : Bag Int =
+                                                                                                                                                dict$Foldable$List$ll2 @Int @(Bag Int) tsort$ll1 (coerce @(_ -> Bag) (Leaf @Int)) xs
+                                                                                                                                          in
+                                                                                                                                          dict$Foldable$BinTree$ll1 @Int @(List Int) f y0 (coerce @(Bag -> _) bag))
 main$ll2 : Int -> IO Unit =
   fun (n : Int) ->
-    (match dict$Monad$IO with
-     | Dict$Monad _ bind ->
-       bind) @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll1
+    let mx : IO (List Int) =
+          sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)
+    in
+    coerce @(_ -> IO) (dict$Monad$IO$ll3 @(List Int) @Unit mx main$ll1)

@@ -32,17 +32,4 @@ data Monad m =
 data World =
        | World
 data IO a = World -> Pair a World
-dict$Monad$IO : Monad IO =
-  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
-main : IO Unit =
-  (match dict$Monad$IO with
-   | Dict$Monad pure _ -> pure) @Unit Unit
-dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
-dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
-    match coerce @(IO -> _) mx world0 with
-    | Pair x world1 -> coerce @(IO -> _) (f x) world1
-dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx : IO a) (f : a -> IO b) ->
-    coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
+main : IO Unit = coerce @(_ -> IO) (Pair @Unit @World Unit)

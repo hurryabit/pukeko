@@ -32,19 +32,11 @@ data Monad m =
 data World =
        | World
 data IO a = World -> Pair a World
-external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
-external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
-dict$Ring$Int : Ring Int =
-  Dict$Ring @Int neg_int add_int sub_int mul_int
 main : IO Unit =
-  print$ll1 (let d : Int =
-                   (match dict$Ring$Int with
-                    | Dict$Ring _ add _ _ -> add) 2 2
-             in
+  print$ll1 (let d : Int = add_int 2 2 in
              1)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->

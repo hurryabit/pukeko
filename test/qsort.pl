@@ -34,30 +34,20 @@ data World =
 data IO a = World -> Pair a World
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
-dict$Ring$Int : Ring Int =
-  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Foldable$List : Foldable List =
   Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 dict$Monad$IO : Monad IO =
   Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
 input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 main : IO Unit =
-  (match dict$Monad$IO with
-   | Dict$Monad _ bind -> bind) @Int @Unit input main$ll2
+  coerce @(_ -> IO) (dict$Monad$IO$ll3 @Int @Unit input main$ll2)
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
-    (match dict$Foldable$List with
-     | Dict$Foldable foldr _ -> foldr) @a @(List a) (Cons @a) ys xs
+    dict$Foldable$List$ll1 @a @(List a) (Cons @a) ys xs
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -74,11 +64,8 @@ dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match dict$Ord$Int with
-           | Dict$Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate$ll1 @a ((match dict$Ring$Int with
-                                    | Dict$Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate$ll1 @a (sub_int n 1) x)
     | True -> Nil @a
 partition$ll1 : ∀a. (a -> Bool) -> List a -> Pair (List a) (List a) =
   fun @a (p : a -> Bool) (xs : List a) ->
@@ -136,9 +123,7 @@ io$ll2 : ∀a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io$ll1 @a @b f x)
 print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
 qsort$ll1 : Int -> Int -> Bool =
-  fun (x : Int) (y : Int) ->
-    (match dict$Ord$Int with
-     | Dict$Ord _ _ _ lt -> lt) y x
+  fun (x : Int) (y : Int) -> lt_int y x
 qsort$ll2 : List Int -> List Int =
   fun (xs : List Int) ->
     match xs with
@@ -158,13 +143,10 @@ qsort$ll2 : List Int -> List Int =
            append) (qsort$ll2 ys) (Cons @Int x (qsort$ll2 zs))
 main$ll1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    (match dict$Foldable$List with
-     | Dict$Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) ((match dict$Monad$IO with
-                                                                                 | Dict$Monad pure _ ->
-                                                                                   pure) @Unit Unit) (qsort$ll2 xs)
+    dict$Foldable$List$ll1 @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (qsort$ll2 xs)
 main$ll2 : Int -> IO Unit =
   fun (n : Int) ->
-    (match dict$Monad$IO with
-     | Dict$Monad _ bind ->
-       bind) @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll1
+    let mx : IO (List Int) =
+          sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)
+    in
+    coerce @(_ -> IO) (dict$Monad$IO$ll3 @(List Int) @Unit mx main$ll1)
