@@ -25,7 +25,7 @@ default rel
 
 %define MAX_CON 32
 
-%define CAF_SIZE 3
+%define GLOBAL_SIZE 3
 
 %define TAG_ARITY_SIZE(tag, arity, size) tag | (arity << 8) | (size << 32)
 
@@ -161,46 +161,52 @@ default rel
 %endrep
 %endmacro
 
-;; CAF related stuff
-%define CAF(label) __caf__ %+ label
+;; Static allocation of globals
+%define GLOBAL(label) __global__ %+ label
 
-%macro g_declare_cafs 1-*
+%macro g_declare_globals 0-*
 section .data
   align 8
-__cafs__start__:
-%rep %0
-  CAF(%1):
-  dq TAG_ARITY_SIZE(TAG_FUN, 0, CAF_SIZE)
-  times (CAF_SIZE-1) dq 0
-%rotate 1
+__globals__start__:
+%rep %0 / 2
+  GLOBAL(%1):
+%if %2 = 0
+%assign size GLOBAL_SIZE
+%else
+%assign size 2
+%endif
+  dq TAG_ARITY_SIZE(TAG_FUN, %2, size)
+  times (GLOBAL_SIZE-1) dq 0
+%rotate 2
 %endrep
-__cafs__end__:
+__globals__end__:
 
 section .text
-__install__cafs__:
-%rep %0
-  lea  rax, [CAF(%1)+8]
+__install__globals__:
+%rep %0 / 2
+  lea  rax, [GLOBAL(%1)+8]
   lea  rbx, [%1]
   mov  [rax], rbx
-%rotate 1
+%rotate 2
 %endrep
   ret
 %endmacro
 
-%macro g_install_cafs 0
-  call __install__cafs__
+%macro g_install_globals 0
+  call __install__globals__
 %endmacro
 
-%macro g_pushcaf 1
+%macro g_pushglobal 1
   @@(4)
-  lea  rax, [CAF(%1)]
+  lea  rax, [GLOBAL(%1)]
   push rax
 %endmacro
+
 
 %macro g_declare_main 1
 __install__main__:
   pop  rbx
-  g_pushcaf %1
+  g_pushglobal %1
   jmp  rbx
 %endmacro
 
@@ -273,19 +279,6 @@ __install__main__:
   g_claim 2
   push rhp
   g_create_int %1
-%endmacro
-
-%macro g_pushglobal 2           ; %1 = label, %2 = arity
-  %if %2 = 0
-    g_pushcaf %1
-  %else
-    @@(5)
-    g_claim 2
-    lea  rax, [%1]
-    push rhp
-    mov  qword rbx, TAG_ARITY_SIZE(TAG_FUN, %2, 2)
-    g_create rax
-  %endif
 %endmacro
 
 %macro g_mkap 1
@@ -617,9 +610,9 @@ _main:
   ; set up the gc info
   lea  rdi, [__gc_info__]
   mov  [rdi], rbp
-  lea  rax, [__cafs__start__]
+  lea  rax, [__globals__start__]
   mov  [rdi+24], rax
-  lea  rax, [__cafs__end__]
+  lea  rax, [__globals__end__]
   mov  [rdi+32], rax
   mov  qword [rdi+40], HEAP_SIZE
   lea  rax, [__heap_start__]
@@ -635,7 +628,7 @@ _main:
   mov  rhp, [rdi+72]
   mov  rhl, [rdi+80]
 
-  g_install_cafs
+  g_install_globals
   g_cons 0, 0
   g_install_main
   g_mkap 1
@@ -814,8 +807,8 @@ __gc_info__:
   resq 1                        ; stack start
   resq 1                        ; base ptr
   resq 1                        ; stack ptr
-  resq 1                        ; cafs start
-  resq 1                        ; cafs end
+  resq 1                        ; globals start
+  resq 1                        ; globals end
   resq 1                        ; heap size
   resq 1                        ; heap start
   resq 1                        ; heap middle
