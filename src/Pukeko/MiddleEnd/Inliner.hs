@@ -2,8 +2,10 @@ module Pukeko.MiddleEnd.Inliner where
 
 import Pukeko.Prelude
 
-import           Control.Lens (_1)
-import qualified Data.Map.Extended as Map
+import           Control.Lens        (_1, matching)
+import           Control.Lens.Extras (is)
+import           Data.Either.Extra   (fromRight')
+import qualified Data.Map.Extended   as Map
 -- import           Debug.Trace
 
 import           Pukeko.AST.SuperCore
@@ -11,8 +13,8 @@ import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 import           Pukeko.MiddleEnd.CallGraph
-import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls, isLink)
--- import           Pukeko.Pretty
+import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls)
+import qualified Safe
 
 newtype InState = InState
   { _inlinables :: Map TmVar (FuncDecl (Only SupC))
@@ -23,6 +25,10 @@ type CanInline effs = Members [State InState, NameSource] effs
 type BindGroup = (BindMode, [Bind])
 
 type CtxtExpr = ([BindGroup], Expr, [Arg])
+
+data InlineMode
+  = Normal
+  | Scrutinee  -- inline CAFs when in WHNF into case scrutinees
 
 makeLenses ''InState
 
@@ -72,26 +78,36 @@ matchArgs pas =
       (bs, subst) = foldMap f pas
   in  (over (traverse . b2binder . _2) (>>= (subst Map.!)) bs, subst)
 
+findAltn :: TmCon -> [Altn] -> Altn
+findAltn tmCon = Safe.findJust (\(MkAltn (PSimple tmCon' _) _) -> tmCon == tmCon')
+
 inline :: (CanInline effs, Member (Reader SourcePos) effs) =>
-  CtxtExpr -> Eff effs CtxtExpr
-inline ce0@(gs0, e0, as0) =
+  InlineMode -> CtxtExpr -> Eff effs CtxtExpr
+inline mode ce0@(gs0, e0, as0) =
   case e0 of
     ELet m bs0 e1 -> do
       bs1 <- (traverse . b2bound) inlineExpr bs0
-      inline ((m, bs1):gs0, e1, as0)
+      inline mode ((m, bs1):gs0, e1, as0)
 
     EApp e1 a0 -> do
       a1 <- arg2expr inlineExpr a0
-      inline (gs0, e1, a1:as0)
+      inline mode (gs0, e1, a1:as0)
 
     EVal z0 -> do
       uses inlinables (Map.lookup z0) >>= \case
         Nothing -> pure ce0
 
         Just supc@(SupCDecl _z0 _t0 ps1 e1)
-          -- We only inline CAFs if they are links.
-          | null ps1, EVal{} <- e1  -> inline (gs0, e1, as0)
-          | null ps1                -> pure ce0
+          -- We inline CAFs if they are links or in WHNF when we are in 'Scrutinee' mode
+          | null ps1, EVal{} <- e1 -> inline mode (gs0, e1, as0)
+
+          | Scrutinee <- mode
+          , null ps1
+          , (ECon{}, args) <- unwindl _EApp e1
+          , all (\arg -> is _TyArg arg || is (_TmArg . _EAtm) arg) args ->
+              inline mode (gs0, e1, as0)
+
+          | null ps1 -> pure ce0
 
           -- We cannot simplify partial applications.
           | length ps1 > length as0 -> pure ce0
@@ -103,12 +119,23 @@ inline ce0@(gs0, e0, as0) =
                   let (as1, as2) = splitAt (length ps1) as0
                       (bs, subst) = matchArgs (zip ps1 as1)
                       e2 = over expr2type (>>= (subst Map.!)) e1
-                  inline ((BindPar, bs):gs0, e2, as2)
+                  inline mode ((BindPar, bs):gs0, e2, as2)
 
     EMat t scrut altns -> do
-      -- ce1@(gs1, e1, as1) <- inline (initCtxt scrut)
-      e1 <- EMat t <$> inlineExpr scrut <*> (traverse . altn2expr) inlineExpr altns
-      pure (gs0, e1, as0)
+      ce1@(gs1, e1, as1) <- inline Scrutinee (initCtxt scrut)
+      case e1 of
+        ECon tmCon -> do
+          let MkAltn (PSimple _ binders) rhs = findAltn tmCon (toList altns)
+          let args =
+                fromRight' . sequence
+                . map (matching _TmArg) . dropWhile (is _TyArg) $ as1
+          let bs =
+                catMaybes (zipWithExact (\b a -> MkBind <$> b <*> pure a) binders args)
+          inline mode ((BindPar, bs):gs1 ++ gs0, rhs, as0)
+
+        _ -> do
+          e1 <- EMat t (closeCtxt ce1) <$> (traverse . altn2expr) inlineExpr altns
+          pure (gs0, e1, as0)
 
     ECast c e1 -> do
       e2 <- inlineExpr e1
@@ -118,7 +145,7 @@ inline ce0@(gs0, e0, as0) =
     EAtm{}  -> pure ce0
 
 inlineExpr :: (CanInline effs, Member (Reader SourcePos) effs) => Expr -> Eff effs Expr
-inlineExpr = fmap closeCtxt . inline . initCtxt
+inlineExpr = fmap closeCtxt . inline Normal . initCtxt
 
 inSupCDecl :: CanInline effs => FuncDecl (Only SupC) -> Eff effs (FuncDecl (Only SupC))
 inSupCDecl decl = func2expr inlineExpr decl & runReader (getPos decl)
@@ -128,7 +155,9 @@ inSCC = \case
   CyclicSCC supcs0 -> do
     supcs1 <- traverse inSupCDecl supcs0
     let supcs2 = inlineSupCDecls supcs1
-    for_ supcs2 $ \supc -> when (isJust (isLink supc)) (makeInlinable supc)
+    -- Since CAFs are only inlined under very specific conditions, we can safely
+    -- make even recursive CAFs inlinable.
+    for_ supcs2 $ \supc -> when (null (_supc2params supc)) (makeInlinable supc)
     pure (foldMap mkFuncDecl supcs2)
   AcyclicSCC supc0 -> do
     supc1 <- inSupCDecl supc0

@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, dict$Monad$IO, input, main, print$ll1
+g_declare_cafs gm$cons_0_0, input, main, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -27,12 +27,6 @@ g_input
 g_update 1
 g_return
 
-g_globstart dict$Monad$IO, 0
-g_pushglobal dict$Monad$IO$ll4, 2
-g_pushglobal dict$Monad$IO$ll2, 1
-g_updcons 0, 2, 1
-g_return
-
 g_globstart input, 0
 g_pushglobal gm$cons_0_0, 0
 g_pushglobal gm$geti, 1
@@ -43,23 +37,12 @@ g_unwind
 g_globstart main, 0
 g_pushglobal main$ll2, 1
 g_pushglobal input, 0
-g_pushglobal dict$Monad$IO, 0
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal dict$Monad$IO$ll3, 3
 g_updap 2, 1
 g_unwind
 
 g_globstart semi$ll1, 2
 g_update 2
-g_pop 1
-g_unwind
-
-g_globstart dict$Monad$IO$ll2, 1
-g_push 0
-g_pushglobal gm$cons_0_2, 2
-g_updap 1, 2
 g_pop 1
 g_unwind
 
@@ -74,14 +57,6 @@ g_push 1
 g_push 5
 g_updap 2, 6
 g_pop 5
-g_unwind
-
-g_globstart dict$Monad$IO$ll4, 2
-g_push 1
-g_push 1
-g_pushglobal dict$Monad$IO$ll3, 3
-g_updap 2, 3
-g_pop 2
 g_unwind
 
 g_globstart io$ll1, 3
@@ -132,26 +107,20 @@ g_mkap 1
 g_push 0
 g_pushglobal semi$ll1, 2
 g_mkap 1
-g_push 2
-g_pushglobal dict$Monad$IO, 0
-g_eval
-g_proj 1
 g_push 0
-g_slide 1
-g_updap 2, 6
-g_pop 5
+g_push 3
+g_pushglobal dict$Monad$IO$ll3, 3
+g_updap 2, 7
+g_pop 6
 g_unwind
 
 g_globstart main$ll2, 1
 g_push 0
 g_pushglobal main$ll1, 2
 g_mkap 1
-g_pushglobal input, 0
-g_pushglobal dict$Monad$IO, 0
-g_eval
-g_proj 1
 g_push 0
-g_slide 1
-g_updap 2, 2
-g_pop 1
+g_pushglobal input, 0
+g_pushglobal dict$Monad$IO$ll3, 3
+g_updap 2, 3
+g_pop 2
 g_unwind

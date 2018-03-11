@@ -40,20 +40,12 @@ data FixPoly p a = Fix (p a)
 data ListF a b =
        | NilF
        | ConsF a b
-external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
-dict$Ring$Int : Ring Int =
-  Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Foldable$List : Foldable List =
   Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 dict$Monad$IO : Monad IO =
@@ -62,8 +54,7 @@ input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 dict$Bifunctor$ListF : Bifunctor ListF =
   Dict$Bifunctor @ListF dict$Bifunctor$ListF$ll1
 main : IO Unit =
-  (match dict$Monad$IO with
-   | Dict$Monad _ bind -> bind) @Int @Unit input main$ll3
+  coerce @(_ -> IO) (dict$Monad$IO$ll3 @Int @Unit input main$ll3)
 id$ll1 : ∀a. a -> a = fun @a (x : a) -> x
 compose$ll1 : ∀a b c. (b -> c) -> (a -> b) -> a -> c =
   fun @a @b @c (f : b -> c) (g : a -> b) (x : a) -> f (g x)
@@ -83,11 +74,8 @@ dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate$ll1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match dict$Ord$Int with
-           | Dict$Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate$ll1 @a ((match dict$Ring$Int with
-                                    | Dict$Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate$ll1 @a (sub_int n 1) x)
     | True -> Nil @a
 semi$ll1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -179,9 +167,7 @@ mono$ll1 : ∀a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
                                                                                                                                              | Dict$Bifunctor bimap ->
                                                                                                                                                bimap) @a @a @(Fix2 p a) @(Fix (p a)) (id$ll1 @a) (mono$ll1 @a @p dict$Bifunctor$p)) (unFix2$ll1 @a @p))
 dict$Functor$ListF$ll1 : ∀a a b. (a -> b) -> ListF a a -> ListF a b =
-  fun @a @a @b ->
-    (match dict$Bifunctor$ListF with
-     | Dict$Bifunctor bimap -> bimap) @a @a @a @b (id$ll1 @a)
+  fun @a @a @b -> dict$Bifunctor$ListF$ll1 @a @a @a @b (id$ll1 @a)
 dict$Bifunctor$ListF$ll1 : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
   fun @a1 @a2 @b1 @b2 (f : a1 -> a2) (g : b1 -> b2) (x : ListF a1 b1) ->
     match x with
@@ -197,41 +183,36 @@ fromList$ll1 : ∀a. List a -> ListF a (List a) =
     match x with
     | Nil -> NilF @a @(List a)
     | Cons y ys -> ConsF @a @(List a) y ys
-main$ll1 : Int -> Int =
-  (match dict$Ring$Int with
-   | Dict$Ring _ _ _ mul -> mul) 2
+main$ll1 : Int -> Int = mul_int 2
 main$ll2 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    (match dict$Foldable$List with
-     | Dict$Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) ((match dict$Monad$IO with
-                                                                                 | Dict$Monad pure _ ->
-                                                                                   pure) @Unit Unit) (let f : Fix (ListF Int) -> List Int =
-                                                                                                            cata$ll1 @(List Int) @(ListF Int) (let map : ∀a b. (a -> b) -> ListF Int a -> ListF Int b =
-                                                                                                                                                     dict$Functor$ListF$ll1 @Int
-                                                                                                                                               in
-                                                                                                                                               Dict$Functor @(ListF Int) map) (toList$ll1 @Int)
-                                                                                                      and g : Fix2 ListF Int -> Fix (ListF Int) =
-                                                                                                            mono$ll1 @Int @ListF dict$Bifunctor$ListF
-                                                                                                      and x : Fix2 ListF Int =
-                                                                                                            let dict : Functor (Fix2 ListF) =
-                                                                                                                  dict$Functor$Fix2$ll2 @ListF dict$Bifunctor$ListF
-                                                                                                            in
-                                                                                                            (match dict with
-                                                                                                             | Dict$Functor map ->
-                                                                                                               map) @Int @Int main$ll1 (let f : Fix (ListF Int) -> Fix2 ListF Int =
-                                                                                                                                              poly$ll1 @Int @ListF dict$Bifunctor$ListF
-                                                                                                                                        and g : List Int -> Fix (ListF Int) =
-                                                                                                                                              ana$ll1 @(List Int) @(ListF Int) (let map : ∀a b. (a -> b) -> ListF Int a -> ListF Int b =
-                                                                                                                                                                                      dict$Functor$ListF$ll1 @Int
-                                                                                                                                                                                in
-                                                                                                                                                                                Dict$Functor @(ListF Int) map) (fromList$ll1 @Int)
-                                                                                                                                        in
-                                                                                                                                        f (g xs))
-                                                                                                      in
-                                                                                                      f (g x))
+    dict$Foldable$List$ll1 @Int @(IO Unit) (traverse_$ll1 @Int @IO dict$Monad$IO print$ll1) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f : Fix (ListF Int) -> List Int =
+                                                                                                                                                cata$ll1 @(List Int) @(ListF Int) (let map : ∀a b. (a -> b) -> ListF Int a -> ListF Int b =
+                                                                                                                                                                                         dict$Functor$ListF$ll1 @Int
+                                                                                                                                                                                   in
+                                                                                                                                                                                   Dict$Functor @(ListF Int) map) (toList$ll1 @Int)
+                                                                                                                                          and g : Fix2 ListF Int -> Fix (ListF Int) =
+                                                                                                                                                mono$ll1 @Int @ListF dict$Bifunctor$ListF
+                                                                                                                                          and x : Fix2 ListF Int =
+                                                                                                                                                let dict : Functor (Fix2 ListF) =
+                                                                                                                                                      dict$Functor$Fix2$ll2 @ListF dict$Bifunctor$ListF
+                                                                                                                                                in
+                                                                                                                                                (match dict with
+                                                                                                                                                 | Dict$Functor map ->
+                                                                                                                                                   map) @Int @Int main$ll1 (let f : Fix (ListF Int) -> Fix2 ListF Int =
+                                                                                                                                                                                  poly$ll1 @Int @ListF dict$Bifunctor$ListF
+                                                                                                                                                                            and g : List Int -> Fix (ListF Int) =
+                                                                                                                                                                                  ana$ll1 @(List Int) @(ListF Int) (let map : ∀a b. (a -> b) -> ListF Int a -> ListF Int b =
+                                                                                                                                                                                                                          dict$Functor$ListF$ll1 @Int
+                                                                                                                                                                                                                    in
+                                                                                                                                                                                                                    Dict$Functor @(ListF Int) map) (fromList$ll1 @Int)
+                                                                                                                                                                            in
+                                                                                                                                                                            f (g xs))
+                                                                                                                                          in
+                                                                                                                                          f (g x))
 main$ll3 : Int -> IO Unit =
   fun (n : Int) ->
-    (match dict$Monad$IO with
-     | Dict$Monad _ bind ->
-       bind) @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll2
+    let mx : IO (List Int) =
+          sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)
+    in
+    coerce @(_ -> IO) (dict$Monad$IO$ll3 @(List Int) @Unit mx main$ll2)

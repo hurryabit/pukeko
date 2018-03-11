@@ -34,10 +34,7 @@ data World =
 data IO a = World -> Pair a World
 external abort : ∀a. a = "abort"
 external eq_int : Int -> Int -> Bool = "eq"
-external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
 external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
@@ -46,14 +43,10 @@ external mod : Int -> Int -> Int = "mod"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Eq$Int : Eq Int = Dict$Eq @Int eq_int
-dict$Ord$Int : Ord Int = Dict$Ord @Int ge_int gt_int le_int lt_int
 dict$Ring$Int : Ring Int =
   Dict$Ring @Int neg_int add_int sub_int mul_int
 dict$Foldable$List : Foldable List =
   Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
-dict$Monad$IO : Monad IO =
-  Dict$Monad @IO dict$Monad$IO$ll2 dict$Monad$IO$ll4
 input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 psums : List Int -> List Int =
   let rec psums0 : ∀_10. Ring _10 -> _10 -> List _10 -> List _10 =
@@ -79,12 +72,10 @@ primes : List Int =
                                                            in
                                                            ys)))))
 main : IO Unit =
-  (match dict$Monad$IO with
-   | Dict$Monad _ bind -> bind) @Int @Unit input main$ll1
+  coerce @(_ -> IO) (dict$Monad$IO$ll3 @Int @Unit input main$ll1)
 dict$Monoid$List$ll1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
-    (match dict$Foldable$List with
-     | Dict$Foldable foldr _ -> foldr) @a @(List a) (Cons @a) ys xs
+    dict$Foldable$List$ll1 @a @(List a) (Cons @a) ys xs
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -104,21 +95,13 @@ nth_exn$ll1 : ∀a. List a -> Int -> a =
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match (match dict$Ord$Int with
-             | Dict$Ord _ _ le _ -> le) n 0 with
-      | False ->
-        nth_exn$ll1 @a xs ((match dict$Ring$Int with
-                            | Dict$Ring _ _ sub _ -> sub) n 1)
+      match le_int n 0 with
+      | False -> nth_exn$ll1 @a xs (sub_int n 1)
       | True -> x
-dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx : IO a) (f : a -> IO b) ->
-    coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
 io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
@@ -149,8 +132,7 @@ filter$ll1 : ∀a. (a -> Bool) -> (List a -> List a) -> List a -> List a =
 sieve$ll1 : Int -> Int -> Bool =
   fun (p : Int) (k : Int) ->
     let x : Int = mod k p in
-    match (match dict$Eq$Int with
-           | Dict$Eq eq -> eq) x 0 with
+    match eq_int x 0 with
     | False -> True
     | True -> False
 sieve$ll2 : List Int -> List Int =

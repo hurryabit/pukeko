@@ -1,10 +1,10 @@
 benchmarking echo 1666 | ./catalan > /dev/null
-time                 4.716 s    (NaN s .. 5.363 s)
-                     0.996 R²   (0.987 R² .. 1.000 R²)
-mean                 4.800 s    (4.683 s .. 4.959 s)
-std dev              142.9 ms   (0.0 s .. 159.5 ms)
+time                 3.719 s    (3.407 s .. 3.941 s)
+                     0.999 R²   (0.999 R² .. NaN R²)
+mean                 3.544 s    (3.432 s .. 3.615 s)
+std dev              108.1 ms   (0.0 s .. 124.6 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
-Steps      :   1636280597
-Alloc bytes:    545123064          (Checks:     15299767)
-GC runs    :           21
+Steps      :   1169097552
+Alloc bytes:    411762816          (Checks:     12522533)
+GC runs    :           15
