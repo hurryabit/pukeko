@@ -16,7 +16,7 @@
 
 #define LIM_CON 4
 
-#define CAF_SIZE 3
+#define GLOB_SIZE 3
 
 typedef struct heap_cell {
   uint8_t tag;
@@ -32,8 +32,8 @@ typedef struct {
   stack_cell* stack_start;
   stack_cell* base_ptr;
   stack_cell* stack_ptr;
-  heap_cell*  cafs_start;
-  heap_cell*  cafs_end;
+  heap_cell*  glob_start;
+  heap_cell*  glob_end;
   uint64_t    heap_size;
   heap_cell*  heap_start;
   heap_cell*  heap_middle;
@@ -156,9 +156,9 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
   }
   heap_cell* follow_ptr = info->heap_ptr;
 
-  for (heap_cell* caf_ptr = info->cafs_start; caf_ptr < info->cafs_end; caf_ptr += CAF_SIZE) {
-    gc_assert_good_tag(caf_ptr, "gc_follow@cafs", true);
-    gc_follow(info, caf_ptr);
+  for (heap_cell* glob_ptr = info->glob_start; glob_ptr < info->glob_end; glob_ptr += GLOB_SIZE) {
+    gc_assert_good_tag(glob_ptr, "gc_follow@glob", true);
+    gc_follow(info, glob_ptr);
   }
 
   stack_cell* stack_ptr = info->stack_ptr;
