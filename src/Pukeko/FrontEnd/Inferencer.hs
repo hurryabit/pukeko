@@ -127,11 +127,10 @@ instantiate = go Map.empty Seq.empty
         pure (e0, t1, cstrs0)
 
 -- TODO: Try removing the returned map.
-inferPatn :: CanInfer s effs =>
-  Patn In -> UType s -> Eff effs (Patn (Aux s), Map TmVar (UType s))
+inferPatn :: CanInfer s effs => Patn In -> UType s -> Eff effs (Patn (Aux s))
 inferPatn patn t_expr = case patn of
-  PWld -> pure (PWld, Map.empty)
-  PVar (x, NoType) -> pure (PVar (x, t_expr), Map.singleton x t_expr)
+  PWld -> pure PWld
+  PVar (x, NoType) -> pure (PVar (x, t_expr))
   PCon dcon ps0 -> do
     (MkTyConDecl tcon params _dcons, MkTmConDecl{_tmcon2fields = fields})
       <- findInfo info2tmcons dcon
@@ -143,8 +142,8 @@ inferPatn patn t_expr = case patn of
     unify t_expr t_inst
     let env = Map.fromList (zipExact params t_params)
     let t_fields = map (open1 . fmap (env Map.!)) fields
-    (ps1, binds) <- unzip <$> zipWithM inferPatn ps0 t_fields
-    pure (PCon dcon ps1, Map.unions binds)
+    ps1 <- zipWithM inferPatn ps0 t_fields
+    pure (PCon dcon ps1)
 
 inferLet :: forall s effs.
   CanInfer s effs => Bind In -> Eff effs (Bind (Aux s), UType s, UTypeCstrs s)
@@ -214,7 +213,8 @@ infer = \case
       (expr1, t_expr, cstrs0) <- infer expr0
       t_res <- freshUVar
       (altns1, cstrss1) <- fmap NE.unzip . for altns0 $ \(MkAltn patn0 rhs0) -> do
-        (patn1, t_binds) <- inferPatn patn0 t_expr
+        patn1 <- inferPatn patn0 t_expr
+        let t_binds = Map.fromList (toListOf patn2binder patn1)
         (rhs1, t_rhs, cstrs1) <- withinEScope t_binds (infer rhs0)
         unify t_res t_rhs
         pure (MkAltn patn1 rhs1, cstrs1)
