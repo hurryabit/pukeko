@@ -134,8 +134,8 @@ inline mode ce0@(gs0, e0, as0) =
           inline mode ((BindPar, bs):gs1 ++ gs0, rhs, as0)
 
         _ -> do
-          e1 <- EMat t (closeCtxt ce1) <$> (traverse . altn2expr) inlineExpr altns
-          pure (gs0, e1, as0)
+          e2 <- EMat t (closeCtxt ce1) <$> (traverse . altn2expr) inlineExpr altns
+          pure (gs0, e2, as0)
 
     ECast c e1 -> do
       e2 <- inlineExpr e1
@@ -150,9 +150,16 @@ inlineExpr = fmap closeCtxt . inline Normal . initCtxt
 inSupCDecl :: CanInline effs => FuncDecl (Only SupC) -> Eff effs (FuncDecl (Only SupC))
 inSupCDecl decl = func2expr inlineExpr decl & runReader (getPos decl)
 
+isConCAF :: FuncDecl (Only SupC) -> Bool
+isConCAF = \case
+  SupCDecl _ _ [] (unwindl _EApp -> (ECon{}, _)) -> True
+  _ -> False
+
 inSCC :: CanInline effs => SCC (FuncDecl (Only SupC)) -> Eff effs Module
 inSCC = \case
+  -- TODO: We need a proper loop breaker.
   CyclicSCC supcs0 -> do
+    for_ supcs0 $ \supc -> when (isConCAF supc) (makeInlinable supc)
     supcs1 <- traverse inSupCDecl supcs0
     let supcs2 = inlineSupCDecls supcs1
     -- Since CAFs are only inlined under very specific conditions, we can safely

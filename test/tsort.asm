@@ -1,4 +1,4 @@
-g_declare_cafs gm$cons_0_0, dict$Ord$Int, dict$Foldable$List, dict$Monad$IO, input, dict$Foldable$BinTree, main, print$ll1
+g_declare_cafs gm$cons_0_0, dict$Ord$Int, dict$Monad$IO, input, main, print$ll1
 g_declare_main main
 
 g_globstart gm$cons_0_0, 0
@@ -97,12 +97,6 @@ g_pushglobal gm$ge, 2
 g_updcons 0, 4, 1
 g_return
 
-g_globstart dict$Foldable$List, 0
-g_pushglobal dict$Foldable$List$ll2, 3
-g_pushglobal dict$Foldable$List$ll1, 3
-g_updcons 0, 2, 1
-g_return
-
 g_globstart dict$Monad$IO, 0
 g_pushglobal dict$Monad$IO$ll4, 2
 g_pushglobal dict$Monad$IO$ll2, 1
@@ -115,12 +109,6 @@ g_pushglobal gm$geti, 1
 g_pushglobal io$ll1, 3
 g_updap 2, 1
 g_unwind
-
-g_globstart dict$Foldable$BinTree, 0
-g_pushglobal dict$Foldable$BinTree$ll2, 3
-g_pushglobal dict$Foldable$BinTree$ll1, 3
-g_updcons 0, 2, 1
-g_return
 
 g_globstart main, 0
 g_pushglobal main$ll2, 1
@@ -143,11 +131,7 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 4
-g_pushglobal dict$Foldable$List, 0
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal dict$Foldable$List$ll1, 3
 g_mkap 3
 g_push 1
 g_push 4
@@ -173,11 +157,7 @@ g_push 5
 g_push 5
 g_mkap 2
 g_push 4
-g_pushglobal dict$Foldable$List, 0
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal dict$Foldable$List$ll2, 3
 g_updap 3, 6
 g_pop 5
 g_unwind
@@ -373,56 +353,13 @@ g_push 0
 g_push 3
 g_push 6
 g_push 6
-g_pushglobal dict$Foldable$BinTree, 0
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
+g_pushglobal dict$Foldable$BinTree$ll1, 3
 g_mkap 3
 g_push 3
 g_push 6
 g_mkap 2
 g_push 5
-g_pushglobal dict$Foldable$BinTree, 0
-g_eval
-g_proj 0
-g_push 0
-g_slide 1
-g_updap 3, 7
-g_pop 6
-g_unwind
-g_label .2
-
-g_globstart dict$Foldable$BinTree$ll2, 3
-g_push 2
-g_eval
-g_jumpcase .0, .1
-g_label .0
-g_pop 2
-g_update 2
-g_pop 1
-g_unwind
-g_label .1
-g_uncons 3
-g_push 2
-g_push 2
-g_push 2
-g_push 7
-g_push 7
-g_pushglobal dict$Foldable$BinTree, 0
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
-g_mkap 3
-g_push 6
-g_mkap 2
-g_push 5
-g_pushglobal dict$Foldable$BinTree, 0
-g_eval
-g_proj 1
-g_push 0
-g_slide 1
+g_pushglobal dict$Foldable$BinTree$ll1, 3
 g_updap 3, 7
 g_pop 6
 g_unwind

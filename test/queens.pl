@@ -41,10 +41,6 @@ external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 dict$Monoid$Int : Monoid Int = Dict$Monoid @Int 0 add_int
-dict$Functor$List : Functor List =
-  Dict$Functor @List dict$Functor$List$ll1
-dict$Foldable$List : Foldable List =
-  Dict$Foldable @List dict$Foldable$List$ll1 dict$Foldable$List$ll2
 input : IO Int = coerce @(_ -> IO) (io$ll1 @Unit @Int geti Unit)
 ints : List Int =
   let rec go : Int -> List Int = ints$ll1 go in
@@ -63,23 +59,12 @@ dict$Functor$List$ll1 : ∀a b. (a -> b) -> List a -> List b =
   fun @a @b (f : a -> b) (xs : List a) ->
     match xs with
     | Nil -> Nil @b
-    | Cons x xs ->
-      Cons @b (f x) ((match dict$Functor$List with
-                      | Dict$Functor map -> map) @a @b f xs)
+    | Cons x xs -> Cons @b (f x) (dict$Functor$List$ll1 @a @b f xs)
 dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      f x ((match dict$Foldable$List with
-            | Dict$Foldable foldr _ -> foldr) @a @b f y0 xs)
-dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
-  fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
-    match xs with
-    | Nil -> y0
-    | Cons x xs ->
-      (match dict$Foldable$List with
-       | Dict$Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
+    | Cons x xs -> f x (dict$Foldable$List$ll1 @a @b f y0 xs)
 take$ll1 : ∀a. Int -> List a -> List a =
   fun @a (n : Int) (xs : List a) ->
     match le_int n 0 with
