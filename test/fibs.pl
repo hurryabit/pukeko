@@ -35,40 +35,27 @@ data IO a = World -> Pair a World
 external abort : ∀a. a = "abort"
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
-monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
-prime : Int =
-  (match ringInt with
-   | .Ring _ add _ _ -> add) ((match ringInt with
-                               | .Ring _ _ _ mul -> mul) 1000000 1000000) 39
+prime : Int = add_int (mul_int 1000000 1000000) 39
 fibs0 : List Int = Cons @Int 0 fibs1
 fibs1 : List Int =
   Cons @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
 main : IO Unit =
-  (match monadIO with
-   | .Monad _ bind -> bind) @Int @Unit input main.L1
+  coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 nth_exn.L1 : ∀a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
-      match (match ordInt with
-             | .Ord _ _ le _ -> le) n 0 with
-      | False ->
-        nth_exn.L1 @a xs ((match ringInt with
-                           | .Ring _ _ sub _ -> sub) n 1)
+      match le_int n 0 with
+      | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
 zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -78,15 +65,10 @@ zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       match ys with
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
-monadIO.pure.L2 : ∀a. a -> IO a =
-  fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-monadIO.bind.L2 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx : IO a) (f : a -> IO b) ->
-    coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
 io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
@@ -96,15 +78,9 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io.L1 @a @b f x)
 add_mod_prime.L1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    let z : Int =
-          (match ringInt with
-           | .Ring _ add _ _ -> add) x y
-    in
-    match (match ordInt with
-           | .Ord _ _ _ lt -> lt) z prime with
-    | False ->
-      (match ringInt with
-       | .Ring _ _ sub _ -> sub) z prime
+    let z : Int = add_int x y in
+    match lt_int z prime with
+    | False -> sub_int z prime
     | True -> z
 main.L1 : Int -> IO Unit =
   fun (n : Int) -> print (nth_exn.L1 @Int fibs0 n)

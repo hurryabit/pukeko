@@ -40,15 +40,11 @@ external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
@@ -56,11 +52,8 @@ print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 foldableBinTree : Foldable BinTree =
   .Foldable @BinTree foldableBinTree.foldr.L1 foldableBinTree.foldl.L1
-foldableBag : Foldable Bag =
-  .Foldable @Bag foldableBag.foldr.L1 foldableBag.foldl.L1
 main : IO Unit =
-  (match monadIO with
-   | .Monad _ bind -> bind) @Int @Unit input main.L2
+  coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -77,11 +70,8 @@ foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate.L1 @a ((match ringInt with
-                                   | .Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
 semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -145,14 +135,6 @@ foldableBinTree.foldl.L1 : ∀a b. (b -> a -> b) -> b -> BinTree a -> b =
        | .Foldable _ foldl ->
          foldl) @a @b f (f ((match foldableBinTree with
                              | .Foldable _ foldl -> foldl) @a @b f y0 l) x) r
-foldableBag.foldr.L1 : ∀a b. (a -> b -> b) -> b -> Bag a -> b =
-  fun @a @b (f : a -> b -> b) (y0 : b) (bag : Bag a) ->
-    (match foldableBinTree with
-     | .Foldable foldr _ -> foldr) @a @b f y0 (coerce @(Bag -> _) bag)
-foldableBag.foldl.L1 : ∀a b. (b -> a -> b) -> b -> Bag a -> b =
-  fun @a @b (f : b -> a -> b) (y0 : b) (bag : Bag a) ->
-    (match foldableBinTree with
-     | .Foldable _ foldl -> foldl) @a @b f y0 (coerce @(Bag -> _) bag)
 bag_insert.L1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
   fun (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (ord._14 : Ord _14) (x : _14) (t : BinTree _14) ->
     match t with
@@ -170,17 +152,17 @@ tsort.L1 : Bag Int -> Int -> Bag Int =
     coerce @(_ -> Bag) (insert @Int ordInt x (coerce @(Bag -> _) s))
 main.L1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    (match foldableList with
-     | .Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) ((match monadIO with
-                                                                      | .Monad pure _ ->
-                                                                        pure) @Unit Unit) ((match foldableBag with
-                                                                                            | .Foldable foldr _ ->
-                                                                                              foldr) @Int @(List Int) (Cons @Int) (Nil @Int) ((match foldableList with
-                                                                                                                                               | .Foldable _ foldl ->
-                                                                                                                                                 foldl) @Int @(Bag Int) tsort.L1 (coerce @(_ -> Bag) (Leaf @Int)) xs))
+    foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f : Int -> List Int -> List Int =
+                                                                                                                                    Cons @Int
+                                                                                                                              and y0 : List Int =
+                                                                                                                                    Nil @Int
+                                                                                                                              and bag : Bag Int =
+                                                                                                                                    foldableList.foldl.L1 @Int @(Bag Int) tsort.L1 (coerce @(_ -> Bag) (Leaf @Int)) xs
+                                                                                                                              in
+                                                                                                                              foldableBinTree.foldr.L1 @Int @(List Int) f y0 (coerce @(Bag -> _) bag))
 main.L2 : Int -> IO Unit =
   fun (n : Int) ->
-    (match monadIO with
-     | .Monad _ bind ->
-       bind) @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L1
+    let mx : IO (List Int) =
+          sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
+    in
+    coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx main.L1)

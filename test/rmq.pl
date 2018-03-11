@@ -38,17 +38,12 @@ data RmqTree a =
 external abort : ∀a. a = "abort"
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
@@ -57,15 +52,11 @@ nats : List Int =
   nats_from 0
 infinity : Int = 1000000000
 main : IO Unit =
-  (match monadIO with
-   | .Monad _ bind -> bind) @Int @Unit input main.L6
+  coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L6)
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate.L1 @a ((match ringInt with
-                                   | .Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
 zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -112,8 +103,7 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io.L1 @a @b f x)
 nats.L1 : (Int -> List Int) -> Int -> List Int =
   fun (nats_from : Int -> List Int) (n : Int) ->
-    Cons @Int n (nats_from ((match ringInt with
-                             | .Ring _ add _ _ -> add) n 1))
+    Cons @Int n (nats_from (add_int n 1))
 pair.L1 : ∀a. (a -> a -> a) -> List a -> List a =
   fun @a (op : a -> a -> a) (xs1 : List a) ->
     match xs1 with
@@ -146,23 +136,15 @@ query.L1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree
     match t with
     | RmqEmpty -> one
     | RmqNode t_lo t_hi value left right ->
-      match let x : Bool =
-                  (match ordInt with
-                   | .Ord _ _ _ lt -> lt) q_hi t_lo
-            and y : Bool =
-                  (match ordInt with
-                   | .Ord _ gt _ _ -> gt) q_lo t_hi
+      match let x : Bool = lt_int q_hi t_lo
+            and y : Bool = gt_int q_lo t_hi
             in
             match x with
             | False -> y
             | True -> True with
       | False ->
-        match let x : Bool =
-                    (match ordInt with
-                     | .Ord _ _ le _ -> le) q_lo t_lo
-              and y : Bool =
-                    (match ordInt with
-                     | .Ord _ _ le _ -> le) t_hi q_hi
+        match let x : Bool = le_int q_lo t_lo
+              and y : Bool = le_int t_hi q_hi
               in
               match x with
               | False -> False
@@ -172,8 +154,7 @@ query.L1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree
       | True -> one
 min.L1 : Int -> Int -> Int =
   fun (x : Int) (y : Int) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) x y with
+    match le_int x y with
     | False -> y
     | True -> x
 main.L1 : RmqTree Int -> Int -> Int -> IO Unit =
@@ -187,12 +168,10 @@ main.L1 : RmqTree Int -> Int -> Int -> IO Unit =
     print res
 main.L2 : RmqTree Int -> Int -> IO Unit =
   fun (t : RmqTree Int) (lo : Int) ->
-    (match monadIO with
-     | .Monad _ bind -> bind) @Int @Unit input (main.L1 t lo)
+    let f : Int -> IO Unit = main.L1 t lo in
+    coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)
 main.L3 : List Unit -> IO Unit =
-  fun (x : List Unit) ->
-    (match monadIO with
-     | .Monad pure _ -> pure) @Unit Unit
+  fun (x : List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)
 main.L4 : Int -> List Int -> IO Unit =
   fun (m : Int) (xs : List Int) ->
     let t : RmqTree Int =
@@ -201,19 +180,22 @@ main.L4 : Int -> List Int -> IO Unit =
           in
           run (zip_with.L1 @Int @Int @(RmqTree Int) (single.L1 @Int) nats xs)
     in
-    (match monadIO with
-     | .Monad _ bind -> bind) @(List Unit) @Unit (let act : IO Unit =
-                                                        (match monadIO with
-                                                         | .Monad _ bind ->
-                                                           bind) @Int @Unit input (main.L2 t)
-                                                  in
-                                                  sequence.L3 @Unit @IO monadIO (replicate.L1 @(IO Unit) m act)) main.L3
+    let mx : IO (List Unit) =
+          let act : IO Unit =
+                let f : Int -> IO Unit = main.L2 t in
+                coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)
+          in
+          sequence.L3 @Unit @IO monadIO (replicate.L1 @(IO Unit) m act)
+    in
+    coerce @(_ -> IO) (monadIO.bind.L1 @(List Unit) @Unit mx main.L3)
 main.L5 : Int -> Int -> IO Unit =
   fun (n : Int) (m : Int) ->
-    (match monadIO with
-     | .Monad _ bind ->
-       bind) @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) (main.L4 m)
+    let mx : IO (List Int) =
+          sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
+    and f : List Int -> IO Unit = main.L4 m
+    in
+    coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx f)
 main.L6 : Int -> IO Unit =
   fun (n : Int) ->
-    (match monadIO with
-     | .Monad _ bind -> bind) @Int @Unit input (main.L5 n)
+    let f : Int -> IO Unit = main.L5 n in
+    coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)

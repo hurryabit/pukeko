@@ -40,19 +40,12 @@ data FixPoly p a = Fix (p a)
 data ListF a b =
        | NilF
        | ConsF a b
-external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
@@ -74,8 +67,7 @@ mono : ∀a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
 bifunctorListF : Bifunctor ListF =
   .Bifunctor @ListF bifunctorListF.bimap.L1
 main : IO Unit =
-  (match monadIO with
-   | .Monad _ bind -> bind) @Int @Unit input main.L3
+  coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L3)
 id.L1 : ∀a. a -> a = fun @a (x : a) -> x
 compose.L1 : ∀a b c. (b -> c) -> (a -> b) -> a -> c =
   fun @a @b @c (f : b -> c) (g : a -> b) (x : a) -> f (g x)
@@ -95,11 +87,8 @@ foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate.L1 @a ((match ringInt with
-                                   | .Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
 semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
@@ -174,9 +163,7 @@ functorFox2.map.L1 : ∀p. Bifunctor p -> (∀a b. (a -> b) -> Fix2 p a -> Fix2 
                                                                                                                                                                                   | .Functor map ->
                                                                                                                                                                                     map) @a @b f)) (unFix2.L1 @a @p))
 functorListF.map.L1 : ∀a a b. (a -> b) -> ListF a a -> ListF a b =
-  fun @a @a @b ->
-    (match bifunctorListF with
-     | .Bifunctor bimap -> bimap) @a @a @a @b (id.L1 @a)
+  fun @a @a @b -> bifunctorListF.bimap.L1 @a @a @a @b (id.L1 @a)
 bifunctorListF.bimap.L1 : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
   fun @a1 @a2 @b1 @b2 (f : a1 -> a2) (g : b1 -> b2) (x : ListF a1 b1) ->
     match x with
@@ -192,35 +179,30 @@ fromList.L1 : ∀a. List a -> ListF a (List a) =
     match x with
     | Nil -> NilF @a @(List a)
     | Cons y ys -> ConsF @a @(List a) y ys
-main.L1 : Int -> Int =
-  (match ringInt with
-   | .Ring _ _ _ mul -> mul) 2
+main.L1 : Int -> Int = mul_int 2
 main.L2 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    (match foldableList with
-     | .Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) ((match monadIO with
-                                                                      | .Monad pure _ ->
-                                                                        pure) @Unit Unit) (let f : Fix (ListF Int) -> List Int =
-                                                                                                 cata.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (toList.L1 @Int)
-                                                                                           and g : Fix2 ListF Int -> Fix (ListF Int) =
-                                                                                                 mono @Int @ListF bifunctorListF
-                                                                                           and x : Fix2 ListF Int =
-                                                                                                 let dict : Functor (Fix2 ListF) =
-                                                                                                       functorFox2 @ListF bifunctorListF
-                                                                                                 in
-                                                                                                 (match dict with
-                                                                                                  | .Functor map ->
-                                                                                                    map) @Int @Int main.L1 (let f : Fix (ListF Int) -> Fix2 ListF Int =
-                                                                                                                                  poly @Int @ListF bifunctorListF
-                                                                                                                            and g : List Int -> Fix (ListF Int) =
-                                                                                                                                  ana.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (fromList.L1 @Int)
-                                                                                                                            in
-                                                                                                                            f (g xs))
-                                                                                           in
-                                                                                           f (g x))
+    foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f : Fix (ListF Int) -> List Int =
+                                                                                                                                    cata.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (toList.L1 @Int)
+                                                                                                                              and g : Fix2 ListF Int -> Fix (ListF Int) =
+                                                                                                                                    mono @Int @ListF bifunctorListF
+                                                                                                                              and x : Fix2 ListF Int =
+                                                                                                                                    let dict : Functor (Fix2 ListF) =
+                                                                                                                                          functorFox2 @ListF bifunctorListF
+                                                                                                                                    in
+                                                                                                                                    (match dict with
+                                                                                                                                     | .Functor map ->
+                                                                                                                                       map) @Int @Int main.L1 (let f : Fix (ListF Int) -> Fix2 ListF Int =
+                                                                                                                                                                     poly @Int @ListF bifunctorListF
+                                                                                                                                                               and g : List Int -> Fix (ListF Int) =
+                                                                                                                                                                     ana.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (fromList.L1 @Int)
+                                                                                                                                                               in
+                                                                                                                                                               f (g xs))
+                                                                                                                              in
+                                                                                                                              f (g x))
 main.L3 : Int -> IO Unit =
   fun (n : Int) ->
-    (match monadIO with
-     | .Monad _ bind ->
-       bind) @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L2
+    let mx : IO (List Int) =
+          sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
+    in
+    coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx main.L2)

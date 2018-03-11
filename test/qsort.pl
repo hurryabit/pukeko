@@ -34,17 +34,10 @@ data World =
 data IO a = World -> Pair a World
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
@@ -63,13 +56,11 @@ qsort : List Int -> List Int =
         (match dict with
          | .Monoid _ append -> append) (qsort ys) (Cons @Int x (qsort zs))
 main : IO Unit =
-  (match monadIO with
-   | .Monad _ bind -> bind) @Int @Unit input main.L2
+  coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 monoidList.empty : ∀a. List a = Nil
 monoidList.append.L1 : ∀a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
-    (match foldableList with
-     | .Foldable foldr _ -> foldr) @a @(List a) (Cons @a) ys xs
+    foldableList.foldr.L1 @a @(List a) (Cons @a) ys xs
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -86,11 +77,8 @@ foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) n 0 with
-    | False ->
-      Cons @a x (replicate.L1 @a ((match ringInt with
-                                   | .Ring _ _ sub _ -> sub) n 1) x)
+    match le_int n 0 with
+    | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
 partition.L1 : ∀a. (a -> Bool) -> List a -> Pair (List a) (List a) =
   fun @a (p : a -> Bool) (xs : List a) ->
@@ -147,18 +135,13 @@ io.L2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 qsort.L1 : Int -> Int -> Bool =
-  fun (x : Int) (y : Int) ->
-    (match ordInt with
-     | .Ord _ _ _ lt -> lt) y x
+  fun (x : Int) (y : Int) -> lt_int y x
 main.L1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    (match foldableList with
-     | .Foldable foldr _ ->
-       foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) ((match monadIO with
-                                                                      | .Monad pure _ ->
-                                                                        pure) @Unit Unit) (qsort xs)
+    foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (qsort xs)
 main.L2 : Int -> IO Unit =
   fun (n : Int) ->
-    (match monadIO with
-     | .Monad _ bind ->
-       bind) @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L1
+    let mx : IO (List Int) =
+          sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
+    in
+    coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx main.L1)

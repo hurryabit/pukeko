@@ -34,17 +34,11 @@ data World =
 data IO a = World -> Pair a World
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
-external ge_int : Int -> Int -> Bool = "ge"
-external gt_int : Int -> Int -> Bool = "gt"
-external neg_int : Int -> Int = "neg"
-external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
 external mod : Int -> Int -> Int = "mod"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
-ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
 foldableList : Foldable List =
   .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
@@ -58,27 +52,24 @@ main : IO Unit =
               match split_at.L1 @Int 400000 random with
               | Pair xs random ->
                 let m1 : IO Unit =
-                      (match foldableList with
-                       | .Foldable foldr _ ->
-                         foldr) @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) ((match monadIO with
-                                                                                        | .Monad pure _ ->
-                                                                                          pure) @Unit Unit) xs
+                      foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) xs
                 and m2 : IO Unit =
                       match split_at.L1 @Int 100000 random with
                       | Pair ys random ->
                         let zs : List Int = take.L1 @Int 100000 random in
-                        (match monadIO with
-                         | .Monad _ bind ->
-                           bind) @(List Unit) @Unit (sequence.L3 @Unit @IO monadIO (zip_with.L1 @Int @Int @(IO Unit) (main.L1 400000) ys zs)) main.L2
+                        let mx : IO (List Unit) =
+                              sequence.L3 @Unit @IO monadIO (zip_with.L1 @Int @Int @(IO Unit) (main.L1 400000) ys zs)
+                        in
+                        coerce @(_ -> IO) (monadIO.bind.L1 @(List Unit) @Unit mx main.L2)
                 in
-                (match monadIO with
-                 | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
+                let f : Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+                coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
         in
-        (match monadIO with
-         | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
+        let f : Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+        coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
   in
-  (match monadIO with
-   | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
+  let f : Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+  coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
@@ -95,14 +86,11 @@ foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
        | .Foldable _ foldl -> foldl) @a @b f (f y0 x) xs
 take.L1 : ∀a. Int -> List a -> List a =
   fun @a (n : Int) (xs : List a) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) n 0 with
+    match le_int n 0 with
     | False ->
       match xs with
       | Nil -> Nil @a
-      | Cons x xs ->
-        Cons @a x (take.L1 @a ((match ringInt with
-                                | .Ring _ _ sub _ -> sub) n 1) xs)
+      | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
     | True -> Nil @a
 zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
@@ -160,39 +148,32 @@ gen.L1 : ∀a. (a -> a) -> a -> List a =
   fun @a (f : a -> a) (x : a) -> Cons @a x (gen.L1 @a f (f x))
 split_at.L1 : ∀a. Int -> List a -> Pair (List a) (List a) =
   fun @a (n : Int) (xs : List a) ->
-    match (match ordInt with
-           | .Ord _ _ le _ -> le) n 0 with
+    match le_int n 0 with
     | False ->
       match xs with
       | Nil -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
       | Cons x xs ->
-        match split_at.L1 @a ((match ringInt with
-                               | .Ring _ _ sub _ -> sub) n 1) xs with
+        match split_at.L1 @a (sub_int n 1) xs with
         | Pair ys zs -> Pair @(List a) @(List a) (Cons @a x ys) zs
     | True -> Pair @(List a) @(List a) (Nil @a) xs
 random.L1 : Int -> Int =
-  fun (x : Int) ->
-    mod ((match ringInt with
-          | .Ring _ _ _ mul -> mul) 91 x) 1000000007
+  fun (x : Int) -> mod (mul_int 91 x) 1000000007
 main.L1 : Int -> Int -> Int -> IO Unit =
   fun (n : Int) (y : Int) (z : Int) ->
     let y : Int = mod y n in
     let z : Int = mod z n in
-    match (match ordInt with
-           | .Ord _ _ _ lt -> lt) y z with
+    match lt_int y z with
     | False ->
       let m1 : IO Unit = print z
       and m2 : IO Unit = print y
       in
-      (match monadIO with
-       | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
+      let f : Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+      coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
     | True ->
       let m1 : IO Unit = print y
       and m2 : IO Unit = print z
       in
-      (match monadIO with
-       | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
+      let f : Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+      coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 main.L2 : List Unit -> IO Unit =
-  fun (x : List Unit) ->
-    (match monadIO with
-     | .Monad pure _ -> pure) @Unit Unit
+  fun (x : List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)

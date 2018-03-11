@@ -35,23 +35,16 @@ data IO a = World -> Pair a World
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 main : IO Unit =
-  (match monadIO with
-   | .Monad _ bind -> bind) @Int @Unit input main.L2
+  coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
-monadIO.pure.L2 : ∀a. a -> IO a =
-  fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-monadIO.bind.L2 : ∀a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx : IO a) (f : a -> IO b) ->
-    coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
 io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
@@ -69,9 +62,9 @@ main.L1 : Int -> Int -> IO Unit =
           print (match p with
                  | Pair _ y -> y)
     in
-    (match monadIO with
-     | .Monad _ bind -> bind) @Unit @Unit m1 (semi.L1 @Unit @IO m2)
+    let f : Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+    coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 main.L2 : Int -> IO Unit =
   fun (x : Int) ->
-    (match monadIO with
-     | .Monad _ bind -> bind) @Int @Unit input (main.L1 x)
+    let f : Int -> IO Unit = main.L1 x in
+    coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)
