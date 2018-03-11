@@ -2,6 +2,7 @@ module Pukeko.AST.Expr.Optics
   ( freeTmVar
   , subst
   , patn2binder
+  , patn2type
   , expr2atom
   , expr2type
   ) where
@@ -45,7 +46,8 @@ freeTmVar f = subst' (fmap EVar . f)
 subst :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
 subst f = runIdentity . subst' (Identity . f)
 
-patn2binder :: Traversal' (Patn lg) (TmBinder (TypeOf lg))
+patn2binder :: IsNested lg1 ~ IsNested lg2 =>
+  Traversal (Patn lg1) (Patn lg2) (TmBinder (TypeOf lg1)) (TmBinder (TypeOf lg2))
 patn2binder f = \case
   PWld -> pure PWld
   PVar b -> PVar <$> f b
@@ -101,12 +103,8 @@ expr2type f = \case
 altn2type :: Traversal' (Altn lg) (TypeOf lg)
 altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0
 
--- TODO: If the binders become typed, we need to traverse them as well.
 -- | Traverse over all types in a pattern, i.e., the type arguments to the data
 -- constructors in the pattern.
-patn2type :: Traversal' (Patn lg) (TypeOf lg)
-patn2type f = \case
-  PWld -> pure PWld
-  PVar xt -> PVar <$> _2 f xt
-  PCon dcon patns -> PCon dcon <$> traverse (patn2type f) patns
-  PSimple dcon binds -> PSimple dcon <$> (traverse . _Just . _2) f binds
+patn2type :: IsNested lg1 ~ IsNested lg2 =>
+  Traversal (Patn lg1) (Patn lg2) (TypeOf lg1) (TypeOf lg2)
+patn2type = patn2binder . _2

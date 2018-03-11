@@ -342,14 +342,7 @@ qualExpr = \case
   ETyAnn t  e  -> ETyAnn <$> qualType t <*> qualExpr e
 
 qualAltn :: Altn (Aux s) -> TQ s (Altn Out)
-qualAltn (MkAltn p e) = MkAltn <$> qualPatn p <*> qualExpr e
-
--- TODO: Use 'patn2type'.
-qualPatn :: Patn (Aux s) -> TQ s (Patn Out)
-qualPatn = \case
-  PWld -> pure PWld
-  PVar (x, t) -> PVar . (x,) <$> qualType t
-  PCon c ps -> PCon c <$> traverse qualPatn ps
+qualAltn (MkAltn p e) = MkAltn <$> patn2type qualType p <*> qualExpr e
 
 qualFuncDecl :: FuncDecl (Aux s) tv -> TQ s (FuncDecl Out tv)
 qualFuncDecl (MkFuncDecl name type0 body0) = do
