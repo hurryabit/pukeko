@@ -26,8 +26,7 @@ substitute' f = go Set.empty
         | x `Set.member` bound -> pure (EVar x)
         | otherwise            -> f x
       EAtm a      -> pure (EAtm a)
-      EApp e (TmArg a) -> ETmApp <$> go bound e <*> go bound a
-      EApp e a         -> EApp   <$> go bound e <*> pure a
+      EApp e a -> EApp   <$> go bound e <*> arg2expr (go bound) a
       EAbs (TmPar x) e -> ETmAbs x <$> go (Set.insert (nameOf x) bound) e
       EAbs p         e -> EAbs   p <$> go bound e
       ELet m ds e -> ELet m <$> (traverse . b2bound) (go bound0) ds <*> go bound1 e
@@ -66,8 +65,7 @@ expr2atom f = \case
   ELoc e       -> ELoc <$> lctd (expr2atom f) e
   EVar x       -> pure (EVar x)
   EAtm a       -> EAtm <$> f a
-  EApp e (TmArg a) -> ETmApp <$> expr2atom f e <*> expr2atom f a
-  EApp e a         -> EApp   <$> expr2atom f e <*> (arg2expr . expr2atom) f a
+  EApp e a     -> EApp   <$> expr2atom f e <*> (arg2expr . expr2atom) f a
   EAbs p  e    -> EAbs p <$> expr2atom f e
   ELet m ds t  -> ELet m <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t e as  -> EMat t <$> expr2atom f e <*> (traverse . altn2expr . expr2atom) f as
