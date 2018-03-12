@@ -43,75 +43,81 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
-ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
-foldableList : Foldable List =
-  .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
-monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
-input : IO Int = io.L2 @Unit @Int geti Unit
-main : IO Unit = bind.L1 @IO monadIO @Int @Unit input main.L2
-le.L1 : ∀a. Ord a -> a -> a -> Bool =
+le : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
     | .Ord _ _ le _ -> le
-sub.L1 : ∀a. Ring a -> a -> a -> a =
+sub : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
     | .Ring _ _ sub _ -> sub
-foldr.L1 : ∀t. Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
+ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
+ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
+foldr : ∀t. Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
     | .Foldable foldr _ -> foldr
-foldl.L1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
+foldl : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
     | .Foldable _ foldl -> foldl
+foldableList : Foldable List =
+  .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
+pure : ∀m. Monad m -> (∀a. a -> m a) =
+  fun @m (dict : Monad m) ->
+    match dict with
+    | .Monad pure _ -> pure
+bind : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+  fun @m (dict : Monad m) ->
+    match dict with
+    | .Monad _ bind -> bind
+monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
+print : Int -> IO Unit = io.L2 @Int @Unit puti
+input : IO Int = io.L2 @Unit @Int geti Unit
+isort : List Int -> List Int =
+  fun (xs : List Int) ->
+    match xs with
+    | Nil -> Nil @Int
+    | Cons x xs -> insert.L1 x (isort xs)
+main : IO Unit = bind @IO monadIO @Int @Unit input main.L2
 foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs -> f x (foldr.L1 @List foldableList @a @b f y0 xs)
+    | Cons x xs -> f x (foldr @List foldableList @a @b f y0 xs)
 foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs -> foldl.L1 @List foldableList @a @b f (f y0 x) xs
+    | Cons x xs -> foldl @List foldableList @a @b f (f y0 x) xs
 replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match le.L1 @Int ordInt n 0 with
-    | False -> Cons @a x (replicate.L1 @a (sub.L1 @Int ringInt n 1) x)
+    match le @Int ordInt n 0 with
+    | False -> Cons @a x (replicate.L1 @a (sub @Int ringInt n 1) x)
     | True -> Nil @a
-pure.L1 : ∀m. Monad m -> (∀a. a -> m a) =
-  fun @m (dict : Monad m) ->
-    match dict with
-    | .Monad pure _ -> pure
-bind.L1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
-  fun @m (dict : Monad m) ->
-    match dict with
-    | .Monad _ bind -> bind
 semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
 semi.L2 : ∀a m. Monad m -> m Unit -> m a -> m a =
   fun @a @m (monad.m : Monad m) (m1 : m Unit) (m2 : m a) ->
-    bind.L1 @m monad.m @Unit @a m1 (semi.L1 @a @m m2)
+    bind @m monad.m @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 : ∀a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (monad.m : Monad m) (x : a) (xs : List a) ->
-    pure.L1 @m monad.m @(List a) (Cons @a x xs)
+    pure @m monad.m @(List a) (Cons @a x xs)
 sequence.L2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) (x : a) ->
-    bind.L1 @m monad.m @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
+    bind @m monad.m @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) ->
     match ms with
-    | Nil -> pure.L1 @m monad.m @(List a) (Nil @a)
+    | Nil -> pure @m monad.m @(List a) (Nil @a)
     | Cons m ms ->
-      bind.L1 @m monad.m @a @(List a) m (sequence.L2 @a @m monad.m ms)
+      bind @m monad.m @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   fun @a @m (monad.m : Monad m) (f : a -> m Unit) (x : a) ->
     semi.L2 @Unit @m monad.m (f x)
 traverse_.L2 : ∀a m t. Monad m -> Foldable t -> (a -> m Unit) -> t a -> m Unit =
   fun @a @m @t (monad.m : Monad m) (foldable.t : Foldable t) (f : a -> m Unit) ->
-    foldr.L1 @t foldable.t @a @(m Unit) (traverse_.L1 @a @m monad.m f) (pure.L1 @m monad.m @Unit Unit)
+    foldr @t foldable.t @a @(m Unit) (traverse_.L1 @a @m monad.m f) (pure @m monad.m @Unit Unit)
 monadIO.pure.L1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 monadIO.pure.L2 : ∀a. a -> IO a =
@@ -130,23 +136,17 @@ io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
 io.L2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
-print.L1 : Int -> IO Unit = io.L2 @Int @Unit puti
 insert.L1 : Int -> List Int -> List Int =
   fun (y : Int) (xs : List Int) ->
     match xs with
     | Nil -> Cons @Int y (Nil @Int)
     | Cons x xs' ->
-      match le.L1 @Int ordInt y x with
+      match le @Int ordInt y x with
       | False -> Cons @Int x (insert.L1 y xs')
       | True -> Cons @Int y xs
-isort.L1 : List Int -> List Int =
-  fun (xs : List Int) ->
-    match xs with
-    | Nil -> Nil @Int
-    | Cons x xs -> insert.L1 x (isort.L1 xs)
 main.L1 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    traverse_.L2 @Int @IO @List monadIO foldableList print.L1 (isort.L1 xs)
+    traverse_.L2 @Int @IO @List monadIO foldableList print (isort xs)
 main.L2 : Int -> IO Unit =
   fun (n : Int) ->
-    bind.L1 @IO monadIO @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L1
+    bind @IO monadIO @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L1

@@ -32,13 +32,13 @@ data Monad m =
 data World =
        | World
 data IO a = World -> Pair a World
-monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
-main : IO Unit =
-  pure.L1 @IO monadIO @Unit (h.L1 @Unit (h.L1 @Unit Unit))
-pure.L1 : ∀m. Monad m -> (∀a. a -> m a) =
+pure : ∀m. Monad m -> (∀a. a -> m a) =
   fun @m (dict : Monad m) ->
     match dict with
     | .Monad pure _ -> pure
+monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
+main : IO Unit =
+  pure @IO monadIO @Unit (h.L1 @Unit (h.L1 @Unit Unit))
 monadIO.pure.L1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
 monadIO.pure.L2 : ∀a. a -> IO a =

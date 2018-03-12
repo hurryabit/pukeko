@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.4, 4, C.1.2, 2, B.abort, 0, B.lt, 2, B.le, 2, B.ge, 2, B.gt, 2, B.neg, 1, B.add, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, B.geti, 1, ordInt, 0, ringInt, 0, functorList, 0, foldableList, 0, monadIO, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, le.L1, 1, add.L1, 1, sub.L1, 1, mul.L1, 1, foldr.L1, 1, foldl.L1, 1, map.L1, 1, functorList.map.L1, 2, foldableList.foldr.L1, 3, foldableList.foldl.L1, 3, nth_exn.L1, 2, zip_with.L1, 3, bind.L1, 1, monadIO.pure.L1, 0, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, print.L1, 0, mul_p.L1, 2, add_p.L1, 2, scanl.L1, 4, scanl.L2, 1, sols.L1, 1, sols.L2, 2, main.L1, 1
+g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.4, 4, C.1.2, 2, B.abort, 0, B.lt, 2, B.le, 2, B.ge, 2, B.gt, 2, B.neg, 1, B.add, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, B.geti, 1, le, 1, add, 1, sub, 1, mul, 1, ordInt, 0, ringInt, 0, foldr, 1, foldl, 1, map, 1, functorList, 0, foldableList, 0, bind, 1, monadIO, 0, print, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, functorList.map.L1, 2, foldableList.foldr.L1, 3, foldableList.foldl.L1, 3, nth_exn.L1, 2, zip_with.L1, 3, monadIO.pure.L1, 0, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, mul_p.L1, 2, add_p.L1, 2, scanl.L1, 4, scanl.L2, 1, sols.L1, 1, sols.L2, 2, main.L1, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -128,6 +128,38 @@ g_input
 g_update 1
 g_return
 
+g_globstart le, 1
+g_push 0
+g_eval
+g_proj 2
+g_update 2
+g_pop 1
+g_unwind
+
+g_globstart add, 1
+g_push 0
+g_eval
+g_proj 1
+g_update 2
+g_pop 1
+g_unwind
+
+g_globstart sub, 1
+g_push 0
+g_eval
+g_proj 2
+g_update 2
+g_pop 1
+g_unwind
+
+g_globstart mul, 1
+g_push 0
+g_eval
+g_proj 3
+g_update 2
+g_pop 1
+g_unwind
+
 g_globstart ordInt, 0
 g_pushglobal B.lt
 g_pushglobal B.le
@@ -144,6 +176,30 @@ g_pushglobal B.neg
 g_updcons 0, 4, 1
 g_return
 
+g_globstart foldr, 1
+g_push 0
+g_eval
+g_proj 0
+g_update 2
+g_pop 1
+g_unwind
+
+g_globstart foldl, 1
+g_push 0
+g_eval
+g_proj 1
+g_update 2
+g_pop 1
+g_unwind
+
+g_globstart map, 1
+g_push 0
+g_eval
+g_proj 0
+g_update 2
+g_pop 1
+g_unwind
+
 g_globstart functorList, 0
 g_pushglobal functorList.map.L1
 g_updcons 0, 1, 1
@@ -155,11 +211,25 @@ g_pushglobal foldableList.foldr.L1
 g_updcons 0, 2, 1
 g_return
 
+g_globstart bind, 1
+g_push 0
+g_eval
+g_proj 1
+g_update 2
+g_pop 1
+g_unwind
+
 g_globstart monadIO, 0
 g_pushglobal monadIO.bind.L2
 g_pushglobal monadIO.pure.L2
 g_updcons 0, 2, 1
 g_return
+
+g_globstart print, 0
+g_pushglobal B.puti
+g_pushglobal io.L2
+g_updap 1, 1
+g_unwind
 
 g_globstart input, 0
 g_pushglobal C.0.0
@@ -177,7 +247,7 @@ g_globstart sum_p, 0
 g_pushint 0
 g_pushglobal add_p.L1
 g_pushglobal foldableList
-g_pushglobal foldl.L1
+g_pushglobal foldl
 g_updap 3, 1
 g_unwind
 
@@ -189,7 +259,7 @@ g_pushglobal scanl.L2
 g_mkap 3
 g_pushglobal sols.L1
 g_pushglobal functorList
-g_pushglobal map.L1
+g_pushglobal map
 g_mkap 3
 g_pushint 1
 g_updcons 1, 2, 1
@@ -199,64 +269,8 @@ g_globstart main, 0
 g_pushglobal main.L1
 g_pushglobal input
 g_pushglobal monadIO
-g_pushglobal bind.L1
+g_pushglobal bind
 g_updap 3, 1
-g_unwind
-
-g_globstart le.L1, 1
-g_push 0
-g_eval
-g_proj 2
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart add.L1, 1
-g_push 0
-g_eval
-g_proj 1
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart sub.L1, 1
-g_push 0
-g_eval
-g_proj 2
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart mul.L1, 1
-g_push 0
-g_eval
-g_proj 3
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart foldr.L1, 1
-g_push 0
-g_eval
-g_proj 0
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart foldl.L1, 1
-g_push 0
-g_eval
-g_proj 1
-g_update 2
-g_pop 1
-g_unwind
-
-g_globstart map.L1, 1
-g_push 0
-g_eval
-g_proj 0
-g_update 2
-g_pop 1
 g_unwind
 
 g_globstart functorList.map.L1, 2
@@ -274,7 +288,7 @@ g_uncons 2
 g_push 1
 g_push 3
 g_pushglobal functorList
-g_pushglobal map.L1
+g_pushglobal map
 g_mkap 3
 g_push 1
 g_push 4
@@ -300,7 +314,7 @@ g_push 1
 g_push 4
 g_push 4
 g_pushglobal foldableList
-g_pushglobal foldr.L1
+g_pushglobal foldr
 g_mkap 4
 g_push 1
 g_push 4
@@ -327,7 +341,7 @@ g_push 5
 g_mkap 2
 g_push 4
 g_pushglobal foldableList
-g_pushglobal foldl.L1
+g_pushglobal foldl
 g_updap 4, 6
 g_pop 5
 g_unwind
@@ -348,7 +362,7 @@ g_uncons 2
 g_pushint 0
 g_push 4
 g_pushglobal ordInt
-g_pushglobal le.L1
+g_pushglobal le
 g_mkap 3
 g_eval
 g_jumpcase .3, .4
@@ -357,7 +371,7 @@ g_pop 1
 g_pushint 1
 g_push 4
 g_pushglobal ringInt
-g_pushglobal sub.L1
+g_pushglobal sub
 g_mkap 3
 g_push 2
 g_pushglobal nth_exn.L1
@@ -413,14 +427,6 @@ g_label .5
 g_jump .2
 g_label .2
 
-g_globstart bind.L1, 1
-g_push 0
-g_eval
-g_proj 1
-g_update 2
-g_pop 1
-g_unwind
-
 g_globstart monadIO.pure.L1, 0
 g_pushglobal C.0.2
 g_update 1
@@ -475,19 +481,13 @@ g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print.L1, 0
-g_pushglobal B.puti
-g_pushglobal io.L2
-g_updap 1, 1
-g_unwind
-
 g_globstart mul_p.L1, 2
 g_pushglobal p
 g_eval
 g_push 2
 g_push 2
 g_pushglobal ringInt
-g_pushglobal mul.L1
+g_pushglobal mul
 g_mkap 3
 g_eval
 g_mod
@@ -501,7 +501,7 @@ g_eval
 g_push 2
 g_push 2
 g_pushglobal ringInt
-g_pushglobal add.L1
+g_pushglobal add
 g_mkap 3
 g_eval
 g_mod
@@ -569,7 +569,7 @@ g_push 0
 g_pushglobal sols
 g_pushglobal nth_exn.L1
 g_mkap 2
-g_pushglobal print.L1
+g_pushglobal print
 g_updap 1, 2
 g_pop 1
 g_unwind

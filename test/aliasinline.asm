@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.2, 2, monadIO, 0, main, 0, pure.L1, 1, monadIO.pure.L1, 0, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, h.L1, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, pure, 1, monadIO, 0, main, 0, monadIO.pure.L1, 0, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, h.L1, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -8,6 +8,14 @@ g_return
 g_globstart C.0.2, 2
 g_updcons 0, 2, 1
 g_return
+
+g_globstart pure, 1
+g_push 0
+g_eval
+g_proj 0
+g_update 2
+g_pop 1
+g_unwind
 
 g_globstart monadIO, 0
 g_pushglobal monadIO.bind.L2
@@ -22,16 +30,8 @@ g_mkap 1
 g_pushglobal h.L1
 g_mkap 1
 g_pushglobal monadIO
-g_pushglobal pure.L1
+g_pushglobal pure
 g_updap 2, 1
-g_unwind
-
-g_globstart pure.L1, 1
-g_push 0
-g_eval
-g_proj 0
-g_update 2
-g_pop 1
 g_unwind
 
 g_globstart monadIO.pure.L1, 0
