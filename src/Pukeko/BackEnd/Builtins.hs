@@ -14,10 +14,10 @@ import qualified Data.Map as Map
 import Pukeko.BackEnd.GCode
 
 externalName :: Name -> Name
-externalName (MkName name) = MkName ("gm$" ++ name)
+externalName (MkName name) = MkName ("B." ++ name)
 
 constructorName :: Int -> Int -> Name
-constructorName tag arity = MkName ("gm$cons_" ++ show tag ++ "_" ++ show arity)
+constructorName tag arity = MkName ("C." ++ show tag ++ "." ++ show arity)
 
 findGlobal :: Name -> Either Failure Global
 findGlobal name = case Map.lookup (externalName name) globalTable of

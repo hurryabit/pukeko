@@ -6,13 +6,13 @@ data BinTree a =
   | Leaf
   | Branch (BinTree a) a (BinTree a)
 
-instance Functor BinTree where
+instance functorBinTree : Functor BinTree where
   map f t =
     match t with
     | Leaf -> Leaf
     | Branch l x r -> Branch (map f l) (f x) (map f r)
 
-instance Foldable BinTree where
+instance foldableBinTree : Foldable BinTree where
   foldr f y0 t =
     match t with
     | Leaf -> y0

@@ -1,10 +1,10 @@
 benchmarking ./tsort < sort400.in > /dev/null
-time                 4.041 s    (NaN s .. 4.674 s)
-                     0.996 R²   (0.995 R² .. 1.000 R²)
-mean                 4.058 s    (3.993 s .. 4.115 s)
-std dev              91.93 ms   (0.0 s .. 98.35 ms)
+time                 4.460 s    (3.695 s .. 5.274 s)
+                     0.996 R²   (0.985 R² .. 1.000 R²)
+mean                 4.286 s    (4.088 s .. 4.418 s)
+std dev              197.7 ms   (0.0 s .. 228.3 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
-Steps      :   7530555246
+Steps      :   7530555192
 Alloc bytes:   2803031344          (Checks:     62863161)
 GC runs    :           28

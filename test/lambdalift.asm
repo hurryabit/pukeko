@@ -1,21 +1,21 @@
-g_declare_globals gm$cons_0_2, 2, gm$cons_0_4, 4, gm$neg, 1, gm$add, 2, gm$sub, 2, gm$mul, 2, gm$seq, 2, gm$puti, 1, dict$Ring$Int, 0, main, 0, add$ll1, 1, io$ll1, 3, io$ll2, 2, print$ll1, 0, g$ll1, 4, h$ll1, 1
+g_declare_globals C.0.2, 2, C.0.4, 4, B.neg, 1, B.add, 2, B.sub, 2, B.mul, 2, B.seq, 2, B.puti, 1, ringInt, 0, main, 0, add.L1, 1, io.L1, 3, io.L2, 2, print.L1, 0, g.L1, 4, h.L1, 1
 g_declare_main main
 
-g_globstart gm$cons_0_2, 2
+g_globstart C.0.2, 2
 g_updcons 0, 2, 1
 g_return
 
-g_globstart gm$cons_0_4, 4
+g_globstart C.0.4, 4
 g_updcons 0, 4, 1
 g_return
 
-g_globstart gm$neg, 1
+g_globstart B.neg, 1
 g_eval
 g_neg
 g_update 1
 g_return
 
-g_globstart gm$add, 2
+g_globstart B.add, 2
 g_push 1
 g_eval
 g_push 1
@@ -25,7 +25,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart gm$sub, 2
+g_globstart B.sub, 2
 g_push 1
 g_eval
 g_push 1
@@ -35,7 +35,7 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart gm$mul, 2
+g_globstart B.mul, 2
 g_push 1
 g_eval
 g_push 1
@@ -45,45 +45,40 @@ g_update 3
 g_pop 2
 g_return
 
-g_globstart gm$seq, 2
+g_globstart B.seq, 2
 g_eval
 g_pop 1
 g_update 1
 g_unwind
 
-g_globstart gm$puti, 1
+g_globstart B.puti, 1
 g_eval
 g_print
 g_updcons 0, 0, 1
 g_return
 
-g_globstart dict$Ring$Int, 0
-g_pushglobal gm$neg
-g_pushglobal gm$add
-g_pushglobal gm$sub
-g_pushglobal gm$mul
-g_push 0
-g_push 2
-g_push 4
-g_push 6
-g_updcons 0, 4, 5
-g_pop 4
+g_globstart ringInt, 0
+g_pushglobal B.mul
+g_pushglobal B.sub
+g_pushglobal B.add
+g_pushglobal B.neg
+g_updcons 0, 4, 1
 g_return
 
 g_globstart main, 0
 g_pushint 2
-g_pushglobal h$ll1
+g_pushglobal h.L1
 g_mkap 1
 g_pushint 3
 g_pushint 2
 g_pushint 1
-g_pushglobal g$ll1
+g_pushglobal g.L1
 g_mkap 4
-g_pushglobal print$ll1
+g_pushglobal print.L1
 g_updap 1, 1
 g_unwind
 
-g_globstart add$ll1, 1
+g_globstart add.L1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -91,7 +86,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart io$ll1, 3
+g_globstart io.L1, 3
 g_push 1
 g_push 1
 g_mkap 1
@@ -99,35 +94,35 @@ g_push 3
 g_push 1
 g_cons 0, 2
 g_push 1
-g_pushglobal gm$seq
+g_pushglobal B.seq
 g_updap 2, 5
 g_pop 4
 g_unwind
 
-g_globstart io$ll2, 2
+g_globstart io.L2, 2
 g_push 1
 g_push 1
-g_pushglobal io$ll1
+g_pushglobal io.L1
 g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 0
-g_pushglobal gm$puti
-g_pushglobal io$ll2
+g_globstart print.L1, 0
+g_pushglobal B.puti
+g_pushglobal io.L2
 g_updap 1, 1
 g_unwind
 
-g_globstart g$ll1, 4
+g_globstart g.L1, 4
 g_update 4
 g_pop 3
 g_unwind
 
-g_globstart h$ll1, 1
+g_globstart h.L1, 1
 g_push 0
 g_push 1
-g_pushglobal dict$Ring$Int
-g_pushglobal add$ll1
+g_pushglobal ringInt
+g_pushglobal add.L1
 g_updap 3, 2
 g_pop 1
 g_unwind
