@@ -14,5 +14,5 @@ disj x y = if x then True else y
 
 infix || disj
 
-instance Eq Bool where
+instance eqBool : Eq Bool where
   eq x y = if x then y else if y then False else True

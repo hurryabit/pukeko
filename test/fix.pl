@@ -12,29 +12,29 @@ data Choice a b =
        | First a
        | Second b
 data Eq a =
-       | Dict$Eq (a -> a -> Bool)
+       | .Eq (a -> a -> Bool)
 data Ord a =
-       | Dict$Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
+       | .Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 data Monoid m =
-       | Dict$Monoid m (m -> m -> m)
+       | .Monoid m (m -> m -> m)
 data Ring a =
-       | Dict$Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
+       | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
 data Foldable t =
-       | Dict$Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+       | .Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
-       | Dict$Functor (∀a b. (a -> b) -> f a -> f b)
+       | .Functor (∀a b. (a -> b) -> f a -> f b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | Dict$Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
+       | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
 data World =
        | World
 data IO a = World -> Pair a World
 data Fix f = f (Fix f)
 data Bifunctor p =
-       | Dict$Bifunctor (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2)
+       | .Bifunctor (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2)
 data Fix2 p a = p a (Fix2 p a)
 data FixPoly p a = Fix (p a)
 data ListF a b =
@@ -51,202 +51,167 @@ external mul_int : Int -> Int -> Int = "mul"
 external seq : ∀a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-dict$Ord$Int : Ord Int =
-  let ge : Int -> Int -> Bool = ge_int
-  and gt : Int -> Int -> Bool = gt_int
-  and le : Int -> Int -> Bool = le_int
-  and lt : Int -> Int -> Bool = lt_int
-  in
-  Dict$Ord @Int ge gt le lt
-dict$Ring$Int : Ring Int =
-  let neg : Int -> Int = neg_int
-  and add : Int -> Int -> Int = add_int
-  and sub : Int -> Int -> Int = sub_int
-  and mul : Int -> Int -> Int = mul_int
-  in
-  Dict$Ring @Int neg add sub mul
-dict$Foldable$List : Foldable List =
-  let foldr : ∀a b. (a -> b -> b) -> b -> List a -> b =
-        dict$Foldable$List$ll1
-  and foldl : ∀a b. (b -> a -> b) -> b -> List a -> b =
-        dict$Foldable$List$ll2
-  in
-  Dict$Foldable @List foldr foldl
-dict$Monad$IO : Monad IO =
-  let pure : ∀a. a -> IO a = dict$Monad$IO$ll2
-  and bind : ∀a b. IO a -> (a -> IO b) -> IO b = dict$Monad$IO$ll4
-  in
-  Dict$Monad @IO pure bind
-input : IO Int = io$ll2 @Unit @Int geti Unit
-dict$Bifunctor$ListF : Bifunctor ListF =
-  let bimap : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
-        dict$Bifunctor$ListF$ll1
-  in
-  Dict$Bifunctor @ListF bimap
-main : IO Unit =
-  bind$ll1 @IO dict$Monad$IO @Int @Unit input main$ll3
-id$ll1 : ∀a. a -> a = fun @a (x : a) -> x
-compose$ll1 : ∀a b c. (b -> c) -> (a -> b) -> a -> c =
+ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
+ringInt : Ring Int = .Ring @Int neg_int add_int sub_int mul_int
+foldableList : Foldable List =
+  .Foldable @List foldableList.foldr.L1 foldableList.foldl.L1
+monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
+input : IO Int = io.L2 @Unit @Int geti Unit
+bifunctorListF : Bifunctor ListF =
+  .Bifunctor @ListF bifunctorListF.bimap.L1
+main : IO Unit = bind.L1 @IO monadIO @Int @Unit input main.L3
+id.L1 : ∀a. a -> a = fun @a (x : a) -> x
+compose.L1 : ∀a b c. (b -> c) -> (a -> b) -> a -> c =
   fun @a @b @c (f : b -> c) (g : a -> b) (x : a) -> f (g x)
-le$ll1 : ∀a. Ord a -> a -> a -> Bool =
+le.L1 : ∀a. Ord a -> a -> a -> Bool =
   fun @a (dict : Ord a) ->
     match dict with
-    | Dict$Ord _ _ le _ -> le
-sub$ll1 : ∀a. Ring a -> a -> a -> a =
+    | .Ord _ _ le _ -> le
+sub.L1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring _ _ sub _ -> sub
-mul$ll1 : ∀a. Ring a -> a -> a -> a =
+    | .Ring _ _ sub _ -> sub
+mul.L1 : ∀a. Ring a -> a -> a -> a =
   fun @a (dict : Ring a) ->
     match dict with
-    | Dict$Ring _ _ _ mul -> mul
-foldr$ll1 : ∀t. Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
+    | .Ring _ _ _ mul -> mul
+foldr.L1 : ∀t. Foldable t -> (∀a b. (a -> b -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
-    | Dict$Foldable foldr _ -> foldr
-foldl$ll1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
+    | .Foldable foldr _ -> foldr
+foldl.L1 : ∀t. Foldable t -> (∀a b. (b -> a -> b) -> b -> t a -> b) =
   fun @t (dict : Foldable t) ->
     match dict with
-    | Dict$Foldable _ foldl -> foldl
-map$ll1 : ∀f. Functor f -> (∀a b. (a -> b) -> f a -> f b) =
+    | .Foldable _ foldl -> foldl
+map.L1 : ∀f. Functor f -> (∀a b. (a -> b) -> f a -> f b) =
   fun @f (dict : Functor f) ->
     match dict with
-    | Dict$Functor map -> map
-dict$Foldable$List$ll1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
+    | .Functor map -> map
+foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      f x (foldr$ll1 @List dict$Foldable$List @a @b f y0 xs)
-dict$Foldable$List$ll2 : ∀a b. (b -> a -> b) -> b -> List a -> b =
+    | Cons x xs -> f x (foldr.L1 @List foldableList @a @b f y0 xs)
+foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
-    | Cons x xs ->
-      foldl$ll1 @List dict$Foldable$List @a @b f (f y0 x) xs
-replicate$ll1 : ∀a. Int -> a -> List a =
+    | Cons x xs -> foldl.L1 @List foldableList @a @b f (f y0 x) xs
+replicate.L1 : ∀a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
-    match le$ll1 @Int dict$Ord$Int n 0 with
-    | False ->
-      Cons @a x (replicate$ll1 @a (sub$ll1 @Int dict$Ring$Int n 1) x)
+    match le.L1 @Int ordInt n 0 with
+    | False -> Cons @a x (replicate.L1 @a (sub.L1 @Int ringInt n 1) x)
     | True -> Nil @a
-pure$ll1 : ∀m. Monad m -> (∀a. a -> m a) =
+pure.L1 : ∀m. Monad m -> (∀a. a -> m a) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad pure _ -> pure
-bind$ll1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
+    | .Monad pure _ -> pure
+bind.L1 : ∀m. Monad m -> (∀a b. m a -> (a -> m b) -> m b) =
   fun @m (dict : Monad m) ->
     match dict with
-    | Dict$Monad _ bind -> bind
-semi$ll1 : ∀a m. m a -> Unit -> m a =
+    | .Monad _ bind -> bind
+semi.L1 : ∀a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
-semi$ll2 : ∀a m. Monad m -> m Unit -> m a -> m a =
-  fun @a @m (dict$Monad$m : Monad m) (m1 : m Unit) (m2 : m a) ->
-    bind$ll1 @m dict$Monad$m @Unit @a m1 (semi$ll1 @a @m m2)
-sequence$ll1 : ∀a m. Monad m -> a -> List a -> m (List a) =
-  fun @a @m (dict$Monad$m : Monad m) (x : a) (xs : List a) ->
-    pure$ll1 @m dict$Monad$m @(List a) (Cons @a x xs)
-sequence$ll2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
-  fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) (x : a) ->
-    bind$ll1 @m dict$Monad$m @(List a) @(List a) (sequence$ll3 @a @m dict$Monad$m ms) (sequence$ll1 @a @m dict$Monad$m x)
-sequence$ll3 : ∀a m. Monad m -> List (m a) -> m (List a) =
-  fun @a @m (dict$Monad$m : Monad m) (ms : List (m a)) ->
+semi.L2 : ∀a m. Monad m -> m Unit -> m a -> m a =
+  fun @a @m (monad.m : Monad m) (m1 : m Unit) (m2 : m a) ->
+    bind.L1 @m monad.m @Unit @a m1 (semi.L1 @a @m m2)
+sequence.L1 : ∀a m. Monad m -> a -> List a -> m (List a) =
+  fun @a @m (monad.m : Monad m) (x : a) (xs : List a) ->
+    pure.L1 @m monad.m @(List a) (Cons @a x xs)
+sequence.L2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
+  fun @a @m (monad.m : Monad m) (ms : List (m a)) (x : a) ->
+    bind.L1 @m monad.m @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
+sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
+  fun @a @m (monad.m : Monad m) (ms : List (m a)) ->
     match ms with
-    | Nil -> pure$ll1 @m dict$Monad$m @(List a) (Nil @a)
+    | Nil -> pure.L1 @m monad.m @(List a) (Nil @a)
     | Cons m ms ->
-      bind$ll1 @m dict$Monad$m @a @(List a) m (sequence$ll2 @a @m dict$Monad$m ms)
-traverse_$ll1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
-  fun @a @m (dict$Monad$m : Monad m) (f : a -> m Unit) (x : a) ->
-    semi$ll2 @Unit @m dict$Monad$m (f x)
-traverse_$ll2 : ∀a m t. Monad m -> Foldable t -> (a -> m Unit) -> t a -> m Unit =
-  fun @a @m @t (dict$Monad$m : Monad m) (dict$Foldable$t : Foldable t) (f : a -> m Unit) ->
-    foldr$ll1 @t dict$Foldable$t @a @(m Unit) (traverse_$ll1 @a @m dict$Monad$m f) (pure$ll1 @m dict$Monad$m @Unit Unit)
-dict$Monad$IO$ll1 : ∀a. a -> World -> Pair a World =
+      bind.L1 @m monad.m @a @(List a) m (sequence.L2 @a @m monad.m ms)
+traverse_.L1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
+  fun @a @m (monad.m : Monad m) (f : a -> m Unit) (x : a) ->
+    semi.L2 @Unit @m monad.m (f x)
+traverse_.L2 : ∀a m t. Monad m -> Foldable t -> (a -> m Unit) -> t a -> m Unit =
+  fun @a @m @t (monad.m : Monad m) (foldable.t : Foldable t) (f : a -> m Unit) ->
+    foldr.L1 @t foldable.t @a @(m Unit) (traverse_.L1 @a @m monad.m f) (pure.L1 @m monad.m @Unit Unit)
+monadIO.pure.L1 : ∀a. a -> World -> Pair a World =
   fun @a -> Pair @a @World
-dict$Monad$IO$ll2 : ∀a. a -> IO a =
-  fun @a (x : a) -> coerce @(_ -> IO) (dict$Monad$IO$ll1 @a x)
-dict$Monad$IO$ll3 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
+monadIO.pure.L2 : ∀a. a -> IO a =
+  fun @a (x : a) -> coerce @(_ -> IO) (monadIO.pure.L1 @a x)
+monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-dict$Monad$IO$ll4 : ∀a b. IO a -> (a -> IO b) -> IO b =
+monadIO.bind.L2 : ∀a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
-    coerce @(_ -> IO) (dict$Monad$IO$ll3 @a @b mx f)
-io$ll1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
+    coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
+io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io$ll2 : ∀a b. (a -> b) -> a -> IO b =
+io.L2 : ∀a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
-    coerce @(_ -> IO) (io$ll1 @a @b f x)
-print$ll1 : Int -> IO Unit = io$ll2 @Int @Unit puti
-fix$ll1 : ∀f. f (Fix f) -> Fix f =
+    coerce @(_ -> IO) (io.L1 @a @b f x)
+print.L1 : Int -> IO Unit = io.L2 @Int @Unit puti
+fix.L1 : ∀f. f (Fix f) -> Fix f =
   fun @f (x : f (Fix f)) -> coerce @(_ -> Fix) x
-unFix$ll1 : ∀f. Fix f -> f (Fix f) =
+unFix.L1 : ∀f. Fix f -> f (Fix f) =
   fun @f (x : Fix f) -> coerce @(Fix -> _) x
-cata$ll1 : ∀a f. Functor f -> (f a -> a) -> Fix f -> a =
-  fun @a @f (dict$Functor$f : Functor f) (f : f a -> a) ->
-    compose$ll1 @(Fix f) @(f a) @a f (compose$ll1 @(Fix f) @(f (Fix f)) @(f a) (map$ll1 @f dict$Functor$f @(Fix f) @a (cata$ll1 @a @f dict$Functor$f f)) (unFix$ll1 @f))
-ana$ll1 : ∀a f. Functor f -> (a -> f a) -> a -> Fix f =
-  fun @a @f (dict$Functor$f : Functor f) (f : a -> f a) ->
-    compose$ll1 @a @(f (Fix f)) @(Fix f) (fix$ll1 @f) (compose$ll1 @a @(f a) @(f (Fix f)) (map$ll1 @f dict$Functor$f @a @(Fix f) (ana$ll1 @a @f dict$Functor$f f)) f)
-bimap$ll1 : ∀p. Bifunctor p -> (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2) =
+cata.L1 : ∀a f. Functor f -> (f a -> a) -> Fix f -> a =
+  fun @a @f (functor.f : Functor f) (f : f a -> a) ->
+    compose.L1 @(Fix f) @(f a) @a f (compose.L1 @(Fix f) @(f (Fix f)) @(f a) (map.L1 @f functor.f @(Fix f) @a (cata.L1 @a @f functor.f f)) (unFix.L1 @f))
+ana.L1 : ∀a f. Functor f -> (a -> f a) -> a -> Fix f =
+  fun @a @f (functor.f : Functor f) (f : a -> f a) ->
+    compose.L1 @a @(f (Fix f)) @(Fix f) (fix.L1 @f) (compose.L1 @a @(f a) @(f (Fix f)) (map.L1 @f functor.f @a @(Fix f) (ana.L1 @a @f functor.f f)) f)
+bimap.L1 : ∀p. Bifunctor p -> (∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2) =
   fun @p (dict : Bifunctor p) ->
     match dict with
-    | Dict$Bifunctor bimap -> bimap
-fix2$ll1 : ∀a p. p a (Fix2 p a) -> Fix2 p a =
+    | .Bifunctor bimap -> bimap
+fix2.L1 : ∀a p. p a (Fix2 p a) -> Fix2 p a =
   fun @a @p (x : p a (Fix2 p a)) -> coerce @(_ -> Fix2) x
-unFix2$ll1 : ∀a p. Fix2 p a -> p a (Fix2 p a) =
+unFix2.L1 : ∀a p. Fix2 p a -> p a (Fix2 p a) =
   fun @a @p (x : Fix2 p a) -> coerce @(Fix2 -> _) x
-dict$Functor$Fix2$ll1 : ∀p. Bifunctor p -> (∀a b. (a -> b) -> Fix2 p a -> Fix2 p b) =
-  fun @p (dict$Bifunctor$p : Bifunctor p) @a @b (f : a -> b) ->
-    compose$ll1 @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (fix2$ll1 @b @p) (compose$ll1 @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) (bimap$ll1 @p dict$Bifunctor$p @a @b @(Fix2 p a) @(Fix2 p b) f (map$ll1 @(Fix2 p) (dict$Functor$Fix2$ll2 @p dict$Bifunctor$p) @a @b f)) (unFix2$ll1 @a @p))
-dict$Functor$Fix2$ll2 : ∀p. Bifunctor p -> Functor (Fix2 p) =
-  fun @p (dict$Bifunctor$p : Bifunctor p) ->
-    let map : ∀a b. (a -> b) -> Fix2 p a -> Fix2 p b =
-          dict$Functor$Fix2$ll1 @p dict$Bifunctor$p
-    in
-    Dict$Functor @(Fix2 p) map
-poly$ll1 : ∀a p. Bifunctor p -> Fix (p a) -> Fix2 p a =
-  fun @a @p (dict$Bifunctor$p : Bifunctor p) ->
-    compose$ll1 @(Fix (p a)) @(p a (Fix2 p a)) @(Fix2 p a) (fix2$ll1 @a @p) (compose$ll1 @(Fix (p a)) @(p a (Fix (p a))) @(p a (Fix2 p a)) (bimap$ll1 @p dict$Bifunctor$p @a @a @(Fix (p a)) @(Fix2 p a) (id$ll1 @a) (poly$ll1 @a @p dict$Bifunctor$p)) (unFix$ll1 @(p a)))
-mono$ll1 : ∀a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
-  fun @a @p (dict$Bifunctor$p : Bifunctor p) ->
-    compose$ll1 @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (fix$ll1 @(p a)) (compose$ll1 @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) (bimap$ll1 @p dict$Bifunctor$p @a @a @(Fix2 p a) @(Fix (p a)) (id$ll1 @a) (mono$ll1 @a @p dict$Bifunctor$p)) (unFix2$ll1 @a @p))
-dict$Functor$ListF$ll1 : ∀a a b. (a -> b) -> ListF a a -> ListF a b =
+functorFox2.L1 : ∀p. Bifunctor p -> Functor (Fix2 p) =
+  fun @p (bifunctor.p : Bifunctor p) ->
+    .Functor @(Fix2 p) (functorFox2.map.L1 @p bifunctor.p)
+functorFox2.map.L1 : ∀p. Bifunctor p -> (∀a b. (a -> b) -> Fix2 p a -> Fix2 p b) =
+  fun @p (bifunctor.p : Bifunctor p) @a @b (f : a -> b) ->
+    compose.L1 @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (fix2.L1 @b @p) (compose.L1 @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) (bimap.L1 @p bifunctor.p @a @b @(Fix2 p a) @(Fix2 p b) f (map.L1 @(Fix2 p) (functorFox2.L1 @p bifunctor.p) @a @b f)) (unFix2.L1 @a @p))
+poly.L1 : ∀a p. Bifunctor p -> Fix (p a) -> Fix2 p a =
+  fun @a @p (bifunctor.p : Bifunctor p) ->
+    compose.L1 @(Fix (p a)) @(p a (Fix2 p a)) @(Fix2 p a) (fix2.L1 @a @p) (compose.L1 @(Fix (p a)) @(p a (Fix (p a))) @(p a (Fix2 p a)) (bimap.L1 @p bifunctor.p @a @a @(Fix (p a)) @(Fix2 p a) (id.L1 @a) (poly.L1 @a @p bifunctor.p)) (unFix.L1 @(p a)))
+mono.L1 : ∀a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
+  fun @a @p (bifunctor.p : Bifunctor p) ->
+    compose.L1 @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (fix.L1 @(p a)) (compose.L1 @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) (bimap.L1 @p bifunctor.p @a @a @(Fix2 p a) @(Fix (p a)) (id.L1 @a) (mono.L1 @a @p bifunctor.p)) (unFix2.L1 @a @p))
+functorListF.L1 : ∀a. Functor (ListF a) =
+  fun @a -> .Functor @(ListF a) (functorListF.map.L1 @a)
+functorListF.map.L1 : ∀a a b. (a -> b) -> ListF a a -> ListF a b =
   fun @a @a @b ->
-    bimap$ll1 @ListF dict$Bifunctor$ListF @a @a @a @b (id$ll1 @a)
-dict$Functor$ListF$ll2 : ∀a. Functor (ListF a) =
-  fun @a ->
-    let map : ∀a b. (a -> b) -> ListF a a -> ListF a b =
-          dict$Functor$ListF$ll1 @a
-    in
-    Dict$Functor @(ListF a) map
-dict$Bifunctor$ListF$ll1 : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
+    bimap.L1 @ListF bifunctorListF @a @a @a @b (id.L1 @a)
+bifunctorListF.bimap.L1 : ∀a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
   fun @a1 @a2 @b1 @b2 (f : a1 -> a2) (g : b1 -> b2) (x : ListF a1 b1) ->
     match x with
     | NilF -> NilF @a2 @b2
     | ConsF y z -> ConsF @a2 @b2 (f y) (g z)
-toList$ll1 : ∀a. ListF a (List a) -> List a =
+toList.L1 : ∀a. ListF a (List a) -> List a =
   fun @a (x : ListF a (List a)) ->
     match x with
     | NilF -> Nil @a
     | ConsF y ys -> Cons @a y ys
-toList$ll2 : ∀a. Fix2 ListF a -> List a =
+toList.L2 : ∀a. Fix2 ListF a -> List a =
   fun @a ->
-    compose$ll1 @(Fix2 ListF a) @(Fix (ListF a)) @(List a) (cata$ll1 @(List a) @(ListF a) (dict$Functor$ListF$ll2 @a) (toList$ll1 @a)) (mono$ll1 @a @ListF dict$Bifunctor$ListF)
-fromList$ll1 : ∀a. List a -> ListF a (List a) =
+    compose.L1 @(Fix2 ListF a) @(Fix (ListF a)) @(List a) (cata.L1 @(List a) @(ListF a) (functorListF.L1 @a) (toList.L1 @a)) (mono.L1 @a @ListF bifunctorListF)
+fromList.L1 : ∀a. List a -> ListF a (List a) =
   fun @a (x : List a) ->
     match x with
     | Nil -> NilF @a @(List a)
     | Cons y ys -> ConsF @a @(List a) y ys
-fromList$ll2 : ∀a. List a -> Fix2 ListF a =
+fromList.L2 : ∀a. List a -> Fix2 ListF a =
   fun @a ->
-    compose$ll1 @(List a) @(Fix (ListF a)) @(Fix2 ListF a) (poly$ll1 @a @ListF dict$Bifunctor$ListF) (ana$ll1 @(List a) @(ListF a) (dict$Functor$ListF$ll2 @a) (fromList$ll1 @a))
-main$ll1 : Int -> Int = mul$ll1 @Int dict$Ring$Int 2
-main$ll2 : List Int -> IO Unit =
+    compose.L1 @(List a) @(Fix (ListF a)) @(Fix2 ListF a) (poly.L1 @a @ListF bifunctorListF) (ana.L1 @(List a) @(ListF a) (functorListF.L1 @a) (fromList.L1 @a))
+main.L1 : Int -> Int = mul.L1 @Int ringInt 2
+main.L2 : List Int -> IO Unit =
   fun (xs : List Int) ->
-    traverse_$ll2 @Int @IO @List dict$Monad$IO dict$Foldable$List print$ll1 (toList$ll2 @Int (map$ll1 @(Fix2 ListF) (dict$Functor$Fix2$ll2 @ListF dict$Bifunctor$ListF) @Int @Int main$ll1 (fromList$ll2 @Int xs)))
-main$ll3 : Int -> IO Unit =
+    traverse_.L2 @Int @IO @List monadIO foldableList print.L1 (toList.L2 @Int (map.L1 @(Fix2 ListF) (functorFox2.L1 @ListF bifunctorListF) @Int @Int main.L1 (fromList.L2 @Int xs)))
+main.L3 : Int -> IO Unit =
   fun (n : Int) ->
-    bind$ll1 @IO dict$Monad$IO @(List Int) @Unit (sequence$ll3 @Int @IO dict$Monad$IO (replicate$ll1 @(IO Int) n input)) main$ll2
+    bind.L1 @IO monadIO @(List Int) @Unit (sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)) main.L2

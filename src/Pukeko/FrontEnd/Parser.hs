@@ -315,12 +315,14 @@ clssDecl =
 
 instDecl :: Parser InstDecl
 instDecl = do
+  n       <- tmvar
+  colon
   q       <- typeCstr
   c       <- clasz
   (t, vs) <- (,) <$> typeAtom <*> pure [] <|>
              parens ((,) <$> typeAtom <*> many tyvar)
   ds      <- reserved "where" *> aligned (many bind)
-  pure (MkInstDecl c t vs q ds)
+  pure (MkInstDecl n c t vs q ds)
 
 extnDecl :: Parser ExtnDecl
 extnDecl = MkExtnDecl

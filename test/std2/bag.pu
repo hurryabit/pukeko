@@ -3,7 +3,7 @@ import std2/bintree
 
 type Bag a = BinTree a
 
-instance Foldable Bag where
+instance foldableBag : Foldable Bag where
   foldr f y0 bag = foldr f y0 (coerce @(Bag -> _) bag)
   foldl f y0 bag = foldl f y0 (coerce @(Bag -> _) bag)
 

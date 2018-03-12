@@ -37,7 +37,7 @@ freshTmVar :: LL TmVar
 freshTmVar = do
   func <- ask @TmVar
   n <- fresh @Int
-  mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
+  mkName (Lctd noPos (fmap (\x -> x ++ ".L" ++ show n) (nameText func)))
 
 coercePar :: Par In -> Par Out
 coercePar = \case
