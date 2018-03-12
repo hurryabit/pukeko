@@ -33,6 +33,7 @@ module Pukeko.AST.Expr
   , _EApp
   , _ETmApp
   , _ETyApp
+  , _EAbs
   , _ETyAbs
   -- , _ECxAbs
 

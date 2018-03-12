@@ -8,7 +8,7 @@ import std2/num
 eq_int : Int -> Int -> Bool
 external eq_int = "eq"
 
-instance Eq Int where
+instance eqInt : Eq Int where
   eq = eq_int
 
 
@@ -25,7 +25,7 @@ external ge_int = "ge"
 gt_int : Int -> Int -> Bool
 external gt_int = "gt"
 
-instance Ord Int where
+instance ordInt : Ord Int where
   lt = lt_int
   le = le_int
   ge = ge_int
@@ -45,7 +45,7 @@ external sub_int = "sub"
 mul_int : Int -> Int -> Int
 external mul_int = "mul"
 
-instance Ring Int where
+instance ringInt : Ring Int where
   neg = neg_int
   add = add_int
   sub = sub_int
@@ -60,6 +60,6 @@ external mod = "mod"
 infix / div
 infix % mod
 
-instance Monoid Int where
+instance monoidInt : Monoid Int where
   empty = 0
   append = add_int

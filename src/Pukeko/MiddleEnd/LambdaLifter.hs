@@ -37,7 +37,7 @@ freshTmVar :: LL TmVar
 freshTmVar = do
   func <- ask @TmVar
   n <- fresh @Int
-  mkName (Lctd noPos (fmap (\x -> x ++ "$ll" ++ show n) (nameText func)))
+  mkName (Lctd noPos (fmap (\x -> x ++ ".L" ++ show n) (nameText func)))
 
 coercePar :: Par In -> Par Out
 coercePar = \case
@@ -146,9 +146,10 @@ llDecl :: Members [Reader ModuleInfo, Writer Core.Module, NameSource] effs =>
   Decl In -> Eff effs ()
 llDecl = \case
   DType t -> tell (mkTypeDecl t)
-  DFunc (MkFuncDecl lhs t rhs) -> do
-    rhs <- llExpr rhs & runGamma & evalSupply @Int [1 ..] & runReader lhs
-    let supc = SupCDecl lhs (closeT t) [] rhs
+  DFunc (MkFuncDecl lhs t (unwindr _EAbs -> (pars, rhs0))) -> do
+    rhs1 <- introPars pars (llExpr rhs0)
+            & runGamma & evalSupply @Int [1 ..] & runReader lhs
+    let supc = SupCDecl lhs (closeT t) (map coercePar pars) rhs1
     tell (mkFuncDecl @Any supc)
   DExtn (MkExtnDecl z t s) -> tell (mkFuncDecl @Any (ExtnDecl z (closeT t) s))
 

@@ -90,7 +90,8 @@ data ClssDecl = MkClssDecl
   }
 
 data InstDecl = MkInstDecl
-  { _inst2clss  :: LctdName 'TyCon
+  { _inst2name  :: LctdName 'TmVar
+  , _inst2clss  :: LctdName 'TyCon
   , _inst2atom  :: TypeAtom
   , _inst2tvars :: [LctdName 'TyVar]
   , _inst2cstr  :: TypeCstr

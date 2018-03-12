@@ -1,57 +1,33 @@
-g_declare_globals gm$cons_0_0, 0, gm$cons_0_2, 2, gm$seq, 2, gm$puti, 1, gm$geti, 1, dict$Monad$IO, 0, input, 0, main, 0, bind$ll1, 1, semi$ll1, 2, semi$ll2, 3, dict$Monad$IO$ll1, 0, dict$Monad$IO$ll2, 1, dict$Monad$IO$ll3, 3, dict$Monad$IO$ll4, 2, io$ll1, 3, io$ll2, 2, print$ll1, 0, fst$ll1, 1, snd$ll1, 1, main$ll1, 2, main$ll2, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, B.seq, 2, B.puti, 1, B.geti, 1, bind, 1, monadIO, 0, print, 0, input, 0, main, 0, semi.L1, 2, semi.L2, 3, monadIO.pure.L1, 0, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, fst.L1, 1, snd.L1, 1, main.L1, 2, main.L2, 1
 g_declare_main main
 
-g_globstart gm$cons_0_0, 0
+g_globstart C.0.0, 0
 g_updcons 0, 0, 1
 g_return
 
-g_globstart gm$cons_0_2, 2
+g_globstart C.0.2, 2
 g_updcons 0, 2, 1
 g_return
 
-g_globstart gm$seq, 2
+g_globstart B.seq, 2
 g_eval
 g_pop 1
 g_update 1
 g_unwind
 
-g_globstart gm$puti, 1
+g_globstart B.puti, 1
 g_eval
 g_print
 g_updcons 0, 0, 1
 g_return
 
-g_globstart gm$geti, 1
+g_globstart B.geti, 1
 g_pop 1
 g_input
 g_update 1
 g_return
 
-g_globstart dict$Monad$IO, 0
-g_pushglobal dict$Monad$IO$ll2
-g_pushglobal dict$Monad$IO$ll4
-g_push 0
-g_push 2
-g_updcons 0, 2, 3
-g_pop 2
-g_return
-
-g_globstart input, 0
-g_pushglobal gm$cons_0_0
-g_pushglobal gm$geti
-g_pushglobal io$ll2
-g_updap 2, 1
-g_unwind
-
-g_globstart main, 0
-g_pushglobal main$ll2
-g_pushglobal input
-g_pushglobal dict$Monad$IO
-g_pushglobal bind$ll1
-g_updap 3, 1
-g_unwind
-
-g_globstart bind$ll1, 1
+g_globstart bind, 1
 g_push 0
 g_eval
 g_proj 1
@@ -59,35 +35,62 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart semi$ll1, 2
+g_globstart monadIO, 0
+g_pushglobal monadIO.bind.L2
+g_pushglobal monadIO.pure.L2
+g_updcons 0, 2, 1
+g_return
+
+g_globstart print, 0
+g_pushglobal B.puti
+g_pushglobal io.L2
+g_updap 1, 1
+g_unwind
+
+g_globstart input, 0
+g_pushglobal C.0.0
+g_pushglobal B.geti
+g_pushglobal io.L2
+g_updap 2, 1
+g_unwind
+
+g_globstart main, 0
+g_pushglobal main.L2
+g_pushglobal input
+g_pushglobal monadIO
+g_pushglobal bind
+g_updap 3, 1
+g_unwind
+
+g_globstart semi.L1, 2
 g_update 2
 g_pop 1
 g_unwind
 
-g_globstart semi$ll2, 3
+g_globstart semi.L2, 3
 g_push 2
-g_pushglobal semi$ll1
+g_pushglobal semi.L1
 g_mkap 1
 g_push 2
 g_push 2
-g_pushglobal bind$ll1
+g_pushglobal bind
 g_updap 3, 4
 g_pop 3
 g_unwind
 
-g_globstart dict$Monad$IO$ll1, 0
-g_pushglobal gm$cons_0_2
+g_globstart monadIO.pure.L1, 0
+g_pushglobal C.0.2
 g_update 1
 g_unwind
 
-g_globstart dict$Monad$IO$ll2, 1
+g_globstart monadIO.pure.L2, 1
 g_push 0
-g_pushglobal dict$Monad$IO$ll1
+g_pushglobal monadIO.pure.L1
 g_updap 1, 2
 g_pop 1
 g_unwind
 
-g_globstart dict$Monad$IO$ll3, 3
+g_globstart monadIO.bind.L1, 3
 g_push 2
 g_push 1
 g_mkap 1
@@ -100,15 +103,15 @@ g_updap 2, 6
 g_pop 5
 g_unwind
 
-g_globstart dict$Monad$IO$ll4, 2
+g_globstart monadIO.bind.L2, 2
 g_push 1
 g_push 1
-g_pushglobal dict$Monad$IO$ll3
+g_pushglobal monadIO.bind.L1
 g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart io$ll1, 3
+g_globstart io.L1, 3
 g_push 1
 g_push 1
 g_mkap 1
@@ -116,26 +119,20 @@ g_push 3
 g_push 1
 g_cons 0, 2
 g_push 1
-g_pushglobal gm$seq
+g_pushglobal B.seq
 g_updap 2, 5
 g_pop 4
 g_unwind
 
-g_globstart io$ll2, 2
+g_globstart io.L2, 2
 g_push 1
 g_push 1
-g_pushglobal io$ll1
+g_pushglobal io.L1
 g_updap 2, 3
 g_pop 2
 g_unwind
 
-g_globstart print$ll1, 0
-g_pushglobal gm$puti
-g_pushglobal io$ll2
-g_updap 1, 1
-g_unwind
-
-g_globstart fst$ll1, 1
+g_globstart fst.L1, 1
 g_push 0
 g_eval
 g_proj 0
@@ -143,7 +140,7 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart snd$ll1, 1
+g_globstart snd.L1, 1
 g_push 0
 g_eval
 g_proj 1
@@ -151,33 +148,33 @@ g_update 2
 g_pop 1
 g_unwind
 
-g_globstart main$ll1, 2
+g_globstart main.L1, 2
 g_push 1
 g_push 1
 g_cons 0, 2
 g_push 0
-g_pushglobal snd$ll1
+g_pushglobal snd.L1
 g_mkap 1
-g_pushglobal print$ll1
+g_pushglobal print
 g_mkap 1
 g_push 1
-g_pushglobal fst$ll1
+g_pushglobal fst.L1
 g_mkap 1
-g_pushglobal print$ll1
+g_pushglobal print
 g_mkap 1
-g_pushglobal dict$Monad$IO
-g_pushglobal semi$ll2
+g_pushglobal monadIO
+g_pushglobal semi.L2
 g_updap 3, 4
 g_pop 3
 g_unwind
 
-g_globstart main$ll2, 1
+g_globstart main.L2, 1
 g_push 0
-g_pushglobal main$ll1
+g_pushglobal main.L1
 g_mkap 1
 g_pushglobal input
-g_pushglobal dict$Monad$IO
-g_pushglobal bind$ll1
+g_pushglobal monadIO
+g_pushglobal bind
 g_updap 3, 2
 g_pop 1
 g_unwind

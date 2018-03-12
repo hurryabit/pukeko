@@ -1,0 +1,10 @@
+-- Operations and instances on pairs
+import std2/basic
+
+instance eqPair : (Eq a, Eq b) => Eq (Pair a b) where
+  eq x y =
+    match x with
+    | Pair x1 x2 ->
+      match y with
+      | Pair y1 y2 ->
+        eq x1 y1 && eq x2 y2

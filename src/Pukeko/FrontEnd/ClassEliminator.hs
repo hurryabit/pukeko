@@ -6,6 +6,7 @@ import Pukeko.Prelude
 
 -- import qualified Bound.Name as B
 import qualified Bound.Scope as B
+import           Data.Char (toLower)
 import qualified Data.Map.Extended as Map
 import qualified Safe
 
@@ -101,22 +102,24 @@ elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
 elimInstDecl :: ClassDecl -> InstDecl In -> CE [Decl In]
 elimInstDecl
   (MkClassDecl _ _ dcon methods0)
-  inst@(MkInstDecl z_dict clss tatom prms cstrs defns0) = do
+  (MkInstDecl inst clss tatom prms cstrs defns0) = do
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
   let t_dict0 = mkTDict (clss, t_inst)
-  let t_dict = rewindr TUni' prms (rewindr TCtx cstrs t_dict0)
+  let mkFuncDecl name type0 body0 =
+        let type1 = rewindr TUni' prms (rewindr TCtx cstrs type0)
+            body1 = rewindr ETyAbs prms (rewindr ECxAbs cstrs (ETyAnn type0 body0))
+        in  MkFuncDecl name type1 body1
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
     let (MkFuncDecl name0 typ_ body) =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
-    name1 <- copyName (getPos inst) name0
-    pure (MkBind (name1, typ_) body)
+    let name1 = Tagged (untag (nameText inst) ++ "." ++ untag (nameText name0))
+    name2 <- mkName (Lctd (getPos name0) name1)
+    pure (mkFuncDecl name2 typ_ body)
   let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
-  let e_body = foldl ETmApp e_dcon (map (EVar . nameOf) defns1)
-  let e_let :: Expr In
-      e_let = ELet BindPar defns1 e_body
-  let e_rhs :: Expr In
-      e_rhs = rewindr ETyAbs prms (rewindr ECxAbs cstrs (ETyAnn t_dict0 e_let))
-  pure [DFunc (MkFuncDecl z_dict t_dict e_rhs)]
+  let callDefn defn =
+        foldl ECxApp (foldl ETyApp (EVal (nameOf defn)) (map TVar prms)) cstrs
+  let e_body = foldl ETmApp e_dcon (map callDefn defns1)
+  pure (map DFunc (mkFuncDecl inst t_dict0 e_body : defns1))
 
 elimDecl :: Decl In -> CE [Decl Out]
 elimDecl = here' $ \case
@@ -150,8 +153,12 @@ buildDict (clss, unwindl _TApp -> (t1, args)) =
 -- @dict$Monoid$m@.
 dictTmVar :: Class -> TyVar -> CE TmVar
 dictTmVar clss tvar = do
-  let name0 = "dict$" ++ untag (nameText clss) ++ "$" ++ untag (nameText tvar)
+  let name0 = uncap (untag (nameText clss)) ++ "." ++ untag (nameText tvar)
   mkName (Lctd noPos (Tagged name0))
+  where
+    uncap = \case
+      x:xs -> toLower x:xs
+      _ -> impossible
 
 -- | Replace a context abstraction by a lambda for the dictionary.
 elimECxAbs :: TypeCstr -> Expr In -> CE (Expr Out)

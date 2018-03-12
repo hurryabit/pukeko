@@ -266,7 +266,7 @@ rnExtnDecl (Ps.MkExtnDecl binder extn) = do
 rnClssDecl :: GlobalEffs effs => Ps.ClssDecl -> Eff effs ClassDecl
 rnClssDecl (Ps.MkClssDecl name param0 methods0) =
   introGlobal tconTab "type constructor" name DClss $ \clss -> do
-    dcon <- mkName (fmap (retag . fmap ("Dict$" <>)) name)
+    dcon <- mkName (fmap (retag . fmap ("." <>)) name)
     param1 <- mkName param0
     let env = Map.singleton (unlctd param0) param1
     let close = TUni' param1 . TCtx (clss, TVar param1)
@@ -276,16 +276,14 @@ rnClssDecl (Ps.MkClssDecl name param0 methods0) =
 -- | Rename an instance definition. There's /no/ check whether an instance for
 -- this class/type combination has already been defined.
 rnInstDecl :: GlobalEffs effs => Ps.InstDecl -> Eff effs (InstDecl Out)
-rnInstDecl (Ps.MkInstDecl clss0 tatom0 params0 cstrs0 methods0) = do
+rnInstDecl (Ps.MkInstDecl name0 clss0 tatom0 params0 cstrs0 methods0) = do
   clss1 <- lookupGlobal tconTab (is _DClss) "unknown class" clss0
   tatom1 <- rnTypeAtom tatom0
-  -- FIXME: 'render . pretty' to get a name is an awful hack.
-  let name0 = "dict$" ++ untag (unlctd clss0) ++ "$" ++ untag (typeAtomText tatom1)
-  name <- mkName (Lctd (getPos clss0) (Tagged name0))
+  name1 <- mkName name0
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)
   cstrs1 <- rnConstraints env cstrs0
-  MkInstDecl name clss1 tatom1 params1 cstrs1 <$> traverse rnFuncDecl methods0
+  MkInstDecl name1 clss1 tatom1 params1 cstrs1 <$> traverse rnFuncDecl methods0
 
 -- | Rename an infix operator declaration, i.e., introduce the mapping from the
 -- infix operator to the backing function to the global environment.
