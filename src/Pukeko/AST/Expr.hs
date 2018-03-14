@@ -27,9 +27,12 @@ module Pukeko.AST.Expr
   , altn2patn
   , altn2expr
 
+  , _TmArg
+  , _TyArg
   , _TmPar
   , _TyPar
   , _AVal
+  , _EAtm
   , _EApp
   , _ETmApp
   , _ETyApp
@@ -39,6 +42,7 @@ module Pukeko.AST.Expr
 
   , mkETmAbs
   , unwindEAbs
+  , mkELet
   , mkTAbs
   , unEAnn
 
@@ -104,6 +108,7 @@ data Expr lg
   |                         EMat (TypeOf lg) (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
+
 pattern EVal :: TmVar -> Expr lg
 pattern EVal z = EAtm (AVal z)
 
@@ -136,6 +141,7 @@ pattern ECxAbs cx body = EAbs (CxPar cx) body
 -- * Derived optics
 makePrisms ''Atom
 makePrisms ''Expr
+makePrisms ''Arg
 makePrisms ''Par
 makeLensesFor [("_altn2patn", "altn2patn")]''Altn
 makeLensesFor [("_b2binder", "b2binder")] ''Bind
@@ -184,6 +190,11 @@ unwindEAbs = go []
       -- lambdas.
       ETyAnn _ expr@EAbs{} -> go params expr
       body -> (reverse params, body)
+
+mkELet :: BindMode -> [Bind lg] -> Expr lg -> Expr lg
+mkELet m bs e
+  | null bs   = e
+  | otherwise = ELet m bs e
 
 mkTAbs :: TypeOf lg ~ Type => Par lg -> Type -> Type
 mkTAbs = \case

@@ -1,23 +1,24 @@
 module Pukeko.AST.Expr.Optics
   ( freeTmVar
-  , subst
+  , substitute
   , patn2binder
   , patn2type
+  , arg2expr
   , expr2atom
   , expr2type
   ) where
 
 import Pukeko.Prelude
 
-import           Control.Lens (_Just)
+import           Control.Lens (_Just, prism')
 import qualified Data.Set as Set
 
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 
-subst' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
-subst' f = go Set.empty
+substitute' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
+substitute' f = go Set.empty
   where
     go bound = \case
       ELoc l      -> ELoc <$> lctd (go bound) l
@@ -25,8 +26,7 @@ subst' f = go Set.empty
         | x `Set.member` bound -> pure (EVar x)
         | otherwise            -> f x
       EAtm a      -> pure (EAtm a)
-      EApp e (TmArg a) -> ETmApp <$> go bound e <*> go bound a
-      EApp e a         -> EApp   <$> go bound e <*> pure a
+      EApp e a -> EApp   <$> go bound e <*> arg2expr (go bound) a
       EAbs (TmPar x) e -> ETmAbs x <$> go (Set.insert (nameOf x) bound) e
       EAbs p         e -> EAbs   p <$> go bound e
       ELet m ds e -> ELet m <$> (traverse . b2bound) (go bound0) ds <*> go bound1 e
@@ -41,10 +41,10 @@ subst' f = go Set.empty
     goAltn bound (MkAltn p e) = MkAltn p <$> go (bound <> setOf (patn2binder . _1) p) e
 
 freeTmVar :: Traversal' (Expr lg) TmVar
-freeTmVar f = subst' (fmap EVar . f)
+freeTmVar f = substitute' (fmap EVar . f)
 
-subst :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
-subst f = runIdentity . subst' (Identity . f)
+substitute :: (TmVar -> Expr lg) -> Expr lg -> Expr lg
+substitute f = runIdentity . substitute' (Identity . f)
 
 patn2binder :: IsNested lg1 ~ IsNested lg2 =>
   Traversal (Patn lg1) (Patn lg2) (TmBinder (TypeOf lg1)) (TmBinder (TypeOf lg2))
@@ -54,14 +54,18 @@ patn2binder f = \case
   PCon c ps -> PCon c <$> (traverse . patn2binder) f ps
   PSimple c bs -> PSimple c <$> (traverse . _Just) f bs
 
+arg2expr :: Prism' (Arg lg) (Expr lg)
+arg2expr = prism' TmArg $ \case
+  TmArg e -> Just e
+  _       -> Nothing
+
 -- | Traverse over all the atoms in an expression.
 expr2atom :: Traversal' (Expr lg) Atom
 expr2atom f = \case
   ELoc e       -> ELoc <$> lctd (expr2atom f) e
   EVar x       -> pure (EVar x)
   EAtm a       -> EAtm <$> f a
-  EApp e (TmArg a) -> ETmApp <$> expr2atom f e <*> expr2atom f a
-  EApp e a         -> EApp   <$> expr2atom f e <*> pure a
+  EApp e a     -> EApp   <$> expr2atom f e <*> (arg2expr . expr2atom) f a
   EAbs p  e    -> EAbs p <$> expr2atom f e
   ELet m ds t  -> ELet m <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
   EMat t e as  -> EMat t <$> expr2atom f e <*> (traverse . altn2expr . expr2atom) f as
