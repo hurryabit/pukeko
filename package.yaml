@@ -65,7 +65,6 @@ library:
   - extra
   - filepath
   - freer-simple
-  - graphviz
   - lens
   - megaparsec
   - mtl
@@ -95,7 +94,6 @@ executables:
     - bytestring
     - pukeko
     - filepath
-    - graphviz
     - mtl
     - optparse-applicative
     - text

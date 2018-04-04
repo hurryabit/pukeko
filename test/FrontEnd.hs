@@ -8,7 +8,7 @@ import Data.List
 import GHC.Stack
 import System.Directory (setCurrentDirectory)
 import Test.Hspec
-import Test.Hspec.Core.Spec
+import Test.Hspec.Core.Spec hiding (Error)
 import Text.Parsec hiding (Error)
 
 import           Pukeko.AST.Name
@@ -58,7 +58,6 @@ atSourcePos pos =
         { locationFile     = sourceName   pos
         , locationLine     = sourceLine   pos
         , locationColumn   = sourceColumn pos
-        , locationAccuracy = ExactLocation
         }
   in  mapSpecItem_ (\item -> item{itemLocation})
 
