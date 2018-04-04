@@ -8,18 +8,18 @@ import System.Exit
 import qualified Data.Aeson               as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.ByteString.Lazy     as BS
-import qualified Data.Text.Lazy.IO        as T
+-- import qualified Data.Text.Lazy.IO        as T
 
 import           Pukeko.AST.Name
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
-import qualified Pukeko.MiddleEnd.CallGraph as G
+-- import qualified Pukeko.MiddleEnd.CallGraph as G
 import qualified Pukeko.BackEnd         as BackEnd
 import           Pukeko.Pretty
 
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()
-compile write_pl stop_tc unsafe json graph detailed opts file = do
+compile write_pl stop_tc unsafe json _graph detailed opts file = do
   ok_or_error <- runM . runNameSource . runError $ do
     package <- Parser.parsePackage file
     module_sf <- FrontEnd.run unsafe package
@@ -38,9 +38,9 @@ compile write_pl stop_tc unsafe json graph detailed opts file = do
             let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
             BS.writeFile (file -<.> "pl" <.> "json")
               (Aeson.encodePretty' config (Aeson.toJSON module_pl))
-          when graph $ do
-            T.writeFile (file -<.> "dot") $
-              G.renderCallGraph (G.makeCallGraph module_pl)
+          -- when graph $ do
+          --   T.writeFile (file -<.> "dot") $
+          --     G.renderCallGraph (G.makeCallGraph module_pl)
           writeFile (file -<.> "asm") nasm
   case ok_or_error of
     Left err -> do

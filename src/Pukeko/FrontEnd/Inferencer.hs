@@ -376,7 +376,9 @@ inferModule :: Members [NameSource, Error Failure] effs =>
 inferModule m0 = eitherM throwError pure $ runSTBelowNameSource $ runError $
   runInfo m0 (inferModule' m0) >>= qualModule
 
+instance Semigroup (SplitCstrs s) where
+  MkSplitCstrs rs1 ds1 <> MkSplitCstrs rs2 ds2 =
+    MkSplitCstrs (rs1 <> rs2) (ds1 <> ds2)
+
 instance Monoid (SplitCstrs s) where
   mempty = MkSplitCstrs mempty mempty
-  MkSplitCstrs rs1 ds1 `mappend` MkSplitCstrs rs2 ds2 =
-    MkSplitCstrs (rs1 <> rs2) (ds1 <> ds2)

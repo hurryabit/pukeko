@@ -52,11 +52,12 @@ import Data.Functor.Identity as X
 import Data.List             as X (sort)
 import Data.Map              as X (Map)
 import Data.Maybe            as X (catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
+import Data.Monoid           as X (Monoid (..))
 import Data.List.Extra       as X (zipFrom, zipWithFrom)
 import Data.List.NonEmpty    as X (NonEmpty (..))
 import Data.Proxy            as X (Proxy (..))
 import Data.Sequence         as X (Seq)
-import Data.Semigroup        as X (Monoid (..), Semigroup (..))
+import Data.Semigroup        as X (Semigroup (..))
 import Data.Set              as X (Set)
 import Data.Set.Lens         as X (setOf)
 import Data.Tagged           as X

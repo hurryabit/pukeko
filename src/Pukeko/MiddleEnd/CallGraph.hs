@@ -8,10 +8,6 @@ import Pukeko.Prelude
 
 import qualified Data.Array as A
 import qualified Data.Graph as G
-import qualified Data.GraphViz.Attributes.Complete as D
-import qualified Data.GraphViz.Printing            as D
-import qualified Data.GraphViz.Types.Monadic       as D
-import qualified Data.Text.Lazy as T
 import           Data.Tuple.Extra (fst3)
 
 import           Pukeko.AST.Name
@@ -47,13 +43,13 @@ scc (CallGraph graph vertex_fn _) = map decode forest
                    dec (G.Node v ts) vs = vertex_fn v : foldr dec vs ts
     mentions_itself v = v `elem` (graph A.! v)
 
-renderCallGraph :: CallGraph m -> T.Text
-renderCallGraph g = D.renderDot . D.toDot . D.digraph' $
-  ifor_ (graph g) $ \v us -> do
-    let decl = toDecl g v
-    let shape = case decl of
-          SupCDecl{} -> D.Ellipse
-          ExtnDecl{} -> D.BoxShape
-    D.node v
-      [D.Label (D.StrLabel (T.pack (untag (nameText (nameOf decl))))), D.Shape shape]
-    traverse (v D.-->) us
+-- renderCallGraph :: CallGraph m -> T.Text
+-- renderCallGraph g = D.renderDot . D.toDot . D.digraph' $
+--   ifor_ (graph g) $ \v us -> do
+--     let decl = toDecl g v
+--     let shape = case decl of
+--           SupCDecl{} -> D.Ellipse
+--           ExtnDecl{} -> D.BoxShape
+--     D.node v
+--       [D.Label (D.StrLabel (T.pack (untag (nameText (nameOf decl))))), D.Shape shape]
+--     traverse (v D.-->) us

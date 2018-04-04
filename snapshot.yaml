@@ -1,5 +1,0 @@
-resolver: nightly-2018-03-01
-name: pukeko-snapshot
-packages:
-- git: https://github.com/ivan-m/graphviz.git
-  commit: 8abdf4dc5b8812a437a5ff01cb35b267422320e2
