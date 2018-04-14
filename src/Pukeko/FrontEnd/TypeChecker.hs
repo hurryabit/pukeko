@@ -51,7 +51,7 @@ typeOf = \case
       (CxArg dx, TCtx cx t1) -> do
         checkDict dx cx
         pure t1
-      (CxArg{}, _) -> throwHere "unexpected constraint argument"
+      (CxArg{}, _) -> throwHere "unexpected dict argument"
   EAbs par e0 -> do
     case par of
       TmPar binder -> TFun (snd binder) <$> introTmVar binder (typeOf e0)

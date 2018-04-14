@@ -78,8 +78,9 @@ instantiate = go Map.empty Seq.empty
       UTUni v t0 -> do
         tv <- freshUVar
         go (Map.insert v tv env0) cstrs0 (ETyApp e0 tv) t0
-      UTCtx cstr0 t0 -> do
-        (dict, cstr1) <- _2 (sendM . substUType env0) cstr0 >>= freshConstraint
+      UTCtx (clss, tc0) t0 -> do
+        tc1 <- sendM (substUType env0 tc0)
+        (dict, cstr1) <- freshConstraint (clss, tc1)
         go env0 (cstrs0 <> cstr1) (ECxApp e0 dict) t0
       t0 -> do
         t1 <- sendM (substUType env0 t0)
@@ -275,7 +276,6 @@ inferModule' = module2decls $ \decls ->
 freezeBind :: Bind (Aux s) -> ST s (Bind Out)
 freezeBind (MkBind (x, t0) e0) = MkBind <$> ((x,) <$> freezeType t0) <*> freezeExpr e0
 
--- TODO: Write 'freezeArg'.
 freezeExpr :: Expr (Aux s) -> ST s (Expr Out)
 freezeExpr = \case
   ELoc le -> ELoc <$> lctd freezeExpr le

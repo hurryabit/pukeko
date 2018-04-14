@@ -285,8 +285,7 @@ instance IsTyped lg => PrettyPrec (Expr lg) where
     -- during type inference.
     ETyAnn _ e -> prettyPrec prec e
 
-prettyEAbs :: (TypeOf lg1 ~ Type, IsTyped lg2) =>
-  Int -> [Par lg1] -> Expr lg2 -> Doc
+prettyEAbs :: (IsTyped lg1, IsTyped lg2) => Int -> [Par lg1] -> Expr lg2 -> Doc
 prettyEAbs prec pars body
   | null pars = prettyPrec prec body
   | otherwise =
