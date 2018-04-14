@@ -7,10 +7,10 @@ import Pukeko.Pretty
 
 import qualified Bound.Name as B
 import qualified Data.Map.Extended as Map
-import qualified Data.Set     as Set
 
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
+import           Pukeko.AST.Dict
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Expr.Optics (patn2binder)
 import qualified Pukeko.AST.SystemF   as SysF
@@ -34,7 +34,7 @@ checkCoercion (MkCoercion _dir _tcon) _from _to =
   -- FIXME: Implement the actual check.
   pure ()
 
-typeOf :: TypeOf lg ~ Type => Expr lg -> TC Type
+typeOf :: IsTyped lg => Expr lg -> TC Type
 typeOf = \case
   ELoc le -> here le $ typeOf (le^.lctd)
   EVar x -> lookupTmVar x
@@ -48,18 +48,15 @@ typeOf = \case
       (TyArg t1, TUni _ tq) -> pure (B.instantiate1Name t1 tq)
       (TyArg{}, TFun{}) -> throwHere "expected value argument, but found type argument"
       (TyArg{}, _     ) -> throwHere "unexpected type argument"
-      (CxArg cstr0, TCtx cstr1 t1) -> do
-        checkCstr cstr1
-        unless (cstr0 == cstr1) $
-          throwHere ("expected evidence for" <+> prettyCstr cstr1 <>
-                     ", but found evidence for" <+> prettyCstr cstr0)
+      (CxArg dx, TCtx cx t1) -> do
+        checkDict dx cx
         pure t1
       (CxArg{}, _) -> throwHere "unexpected constraint argument"
   EAbs par e0 -> do
     case par of
       TmPar binder -> TFun (snd binder) <$> introTmVar binder (typeOf e0)
-      TyPar v      -> TUni' v           <$> introTyVar v (typeOf e0)
-      CxPar cstr   -> TCtx cstr         <$> introCstr cstr (typeOf e0)
+      TyPar v      -> TUni' v           <$> introTyVar v      (typeOf e0)
+      CxPar binder -> TCtx (snd binder) <$> introDxVar binder (typeOf e0)
   ELet BindPar ds e0 -> do
     traverse_ checkBind ds
     introTmVars (map _b2binder ds) (typeOf e0)
@@ -81,25 +78,26 @@ typeOf = \case
     pure t_to
   ETyAnn t0 e0 -> checkExpr e0 t0 $> t0
 
-checkCstr :: TypeCstr -> TC ()
-checkCstr cstr@(clss, unwindl _TApp -> (t1, targs)) = do
-  let throwNoInst = throwHere ("TC: no evidence for" <+> prettyCstr cstr)
-  case t1 of
-    TAtm atom ->
-      lookupInfo info2insts (clss, atom) >>= \case
-        Nothing -> throwNoInst
-        Just (SomeInstDecl (SysF.MkInstDecl _ _ _ prms cstrs0 _)) -> do
-          -- the kind checker guarantees macthing parameter/argument arity
+checkDict :: Dict -> TypeCstr -> TC ()
+checkDict dict cstr =
+  case dict of
+    DVar x -> lookupDxVar x >>= matchCstr cstr
+    DDer z targs subDicts ->
+      lookupInfo info2dicts z >>= \case
+        Nothing -> impossible
+        Just (SomeInstDecl (SysF.MkInstDecl _ clss tatom prms ctxt _)) -> do
+          matchCstr cstr (clss, foldl TApp (TAtm tatom) targs)
+          -- the kind checker guarantees matching parameter/argument arity
           let inst = (>>= (Map.fromList (zipExact prms targs) Map.!))
-          let cstrs1 = map (second inst) cstrs0
-          traverse_ checkCstr cstrs1
-    TVar v
-      | null targs -> do
-          qual <- lookupTyVar v
-          unless (clss `Set.member` qual) throwNoInst
-    _ -> throwNoInst
+          for_ (zipExact subDicts ctxt) $ \(subDict, (_, subCstr)) ->
+            checkDict subDict (second inst subCstr)
+  where
+    matchCstr cstr0 cstr1 =
+      unless (cstr0 == cstr1) $
+        throwHere ("expected evidence for" <+> prettyCstr cstr0 <> ","
+                   <+> "but found evidence for" <+> prettyCstr cstr1)
 
-typeOfAltn :: TypeOf lg ~ Type => Altn lg -> TC Type
+typeOfAltn :: IsTyped lg => Altn lg -> TC Type
 typeOfAltn (MkAltn p e) = do
   introTmVars (toListOf patn2binder p) (typeOf e)
 
@@ -108,23 +106,23 @@ match t0 t1 =
   unless (t0 == t1) $
     throwHere ("expected type" <+> pretty t0 <> ", but found type" <+> pretty t1)
 
-checkExpr :: TypeOf lg ~ Type => Expr lg -> Type -> TC ()
+checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
 
-checkBind :: TypeOf lg ~ Type => Bind lg -> TC ()
+checkBind :: IsTyped lg => Bind lg -> TC ()
 checkBind (MkBind (_, t) e) = checkExpr e t
 
-instance IsTyped st => TypeCheckable (SysF.Module st) where
+instance (IsTyped lg, IsTyped lg) => TypeCheckable (SysF.Module lg) where
   checkModule (SysF.MkModule decls) = for_ decls $ here' $ \case
     SysF.DType{} -> pure ()
     SysF.DSign{} -> pure ()
     SysF.DFunc (SysF.MkFuncDecl _ typ_ body) -> checkExpr body typ_
     SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
-    SysF.DInst (SysF.MkInstDecl _ _ atom prms cstrs ds) -> do
+    SysF.DInst (SysF.MkInstDecl _ _ atom prms ctxt ds) -> do
       let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      introTyVars prms $ introCstrs cstrs $
+      introTyVars prms $ introDxVars ctxt $
         for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
           (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2methods name
           -- TODO: There might be some lexical name capturing going on here: type

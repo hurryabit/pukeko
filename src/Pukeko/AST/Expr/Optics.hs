@@ -13,9 +13,11 @@ import Pukeko.Prelude
 import           Control.Lens (_Just, prism')
 import qualified Data.Set as Set
 
+import           Pukeko.AST.Dict
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
+import           Pukeko.AST.Type
 
 substitute' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
 substitute' f = go Set.empty
@@ -74,23 +76,23 @@ expr2atom f = \case
 
 -- | Traverse over all types in a definition, i.e., the type in the binder on
 -- the LHS and the types on the RHS.
-b2type :: Traversal' (Bind lg) (TypeOf lg)
+b2type :: IsTyped lg => Traversal' (Bind lg) Type
 b2type f (MkBind b e) = MkBind <$> _2 f b <*> expr2type f e
 
-arg2type :: Traversal' (Arg lg) (TypeOf lg)
+arg2type :: IsTyped lg => Traversal' (Arg lg) Type
 arg2type f = \case
-  TmArg e  -> TmArg <$> expr2type f e
-  TyArg t  -> TyArg <$> f t
-  CxArg cx -> CxArg <$> _2 f cx
+  TmArg e -> TmArg <$> expr2type f e
+  TyArg t -> TyArg <$> f t
+  CxArg d -> CxArg <$> dict2type f d
 
 par2type :: Traversal' (Par lg) (TypeOf lg)
 par2type f = \case
   TmPar x  -> TmPar <$> _2 f x
   TyPar v  -> pure (TyPar v)
-  CxPar cx -> CxPar <$> _2 f cx
+  CxPar cx -> CxPar <$> (_2 . _2) f cx
 
 -- | Traverse over all types in an expression.
-expr2type :: Traversal' (Expr lg) (TypeOf lg)
+expr2type :: IsTyped lg => Traversal' (Expr lg) Type
 expr2type f = \case
   ELoc l       -> ELoc <$> traverse (expr2type f) l
   EVar x       -> pure (EVar x)
@@ -104,7 +106,7 @@ expr2type f = \case
 
 -- | Traverse over all types in a pattern matching alternative, i.e., the types
 -- in the pattern and the types on the RHS.
-altn2type :: Traversal' (Altn lg) (TypeOf lg)
+altn2type :: IsTyped lg => Traversal' (Altn lg) Type
 altn2type f (MkAltn patn e0) = MkAltn <$> patn2type f patn <*> expr2type f e0
 
 -- | Traverse over all types in a pattern, i.e., the type arguments to the data

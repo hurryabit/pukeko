@@ -106,9 +106,9 @@ rnType env = go
 -- | Collect all type class/type variable pairs in a type constraint. Rename all
 -- references to type classes.
 rnConstraints :: GlobalEffs effs =>
-  Map (Ps.Name 'TyVar) TyVar -> Ps.TypeCstr -> Eff effs [TypeCstr]
+  Map (Ps.Name 'TyVar) TyVar -> Ps.TypeCstr -> Eff effs [(Class, TyVar)]
 rnConstraints env (Ps.MkTypeCstr constraints) =
-  fmap (map (second TVar) . nubOrd) .
+  fmap nubOrd .
   for constraints $ \(clss, unlctd -> tvar0) ->
     case env Map.!? tvar0 of
       Nothing -> throwHere ("unknown type variable" <:~> pretty tvar0)
@@ -123,7 +123,7 @@ rnTypeScheme env0 (Ps.MkTypeScheme cstrs0 t0) = do
   env1 <- traverse mkName (Ps.freeTyVars t0 `Map.difference` env0)
   cstrs1 <- rnConstraints env1 cstrs0
   t1 <- rnType (env1 <> env0) t0
-  pure (rewindr TUni' (Map.elems env1) (rewindr TCtx cstrs1 t1))
+  pure (rewindr TUni' (Map.elems env1) (rewindr TCtx (map (second TVar) cstrs1) t1))
 
 -- | Rename a type coercion.
 rnCoercion :: GlobalEffs effs => Ps.Coercion -> Eff effs Coercion
@@ -276,14 +276,16 @@ rnClssDecl (Ps.MkClssDecl name param0 methods0) =
 -- | Rename an instance definition. There's /no/ check whether an instance for
 -- this class/type combination has already been defined.
 rnInstDecl :: GlobalEffs effs => Ps.InstDecl -> Eff effs (InstDecl Out)
-rnInstDecl (Ps.MkInstDecl name0 clss0 tatom0 params0 cstrs0 methods0) = do
+rnInstDecl (Ps.MkInstDecl name0 clss0 tatom0 params0 ctxt0 methods0) = do
   clss1 <- lookupGlobal tconTab (is _DClss) "unknown class" clss0
   tatom1 <- rnTypeAtom tatom0
   name1 <- mkName name0
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)
-  cstrs1 <- rnConstraints env cstrs0
-  MkInstDecl name1 clss1 tatom1 params1 cstrs1 <$> traverse rnFuncDecl methods0
+  ctxt1 <- rnConstraints env ctxt0
+  ctxt2 <- for ctxt1 $ \(clss, tvar) ->
+    (,) <$> mkDxVar clss tvar <*> pure (clss, TVar tvar)
+  MkInstDecl name1 clss1 tatom1 params1 ctxt2 <$> traverse rnFuncDecl methods0
 
 -- | Rename an infix operator declaration, i.e., introduce the mapping from the
 -- infix operator to the backing function to the global environment.

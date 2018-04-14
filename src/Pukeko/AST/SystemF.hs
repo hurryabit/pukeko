@@ -13,6 +13,7 @@ import Pukeko.Pretty
 import Data.Aeson
 import Data.Aeson.TH
 
+import           Pukeko.AST.Dict
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
@@ -61,7 +62,7 @@ data ClassDecl = MkClassDecl
 
 -- | Definition of an instance of a class.
 data InstDecl lg = MkInstDecl
-  { _inst2name    :: TmVar
+  { _inst2name    :: DxVar
     -- ^ During type class elimination, we introduce a top level value for the
     -- dictionary. We generate the name for this value during renaming, cf.
     -- '_clss2dcon'. For class @XZY@ and type constructor @ABC@ this value is
@@ -69,7 +70,7 @@ data InstDecl lg = MkInstDecl
   , _inst2class   :: Class
   , _inst2type    :: TypeAtom
   , _inst2params  :: [TyVar]
-  , _inst2context :: [TypeCstr]
+  , _inst2context :: [DxBinder Type]
   , _inst2methods :: [FuncDecl lg TyVar]
   }
 
@@ -133,11 +134,11 @@ instance HasPos (GenDecl nsp st) where
 instance Pretty (SignDecl tv) where
   pretty (MkSignDecl name typ_) = pretty (name ::: typ_)
 
-instance TypeOf lg ~ Type => Pretty (FuncDecl lg tv) where
+instance IsTyped lg => Pretty (FuncDecl lg tv) where
   pretty (MkFuncDecl name typ_ body) =
     hang (pretty (name ::: typ_) <+> "=") 2 (pretty body)
 
-instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
+instance IsTyped lg => Pretty (GenDecl nsp lg) where
   pretty = \case
     DType tcon -> "data" <+> pretty tcon
     DSign sign -> pretty sign
@@ -147,34 +148,34 @@ instance (TypeOf lg ~ Type) => Pretty (GenDecl nsp lg) where
     DClss (MkClassDecl c v _ ms) ->
       "class" <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
-    DInst (MkInstDecl _ c t0 vs cstrs ds) ->
-      "instance" <+> prettyContext cstrs <+> pretty c <+> prettyPrec 3 t1
+    DInst (MkInstDecl _ c t0 vs ctxt ds) ->
+      "instance" <+> prettyContext (map snd ctxt) <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where
         t1 = mkTApp (TAtm t0) (map TVar vs)
 
-instance TypeOf lg ~ Type => Pretty (Module lg) where
+instance IsTyped lg => Pretty (Module lg) where
   pretty (MkModule decls) = vcatMap pretty decls
 
-deriving instance                   (Show tv) => Show (SignDecl tv)
-deriving instance (TypeOf lg ~ Type, Show tv) => Show (FuncDecl lg tv)
-deriving instance (TypeOf lg ~ Type)          => Show (ExtnDecl lg)
-deriving instance                                Show ClassDecl
-deriving instance (TypeOf lg ~ Type)          => Show (InstDecl lg)
-deriving instance (TypeOf lg ~ Type)          => Show (GenDecl nsp lg)
+deriving instance             (Show tv) => Show (SignDecl tv)
+deriving instance (IsTyped lg, Show tv) => Show (FuncDecl lg tv)
+deriving instance (IsTyped lg)          => Show (ExtnDecl lg)
+deriving instance                          Show ClassDecl
+deriving instance (IsTyped lg)          => Show (InstDecl lg)
+deriving instance (IsTyped lg)          => Show (GenDecl nsp lg)
 
 
 deriveToJSON defaultOptions ''SignDecl
-instance TypeOf lg ~ Type => ToJSON (FuncDecl lg tv) where
+instance IsTyped lg => ToJSON (FuncDecl lg tv) where
   toJSON = $(mkToJSON defaultOptions ''FuncDecl)
-instance TypeOf lg ~ Type => ToJSON (ExtnDecl lg) where
+instance IsTyped lg => ToJSON (ExtnDecl lg) where
   toJSON = $(mkToJSON defaultOptions ''ExtnDecl)
 deriveToJSON defaultOptions ''ClassDecl
-instance TypeOf lg ~ Type => ToJSON (InstDecl lg) where
+instance IsTyped lg => ToJSON (InstDecl lg) where
   toJSON = $(mkToJSON defaultOptions ''InstDecl)
 
-instance TypeOf lg ~ Type => ToJSON (GenDecl nsp lg) where
+instance IsTyped lg => ToJSON (GenDecl nsp lg) where
   toJSON = $(mkToJSON defaultOptions ''GenDecl)
 
-instance TypeOf lg ~ Type => ToJSON (Module lg) where
+instance IsTyped lg => ToJSON (Module lg) where
   toJSON = $(mkToJSON defaultOptions ''Module)
