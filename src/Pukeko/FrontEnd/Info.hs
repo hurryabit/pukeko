@@ -11,6 +11,7 @@ module Pukeko.FrontEnd.Info
   , info2classes
   , info2methods
   , info2insts
+  , info2dicts
   , runInfo
   , lookupInfo
   , findInfo
@@ -39,6 +40,7 @@ data ModuleInfo = MkModuleInfo
   , _info2classes :: Map Class SysF.ClassDecl
   , _info2methods :: Map TmVar (SysF.ClassDecl, SysF.SignDecl TyVar)
   , _info2insts   :: Map (Class, TypeAtom) SomeInstDecl
+  , _info2dicts   :: Map DxVar SomeInstDecl
   }
 
 data SomeInstDecl = forall st. SomeInstDecl (SysF.InstDecl st)
@@ -103,8 +105,9 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
             in  signInfo mthd typ1
                 <> itemInfo info2methods mthd (clssDecl, mthdDecl)
       in  itemInfo info2classes clss clssDecl <> mthds_info
-    SysF.DInst inst@(SysF.MkInstDecl _ clss t _ _ _) ->
-      itemInfo info2insts (clss, t) (SomeInstDecl inst)
+    SysF.DInst inst0@(SysF.MkInstDecl dict clss t _ _ _) ->
+      let inst1 = SomeInstDecl inst0
+      in  itemInfo info2insts (clss, t) inst1 <> itemInfo info2dicts dict inst1
 
 instance HasModuleInfo Core.Module where
   collectInfo (Core.MkModule types extns supcs) = fold
@@ -117,9 +120,8 @@ foldFor :: (Foldable t, Monoid m) => t a -> (a -> m) -> m
 foldFor = flip foldMap
 
 instance Semigroup ModuleInfo where
-  MkModuleInfo a1 b1 c1 d1 e1 f1 <> MkModuleInfo a2 b2 c2 d2 e2 f2 =
-    MkModuleInfo (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2) (f1 <> f2)
+  MkModuleInfo a1 b1 c1 d1 e1 f1 g1 <> MkModuleInfo a2 b2 c2 d2 e2 f2 g2 =
+    MkModuleInfo (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2) (f1 <> f2) (g1 <> g2)
 
 instance Monoid ModuleInfo where
-  mempty = MkModuleInfo mempty mempty mempty mempty mempty mempty
-  mappend = (<>)
+  mempty = MkModuleInfo mempty mempty mempty mempty mempty mempty mempty

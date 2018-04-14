@@ -8,14 +8,11 @@ where
 
 import Pukeko.Prelude
 
-import           Control.Monad.ST
 import           Data.STRef
 
 import           Pukeko.Pretty
 import           Pukeko.FrontEnd.Inferencer.Gamma
 import           Pukeko.FrontEnd.Inferencer.UType
-
-type MemberST s effs = LastMember (ST s) effs
 
 type CanUnify s effs = (CanThrowHere effs, CanGamma s effs, MemberST s effs)
 
@@ -48,9 +45,7 @@ occursCheck uref1 t2 = case t2 of
             (_, l1) <- readUnwound uref1
             sendM (writeSTRef uref2 (UFree x2 (min l1 l2)))
           ULink t2' -> occursCheck uref1 t2'
-  UTVar v -> do
-    !_ <- lookupTVar @s v  -- NOTE: This is a sanity check.
-    pure ()
+  UTVar v -> checkTyVar @s v
   UTAtm{} -> pure ()
   UTUni{} -> impossible  -- UVar is assumed to be unwound
   UTCtx{} -> impossible

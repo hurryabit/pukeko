@@ -60,6 +60,7 @@ import           Unsafe.Coerce
 import           Pukeko.Pretty
 import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.AST.Name
+import           Pukeko.AST.Dict
 import           Pukeko.AST.Type
 import           Pukeko.AST.Language
 
@@ -73,12 +74,12 @@ type TmBinder ty = (TmVar, ty)
 data Arg lg
   =                TmArg (Expr lg)
   | HasTyApp lg => TyArg (TypeOf lg)
-  | HasCxApp lg => CxArg (Class, TypeOf lg)
+  | HasCxApp lg => CxArg (DictOf lg)
 
 data Par lg
   = HasTmAbs lg => TmPar (TmBinder (TypeOf lg))
   | HasTyAbs lg => TyPar TyVar
-  | HasCxAbs lg => CxPar TypeCstr
+  | HasCxAbs lg => CxPar (DxBinder (TypeOf lg))
 
 data BindMode = BindPar | BindRec
 
@@ -124,7 +125,7 @@ pattern ETmApp fun arg = EApp fun (TmArg arg)
 pattern ETyApp :: HasTyApp lg => Expr lg -> TypeOf lg -> Expr lg
 pattern ETyApp fun typ = EApp fun (TyArg typ)
 
-pattern ECxApp :: HasCxApp lg => Expr lg -> (Class, TypeOf lg) -> Expr lg
+pattern ECxApp :: HasCxApp lg => Expr lg -> DictOf lg -> Expr lg
 pattern ECxApp fun cx = EApp fun (CxArg cx)
 
 pattern ETmAbs :: (IsLambda lg ~ True, HasTmAbs lg) =>
@@ -135,7 +136,7 @@ pattern ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) => TyVar -> Expr lg -> Expr 
 pattern ETyAbs par body = EAbs (TyPar par) body
 
 pattern ECxAbs :: (IsLambda lg ~ True, HasCxAbs lg) =>
-  (Class, TypeOf lg) -> Expr lg -> Expr lg
+  DxBinder (TypeOf lg) -> Expr lg -> Expr lg
 pattern ECxAbs cx body = EAbs (CxPar cx) body
 
 -- * Derived optics
@@ -200,7 +201,7 @@ mkTAbs :: TypeOf lg ~ Type => Par lg -> Type -> Type
 mkTAbs = \case
   TmPar (_, t) -> TFun t
   TyPar v      -> TUni' v
-  CxPar cx     -> TCtx cx
+  CxPar (_, c) -> TCtx c
 
 unEAnn :: IsLambda lg ~ True => Expr lg -> Expr lg
 unEAnn = \case
@@ -215,11 +216,12 @@ instance HasPos  (Bind lg) where getPos = getPos . nameOf
 
 
 -- * Pretty printing
-instance TypeOf st ~ Type => Pretty (Bind st) where
+
+instance IsTyped lg => Pretty (Bind lg) where
   pretty (MkBind (z, t) e) =
     hang (pretty (z ::: t) <+> "=") 2 (prettyPrec 0 e)
 
-prettyBinds :: TypeOf st ~ Type => BindMode -> [Bind st] -> Doc
+prettyBinds :: IsTyped lg => BindMode -> [Bind lg] -> Doc
 prettyBinds mode ds = case ds of
     [] -> impossible  -- maintained invariant
     d0:ds ->
@@ -239,21 +241,21 @@ instance Pretty Atom where
 prettyTyArg :: Type -> Doc
 prettyTyArg t = "@" <> prettyPrec 3 t
 
-instance TypeOf lg ~ Type => Pretty (Arg lg) where
+instance IsTyped lg => Pretty (Arg lg) where
   pretty = \case
-    TmArg e  -> prettyPrec (succ Op.aprec) e
-    TyArg t  -> prettyTyArg t
-    CxArg cx -> braces (prettyCstr cx)
+    TmArg e -> prettyPrec (succ Op.aprec) e
+    TyArg t -> prettyTyArg t
+    CxArg d -> braces (pretty d)
 
 instance TypeOf lg ~ Type => Pretty (Par lg) where
   pretty = \case
     TmPar (x, t) -> parens (pretty (x ::: t))
     TyPar v      -> "@" <> pretty v
-    CxPar cx     -> braces (prettyCstr cx)
+    CxPar (_, c) -> braces (prettyCstr c)
 
-instance TypeOf lg ~ Type => Pretty (Expr lg)
+instance IsTyped lg => Pretty (Expr lg)
 
-instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
+instance IsTyped lg => PrettyPrec (Expr lg) where
   prettyPrec prec e0 = case e0 of
     ELoc l -> prettyPrec prec l
     EVar x -> pretty x
@@ -283,15 +285,14 @@ instance TypeOf lg ~ Type => PrettyPrec (Expr lg) where
     -- during type inference.
     ETyAnn _ e -> prettyPrec prec e
 
-prettyEAbs :: (TypeOf lg1 ~ Type, TypeOf lg2 ~ Type) =>
-  Int -> [Par lg1] -> Expr lg2 -> Doc
+prettyEAbs :: (IsTyped lg1, IsTyped lg2) => Int -> [Par lg1] -> Expr lg2 -> Doc
 prettyEAbs prec pars body
   | null pars = prettyPrec prec body
   | otherwise =
       maybeParens (prec > 0) $
       hang ("fun" <+> hsepMap pretty pars <+> "->") 2 (pretty body)
 
-instance TypeOf lg ~ Type => Pretty (Altn lg) where
+instance IsTyped lg => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)
 
 instance TypeOf lg ~ Type => Pretty (Patn lg)
@@ -308,26 +309,26 @@ instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
       $ pretty c <+> hsepMap (maybe "_" (pretty . fst)) bs
 
 deriving instance                     Show  BindMode
-deriving instance TypeOf lg ~ Type => Show (Bind lg)
-deriving instance TypeOf lg ~ Type => Show (Arg  lg)
-deriving instance TypeOf lg ~ Type => Show (Par  lg)
-deriving instance TypeOf lg ~ Type => Show (Expr lg)
-deriving instance TypeOf lg ~ Type => Show (Altn lg)
+deriving instance IsTyped lg => Show (Bind lg)
+deriving instance IsTyped lg => Show (Arg  lg)
+deriving instance IsTyped lg => Show (Par  lg)
+deriving instance IsTyped lg => Show (Expr lg)
+deriving instance IsTyped lg => Show (Altn lg)
 deriving instance                     Show  Atom
-deriving instance TypeOf lg ~ Type => Show (Patn lg)
+deriving instance IsTyped lg => Show (Patn lg)
 
 deriveToJSON defaultOptions ''BindMode
 deriveToJSON defaultOptions ''Atom
 
-instance TypeOf lg ~ Type => ToJSON (Patn lg) where
+instance IsTyped lg => ToJSON (Patn lg) where
   toJSON = $(mkToJSON defaultOptions ''Patn)
-instance TypeOf lg ~ Type => ToJSON (Altn lg) where
+instance IsTyped lg => ToJSON (Altn lg) where
   toJSON = $(mkToJSON defaultOptions ''Altn)
-instance TypeOf lg ~ Type => ToJSON (Bind lg) where
+instance IsTyped lg => ToJSON (Bind lg) where
   toJSON = $(mkToJSON defaultOptions ''Bind)
-instance TypeOf lg ~ Type => ToJSON (Arg  lg) where
+instance IsTyped lg => ToJSON (Arg  lg) where
   toJSON = $(mkToJSON defaultOptions ''Arg)
-instance TypeOf lg ~ Type => ToJSON (Par  lg) where
+instance IsTyped lg => ToJSON (Par  lg) where
   toJSON = $(mkToJSON defaultOptions ''Par)
-instance TypeOf lg ~ Type => ToJSON (Expr lg) where
+instance IsTyped lg => ToJSON (Expr lg) where
   toJSON = $(mkToJSON defaultOptions ''Expr)

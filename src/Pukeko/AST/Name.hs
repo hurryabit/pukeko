@@ -4,6 +4,7 @@ module Pukeko.AST.Name
   ( NameSpace (..)
   , TmVar
   , TyVar
+  , DxVar
   , TmCon
   , TyCon
   , Class
@@ -19,6 +20,7 @@ module Pukeko.AST.Name
   , runSTBelowNameSource
   , mkName
   , copyName
+  , mkDxVar
   , type NameSpaceOf
   , HasName (..)
   ) where
@@ -31,6 +33,7 @@ import           Control.Monad.Freer.State
 import           Control.Monad.ST
 import           Data.Aeson
 import           Data.Aeson.TH
+import           Data.Char (toLower)
 import           Data.Function
 import           Data.Kind
 import           Data.Tagged
@@ -50,6 +53,7 @@ data NameSpace
 -- Saves us a few spaces, but more importantly tons of parentheses.
 type TmVar = Name 'TmVar
 type TyVar = Name 'TyVar
+type DxVar = Name 'TmVar
 
 type TmCon = Name 'TmCon
 type TyCon = Name 'TyCon
@@ -98,6 +102,15 @@ mkName (Lctd pos (Tagged text)) = do
 
 copyName :: Member NameSource effs => SourcePos -> Name nsp -> Eff effs (Name nsp)
 copyName pos (Name _ text _) = mkName (Lctd pos (Tagged text))
+
+mkDxVar :: Member NameSource effs => Class -> TyVar -> Eff effs DxVar
+mkDxVar clss tvar = do
+  let name0 = uncap (untag (nameText clss)) ++ "." ++ untag (nameText tvar)
+  mkName (Lctd noPos (Tagged name0))
+  where
+    uncap = \case
+      x:xs -> toLower x:xs
+      _ -> error "IMPOSSIBLE"
 
 type family NameSpaceOf (a :: Type) :: NameSpace
 

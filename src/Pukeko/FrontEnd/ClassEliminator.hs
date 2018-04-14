@@ -6,11 +6,10 @@ import Pukeko.Prelude
 
 -- import qualified Bound.Name as B
 import qualified Bound.Scope as B
-import           Data.Char (toLower)
-import qualified Data.Map.Extended as Map
 import qualified Safe
 
 import           Pukeko.AST.ConDecl
+import           Pukeko.AST.Dict
 import           Pukeko.AST.Name
 import           Pukeko.AST.SystemF
 import           Pukeko.AST.Language
@@ -20,16 +19,12 @@ import           Pukeko.FrontEnd.Info
 type In  = Unnested
 type Out = Unclassy
 
-type DictMap = Map (TyVar, Class) TmVar
-type CanCE effs =
-  Members [Reader DictMap, Reader SourcePos, Reader ModuleInfo, NameSource] effs
+type CanCE effs = Members [Reader SourcePos, Reader ModuleInfo, NameSource] effs
 type CE a = forall effs. CanCE effs => Eff effs a
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
 elimModule m0@(MkModule decls0) = runInfo m0 $ do
-  decls1 <- for decls0 $ \decl0 -> elimDecl decl0
-                                   & runReader @DictMap Map.empty
-                                   & runReader (getPos decl0)
+  decls1 <- for decls0 $ \decl0 -> elimDecl decl0 & runReader (getPos decl0)
   pure (MkModule (map unclssDecl (concat decls1)))
 
 -- | Apply the dictionary type constructor of a type class to a type. For the
@@ -102,12 +97,13 @@ elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
 elimInstDecl :: ClassDecl -> InstDecl In -> CE [Decl In]
 elimInstDecl
   (MkClassDecl _ _ dcon methods0)
-  (MkInstDecl inst clss tatom prms cstrs defns0) = do
+  (MkInstDecl inst clss tatom prms ctxt defns0) = do
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
   let t_dict0 = mkTDict (clss, t_inst)
   let mkFuncDecl name type0 body0 =
-        let type1 = rewindr TUni' prms (rewindr TCtx cstrs type0)
-            body1 = rewindr ETyAbs prms (rewindr ECxAbs cstrs (ETyAnn type0 body0))
+        -- TODO: We might want to copy the dictionary binders here.
+        let type1 = rewindr TUni' prms (rewindr TCtx (map snd ctxt) type0)
+            body1 = rewindr ETyAbs prms (rewindr ECxAbs ctxt (ETyAnn type0 body0))
         in  MkFuncDecl name type1 body1
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
     let (MkFuncDecl name0 typ_ body) =
@@ -117,7 +113,9 @@ elimInstDecl
     pure (mkFuncDecl name2 typ_ body)
   let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
   let callDefn defn =
-        foldl ECxApp (foldl ETyApp (EVal (nameOf defn)) (map TVar prms)) cstrs
+        foldl ECxApp
+          (foldl ETyApp (EVal (nameOf defn)) (map TVar prms))
+          (map (DVar . fst) ctxt)
   let e_body = foldl ETmApp e_dcon (map callDefn defns1)
   pure (map DFunc (mkFuncDecl inst t_dict0 e_body : defns1))
 
@@ -136,44 +134,10 @@ elimDecl = here' $ \case
       defns <- elimInstDecl clss inst
       concat <$> traverse elimDecl defns
 
-buildDict :: TypeCstr -> CE (Expr In)
-buildDict (clss, unwindl _TApp -> (t1, args)) =
-  case t1 of
-    TVar v
-      | null args -> EVar <$> asks @DictMap (Map.! (v, clss))
-    TAtm tatom -> do
-      SomeInstDecl (MkInstDecl inst _ _ pars cstrs _) <-
-        findInfo info2insts (clss, tatom)
-      let instArgs t = t >>= (Map.fromList (zipExact pars args) Map.!)
-      pure (foldl ECxApp (foldl ETyApp (EVal inst) args) (map (second instArgs) cstrs))
-    _ -> impossible  -- type checker would catch this
-
--- | Name of the dictionary for a type class instance of either a known type
--- ('Id.TCon') or an unknown type ('Id.TVar'), e.g., @dict@Traversable$List@ or
--- @dict$Monoid$m@.
-dictTmVar :: Class -> TyVar -> CE TmVar
-dictTmVar clss tvar = do
-  let name0 = uncap (untag (nameText clss)) ++ "." ++ untag (nameText tvar)
-  mkName (Lctd noPos (Tagged name0))
-  where
-    uncap = \case
-      x:xs -> toLower x:xs
-      _ -> impossible
-
--- | Replace a context abstraction by a lambda for the dictionary.
-elimECxAbs :: TypeCstr -> Expr In -> CE (Expr Out)
-elimECxAbs cstr@(clss, TVar v) e0 = do
-  x <- dictTmVar clss v
-  let dictBinder = (x, mkTDict cstr)
-  ETmAbs dictBinder <$> local (Map.insertWith impossible (v, clss) x) (elimExpr e0)
-elimECxAbs _ _ = impossible
-
-elimECxApp :: Expr In -> TypeCstr -> CE (Expr Out)
-elimECxApp e0 cstr = do
-  e1 <- elimExpr e0
-  dict0 <- buildDict cstr
-  dict1 <- elimExpr dict0
-  pure (ETmApp e1 dict1)
+elimDict :: Dict -> Expr Out
+elimDict = \case
+  DVar x -> EVar x
+  DDer z ts ds -> foldl ETmApp (foldl ETyApp (EVal z) ts) (map elimDict ds)
 
 elimExpr :: Expr In -> CE (Expr Out)
 elimExpr = \case
@@ -182,11 +146,11 @@ elimExpr = \case
   EAtm a -> pure (EAtm a)
   ETmApp fun arg -> ETmApp <$> elimExpr fun <*> elimExpr arg
   ETyApp e0 ts0 -> ETyApp <$> elimExpr e0 <*> pure ts0
-  ECxApp e0 cstr -> elimECxApp e0 cstr
+  ECxApp e0 dict -> ETmApp <$> elimExpr e0 <*> pure (elimDict dict)
   EApp{} -> impossible
   ETmAbs binder body0 -> ETmAbs binder <$> elimExpr body0
   ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
-  ECxAbs cstr e0 -> elimECxAbs cstr e0
+  ECxAbs (x, c) e0 -> ETmAbs (x, mkTDict c) <$> elimExpr e0
   EAbs{} -> impossible
   ELet m ds0 e0 -> ELet m <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   EMat t e0 as -> EMat t <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as

@@ -19,6 +19,7 @@ module Pukeko.FrontEnd.Inferencer.UType
   , unwindUTApp
   , open
   , open1
+  , freezeType
   , substUType
   , prettyUType
   )
@@ -29,7 +30,6 @@ import Pukeko.Pretty
 
 import qualified Bound as B
 import qualified Bound.Name as B
-import           Control.Monad.ST
 import           Data.STRef
 import qualified Data.Map.Extended as Map
 
@@ -99,6 +99,19 @@ open1 = \case
   TApp tf tp -> UTApp (open1 tf) (open1 tp)
   TUni xs tq -> UTUni xs (open1 (B.instantiate (TVar . UTVar . B.name) tq))
   TCtx (clss, tc) tq -> UTCtx (clss, open1 tc) (open1 tq)
+
+freezeType :: UType s -> ST s Type
+freezeType = \case
+  UTVar x -> pure (TVar x)
+  UTAtm a -> pure (TAtm a)
+  UTApp t1 t2 -> TApp <$> freezeType t1 <*> freezeType t2
+  UTUni v t1 -> TUni' v <$> freezeType t1
+  UTCtx (clss, t1) t2 -> TCtx <$> ((,) clss <$> freezeType t1) <*> freezeType t2
+  UVar uref ->
+    readSTRef uref >>= \case
+      ULink t -> freezeType t
+      UFree{} -> impossible  -- all unification variables have been generalized
+
 
 substUType :: Map TyVar (UType s) -> UType s -> ST s (UType s)
 substUType env = go

@@ -4,6 +4,7 @@ module Pukeko.Prelude
 
   , True
   , False
+  , MemberST
   , Failure
   , CanThrowHere
   , throwFailure
@@ -40,6 +41,7 @@ import Control.Monad.Freer.Error  as X
 import Control.Monad.Freer.Reader as X
 import Control.Monad.Freer.State  as X
 import Control.Monad.Freer.Writer as X
+import Control.Monad.ST           as X (ST)
 
 import Data.Bifunctor        as X
 import Data.CallStack        as X (HasCallStack)
@@ -79,6 +81,8 @@ import           Pukeko.Orphans ()
 
 type True  = 'True
 type False = 'False
+
+type MemberST s effs = LastMember (ST s) effs
 
 type Failure = Doc
 

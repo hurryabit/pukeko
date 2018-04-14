@@ -4,16 +4,20 @@ module Pukeko.FrontEnd.Inferencer.Gamma
   ( Gamma
   , CanGamma
   , runGamma
-  , withinEScope
-  , withinEScope1
+
+  , introTmVar
+  , introTmVars
+  , lookupTmVar
+
   , enterLevel
-  , introTVar
-  , introTVars
-  , withinContext1
-  , withinContext
-  , getTLevel
-  , lookupEVar
-  , lookupTVar
+  , getLevel
+
+  , introTyVar
+  , introTyVars
+  , checkTyVar
+
+  , enterContext
+  , lookupContext
   ) where
 
 import Pukeko.Prelude
@@ -21,53 +25,61 @@ import Pukeko.Prelude
 import qualified Data.Map.Extended as Map
 import qualified Data.Set          as Set
 
+import           Pukeko.AST.Dict (DxBinder)
+import           Pukeko.AST.Expr (TmBinder)
 import           Pukeko.AST.Name
 import           Pukeko.FrontEnd.Inferencer.UType
 
 data Gamma s = Gamma
-  { _tenv  :: Map TmVar (UType s)
-  , _level :: Level
-  , _qenv  :: Map TyVar (Set Class)
+  { _tmVars  :: Map TmVar (UType s)
+  , _level   :: Level
+  , _tyVars  :: Set TyVar
+  , _context :: Map (Class, TyVar) DxVar
   }
 makeLenses ''Gamma
 
 type CanGamma s effs = Member (Reader (Gamma s)) effs
 
 runGamma :: Eff (Reader (Gamma s) : effs) a -> Eff effs a
-runGamma = runReader (Gamma Map.empty topLevel Map.empty)
+runGamma = runReader (Gamma Map.empty topLevel Set.empty Map.empty)
 
-withinEScope :: CanGamma s effs => Map TmVar (UType s) -> Eff effs a -> Eff effs a
-withinEScope ts = locally tenv (ts `Map.union`)
+introTmVar :: CanGamma s effs => TmBinder (UType s) -> Eff effs a -> Eff effs a
+introTmVar (x, t) = locally tmVars (Map.insertWith impossible x t)
 
-withinEScope1 :: CanGamma s effs => TmVar -> UType s -> Eff effs a -> Eff effs a
-withinEScope1 x t = withinEScope (Map.singleton x t)
+introTmVars :: CanGamma s effs => [TmBinder (UType s)] -> Eff effs a -> Eff effs a
+introTmVars = flip (foldr introTmVar)
+
+lookupTmVar :: CanGamma s effs => TmVar -> Eff effs (UType s)
+lookupTmVar x = views tmVars (Map.! x)
 
 enterLevel :: forall s effs a. CanGamma s effs => Eff effs a -> Eff effs a
 enterLevel = locally (level @s) succ
 
-introTVar :: forall s effs a. CanGamma s effs =>
-  TyVar -> Eff effs a -> Eff effs a
-introTVar v = locally (qenv @s) (Map.insertWith impossible v Set.empty)
+getLevel :: forall s effs. CanGamma s effs => Eff effs Level
+getLevel = view (level @s)
 
-introTVars :: forall s t effs a. (CanGamma s effs, Foldable t) =>
-  t TyVar -> Eff effs a -> Eff effs a
-introTVars vs act = foldr (introTVar @s) act vs
+introTyVar :: forall s effs a. CanGamma s effs => TyVar -> Eff effs a -> Eff effs a
+introTyVar v act = do
+  views (tyVars @s) (Set.notMember v) >>= assertM
+  locally (tyVars @s) (Set.insert v) act
 
-withinContext1 :: forall s effs a. CanGamma s effs =>
-  UTypeCstr s -> Eff effs a -> Eff effs a
-withinContext1 (clss, UTVar v) =
-  locally (qenv @s) (Map.alter (maybe impossible (Just . Set.insert clss)) v)
-withinContext1 _ = impossible
+introTyVars :: forall s effs a. CanGamma s effs => [TyVar] -> Eff effs a -> Eff effs a
+introTyVars = flip (foldr (introTyVar @s))
 
-withinContext :: forall s effs a. CanGamma s effs =>
-  [UTypeCstr s] -> Eff effs a -> Eff effs a
-withinContext cstrs act = foldr withinContext1 act cstrs
+checkTyVar :: forall s effs. CanGamma s effs => TyVar -> Eff effs ()
+checkTyVar v = views (tyVars @s) (Set.member v) >>= assertM
 
-getTLevel :: forall s effs. CanGamma s effs => Eff effs Level
-getTLevel = view (level @s)
+enterContext1 :: forall s effs a. CanGamma s effs =>
+  DxBinder (UType s) -> Eff effs a -> Eff effs a
+enterContext1 (dvar, (clss, UTVar tvar)) act = do
+  checkTyVar @s tvar
+  locally (context @s) (Map.insertWith impossible (clss, tvar) dvar) act
+enterContext1 _ _ = impossible
 
-lookupEVar :: CanGamma s effs => TmVar -> Eff effs (UType s)
-lookupEVar x = views tenv (Map.! x)
+enterContext :: forall s effs a. CanGamma s effs =>
+  [DxBinder (UType s)] -> Eff effs a -> Eff effs a
+enterContext = flip (foldr enterContext1)
 
-lookupTVar :: forall s effs. CanGamma s effs => TyVar -> Eff effs (Set Class)
-lookupTVar v = views (qenv @s) (Map.! v)
+lookupContext :: forall s effs. CanGamma s effs =>
+  (Class, TyVar)-> Eff effs (Maybe DxVar)
+lookupContext v = views (context @s) (Map.lookup v)
