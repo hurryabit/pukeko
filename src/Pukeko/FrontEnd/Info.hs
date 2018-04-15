@@ -99,13 +99,13 @@ instance IsType (TypeOf st) => HasModuleInfo (SysF.Module st) where
     -- SysF.DExtn (SysF.MkExtnDecl _    TArr _) -> mempty
     SysF.DExtn (SysF.MkExtnDecl func typ_ _) ->
       maybe mempty (signInfo func) (isType typ_)
-    SysF.DClss clssDecl@(SysF.MkClassDecl clss param _dcon mthds) ->
+    SysF.DClss clssDecl@(SysF.MkClassDecl clss param _super _dcon mthds) ->
       let mthds_info = foldFor mthds $ \mthdDecl@(SysF.MkSignDecl mthd typ0) ->
             let typ1 = TUni' param (TCtx (clss, TVar param) typ0)
             in  signInfo mthd typ1
                 <> itemInfo info2methods mthd (clssDecl, mthdDecl)
       in  itemInfo info2classes clss clssDecl <> mthds_info
-    SysF.DInst inst0@(SysF.MkInstDecl dict clss t _ _ _) ->
+    SysF.DInst inst0@(SysF.MkInstDecl dict clss t _ _ _ _) ->
       let inst1 = SomeInstDecl inst0
       in  itemInfo info2insts (clss, t) inst1 <> itemInfo info2dicts dict inst1
 

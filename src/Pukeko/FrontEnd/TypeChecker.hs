@@ -83,14 +83,24 @@ checkDict dict cstr =
   case dict of
     DVar x -> lookupDxVar x >>= matchCstr cstr
     DDer z targs subDicts ->
+      -- TODO: Use 'findInfo'
       lookupInfo info2dicts z >>= \case
         Nothing -> impossible
-        Just (SomeInstDecl (SysF.MkInstDecl _ clss tatom prms ctxt _)) -> do
+        Just (SomeInstDecl (SysF.MkInstDecl _ clss tatom prms ctxt _ _)) -> do
           matchCstr cstr (clss, foldl TApp (TAtm tatom) targs)
           -- the kind checker guarantees matching parameter/argument arity
           let inst = (>>= (Map.fromList (zipExact prms targs) Map.!))
           for_ (zipExact subDicts ctxt) $ \(subDict, (_, subCstr)) ->
             checkDict subDict (second inst subCstr)
+    DSub z clss typ subDict -> do
+      clssDecl <- findInfo info2classes clss
+      case clssDecl ^. SysF.class2super of
+        Nothing -> impossible
+        Just (z', super)
+          | z /= z' -> impossible
+          | otherwise -> do
+              matchCstr cstr (super, typ)
+              checkDict subDict (clss, typ)
   where
     matchCstr cstr0 cstr1 =
       unless (cstr0 == cstr1) $
@@ -119,10 +129,21 @@ instance (IsTyped lg, IsTyped lg) => TypeCheckable (SysF.Module lg) where
     SysF.DFunc (SysF.MkFuncDecl _ typ_ body) -> checkExpr body typ_
     SysF.DExtn _ -> pure ()
     SysF.DClss{} -> pure ()
-    SysF.DInst (SysF.MkInstDecl _ _ atom prms ctxt ds) -> do
+    SysF.DInst (SysF.MkInstDecl inst clss atom prms ctxt super ds) -> do
+      clssDecl <- findInfo info2classes clss
       let t_inst = foldl TApp (TAtm atom) (map TVar prms)
       -- FIXME: Ensure that the type in @b@ is correct as well.
-      introTyVars prms $ introDxVars ctxt $
+      introTyVars prms $ introDxVars ctxt $ do
+        case (super, clssDecl ^. SysF.class2super) of
+          (Nothing, Nothing) -> pure ()
+          (Nothing, Just _) -> throwHere $
+            "instance" <+> pretty inst <+> "wronlgy indicates that class"
+            <+> pretty clss <+> "has a super class"
+          (Just _, Nothing) -> throwHere $
+            "instance" <+> pretty inst <+> "wrongly indicated that class"
+            <+> pretty clss <+> "has no super class"
+          (Just dict, Just (_, sclss)) ->
+            checkDict dict (sclss, t_inst)
         for_ ds $ \(SysF.MkFuncDecl name _typ body) -> do
           (_, SysF.MkSignDecl _ t_mthd) <- findInfo info2methods name
           -- TODO: There might be some lexical name capturing going on here: type

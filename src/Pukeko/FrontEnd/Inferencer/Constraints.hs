@@ -26,6 +26,7 @@ type MDictRef s = STRef s (MDict s)
 data MDict s
   = MDVar DxVar
   | MDDer DxVar [UType s] [MDict s]
+  | MDSub DxVar Class (UType s) (MDict s)
   | MMeta (MDictRef s)
   | MTodo
 
@@ -36,6 +37,9 @@ data SplitCstrs s = MkSplitCstrs
   , _deferred :: UnsolvedCstrs s
   }
 
+nullSplitCstrs :: SplitCstrs s -> Bool
+nullSplitCstrs (MkSplitCstrs rets defs) = null rets && null defs
+
 freshConstraint :: CanSolve s effs => UTypeCstr s -> Eff effs (MDict s, UnsolvedCstrs s)
 freshConstraint cstr = do
   dref <- sendM (newSTRef MTodo)
@@ -45,18 +49,41 @@ freezeDict :: MDict s -> ST s Dict
 freezeDict = \case
   MDVar x -> pure (DVar x)
   MDDer z ts ds -> DDer z <$> traverse freezeType ts <*> traverse freezeDict ds
+  MDSub z c t d -> DSub z c <$> freezeType t <*> freezeDict d
   MTodo -> impossible
   MMeta dref -> readSTRef dref >>= freezeDict
 
-throwUnsolvable :: CanSolve s effs => Maybe [Class] -> UTypeCstr s -> Eff effs a
-throwUnsolvable mbCtxt (clss, typ) = do
-  dTyp <- sendM (prettyUType 3 typ)
-  let dCtxt = case mbCtxt of
-        Nothing -> mempty
-        Just ctxt ->
-          "in context"
-          <+> parens (hsep (punctuate "," (map (\c -> pretty c <+> dTyp) ctxt)))
-  throwHere ("cannot solve constraint" <+> pretty clss <+> dTyp <+> dCtxt)
+throwUnsolvable :: CanSolve s effs => Maybe [UTypeCstr s] -> UTypeCstr s -> Eff effs a
+throwUnsolvable mbCtxt cstr = do
+  dCstr <- sendM (prettyUTypeCstr cstr)
+  dCtxt <- case mbCtxt of
+    Nothing -> pure mempty
+    Just ctxt -> do
+      dCstrs <- sendM (traverse prettyUTypeCstr ctxt)
+      pure ("in context" <+> parens (hsep (punctuate "," dCstrs)))
+  throwHere ("cannot solve constraint" <+> dCstr <+> dCtxt)
+  where
+    prettyUTypeCstr (clss, typ) = (<+>) (pretty clss) <$> prettyUType 3 typ
+
+
+solveRigid
+  :: forall s effs. CanSolve s effs
+  => UTypeCstr s -> Map Class DxVar -> Eff effs (MDict s)
+solveRigid cstr0@(clss0, type0) ctxt0 = go (fmap MDVar ctxt0)
+  where
+    -- 'go' searches for the /shortest/ derivation of the constraint.
+    go :: Map Class (MDict s) -> Eff effs (MDict s)
+    go ctxt1
+      | null ctxt1 = throwUnsolvable (Just (zip (Map.keys ctxt0) (repeat type0))) cstr0
+      | Just dict <- ctxt1 Map.!? clss0 = pure dict
+      | otherwise = do
+          -- TODO: Simplify code.
+          ctxt2 <- for (Map.toList ctxt1) $ \(clss, dict) -> do
+            clssDecl <- findInfo info2classes clss
+            pure $ case clssDecl ^. class2super of
+              Just (z, super) -> Just (super, MDSub z clss type0 dict)
+              Nothing -> Nothing
+          go (Map.fromList (catMaybes ctxt2))
 
 preSolveConstraint
   :: forall s effs
@@ -84,14 +111,11 @@ preSolveConstraint cstr@(clss, t0) = do
           dref <- sendM (newSTRef MTodo)
           tell (MkSplitCstrs (Seq.singleton ((clss, tvar), dref)) mempty)
           pure (MMeta dref)
-        Just dvars ->
-          case Map.lookup clss dvars of
-            Nothing -> throwUnsolvable (Just (Map.keys dvars)) cstr
-            Just dvar -> pure (MDVar dvar)
+        Just ctxt -> solveRigid cstr ctxt
     UTAtm atom ->
       lookupInfo info2insts (clss, atom) >>= \case
         Nothing -> throwUnsolvable Nothing cstr
-        Just (SomeInstDecl (MkInstDecl z _ _ prms ctxt _)) -> do
+        Just (SomeInstDecl (MkInstDecl z _ _ prms ctxt _ _)) -> do
           -- The kind checker guarantees the number of parameters/arguments to match.
           let inst = open1 . fmap (Map.fromList (zipExact prms targs) Map.!)
           MDDer z targs <$> traverse (preSolveConstraint . second inst . snd) ctxt

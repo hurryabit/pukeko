@@ -30,7 +30,7 @@ import Data.Kind (Constraint)
 import GHC.TypeLits (Nat, type (<=?), type (-))
 
 import Pukeko.AST.Type (NoType, Type)
-import Pukeko.AST.Dict (Dict)
+import Pukeko.AST.Dict (NoDict, Dict)
 
 data Surface
 data PreTyped (t :: *) (d :: *)
@@ -57,7 +57,7 @@ type family TypeOf lg :: * where
   TypeOf SuperCore      = Type
 
 type family DictOf lg :: * where
-  DictOf Surface        = Void
+  DictOf Surface        = NoDict
   DictOf (PreTyped t d) = d
   DictOf Typed          = Dict
   DictOf Unnested       = Dict

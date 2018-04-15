@@ -86,6 +86,7 @@ data SignDecl = MkSignDecl
 data ClssDecl = MkClssDecl
   { _clss2name  :: LctdName 'TyCon
   , _clss2prm   :: LctdName 'TyVar
+  , _clss2super :: Maybe (LctdName 'TyCon, LctdName 'TyVar)
   , _clss2mthds :: [SignDecl]
   }
 
