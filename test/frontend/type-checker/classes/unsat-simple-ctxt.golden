@@ -1,0 +1,1 @@
+test/frontend/type-checker/classes/unsat-simple-ctxt.pu:6:1: cannot solve constraint C a in context (D a)

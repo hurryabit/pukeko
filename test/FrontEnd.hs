@@ -13,7 +13,7 @@ import qualified Pukeko.FrontEnd        as FrontEnd
 import           Pukeko.Pretty
 
 diffCmd :: FilePath -> FilePath -> [String]
-diffCmd ref new = ["diff", "--rcs", ref, new]
+diffCmd ref new = ["diff", "-u", ref, new]
 
 fileTest :: FilePath -> TestTree
 fileTest file = goldenVsStringDiff file diffCmd (file -<.> "golden") $ do

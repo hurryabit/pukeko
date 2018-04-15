@@ -228,12 +228,10 @@ inferFuncDecl (MkFuncDecl name NoType body0) t_decl = do
       -- it does not, the freezing will catch this (and error out).
       unify t_body0 t_body1
       solveConstraints cstrs1
-    assertM (null defs1)  -- the renamer catches free type variables in constraints
-    case rets1 of
-      [] -> pure ()
-      (_, (clss, typ)):_ -> do
-        pTyp <- sendM (prettyUType 0 typ)
-        throwHere ("cannot deduce" <+> pretty clss <+> pTyp <+> "from context")
+    assertM (null rets1 && null defs1)
+    -- case rets1 of
+    --   [] -> pure ()
+    --   (_, cstr):_ -> throwUnsolvable cstr
     let (body2, _) = addTyCxAbs vs0 ctxt1 body1 t_body1
     pure (MkFuncDecl name t_decl body2)
 

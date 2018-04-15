@@ -12,6 +12,7 @@ import Pukeko.AST.SystemF
 import Pukeko.FrontEnd.Inferencer.UType
 import Pukeko.FrontEnd.Inferencer.Gamma
 import Pukeko.FrontEnd.Info
+import Pukeko.Pretty
 
 type CanSolve s effs =
   ( CanThrowHere effs
@@ -47,6 +48,16 @@ freezeDict = \case
   MTodo -> impossible
   MMeta dref -> readSTRef dref >>= freezeDict
 
+throwUnsolvable :: CanSolve s effs => Maybe [Class] -> UTypeCstr s -> Eff effs a
+throwUnsolvable mbCtxt (clss, typ) = do
+  dTyp <- sendM (prettyUType 3 typ)
+  let dCtxt = case mbCtxt of
+        Nothing -> mempty
+        Just ctxt ->
+          "in context"
+          <+> parens (hsep (punctuate "," (map (\c -> pretty c <+> dTyp) ctxt)))
+  throwHere ("cannot solve constraint" <+> pretty clss <+> dTyp <+> dCtxt)
+
 preSolveConstraint
   :: forall s effs
   .  CanSolve s effs
@@ -68,17 +79,18 @@ preSolveConstraint cstr@(clss, t0) = do
               pure (MMeta dref)
         ULink{} -> impossible  -- we've unwound 'UTApp's
     UTVar tvar ->
-      lookupContext @s (clss, tvar) >>= \case
+      lookupContext @s tvar >>= \case
         Nothing -> do
           dref <- sendM (newSTRef MTodo)
           tell (MkSplitCstrs (Seq.singleton ((clss, tvar), dref)) mempty)
           pure (MMeta dref)
-        Just dvar -> pure (MDVar dvar)
-    UTAtm atom ->
+        Just dvars ->
+          case Map.lookup clss dvars of
+            Nothing -> throwUnsolvable (Just (Map.keys dvars)) cstr
+            Just dvar -> pure (MDVar dvar)
+    UTAtm atom -> do
       lookupInfo info2insts (clss, atom) >>= \case
-        Nothing -> do
-          p0 <- sendM (prettyUType 1 t0)
-          throwHere ("TI: no instance for" <+> pretty clss <+> p0)
+        Nothing -> throwUnsolvable Nothing cstr
         Just (SomeInstDecl (MkInstDecl z _ _ prms ctxt _)) -> do
           -- The kind checker guarantees the number of parameters/arguments to match.
           let inst = open1 . fmap (Map.fromList (zipExact prms targs) Map.!)
