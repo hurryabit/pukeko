@@ -28,8 +28,7 @@ data MDict s
   | MMeta (MDictRef s)
   | MTodo
 
-type UnsolvedCstr s = (UTypeCstr s, MDictRef s)
-type UnsolvedCstrs s = Seq (UnsolvedCstr s)
+type UnsolvedCstrs s = Seq (UTypeCstr s, MDictRef s)
 
 data SplitCstrs s = MkSplitCstrs
   { _retained :: Seq ((Class, TyVar), MDictRef s)
@@ -89,9 +88,9 @@ preSolveConstraint cstr@(clss, t0) = do
     UTCtx{} -> impossible
 
 solveConstraints
-  :: forall s effs t
-  .  (CanSolve s effs, Foldable t)
-  => t (UnsolvedCstr s)
+  :: forall s effs
+  .  CanSolve s effs
+  => UnsolvedCstrs s
   -> Eff effs ([DxBinder (UType s)], UnsolvedCstrs s)
 solveConstraints ucstrs = do
   ((), MkSplitCstrs rets0 defs) <- runWriter $

@@ -13,7 +13,6 @@ import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
 import qualified Data.List.NE     as NE
 import qualified Data.Map.Extended as Map
-import qualified Data.Sequence    as Seq
 import qualified Data.Set         as Set
 import           Data.STRef
 
@@ -72,7 +71,7 @@ generalize = go
 
 instantiate :: CanInfer s effs =>
   Expr (Aux s) -> UType s -> Eff effs (Expr (Aux s), UType s, UnsolvedCstrs s)
-instantiate = go Map.empty Seq.empty
+instantiate = go Map.empty mempty
   where
     go env0 cstrs0 e0 = \case
       UTUni v t0 -> do

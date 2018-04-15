@@ -4,7 +4,6 @@ module Pukeko.FrontEnd.ClassEliminator
 
 import Pukeko.Prelude
 
--- import qualified Bound.Name as B
 import qualified Bound.Scope as B
 import qualified Safe
 
@@ -19,13 +18,12 @@ import           Pukeko.FrontEnd.Info
 type In  = Unnested
 type Out = Unclassy
 
-type CanCE effs = Members [Reader SourcePos, Reader ModuleInfo, NameSource] effs
+type CanCE effs = Members [Reader ModuleInfo, NameSource] effs
 type CE a = forall effs. CanCE effs => Eff effs a
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
 elimModule m0@(MkModule decls0) = runInfo m0 $ do
-  decls1 <- for decls0 $ \decl0 -> elimDecl decl0 & runReader (getPos decl0)
-  pure (MkModule (map unclssDecl (concat decls1)))
+  MkModule . map unclssDecl . concat <$> traverse elimDecl decls0
 
 -- | Apply the dictionary type constructor of a type class to a type. For the
 -- @List@ instance of @Traversable@, we obtain @Dict$Traversable List$, i.e.,
@@ -42,6 +40,7 @@ dictTyConDecl (MkClassDecl clss prm dcon mthds) =
         dconDecl = MkTmConDecl clss dcon 0 flds
     in  MkTyConDecl clss [prm] (Right [dconDecl])
 
+-- TODO: This documentation is out of date.
 -- | Transform a type class declaration into a data type declaration for the
 -- dictionary and projections from the dictionary to each class method.
 --
@@ -78,6 +77,7 @@ elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
     pure (DFunc (MkFuncDecl z t1 e_tyabs))
   pure (DType tcon : sels)
 
+-- TODO: This documentation is out of date.
 -- | Transform a class instance definition into a dictionary definition.
 --
 -- The @List@ instance of @Traversable@ is transformed as follows, e.g.:
@@ -94,45 +94,39 @@ elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
 -- >         sequence @b @m (map @List @a @(m b) f xs)
 -- >   in
 -- >   Dict$Traversable @List traverse
-elimInstDecl :: ClassDecl -> InstDecl In -> CE [Decl In]
-elimInstDecl
-  (MkClassDecl _ _ dcon methods0)
-  (MkInstDecl inst clss tatom prms ctxt defns0) = do
+elimInstDecl :: InstDecl In -> CE [Decl Out]
+elimInstDecl (MkInstDecl inst clss tatom prms ctxt defns0) = do
+  MkClassDecl _ _ dcon methods0 <- findInfo info2classes clss
   let t_inst = mkTApp (TAtm tatom) (map TVar prms)
   let t_dict0 = mkTDict (clss, t_inst)
-  let mkFuncDecl name type0 body0 =
+  let mkFuncDecl name type0 body0 = do
         -- TODO: We might want to copy the dictionary binders here.
         let type1 = rewindr TUni' prms (rewindr TCtx (map snd ctxt) type0)
-            body1 = rewindr ETyAbs prms (rewindr ECxAbs ctxt (ETyAnn type0 body0))
-        in  MkFuncDecl name type1 body1
+        let body1 = rewindr ETyAbs prms (rewindr ECxAbs ctxt (ETyAnn type0 body0))
+        MkFuncDecl name type1 <$> elimExpr body1
   defns1 <- for methods0 $ \(MkSignDecl mthd _) -> do
-    let (MkFuncDecl name0 typ_ body) =
+    let MkFuncDecl name0 typ_ body =
           Safe.findJustNote "BUG" (\defn -> nameOf defn == mthd) defns0
     let name1 = Tagged (untag (nameText inst) ++ "." ++ untag (nameText name0))
     name2 <- mkName (Lctd (getPos name0) name1)
-    pure (mkFuncDecl name2 typ_ body)
+    mkFuncDecl name2 typ_ body
   let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
   let callDefn defn =
         foldl ECxApp
           (foldl ETyApp (EVal (nameOf defn)) (map TVar prms))
           (map (DVar . fst) ctxt)
   let e_body = foldl ETmApp e_dcon (map callDefn defns1)
-  pure (map DFunc (mkFuncDecl inst t_dict0 e_body : defns1))
+  dictDefn <- mkFuncDecl inst t_dict0 e_body
+  pure (map DFunc (dictDefn : defns1))
 
 elimDecl :: Decl In -> CE [Decl Out]
-elimDecl = here' $ \case
+elimDecl = \case
   DType tcons -> pure [DType tcons]
   DFunc (MkFuncDecl name typ_ body) ->
     (:[]) . DFunc . MkFuncDecl name typ_ <$> elimExpr body
   DExtn (MkExtnDecl name typ_ extn) -> pure [DExtn (MkExtnDecl name typ_ extn)]
   DClss clss  -> elimClssDecl clss
-  DInst inst  -> do
-    -- TODO: Constructing the declaration of the dictionary type again and
-    -- putting it in the environment locally is a bit a of a hack.
-    clss <- findInfo info2classes (inst^.inst2class)
-    local (<> tyconDeclInfo (dictTyConDecl clss)) $ do
-      defns <- elimInstDecl clss inst
-      concat <$> traverse elimDecl defns
+  DInst inst  -> elimInstDecl inst
 
 elimDict :: Dict -> Expr Out
 elimDict = \case
@@ -141,7 +135,7 @@ elimDict = \case
 
 elimExpr :: Expr In -> CE (Expr Out)
 elimExpr = \case
-  ELoc (Lctd pos e0) -> here_ pos $ elimExpr e0
+  ELoc (Lctd _pos e0) -> elimExpr e0
   EVar x -> pure (EVar x)
   EAtm a -> pure (EAtm a)
   ETmApp fun arg -> ETmApp <$> elimExpr fun <*> elimExpr arg
