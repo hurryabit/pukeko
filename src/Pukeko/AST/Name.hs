@@ -20,6 +20,7 @@ module Pukeko.AST.Name
   , runSTBelowNameSource
   , mkName
   , copyName
+  , copyName'
   , mkDxVar
   , type NameSpaceOf
   , HasName (..)
@@ -100,8 +101,13 @@ mkName (Lctd pos (Tagged text)) = do
   send (NameSource (Put (n+1)))
   pure (Name n text pos)
 
-copyName :: Member NameSource effs => SourcePos -> Name nsp -> Eff effs (Name nsp)
-copyName pos (Name _ text _) = mkName (Lctd pos (Tagged text))
+copyName :: Member NameSource effs => Name nsp -> Eff effs (Name nsp)
+copyName = copyName' id
+
+copyName'
+  :: Member NameSource effs
+  => (String -> String) -> Name nsp1 -> Eff effs (Name nsp2)
+copyName' f (Name _ text _) = mkName (Lctd noPos (Tagged (f text)))
 
 mkDxVar :: Member NameSource effs => Class -> TyVar -> Eff effs DxVar
 mkDxVar clss tvar = do
