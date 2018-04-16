@@ -1,8 +1,9 @@
 -- The monad class and some useful functions for monads
 import std2/basic
+import std2/functor
 import std2/list
 
-class Monad m where
+class (Functor m) <= Monad m where
   pure : a -> m a
   bind : m a -> (a -> m b) -> m b
 

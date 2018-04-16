@@ -14,21 +14,21 @@ data Choice a b =
 data Eq a =
        | .Eq (a -> a -> Bool)
 data Ord a =
-       | .Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
+       | .Ord (Eq a) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 data Monoid m =
        | .Monoid m (m -> m -> m)
 data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
-data Foldable t =
-       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
        | .Functor (forall a b. (a -> b) -> f a -> f b)
+data Foldable t =
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
+       | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 external ge_int : Int -> Int -> Bool = "ge"
@@ -37,7 +37,9 @@ external sub_int : Int -> Int -> Int = "sub"
 external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
+functorIO : Functor IO = .Functor @IO functorIO.map.L2
+monadIO : Monad IO =
+  .Monad @IO functorIO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 count_down : Int -> IO Unit =
@@ -57,6 +59,13 @@ main : IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 semi.L1 : forall a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
+functorIO.map.L1 : forall a b. (a -> b) -> IO a -> World -> Pair b World =
+  fun @a @b (f : a -> b) (mx : IO a) (world0 : World) ->
+    match coerce @(IO -> _) mx world0 with
+    | Pair x world1 -> Pair @b @World (f x) world1
+functorIO.map.L2 : forall a b. (a -> b) -> IO a -> IO b =
+  fun @a @b (f : a -> b) (mx : IO a) ->
+    coerce @(_ -> IO) (functorIO.map.L1 @a @b f mx)
 monadIO.pure.L2 : forall a. a -> IO a =
   fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
@@ -79,12 +88,12 @@ repeat.L1 : forall m. Monad m -> Int -> m Unit -> m Unit =
     and m : m Unit =
           let m2 : m Unit = repeat.L1 @m monad.m (sub_int k 1) m in
           (match monad.m with
-           | .Monad _ bind -> bind) @Unit @Unit m (semi.L1 @Unit @m m2)
+           | .Monad _ _ bind -> bind) @Unit @Unit m (semi.L1 @Unit @m m2)
     in
     match p with
     | False ->
       (match monad.m with
-       | .Monad pure _ -> pure) @Unit Unit
+       | .Monad _ pure _ -> pure) @Unit Unit
     | True -> m
 main.L1 : Int -> Int -> IO Unit =
   fun (k : Int) (n : Int) -> repeat.L1 @IO monadIO k (count_down n)

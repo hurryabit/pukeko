@@ -14,21 +14,21 @@ data Choice a b =
 data Eq a =
        | .Eq (a -> a -> Bool)
 data Ord a =
-       | .Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
+       | .Ord (Eq a) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 data Monoid m =
        | .Monoid m (m -> m -> m)
 data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
-data Foldable t =
-       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
        | .Functor (forall a b. (a -> b) -> f a -> f b)
+data Foldable t =
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
+       | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 external seq : forall a b. a -> b -> b = "seq"

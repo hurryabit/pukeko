@@ -14,21 +14,21 @@ data Choice a b =
 data Eq a =
        | .Eq (a -> a -> Bool)
 data Ord a =
-       | .Ord (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
+       | .Ord (Eq a) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 data Monoid m =
        | .Monoid m (m -> m -> m)
 data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
-data Foldable t =
-       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
        | .Functor (forall a b. (a -> b) -> f a -> f b)
+data Foldable t =
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
+       | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 data RmqTree a =
@@ -43,7 +43,9 @@ external sub_int : Int -> Int -> Int = "sub"
 external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
-monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
+functorIO : Functor IO = .Functor @IO functorIO.map.L2
+monadIO : Monad IO =
+  .Monad @IO functorIO monadIO.pure.L2 monadIO.bind.L2
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 nats : List Int =
@@ -68,22 +70,29 @@ zip_with.L1 : forall a b c. (a -> b -> c) -> List a -> List b -> List c =
 sequence.L1 : forall a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (monad.m : Monad m) (x : a) (xs : List a) ->
     (match monad.m with
-     | .Monad pure _ -> pure) @(List a) (Cons @a x xs)
+     | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
 sequence.L2 : forall a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) (x : a) ->
     (match monad.m with
-     | .Monad _ bind ->
+     | .Monad _ _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 : forall a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) ->
     match ms with
     | Nil ->
       (match monad.m with
-       | .Monad pure _ -> pure) @(List a) (Nil @a)
+       | .Monad _ pure _ -> pure) @(List a) (Nil @a)
     | Cons m ms ->
       (match monad.m with
-       | .Monad _ bind ->
+       | .Monad _ _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
+functorIO.map.L1 : forall a b. (a -> b) -> IO a -> World -> Pair b World =
+  fun @a @b (f : a -> b) (mx : IO a) (world0 : World) ->
+    match coerce @(IO -> _) mx world0 with
+    | Pair x world1 -> Pair @b @World (f x) world1
+functorIO.map.L2 : forall a b. (a -> b) -> IO a -> IO b =
+  fun @a @b (f : a -> b) (mx : IO a) ->
+    coerce @(_ -> IO) (functorIO.map.L1 @a @b f mx)
 monadIO.pure.L2 : forall a. a -> IO a =
   fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
