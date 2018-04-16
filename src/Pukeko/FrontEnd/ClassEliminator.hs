@@ -40,6 +40,23 @@ dictTyConDecl (MkClassDecl clss prm dcon mthds) =
         dconDecl = MkTmConDecl clss dcon 0 flds
     in  MkTyConDecl clss [prm] (Right [dconDecl])
 
+mkProjExpr
+  :: Member NameSource effs
+  => Type      -- ^ Type of the scrutinee.
+  -> Expr Out  -- ^ Scrutinee.
+  -> TmCon     -- ^ Constructor of the record type.
+  -> Int       -- ^ Arity of the constructor aka. number of fields.
+  -> Int       -- ^ Index of the field to project on.
+  -> TmVar     -- ^ Name of the field to project on.
+  -> Type      -- ^ Type of the field to project on.
+  -> Eff effs (Expr Out)
+mkProjExpr t_scrut scrut tmcon arity index field t_field = do
+  let patn = PSimple tmcon $
+        replicate index Nothing
+        ++ [Just (field, t_field)]
+        ++ replicate (arity-index-1) Nothing
+  pure (EMat t_scrut scrut (MkAltn patn (EVar field) :| []))
+
 -- TODO: This documentation is out of date.
 -- | Transform a type class declaration into a data type declaration for the
 -- dictionary and projections from the dictionary to each class method.
@@ -63,18 +80,15 @@ elimClssDecl :: ClassDecl -> CE [Decl Out]
 elimClssDecl clssDecl@(MkClassDecl clss prm dcon mthds) = do
   let tcon = dictTyConDecl clssDecl
   let cstr = (clss, TVar prm)
-  sels <- ifor mthds $ \i (MkSignDecl z t0) -> do
+  let numMthds = length mthds
+  sels <- ifor mthds $ \i (MkSignDecl z t_mthd) -> do
     dictPrm <- mkName (Lctd noPos "dict")
     let dictType = mkTDict cstr
-    let t1 = TUni' prm (TCtx cstr t0)
-    let e_rhs = EVar z
-    let c_binds = imap (\j _ -> guard (i==j) $> (z, t0)) mthds
-    let c_one = MkAltn (PSimple dcon c_binds) e_rhs
-    let e_cas = EMat dictType (EVar dictPrm) (c_one :| [])
-    let b_lam = (dictPrm, dictType)
-    let e_lam = ETmAbs b_lam (ETyAnn t0 e_cas)
-    let e_tyabs = ETyAbs prm e_lam
-    pure (DFunc (MkFuncDecl z t1 e_tyabs))
+    projVar <- copyName z
+    proj <- mkProjExpr dictType (EVar dictPrm) dcon numMthds i projVar t_mthd
+    let body = ETyAbs prm $ ETmAbs (dictPrm, dictType) $ ETyAnn t_mthd proj
+    let t_body = TUni' prm (TCtx cstr t_mthd)
+    pure (DFunc (MkFuncDecl z t_body body))
   pure (DType tcon : sels)
 
 -- TODO: This documentation is out of date.

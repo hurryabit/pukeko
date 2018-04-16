@@ -84,7 +84,7 @@ llETmAbs oldPars t_rhs rhs1 = do
     (evCaptured, newTmPars)  <-
       fmap (unzip . map snd . sortOn fst) . for evCaptured0 $ \x -> do
         (t, i) <- lookupTmVarIx x
-        bind <- (, t) <$> copyName noPos x
+        bind <- (, t) <$> copyName x
         pure (i, (x, bind))
     let allPars0 = map TmPar newTmPars ++ map coercePar oldPars
     -- NOTE: We're (ab)using the fact that a subterm @λ(x:t). Λa. E@ of a closed
@@ -96,7 +96,7 @@ llETmAbs oldPars t_rhs rhs1 = do
           ((setOf (traverse . _TmPar . _2 . traverse) allPars0 <> setOf traverse t_rhs)
            `Set.difference` setOf (traverse . _TyPar) oldPars)
     -- TODO: Sort type variable binders in descreasing de Bruijn index order.
-    tyPars <- traverse (copyName noPos) tvCaptured
+    tyPars <- traverse copyName tvCaptured
     let tvMap = Map.fromList (zipExact tvCaptured tyPars)
     let tvRename :: TyVar -> TyVar
         tvRename v = Map.findWithDefault v v tvMap

@@ -63,7 +63,7 @@ copySupCDecl :: Member NameSource effs =>
 copySupCDecl pos (SupCDecl z t ps0 e0) = do
   let xs :: [TmVar]
       xs = toListOf (traverse . _TmPar . _1) ps0
-  subst <- Map.fromList . zip xs <$> traverse (copyName pos) xs
+  subst <- Map.fromList . zip xs <$> traverse (fmap (set namePos pos) . copyName) xs
   let ps1 = over (traverse . _TmPar . _1) (subst Map.!) ps0
   let e1 = over freeTmVar (subst Map.!) e0
   pure (SupCDecl z t ps1 e1)
