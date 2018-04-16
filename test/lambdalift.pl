@@ -29,8 +29,7 @@ data List a =
        | Cons a (List a)
 data Monad m =
        | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
-data World =
-       | World
+data World
 data IO a = World -> Pair a World
 external add_int : Int -> Int -> Int = "add"
 external seq : ∀a b. a -> b -> b = "seq"

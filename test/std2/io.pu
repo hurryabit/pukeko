@@ -20,7 +20,7 @@ getc : Unit -> Int
 external getc = "getc"
 
 -- The IO monad
-data World = | World
+type World = external
 
 type IO a = World -> Pair a World
 
