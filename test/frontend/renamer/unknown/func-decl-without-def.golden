@@ -1,0 +1,1 @@
+test/frontend/renamer/unknown/func-decl-without-def.pu:1:1: declared but undefined function: f

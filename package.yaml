@@ -109,30 +109,11 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - directory
-    - hspec
-    - hspec-core
-    - HUnit
-    - parsec
-    - pukeko
-
-  golden-frontend:
-    main: GoldenFrontEnd
-    other-modules: []
-    source-dirs: test
-    ghc-options:
-    - -Wno-missing-signatures
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - directory
-    - HUnit
-    - parsec
+    - bytestring
+    - filepath
     - pukeko
     - tasty
     - tasty-golden
-    - transformers
 
   examples:
     main: Examples

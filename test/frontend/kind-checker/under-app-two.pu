@@ -1,0 +1,3 @@
+data Typ1 a = | A
+data Typ2 =
+  | Con Typ1

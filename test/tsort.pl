@@ -21,14 +21,14 @@ data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
 data Foldable t =
-       | .Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
-       | .Functor (∀a b. (a -> b) -> f a -> f b)
+       | .Functor (forall a b. (a -> b) -> f a -> f b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
+       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 data BinTree a =
@@ -40,7 +40,7 @@ external le_int : Int -> Int -> Bool = "le"
 external ge_int : Int -> Int -> Bool = "ge"
 external gt_int : Int -> Int -> Bool = "gt"
 external sub_int : Int -> Int -> Int = "sub"
-external seq : ∀a b. a -> b -> b = "seq"
+external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 ordInt : Ord Int = .Ord @Int ge_int gt_int le_int lt_int
@@ -49,37 +49,37 @@ print : Int -> IO Unit = io.L2 @Int @Unit puti
 input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 main : IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
-foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
+foldableList.foldr.L1 : forall a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
-foldableList.foldl.L1 : ∀a b. (b -> a -> b) -> b -> List a -> b =
+foldableList.foldl.L1 : forall a b. (b -> a -> b) -> b -> List a -> b =
   fun @a @b (f : b -> a -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs -> foldableList.foldl.L1 @a @b f (f y0 x) xs
-replicate.L1 : ∀a. Int -> a -> List a =
+replicate.L1 : forall a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
     match le_int n 0 with
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-semi.L1 : ∀a m. m a -> Unit -> m a =
+semi.L1 : forall a m. m a -> Unit -> m a =
   fun @a @m (m2 : m a) (x : Unit) -> m2
-semi.L2 : ∀a m. Monad m -> m Unit -> m a -> m a =
+semi.L2 : forall a m. Monad m -> m Unit -> m a -> m a =
   fun @a @m (monad.m : Monad m) (m1 : m Unit) (m2 : m a) ->
     (match monad.m with
      | .Monad _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
-sequence.L1 : ∀a m. Monad m -> a -> List a -> m (List a) =
+sequence.L1 : forall a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (monad.m : Monad m) (x : a) (xs : List a) ->
     (match monad.m with
      | .Monad pure _ -> pure) @(List a) (Cons @a x xs)
-sequence.L2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
+sequence.L2 : forall a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) (x : a) ->
     (match monad.m with
      | .Monad _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
-sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
+sequence.L3 : forall a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) ->
     match ms with
     | Nil ->
@@ -89,33 +89,33 @@ sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
       (match monad.m with
        | .Monad _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
-traverse_.L1 : ∀a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
+traverse_.L1 : forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   fun @a @m (monad.m : Monad m) (f : a -> m Unit) (x : a) ->
     semi.L2 @Unit @m monad.m (f x)
-monadIO.pure.L2 : ∀a. a -> IO a =
+monadIO.pure.L2 : forall a. a -> IO a =
   fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
-monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
+monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-monadIO.bind.L2 : ∀a b. IO a -> (a -> IO b) -> IO b =
+monadIO.bind.L2 : forall a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
-io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
+io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : ∀a b. (a -> b) -> a -> IO b =
+io.L2 : forall a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
-foldableBinTree.foldr.L1 : ∀a b. (a -> b -> b) -> b -> BinTree a -> b =
+foldableBinTree.foldr.L1 : forall a b. (a -> b -> b) -> b -> BinTree a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (t : BinTree a) ->
     match t with
     | Leaf -> y0
     | Branch l x r ->
       foldableBinTree.foldr.L1 @a @b f (f x (foldableBinTree.foldr.L1 @a @b f y0 r)) l
-bag_insert.L1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
-  fun (insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (ord._14 : Ord _14) (x : _14) (t : BinTree _14) ->
+bag_insert.L1 : (forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
+  fun (insert : forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (ord._14 : Ord _14) (x : _14) (t : BinTree _14) ->
     match t with
     | Leaf -> Branch @_14 (Leaf @_14) x (Leaf @_14)
     | Branch l y r ->
@@ -125,7 +125,7 @@ bag_insert.L1 : (∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (∀_1
       | True -> Branch @_14 (insert @_14 ord._14 x l) y r
 tsort.L1 : Bag Int -> Int -> Bag Int =
   fun (s : Bag Int) (x : Int) ->
-    let rec insert : ∀_14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14 =
+    let rec insert : forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14 =
               bag_insert.L1 insert
     in
     coerce @(_ -> Bag) (insert @Int ordInt x (coerce @(Bag -> _) s))

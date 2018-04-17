@@ -1,0 +1,11 @@
+data List a =
+       | Nil
+       | Cons a (List a)
+fold : forall a b. (a -> b -> a) -> a -> List b -> a =
+  fun @a @b ->
+    fun (f : a -> b -> a) ->
+      fun (y0 : a) ->
+        fun (xs : List b) ->
+          match xs with
+          | Nil -> y0
+          | Cons x xs -> fold @a @b f (f y0 x) xs

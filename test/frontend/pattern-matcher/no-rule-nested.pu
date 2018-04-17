@@ -1,0 +1,12 @@
+data List a =
+  | Nil
+  | Cons a (List a)
+data Option a =
+  | None
+  | Some a
+f : a -> List (Option a) -> a
+f x0 ys =
+  match ys with
+  | Nil              -> x0
+  | Cons (Some x) _  -> x
+  | Cons _        ys -> f x0 ys

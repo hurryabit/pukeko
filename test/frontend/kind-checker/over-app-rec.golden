@@ -1,0 +1,1 @@
+test/frontend/kind-checker/over-app-rec.pu:2:5: cannot unify kinds * and _4 -> *

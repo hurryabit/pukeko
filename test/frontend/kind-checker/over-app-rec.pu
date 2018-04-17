@@ -1,0 +1,2 @@
+data Typ a =
+  | Con (Typ a a)

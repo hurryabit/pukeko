@@ -1,0 +1,4 @@
+data T a b = | C a b
+f : T a b -> a
+f t = match t with
+  | C x y -> y

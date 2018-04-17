@@ -1,0 +1,1 @@
+test/frontend/type-checker/term-con/over-app-in-patn.pu:3:7: data constructor 'C' expects 1 arguments

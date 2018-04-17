@@ -1,0 +1,1 @@
+test/frontend/kind-checker/under-app-two.pu:3:5: cannot unify kinds * -> * and *

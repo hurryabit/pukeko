@@ -21,27 +21,27 @@ data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
 data Foldable t =
-       | .Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
-       | .Functor (∀a b. (a -> b) -> f a -> f b)
+       | .Functor (forall a b. (a -> b) -> f a -> f b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
+       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 external add_int : Int -> Int -> Int = "add"
-external seq : ∀a b. a -> b -> b = "seq"
+external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 print : Int -> IO Unit = io.L2 @Int @Unit puti
 main : IO Unit =
   print (let d : Int = add_int 2 2 in
          1)
-io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
+io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : ∀a b. (a -> b) -> a -> IO b =
+io.L2 : forall a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)

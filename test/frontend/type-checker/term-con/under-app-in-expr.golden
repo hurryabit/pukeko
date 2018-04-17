@@ -1,0 +1,1 @@
+test/frontend/type-checker/term-con/under-app-in-expr.pu:3:1: mismatching types T and (->) a
