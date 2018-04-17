@@ -21,23 +21,23 @@ data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
 data Foldable t =
-       | .Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
-       | .Functor (∀a b. (a -> b) -> f a -> f b)
+       | .Functor (forall a b. (a -> b) -> f a -> f b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
+       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
-external abort : ∀a. a = "abort"
+external abort : forall a. a = "abort"
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
 external mul_int : Int -> Int -> Int = "mul"
-external seq : ∀a b. a -> b -> b = "seq"
+external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 print : Int -> IO Unit = io.L2 @Int @Unit puti
@@ -48,7 +48,7 @@ fibs1 : List Int =
   Cons @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
 main : IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
-nth_exn.L1 : ∀a. List a -> Int -> a =
+nth_exn.L1 : forall a. List a -> Int -> a =
   fun @a (xs : List a) (n : Int) ->
     match xs with
     | Nil -> abort @a
@@ -56,7 +56,7 @@ nth_exn.L1 : ∀a. List a -> Int -> a =
       match le_int n 0 with
       | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
-zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 : forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
     match xs with
     | Nil -> Nil @c
@@ -64,15 +64,15 @@ zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       match ys with
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
-monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
+monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
+io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : ∀a b. (a -> b) -> a -> IO b =
+io.L2 : forall a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 add_mod_prime.L1 : Int -> Int -> Int =

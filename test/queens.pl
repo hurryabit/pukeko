@@ -21,14 +21,14 @@ data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
 data Foldable t =
-       | .Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
-       | .Functor (∀a b. (a -> b) -> f a -> f b)
+       | .Functor (forall a b. (a -> b) -> f a -> f b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
+       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 external eq_int : Int -> Int -> Bool = "eq"
@@ -36,7 +36,7 @@ external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external seq : ∀a b. a -> b -> b = "seq"
+external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 monoidInt : Monoid Int = .Monoid @Int monoidInt.empty add_int
@@ -60,26 +60,26 @@ solve_aux : List (List Int) -> List (List Int) =
 main : IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 monoidInt.empty : Int = 0
-monoidList.empty : ∀a. List a = Nil
-foldMap.L1 : ∀a m. Monoid m -> (a -> m) -> a -> m -> m =
+monoidList.empty : forall a. List a = Nil
+foldMap.L1 : forall a m. Monoid m -> (a -> m) -> a -> m -> m =
   fun @a @m (monoid.m : Monoid m) (f : a -> m) (x : a) ->
     (match monoid.m with
      | .Monoid _ append -> append) (f x)
-length.L1 : ∀a. a -> Int = fun @a (x : a) -> 1
-monoidList.append.L1 : ∀a. List a -> List a -> List a =
+length.L1 : forall a. a -> Int = fun @a (x : a) -> 1
+monoidList.append.L1 : forall a. List a -> List a -> List a =
   fun @a (xs : List a) (ys : List a) ->
     foldableList.foldr.L1 @a @(List a) (Cons @a) ys xs
-functorList.map.L1 : ∀a b. (a -> b) -> List a -> List b =
+functorList.map.L1 : forall a b. (a -> b) -> List a -> List b =
   fun @a @b (f : a -> b) (xs : List a) ->
     match xs with
     | Nil -> Nil @b
     | Cons x xs -> Cons @b (f x) (functorList.map.L1 @a @b f xs)
-foldableList.foldr.L1 : ∀a b. (a -> b -> b) -> b -> List a -> b =
+foldableList.foldr.L1 : forall a b. (a -> b -> b) -> b -> List a -> b =
   fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
-take.L1 : ∀a. Int -> List a -> List a =
+take.L1 : forall a. Int -> List a -> List a =
   fun @a (n : Int) (xs : List a) ->
     match le_int n 0 with
     | False ->
@@ -87,12 +87,12 @@ take.L1 : ∀a. Int -> List a -> List a =
       | Nil -> Nil @a
       | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
     | True -> Nil @a
-replicate.L1 : ∀a. Int -> a -> List a =
+replicate.L1 : forall a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
     match le_int n 0 with
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 : forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
     match xs with
     | Nil -> Nil @c
@@ -100,15 +100,15 @@ zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       match ys with
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
-monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
+monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
+io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : ∀a b. (a -> b) -> a -> IO b =
+io.L2 : forall a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 diff.L1 : List Int -> List Int -> List Int =

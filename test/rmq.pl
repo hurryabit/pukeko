@@ -21,26 +21,26 @@ data Ring a =
        | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
 data Char
 data Foldable t =
-       | .Foldable (∀a b. (a -> b -> b) -> b -> t a -> b) (∀a b. (b -> a -> b) -> b -> t a -> b)
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
 data Functor f =
-       | .Functor (∀a b. (a -> b) -> f a -> f b)
+       | .Functor (forall a b. (a -> b) -> f a -> f b)
 data List a =
        | Nil
        | Cons a (List a)
 data Monad m =
-       | .Monad (∀a. a -> m a) (∀a b. m a -> (a -> m b) -> m b)
+       | .Monad (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
 data RmqTree a =
        | RmqEmpty
        | RmqNode Int Int a (RmqTree a) (RmqTree a)
-external abort : ∀a. a = "abort"
+external abort : forall a. a = "abort"
 external lt_int : Int -> Int -> Bool = "lt"
 external le_int : Int -> Int -> Bool = "le"
 external gt_int : Int -> Int -> Bool = "gt"
 external add_int : Int -> Int -> Int = "add"
 external sub_int : Int -> Int -> Int = "sub"
-external seq : ∀a b. a -> b -> b = "seq"
+external seq : forall a b. a -> b -> b = "seq"
 external puti : Int -> Unit = "puti"
 external geti : Unit -> Int = "geti"
 monadIO : Monad IO = .Monad @IO monadIO.pure.L2 monadIO.bind.L2
@@ -52,12 +52,12 @@ nats : List Int =
 infinity : Int = 1000000000
 main : IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L6)
-replicate.L1 : ∀a. Int -> a -> List a =
+replicate.L1 : forall a. Int -> a -> List a =
   fun @a (n : Int) (x : a) ->
     match le_int n 0 with
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 : forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
     match xs with
     | Nil -> Nil @c
@@ -65,16 +65,16 @@ zip_with.L1 : ∀a b c. (a -> b -> c) -> List a -> List b -> List c =
       match ys with
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
-sequence.L1 : ∀a m. Monad m -> a -> List a -> m (List a) =
+sequence.L1 : forall a m. Monad m -> a -> List a -> m (List a) =
   fun @a @m (monad.m : Monad m) (x : a) (xs : List a) ->
     (match monad.m with
      | .Monad pure _ -> pure) @(List a) (Cons @a x xs)
-sequence.L2 : ∀a m. Monad m -> List (m a) -> a -> m (List a) =
+sequence.L2 : forall a m. Monad m -> List (m a) -> a -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) (x : a) ->
     (match monad.m with
      | .Monad _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
-sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
+sequence.L3 : forall a m. Monad m -> List (m a) -> m (List a) =
   fun @a @m (monad.m : Monad m) (ms : List (m a)) ->
     match ms with
     | Nil ->
@@ -84,26 +84,26 @@ sequence.L3 : ∀a m. Monad m -> List (m a) -> m (List a) =
       (match monad.m with
        | .Monad _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
-monadIO.pure.L2 : ∀a. a -> IO a =
+monadIO.pure.L2 : forall a. a -> IO a =
   fun @a (x : a) -> coerce @(_ -> IO) (Pair @a @World x)
-monadIO.bind.L1 : ∀a b. IO a -> (a -> IO b) -> World -> Pair b World =
+monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-monadIO.bind.L2 : ∀a b. IO a -> (a -> IO b) -> IO b =
+monadIO.bind.L2 : forall a b. IO a -> (a -> IO b) -> IO b =
   fun @a @b (mx : IO a) (f : a -> IO b) ->
     coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
-io.L1 : ∀a b. (a -> b) -> a -> World -> Pair b World =
+io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
   fun @a @b (f : a -> b) (x : a) (world : World) ->
     let y : b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : ∀a b. (a -> b) -> a -> IO b =
+io.L2 : forall a b. (a -> b) -> a -> IO b =
   fun @a @b (f : a -> b) (x : a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 nats.L1 : (Int -> List Int) -> Int -> List Int =
   fun (nats_from : Int -> List Int) (n : Int) ->
     Cons @Int n (nats_from (add_int n 1))
-pair.L1 : ∀a. (a -> a -> a) -> List a -> List a =
+pair.L1 : forall a. (a -> a -> a) -> List a -> List a =
   fun @a (op : a -> a -> a) (xs1 : List a) ->
     match xs1 with
     | Nil -> Nil @a
@@ -111,10 +111,10 @@ pair.L1 : ∀a. (a -> a -> a) -> List a -> List a =
       match pm$2 with
       | Nil -> xs1
       | Cons x2 xs3 -> Cons @a (op pm$1 x2) (pair.L1 @a op xs3)
-single.L1 : ∀a. Int -> a -> RmqTree a =
+single.L1 : forall a. Int -> a -> RmqTree a =
   fun @a (i : Int) (x : a) ->
     RmqNode @a i i x (RmqEmpty @a) (RmqEmpty @a)
-combine.L1 : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
+combine.L1 : forall a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
   fun @a (op : a -> a -> a) (t1 : RmqTree a) (t2 : RmqTree a) ->
     match t1 with
     | RmqEmpty -> abort @(RmqTree a)
@@ -122,7 +122,7 @@ combine.L1 : ∀a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
       match t2 with
       | RmqEmpty -> abort @(RmqTree a)
       | RmqNode _ e2 v2 _ _ -> RmqNode @a s1 e2 (op v1 v2) t1 t2
-build.L1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
+build.L1 : forall a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
   fun @a (op : a -> a -> a) (run : List (RmqTree a) -> RmqTree a) (ts : List (RmqTree a)) ->
     match ts with
     | Nil -> abort @(RmqTree a)
@@ -130,7 +130,7 @@ build.L1 : ∀a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTr
       match pm$2 with
       | Nil -> pm$1
       | Cons _ _ -> run (pair.L1 @(RmqTree a) (combine.L1 @a op) ts)
-query.L1 : ∀a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
+query.L1 : forall a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
   fun @a (one : a) (op : a -> a -> a) (q_lo : Int) (q_hi : Int) (aux : RmqTree a -> a) (t : RmqTree a) ->
     match t with
     | RmqEmpty -> one
