@@ -1,0 +1,4 @@
+f : a -> a
+f x =
+  match x with
+  | y -> y

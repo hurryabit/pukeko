@@ -1,0 +1,2 @@
+data Typ f =
+  | Con (f f)

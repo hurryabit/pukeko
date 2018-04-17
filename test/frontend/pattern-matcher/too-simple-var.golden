@@ -1,0 +1,1 @@
+test/frontend/pattern-matcher/too-simple-var.pu:3:3: pattern match too simple, use a let binding instead

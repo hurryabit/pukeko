@@ -1,0 +1,3 @@
+data Typ =
+  | Con
+  | Con

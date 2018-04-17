@@ -201,7 +201,7 @@ prettyContext cstrs
 
 prettyTUni :: Foldable t => Int -> t TyVar -> Doc -> Doc
 prettyTUni prec vs tq =
-  maybeParens (prec > 0) ("∀" <> hsepMap pretty vs <> "." <+> tq)
+  maybeParens (prec > 0) ("forall" <+> hsepMap pretty vs <> "." <+> tq)
 
 instance (Pretty a, Pretty t) => Pretty (a ::: t) where
 instance (Pretty a, Pretty t) => PrettyPrec (a ::: t) where

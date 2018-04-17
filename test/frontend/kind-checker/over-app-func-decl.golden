@@ -1,0 +1,1 @@
+test/frontend/kind-checker/over-app-func-decl.pu:1:1: cannot unify kinds * and * -> *

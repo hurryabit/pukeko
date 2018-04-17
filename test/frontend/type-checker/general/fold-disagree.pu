@@ -1,0 +1,9 @@
+-- NOTE: There used to be a bug that caused this to _not_ type check.
+data List a =
+  | Nil
+  | Cons a (List a)
+fold : (a -> b -> a) -> a -> List b -> a
+fold f y0 xs =
+  match xs with
+  | Nil -> y0
+  | Cons x xs -> fold f (f y0 x) xs

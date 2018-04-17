@@ -1,0 +1,10 @@
+data Bool =
+  | False
+  | True
+f : Int
+f =
+  let g x =
+    let h y = x in
+    if h True then 0 else h False
+  in
+  0

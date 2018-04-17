@@ -5,6 +5,7 @@
 doc/
 test/*
 !test/
+!test/frontend/
 !test/std/
 !test/std2/
 !test/Makefile
