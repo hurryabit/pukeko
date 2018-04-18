@@ -74,7 +74,7 @@ preSolveConstraint cstr@(clss, t0) = do
           tell (MkSplitCstrs (Seq.singleton ((clss, tvar), dref)) mempty)
           pure (MMeta dref)
         Just dvar -> pure (MDVar dvar)
-    UTAtm atom -> do
+    UTAtm atom ->
       lookupInfo info2insts (clss, atom) >>= \case
         Nothing -> do
           p0 <- sendM (prettyUType 1 t0)

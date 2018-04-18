@@ -17,7 +17,7 @@ diffCmd ref new = ["diff", "--rcs", ref, new]
 
 fileTest :: FilePath -> TestTree
 fileTest file = goldenVsStringDiff file diffCmd (file -<.> "golden") $ do
-  module0 <- runM . runNameSource . runError $ do
+  module0 <- runM . runNameSource . runError $
     Parser.parsePackage file >>= FrontEnd.run False
   let text = case module0 of
         Left err -> renderFailure err

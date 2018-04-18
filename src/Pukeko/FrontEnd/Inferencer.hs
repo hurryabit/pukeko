@@ -114,7 +114,7 @@ addTyCxAbs tyVars dxBinders expr typ
   | null tyVars && null dxBinders = (expr, typ)
   | otherwise =
       ( rewindr ETyAbs tyVars $ rewindr ECxAbs         dxBinders  $ ETyAnn typ expr
-      , rewindr UTUni  tyVars $ rewindr UTCtx (map snd dxBinders) $        typ
+      , rewindr UTUni  tyVars $ rewindr UTCtx (map snd dxBinders)          typ
       )
 
 inferLet :: forall s effs.
@@ -308,7 +308,7 @@ freezeDecl = \case
   DExtn (MkExtnDecl func typ sym) ->
     DExtn <$> (MkExtnDecl func <$> freezeType typ <*> pure sym)
   DClss clss -> pure (DClss clss)
-  DInst (MkInstDecl inst clss head prms ctxt mthds) -> do
+  DInst (MkInstDecl inst clss head prms ctxt mthds) ->
     DInst . MkInstDecl inst clss head prms ctxt <$> traverse freezeFuncDecl mthds
 
 freezeModule :: Module (Aux s) -> ST s (Module Out)

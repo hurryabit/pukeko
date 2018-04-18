@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Pukeko.FrontEnd.Inferencer.Unify
   ( CanUnify
   , MemberST
