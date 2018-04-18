@@ -1,0 +1,9 @@
+data T a = | C a
+class C a where
+  c : a -> Int
+instance cT : (C a) => C (T a) where
+  c t =
+    match t with
+    | C x -> c x
+f : T a -> Int
+f = c
