@@ -1,0 +1,1 @@
+test/frontend/type-checker/classes/ambiguous-simple.pu:4:1: ambiguous type variable in constraint C _1

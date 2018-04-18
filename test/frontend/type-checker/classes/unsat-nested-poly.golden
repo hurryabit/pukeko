@@ -1,0 +1,1 @@
+test/frontend/type-checker/classes/unsat-nested-poly.pu:4:1: cannot deduce C a from context
