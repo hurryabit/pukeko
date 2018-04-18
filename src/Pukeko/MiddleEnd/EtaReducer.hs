@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Pukeko.MiddleEnd.EtaReducer
   ( reduceModule
   ) where

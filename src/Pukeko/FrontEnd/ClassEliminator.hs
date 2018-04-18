@@ -22,7 +22,7 @@ type CanCE effs = Members [Reader ModuleInfo, NameSource] effs
 type CE a = forall effs. CanCE effs => Eff effs a
 
 elimModule :: Member NameSource effs => Module In -> Eff effs (Module Out)
-elimModule m0@(MkModule decls0) = runInfo m0 $ do
+elimModule m0@(MkModule decls0) = runInfo m0 $
   MkModule . map unclssDecl . concat <$> traverse elimDecl decls0
 
 -- | Apply the dictionary type constructor of a type class to a type. For the

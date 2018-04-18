@@ -8,13 +8,11 @@ import System.Exit
 import qualified Data.Aeson               as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.ByteString.Lazy     as BS
--- import qualified Data.Text.Lazy.IO        as T
 
 import           Pukeko.AST.Name
 import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd        as FrontEnd
 import qualified Pukeko.MiddleEnd       as MiddleEnd
--- import qualified Pukeko.MiddleEnd.CallGraph as G
 import qualified Pukeko.BackEnd         as BackEnd
 import           Pukeko.Pretty
 
@@ -24,7 +22,7 @@ compile write_pl stop_tc unsafe json _graph detailed opts file = do
     package <- Parser.parsePackage file
     module_sf <- FrontEnd.run unsafe package
     if stop_tc
-      then do
+      then
         sendM $ writeFile (file -<.> "ti")
           (render detailed (pretty module_sf) ++ "\n")
       else do
@@ -32,21 +30,18 @@ compile write_pl stop_tc unsafe json _graph detailed opts file = do
         (module_pl, module_lm) <- MiddleEnd.run cfg module_sf
         nasm <- BackEnd.run module_lm
         sendM $ do
-          when write_pl $ do
+          when write_pl $
             writeFile (file -<.> "pl") $ render detailed (pretty module_pl) ++ "\n"
           when json $ do
             let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
             BS.writeFile (file -<.> "pl" <.> "json")
               (Aeson.encodePretty' config (Aeson.toJSON module_pl))
-          -- when graph $ do
-          --   T.writeFile (file -<.> "dot") $
-          --     G.renderCallGraph (G.makeCallGraph module_pl)
           writeFile (file -<.> "asm") nasm
   case ok_or_error of
     Left err -> do
       putStrLn $ "Error: " ++ renderFailure err
       exitWith (ExitFailure 1)
-    Right () -> exitWith ExitSuccess
+    Right () -> exitSuccess
 
 optimizations :: Parser [MiddleEnd.Optimization]
 optimizations =

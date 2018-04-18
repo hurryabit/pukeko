@@ -52,7 +52,7 @@ typeOf = \case
         checkDict dx cx
         pure t1
       (CxArg{}, _) -> throwHere "unexpected dict argument"
-  EAbs par e0 -> do
+  EAbs par e0 ->
     case par of
       TmPar binder -> TFun (snd binder) <$> introTmVar binder (typeOf e0)
       TyPar v      -> TUni' v           <$> introTyVar v      (typeOf e0)
@@ -98,7 +98,7 @@ checkDict dict cstr =
                    <+> "but found evidence for" <+> prettyCstr cstr1)
 
 typeOfAltn :: IsTyped lg => Altn lg -> TC Type
-typeOfAltn (MkAltn p e) = do
+typeOfAltn (MkAltn p e) =
   introTmVars (toListOf patn2binder p) (typeOf e)
 
 match :: Type -> Type -> TC ()
