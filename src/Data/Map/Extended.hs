@@ -8,14 +8,14 @@ where
 
 import Prelude  hiding (lookup)
 import Data.Map.Lazy hiding (foldr, (!))
+import Data.Maybe (fromMaybe)
 import Data.CallStack
 
 infixl 9 !
 
 (!) :: (HasCallStack, Ord k) => Map k v -> k -> v
-m ! k = case k `lookup` m of
-  Nothing -> error "Map.!: given key is not an element in the map"
-  Just v  -> v
+m ! k =
+  fromMaybe (error "Map.!: given key is not an element in the map") (k `lookup` m)
 
 fromMultiList :: Ord k => [(k, v)] -> Map k [v]
 fromMultiList = foldr f empty

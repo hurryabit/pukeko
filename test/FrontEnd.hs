@@ -17,7 +17,7 @@ diffCmd ref new = ["diff", "--rcs", ref, new]
 
 fileTest :: FilePath -> TestTree
 fileTest file = goldenVsStringDiff file diffCmd (file -<.> "golden") $ do
-  module0 <- runM . runNameSource . runError $ do
+  module0 <- runM . runNameSource . runError $
     Parser.parsePackage file >>= FrontEnd.run False
   let text = case module0 of
         Left err -> renderFailure err
@@ -25,9 +25,9 @@ fileTest file = goldenVsStringDiff file diffCmd (file -<.> "golden") $ do
   pure (BSL.pack text <> "\n")
 
 allTests :: IO TestTree
-allTests = do
-  files <- findByExtension [".pu"] ("test" </> "frontend")
-  pure $ testGroup "frontend" (map fileTest files)
+allTests =
+  testGroup "frontend" . map fileTest
+  <$> findByExtension [".pu"] ("test" </> "frontend")
 
 main :: IO ()
 main = allTests >>= defaultMain

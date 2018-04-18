@@ -93,7 +93,7 @@ inline mode ce0@(gs0, e0, as0) =
       a1 <- arg2expr inlineExpr a0
       inline mode (gs0, e1, a1:as0)
 
-    EVal z0 -> do
+    EVal z0 ->
       uses inlinables (Map.lookup z0) >>= \case
         Nothing -> pure ce0
 
@@ -127,8 +127,7 @@ inline mode ce0@(gs0, e0, as0) =
         ECon tmCon -> do
           let MkAltn (PSimple _ binders) rhs = findAltn tmCon (toList altns)
           let args =
-                fromRight' . sequence
-                . map (matching _TmArg) . dropWhile (is _TyArg) $ as1
+                fromRight' . traverse (matching _TmArg) . dropWhile (is _TyArg) $ as1
           let bs =
                 catMaybes (zipWithExact (\b a -> MkBind <$> b <*> pure a) binders args)
           inline mode ((BindPar, bs):gs1 ++ gs0, rhs, as0)

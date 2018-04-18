@@ -106,12 +106,8 @@ prop_rmq_correct prog = monadicIO $ do
   let output = map (\(lo, hi) -> minimum $ take (hi-lo+1) $ drop lo xs) qs
   assert (stdout == format output)
 
-compile :: IO ()
-compile = do
-  setCurrentDirectory "test"
-
 main :: IO ()
-main = hspec $ beforeAll_ compile $ do
+main = hspec $ beforeAll_ (setCurrentDirectory "test") $ do
   describe "test basics" $ do
     testBasic "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
     testBasic "wildcard" [7, 13] [7, 13]
