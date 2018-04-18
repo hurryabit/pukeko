@@ -30,11 +30,15 @@ before_install:
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
 - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+# Install hlint
+- stack -j1 --no-terminal --install-ghc build hlint
 
 install:
 # Build dependencies
-- stack -j1 --no-terminal --install-ghc test --only-dependencies
+- stack -j1 --no-terminal test --only-dependencies
 
 script:
+# Run hlint
+- hlint --git
 # Build the package, its tests, and its docs and run the tests
 - stack -j1 --no-terminal test --ghc-options=-Werror :frontend

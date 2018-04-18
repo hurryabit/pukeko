@@ -50,7 +50,7 @@ x <:~> y = x <> ":" <+> y
 {-# INLINE (<+>) #-}
 {-# INLINE (<:~>) #-}
 
-data SrcAnn = NameId Int
+newtype SrcAnn = NameId Int
 
 type Doc = PP.Doc SrcAnn
 
