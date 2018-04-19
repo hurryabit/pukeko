@@ -1,0 +1,1 @@
+test/frontend/type-checker/classes/unsat-super-mono.pu:5:10: cannot solve constraint C Int

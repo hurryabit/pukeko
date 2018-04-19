@@ -21,6 +21,7 @@ module Pukeko.AST.Name
   , mkName
   , copyName
   , copyName'
+  , synthName
   , mkDxVar
   , type NameSpaceOf
   , HasName (..)
@@ -109,6 +110,14 @@ copyName'
   => (String -> String) -> Name nsp1 -> Eff effs (Name nsp2)
 copyName' f (Name _ text _) = mkName (Lctd noPos (Tagged (f text)))
 
+synthName
+  :: Member NameSource effs
+  => SourcePos -> Name nsp1 -> Name nsp2 -> Eff effs (Name nsp3)
+synthName pos name1 name2 = do
+  let name3 = _text name1 ++ "." ++ _text name2
+  mkName (Lctd pos (Tagged name3))
+
+-- TODO: Make it "a.C" rather than "C.a".
 mkDxVar :: Member NameSource effs => Class -> TyVar -> Eff effs DxVar
 mkDxVar clss tvar = do
   let name0 = uncap (untag (nameText clss)) ++ "." ++ untag (nameText tvar)

@@ -63,7 +63,8 @@ pmDecl = \case
   DFunc func -> DFunc <$> pmFuncDecl func
   DExtn (MkExtnDecl name typ_ extn) -> pure (DExtn (MkExtnDecl name typ_ extn))
   DClss c -> pure (DClss c)
-  DInst i -> DInst <$> (inst2methods . traverse) pmFuncDecl i
+  DInst (MkInstDecl name clss typ prms ctxt super mthds) ->
+    DInst . MkInstDecl name clss typ prms ctxt super <$> traverse pmFuncDecl mthds
 
 compileModule :: Members [NameSource, Error Failure] effs =>
   Module In -> Eff effs (Module Out)

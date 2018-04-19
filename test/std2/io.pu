@@ -24,6 +24,11 @@ type World = external
 
 type IO a = World -> Pair a World
 
+instance functorIO : Functor IO where
+  map f mx = coerce@(_ -> IO) (fun world0 ->
+    match (coerce @(IO -> _) mx) world0 with
+    | Pair x world1 -> Pair (f x) world1)
+
 instance monadIO : Monad IO where
   pure x = coerce @(_ -> IO) (fun world -> Pair x world)
   bind mx f = coerce @(_ -> IO) (fun world0 ->

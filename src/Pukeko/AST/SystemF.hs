@@ -52,6 +52,7 @@ data ExtnDecl lg = MkExtnDecl
 data ClassDecl = MkClassDecl
   { _class2name    :: Class
   , _class2param   :: TyVar
+  , _class2super   :: Maybe (DxVar, Class)
   , _class2tmcon   :: TmCon
     -- ^ During type class elimination, we introduce a data constructor for the
     -- dictionary type. The easiest way to get and distribute a 'Name' for this
@@ -71,6 +72,7 @@ data InstDecl lg = MkInstDecl
   , _inst2type    :: TypeAtom
   , _inst2params  :: [TyVar]
   , _inst2context :: [DxBinder Type]
+  , _inst2super   :: Maybe (DictOf lg)
   , _inst2methods :: [FuncDecl lg TyVar]
   }
 
@@ -145,10 +147,14 @@ instance IsTyped lg => Pretty (GenDecl nsp lg) where
     DFunc func -> pretty func
     DExtn (MkExtnDecl name typ_ extn) ->
       hsep ["external", pretty (name ::: typ_), "=", doubleQuotes (pretty extn)]
-    DClss (MkClassDecl c v _ ms) ->
-      "class" <+> pretty c <+> pretty v <+> "where"
+    DClss (MkClassDecl c v s _ ms) ->
+      "class" <+> sdoc <+> pretty c <+> pretty v <+> "where"
       $$ nest 2 (vcatMap pretty ms)
-    DInst (MkInstDecl _ c t0 vs ctxt ds) ->
+      where
+        sdoc = case s of
+          Nothing -> mempty
+          Just (_, c') -> parens (pretty c' <+> pretty v) <+> "<="
+    DInst (MkInstDecl _ c t0 vs ctxt _super ds) ->
       "instance" <+> prettyContext (map snd ctxt) <+> pretty c <+> prettyPrec 3 t1
       $$ nest 2 (vcatMap pretty ds)
       where

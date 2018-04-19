@@ -232,6 +232,31 @@ inferFuncDecl (MkFuncDecl name NoType body0) t_decl = do
     let (body2, _) = addTyCxAbs vs0 ctxt1 body1 t_body1
     pure (MkFuncDecl name t_decl body2)
 
+inferInstDecl
+  :: forall s effs. CanInfer s effs
+  => InstDecl In -> Eff effs (InstDecl (Aux s))
+inferInstDecl (MkInstDecl instName clss atom prms ctxt0 super0 ds0) = do
+    clssDecl <- findInfo info2classes clss
+    let ctxt1 = map (second (second open)) ctxt0
+    introTyVars @s prms $ enterContext @s ctxt1 $ do
+      let t_inst = foldl TApp (TAtm atom) (map TVar prms)
+      super1 <- case (super0, clssDecl ^. class2super) of
+        (Nothing, Nothing) -> pure Nothing
+        (Nothing, Just{}) -> impossible
+        (Just{}, Nothing) -> impossible
+        (Just NoDict, Just (_, sclss)) -> do
+          let cstr = (sclss, open t_inst)
+          (dict, cstrs) <- runWriter (preSolveConstraint cstr)
+          -- TODO: This is reaching too far into the internals of constraint solving.
+          unless (nullSplitCstrs cstrs) $ throwUnsolvable (Just (map snd ctxt1)) cstr
+          pure (Just dict)
+      ds1 <- for ds0 $ \mthd -> do
+        (_, MkSignDecl _ t_decl0) <- findInfo info2methods (nameOf mthd)
+        -- FIXME: renameType
+        let t_decl1 = t_decl0 >>= const t_inst
+        inferFuncDecl mthd (open t_decl1)
+      pure (MkInstDecl instName clss atom prms ctxt0 super1 ds1)
+
 inferDecl :: forall s effs. CanInfer s effs => Decl In -> Eff effs (Maybe (Decl (Aux s)))
 inferDecl = \case
   DType ds -> yield (DType ds)
@@ -244,16 +269,9 @@ inferDecl = \case
     t <- open <$> typeOfFunc name
     yield (DExtn (MkExtnDecl name t s))
   DClss c -> yield (DClss c)
-  DInst (MkInstDecl instName clss atom prms ctxt0 ds0) -> do
-    let ctxt1 = map (second (second open)) ctxt0
-    introTyVars @s prms $ enterContext @s ctxt1 $ do
-      ds1 <- for ds0 $ \mthd -> do
-        (_, MkSignDecl _ t_decl0) <- findInfo info2methods (nameOf mthd)
-        let t_inst = foldl TApp (TAtm atom) (map TVar prms)
-        -- FIXME: renameType
-        let t_decl1 = t_decl0 >>= const t_inst
-        inferFuncDecl mthd (open t_decl1)
-      yield (DInst (MkInstDecl instName clss atom prms ctxt0 ds1))
+  DInst inst0 -> do
+    inst1 <- inferInstDecl inst0
+    yield (DInst inst1)
   where
     yield = pure . Just
 
@@ -303,8 +321,11 @@ freezeDecl = \case
   DExtn (MkExtnDecl func typ sym) ->
     DExtn <$> (MkExtnDecl func <$> freezeType typ <*> pure sym)
   DClss clss -> pure (DClss clss)
-  DInst (MkInstDecl inst clss head prms ctxt mthds) ->
-    DInst . MkInstDecl inst clss head prms ctxt <$> traverse freezeFuncDecl mthds
+  DInst (MkInstDecl inst clss head prms ctxt super mthds) ->
+    DInst
+    <$> (MkInstDecl inst clss head prms ctxt
+         <$> traverse freezeDict super
+         <*> traverse freezeFuncDecl mthds)
 
 freezeModule :: Module (Aux s) -> ST s (Module Out)
 freezeModule = module2decls . traverse $ freezeDecl

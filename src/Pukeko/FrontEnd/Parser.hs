@@ -310,8 +310,13 @@ signDecl = indented
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
-clssDecl =
-  MkClssDecl <$> clasz <*> tyvar <*> (reserved "where" *> aligned (many signDecl))
+clssDecl = do
+  super <- optional (parens ((,) <$> clasz <*> tyvar) <* reservedOp "<=")
+  clss <- clasz
+  tvar <- tyvar
+  reserved "where"
+  mthds <- aligned (many signDecl)
+  pure (MkClssDecl clss tvar super mthds)
 
 instDecl :: Parser InstDecl
 instDecl = do

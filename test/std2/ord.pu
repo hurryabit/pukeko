@@ -1,7 +1,7 @@
 -- Orderings
 import std2/basic
 
-class Ord a where
+class (Eq a) <= Ord a where
   ge : a -> a -> Bool
   gt : a -> a -> Bool
   le : a -> a -> Bool

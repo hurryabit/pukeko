@@ -1,0 +1,6 @@
+class C a where
+  c : a -> a
+class (C a) <= D a where
+  d : a -> a
+instance dInt : D Int where
+  d x = x
