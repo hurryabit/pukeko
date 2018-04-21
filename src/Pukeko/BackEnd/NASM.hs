@@ -5,7 +5,7 @@ where
 
 import Pukeko.Prelude
 
-import Data.List (isPrefixOf, intercalate)
+import Data.List (intercalate, isPrefixOf)
 
 import Pukeko.BackEnd.GCode
 

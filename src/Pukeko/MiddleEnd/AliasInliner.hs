@@ -18,13 +18,13 @@ module Pukeko.MiddleEnd.AliasInliner where
 import Pukeko.Prelude
 
 import           Control.Monad.ST
-import qualified Data.Map          as Map
-import qualified Data.Set          as Set
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Data.UnionFind.ST as UF
 
-import           Pukeko.AST.Name
-import           Pukeko.AST.SuperCore
-import           Pukeko.AST.Expr.Optics
+import Pukeko.AST.Expr.Optics
+import Pukeko.AST.Name
+import Pukeko.AST.SuperCore
 
 -- | Follow all chains of links in a module and adjust all call sites accordingly.
 inlineModule :: Module -> Module

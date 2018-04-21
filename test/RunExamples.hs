@@ -87,7 +87,7 @@ spec_fibs n =
 
 spec_primes :: Int -> Int
 spec_primes n =
-  let sieve [] = undefined
+  let sieve []     = undefined
       sieve (p:ks) = p : sieve (filter ((0 /=) . (`mod` p)) ks)
       primes = 2 : 3 : sieve (scanl1 (+) (5 : cycle [2, 4]))
   in  primes !! n

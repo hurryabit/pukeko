@@ -10,14 +10,14 @@ module Pukeko.AST.Expr.Optics
 
 import Pukeko.Prelude
 
-import           Control.Lens (_Just, prism')
+import           Control.Lens (prism', _Just)
 import qualified Data.Set as Set
 
-import           Pukeko.AST.Dict
-import           Pukeko.AST.Expr
-import           Pukeko.AST.Language
-import           Pukeko.AST.Name
-import           Pukeko.AST.Type
+import Pukeko.AST.Dict
+import Pukeko.AST.Expr
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.Type
 
 substitute' :: Applicative f => (TmVar -> f (Expr lg)) -> Expr lg -> f (Expr lg)
 substitute' f = go Set.empty

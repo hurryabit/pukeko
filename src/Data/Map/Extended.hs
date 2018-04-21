@@ -6,10 +6,11 @@ module Data.Map.Extended
   )
 where
 
-import Prelude  hiding (lookup)
+import Prelude hiding (lookup)
+
+import Data.CallStack
 import Data.Map.Lazy hiding (foldr, (!))
 import Data.Maybe (fromMaybe)
-import Data.CallStack
 
 infixl 9 !
 

@@ -8,11 +8,11 @@ import Pukeko.Prelude
 
 import qualified Data.Map as Map
 
-import           Pukeko.AST.NoLambda
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Name       as In
-import qualified Pukeko.AST.SuperCore  as In
-import qualified Pukeko.AST.Unwind     as In
+import qualified Pukeko.AST.Name as In
+import           Pukeko.AST.NoLambda
+import qualified Pukeko.AST.SuperCore as In
+import qualified Pukeko.AST.Unwind as In
 import           Pukeko.FrontEnd.Info
 
 eraseModule :: In.Module -> Module

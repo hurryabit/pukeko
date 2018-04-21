@@ -3,18 +3,18 @@ module Pukeko.MiddleEnd.Inliner where
 
 import Pukeko.Prelude
 
-import           Control.Lens        (_1, matching)
+import           Control.Lens (matching, _1)
 import           Control.Lens.Extras (is)
-import           Data.Either.Extra   (fromRight')
-import qualified Data.Map.Extended   as Map
+import           Data.Either.Extra (fromRight')
+import qualified Data.Map.Extended as Map
 -- import           Debug.Trace
 
-import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Expr.Optics
 import           Pukeko.AST.Name
+import           Pukeko.AST.SuperCore
 import           Pukeko.AST.Type
-import           Pukeko.MiddleEnd.CallGraph
 import           Pukeko.MiddleEnd.AliasInliner (inlineSupCDecls)
+import           Pukeko.MiddleEnd.CallGraph
 import qualified Safe
 
 newtype InState = InState

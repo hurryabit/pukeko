@@ -13,9 +13,9 @@ import           Data.Aeson.TH
 import qualified Data.Map as Map
 
 import           Pukeko.AST.ConDecl
-import           Pukeko.AST.Language
-import           Pukeko.AST.Expr hiding (Bind, Expr, Altn, Arg, Par)
+import           Pukeko.AST.Expr hiding (Altn, Arg, Bind, Expr, Par)
 import qualified Pukeko.AST.Expr as Expr
+import           Pukeko.AST.Language
 import           Pukeko.AST.Name
 import           Pukeko.AST.Type
 

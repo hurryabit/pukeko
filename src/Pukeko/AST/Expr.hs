@@ -53,17 +53,17 @@ module Pukeko.AST.Expr
 
 import Pukeko.Prelude
 
-import           Control.Lens (makeLensesFor, prism')
-import           Data.Aeson
-import           Data.Aeson.TH
-import           Unsafe.Coerce
+import Control.Lens (makeLensesFor, prism')
+import Data.Aeson
+import Data.Aeson.TH
+import Unsafe.Coerce
 
-import           Pukeko.Pretty
-import qualified Pukeko.AST.Operator   as Op
-import           Pukeko.AST.Name
 import           Pukeko.AST.Dict
-import           Pukeko.AST.Type
 import           Pukeko.AST.Language
+import           Pukeko.AST.Name
+import qualified Pukeko.AST.Operator as Op
+import           Pukeko.AST.Type
+import           Pukeko.Pretty
 
 data Atom
   = AVal TmVar

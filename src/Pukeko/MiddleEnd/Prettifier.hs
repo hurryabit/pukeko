@@ -4,12 +4,12 @@ module Pukeko.MiddleEnd.Prettifier
 
 import Pukeko.Prelude
 
-import qualified Data.Map      as Map
-import qualified Data.Set      as Set
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import           Pukeko.AST.SuperCore
-import           Pukeko.AST.Expr.Optics
-import           Pukeko.AST.Name
+import Pukeko.AST.Expr.Optics
+import Pukeko.AST.Name
+import Pukeko.AST.SuperCore
 
 prettifyModule :: Module -> Module
 prettifyModule = over mod2supcs $ \supcs0 ->

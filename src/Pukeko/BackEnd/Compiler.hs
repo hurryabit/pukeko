@@ -12,10 +12,10 @@ import           Control.Monad.Freer.Fresh
 import qualified Data.Map.Extended as Map
 import qualified Data.Set as Set
 
-import Pukeko.BackEnd.Info
 import Pukeko.AST.NoLambda
-import Pukeko.BackEnd.GCode
 import Pukeko.BackEnd.Builtins as Builtins
+import Pukeko.BackEnd.GCode
+import Pukeko.BackEnd.Info
 
 data Context = MkContext
   { _offsets :: Map Name Int

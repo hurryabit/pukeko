@@ -8,13 +8,13 @@ import qualified Bound.Scope as B
 import           Data.Maybe (maybeToList)
 import qualified Safe
 
-import           Pukeko.AST.ConDecl
-import           Pukeko.AST.Dict
-import           Pukeko.AST.Name
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Language
-import           Pukeko.AST.Type
-import           Pukeko.FrontEnd.Info
+import Pukeko.AST.ConDecl
+import Pukeko.AST.Dict
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.SystemF
+import Pukeko.AST.Type
+import Pukeko.FrontEnd.Info
 
 type In  = Unnested
 type Out = Unclassy

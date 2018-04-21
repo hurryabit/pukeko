@@ -7,6 +7,7 @@ module Data.Forget
 where
 
 import Prelude
+
 import Control.Lens (Iso, iso)
 import Data.Aeson.TH
 

@@ -12,17 +12,17 @@ import Pukeko.Prelude hiding (run)
 
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
-import qualified Pukeko.AST.NoLambda           as NoLambda
-import qualified Pukeko.AST.SuperCore          as Core
-import qualified Pukeko.AST.SystemF            as SysF
-import qualified Pukeko.FrontEnd.TypeChecker   as TypeChecker
+import qualified Pukeko.AST.NoLambda as NoLambda
+import qualified Pukeko.AST.SuperCore as Core
+import qualified Pukeko.AST.SystemF as SysF
+import qualified Pukeko.FrontEnd.TypeChecker as TypeChecker
 import qualified Pukeko.MiddleEnd.AliasInliner as AliasInliner
-import qualified Pukeko.MiddleEnd.Inliner      as Inliner
-import qualified Pukeko.MiddleEnd.TypeEraser   as TypeEraser
-import qualified Pukeko.MiddleEnd.DeadCode     as DeadCode
-import qualified Pukeko.MiddleEnd.EtaReducer   as EtaReducer
+import qualified Pukeko.MiddleEnd.DeadCode as DeadCode
+import qualified Pukeko.MiddleEnd.EtaReducer as EtaReducer
+import qualified Pukeko.MiddleEnd.Inliner as Inliner
 import qualified Pukeko.MiddleEnd.LambdaLifter as LambdaLifter
-import qualified Pukeko.MiddleEnd.Prettifier   as Prettifier
+import qualified Pukeko.MiddleEnd.Prettifier as Prettifier
+import qualified Pukeko.MiddleEnd.TypeEraser as TypeEraser
 
 type Module = NoLambda.Module
 

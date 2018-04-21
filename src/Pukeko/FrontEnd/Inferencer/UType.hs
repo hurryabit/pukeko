@@ -31,11 +31,11 @@ import Pukeko.Pretty
 
 import qualified Bound as B
 import qualified Bound.Name as B
-import           Data.STRef
 import qualified Data.Map.Extended as Map
+import           Data.STRef
 
-import           Pukeko.AST.Name
-import           Pukeko.AST.Type       hiding ((~>))
+import Pukeko.AST.Name
+import Pukeko.AST.Type hiding ((~>))
 
 newtype Level = Level Int
   deriving (Eq, Ord, Enum)

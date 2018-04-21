@@ -20,11 +20,11 @@ import Pukeko.Prelude
 
 import qualified Data.Map.Extended as Map
 
-import           Pukeko.AST.Expr (Par (..), TmBinder)
-import           Pukeko.AST.Language
-import           Pukeko.AST.Name
-import           Pukeko.AST.Dict
-import           Pukeko.AST.Type
+import Pukeko.AST.Dict
+import Pukeko.AST.Expr (Par (..), TmBinder)
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.Type
 
 data Gamma = Gamma
   { _tmVars :: Map TmVar (Type, Int)

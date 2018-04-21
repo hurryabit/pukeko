@@ -10,10 +10,10 @@ import           Test.Tasty
 import           Test.Tasty.Golden
 
 import           Pukeko.AST.Name
+import qualified Pukeko.BackEnd as BackEnd
+import qualified Pukeko.FrontEnd as FrontEnd
 import qualified Pukeko.FrontEnd.Parser as Parser
-import qualified Pukeko.FrontEnd        as FrontEnd
-import qualified Pukeko.MiddleEnd       as MiddleEnd
-import qualified Pukeko.BackEnd         as BackEnd
+import qualified Pukeko.MiddleEnd as MiddleEnd
 import           Pukeko.Pretty
 
 pu :: String
@@ -27,7 +27,7 @@ frontEndTest golden file = goldenVsStringDiff file diffCmd (golden file) $ do
   module0 <- runM . runNameSource . runError $
     Parser.parsePackage file >>= FrontEnd.run False
   let text = case module0 of
-        Left err -> renderFailure err
+        Left err      -> renderFailure err
         Right module1 -> render False (pretty module1)
   pure (BSL.pack text <> "\n")
 
@@ -38,7 +38,7 @@ middleEndTest golden file = goldenVsStringDiff file diffCmd (golden file) $ do
     >>= FrontEnd.run False
     >>= MiddleEnd.run MiddleEnd.defaultConfig
   let text = case module0 of
-        Left err -> renderFailure err
+        Left err           -> renderFailure err
         Right (module1, _) -> render False (pretty module1)
   pure (BSL.pack text <> "\n")
 
@@ -50,7 +50,7 @@ backEndTest golden file = goldenVsStringDiff file diffCmd (golden file) $ do
     >>= MiddleEnd.run MiddleEnd.defaultConfig
     >>= BackEnd.run . snd
   let text = case module0 of
-        Left err -> renderFailure err
+        Left err      -> renderFailure err
         Right module1 -> render False (pretty module1)
   pure (BSL.pack text)
 

@@ -9,8 +9,8 @@ import           Data.STRef
 import Pukeko.AST.Dict
 import Pukeko.AST.Name
 import Pukeko.AST.SystemF
-import Pukeko.FrontEnd.Inferencer.UType
 import Pukeko.FrontEnd.Inferencer.Gamma
+import Pukeko.FrontEnd.Inferencer.UType
 import Pukeko.FrontEnd.Info
 import Pukeko.Pretty
 
@@ -82,7 +82,7 @@ solveRigid cstr0@(clss0, type0) ctxt0 = go (fmap MDVar ctxt0)
             clssDecl <- findInfo info2classes clss
             pure $ case clssDecl ^. class2super of
               Just (z, super) -> Just (super, MDSub z clss type0 dict)
-              Nothing -> Nothing
+              Nothing         -> Nothing
           go (Map.fromList (catMaybes ctxt2))
 
 preSolveConstraint

@@ -13,13 +13,13 @@ import Pukeko.Pretty
 import Data.Aeson
 import Data.Aeson.TH
 
-import           Pukeko.AST.Dict
-import           Pukeko.AST.Expr
-import           Pukeko.AST.Expr.Optics
-import           Pukeko.AST.Name
-import           Pukeko.AST.Type
-import           Pukeko.AST.Language
-import           Pukeko.AST.ConDecl
+import Pukeko.AST.ConDecl
+import Pukeko.AST.Dict
+import Pukeko.AST.Expr
+import Pukeko.AST.Expr.Optics
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.Type
 
 -- | Declaration of a function signature (@SignDecl Void@) or a method signature
 -- (@SignDecl (TScope Int Void)@).
@@ -50,10 +50,10 @@ data ExtnDecl lg = MkExtnDecl
 
 -- | Declaration of a class.
 data ClassDecl = MkClassDecl
-  { _class2name    :: Class
-  , _class2param   :: TyVar
-  , _class2super   :: Maybe (DxVar, Class)
-  , _class2tmcon   :: TmCon
+  { _class2name   :: Class
+  , _class2param  :: TyVar
+  , _class2super  :: Maybe (DxVar, Class)
+  , _class2tmcon  :: TmCon
     -- ^ During type class elimination, we introduce a data constructor for the
     -- dictionary type. The easiest way to get and distribute a 'Name' for this
     -- constructor is to get it during renaming and carry it around afterwards.
@@ -152,7 +152,7 @@ instance IsTyped lg => Pretty (GenDecl nsp lg) where
       $$ nest 2 (vcatMap pretty ms)
       where
         sdoc = case s of
-          Nothing -> mempty
+          Nothing      -> mempty
           Just (_, c') -> parens (pretty c' <+> pretty v) <+> "<="
     DInst (MkInstDecl _ c t0 vs ctxt _super ds) ->
       "instance" <+> prettyContext (map snd ctxt) <+> pretty c <+> prettyPrec 3 t1

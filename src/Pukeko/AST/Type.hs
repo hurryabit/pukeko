@@ -40,18 +40,18 @@ module Pukeko.AST.Type
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import qualified Bound      as B
+import qualified Bound as B
 import qualified Bound.Name as B
-import qualified Bound.Var  as B
+import qualified Bound.Var as B
 import           Control.Lens (Iso', iso)
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Deriving
 import           Data.Functor.Classes
 
-import           Pukeko.AST.Name
-import           Pukeko.AST.Unwind
-import           Pukeko.Orphans ()
+import Pukeko.AST.Name
+import Pukeko.AST.Unwind
+import Pukeko.Orphans ()
 
 class IsType t where
   isType :: t -> Maybe Type

@@ -24,15 +24,15 @@ import Pukeko.Prelude
 
 import qualified Data.Map.Extended as Map
 
-import           Pukeko.AST.Dict (DxBinder)
-import           Pukeko.AST.Expr (TmBinder)
-import           Pukeko.AST.Name
-import           Pukeko.FrontEnd.Inferencer.UType
+import Pukeko.AST.Dict (DxBinder)
+import Pukeko.AST.Expr (TmBinder)
+import Pukeko.AST.Name
+import Pukeko.FrontEnd.Inferencer.UType
 
 data Gamma s = Gamma
-  { _tmVars  :: Map TmVar (UType s)
-  , _level   :: Level
-  , _tyVars  :: Map TyVar (Map Class DxVar)
+  { _tmVars :: Map TmVar (UType s)
+  , _level  :: Level
+  , _tyVars :: Map TyVar (Map Class DxVar)
   }
 makeLenses ''Gamma
 
