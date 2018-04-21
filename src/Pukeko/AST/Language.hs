@@ -18,8 +18,8 @@ module Pukeko.AST.Language
   , HasTmAbs
   , HasTyApp
   , HasTyAbs
-  , HasCxApp
-  , HasCxAbs
+  , HasDxApp
+  , HasDxAbs
   )
 
 where
@@ -73,7 +73,7 @@ type IsLambda   lg = LangId lg <? LangId SuperCore
 type HasTmAbs lg = (() :: Constraint)
 type HasTyApp lg =  IsPreTyped lg ~ True
 type HasTyAbs lg =  IsPreTyped lg ~ True
-type HasCxApp lg = (IsPreTyped lg ~ True, IsClassy lg ~ True)
-type HasCxAbs lg = (IsPreTyped lg ~ True, IsClassy lg ~ True)
+type HasDxApp lg = (IsPreTyped lg ~ True, IsClassy lg ~ True)
+type HasDxAbs lg = (IsPreTyped lg ~ True, IsClassy lg ~ True)
 
 type (<?) m n = m <=? n-1

@@ -48,15 +48,15 @@ typeOf = \case
       (TyArg t1, TUni _ tq) -> pure (B.instantiate1Name t1 tq)
       (TyArg{}, TFun{}) -> throwHere "expected value argument, but found type argument"
       (TyArg{}, _     ) -> throwHere "unexpected type argument"
-      (CxArg dx, TCtx cx t1) -> do
-        checkDict dx cx
+      (DxArg dict, TCtx cstr t1) -> do
+        checkDict dict cstr
         pure t1
-      (CxArg{}, _) -> throwHere "unexpected dict argument"
+      (DxArg{}, _) -> throwHere "unexpected dict argument"
   EAbs par e0 ->
     case par of
       TmPar binder -> TFun (snd binder) <$> introTmVar binder (typeOf e0)
       TyPar v      -> TUni' v           <$> introTyVar v      (typeOf e0)
-      CxPar binder -> TCtx (snd binder) <$> introDxVar binder (typeOf e0)
+      DxPar binder -> TCtx (snd binder) <$> introDxVar binder (typeOf e0)
   ELet BindPar ds e0 -> do
     traverse_ checkBind ds
     introTmVars (map _b2binder ds) (typeOf e0)

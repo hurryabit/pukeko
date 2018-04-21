@@ -83,13 +83,13 @@ arg2type :: IsTyped lg => Traversal' (Arg lg) Type
 arg2type f = \case
   TmArg e -> TmArg <$> expr2type f e
   TyArg t -> TyArg <$> f t
-  CxArg d -> CxArg <$> dict2type f d
+  DxArg d -> DxArg <$> dict2type f d
 
 par2type :: Traversal' (Par lg) (TypeOf lg)
 par2type f = \case
-  TmPar x  -> TmPar <$> _2 f x
-  TyPar v  -> pure (TyPar v)
-  CxPar cx -> CxPar <$> (_2 . _2) f cx
+  TmPar x -> TmPar <$> _2 f x
+  TyPar v -> pure (TyPar v)
+  DxPar d -> DxPar <$> (_2 . _2) f d
 
 -- | Traverse over all types in an expression.
 expr2type :: IsTyped lg => Traversal' (Expr lg) Type

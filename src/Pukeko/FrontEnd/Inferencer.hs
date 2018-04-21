@@ -79,7 +79,7 @@ instantiate = go Map.empty mempty
       UTCtx (clss, tc0) t0 -> do
         tc1 <- sendM (substUType env0 tc0)
         (dict, cstr1) <- freshConstraint (clss, tc1)
-        go env0 (cstrs0 <> cstr1) (ECxApp e0 dict) t0
+        go env0 (cstrs0 <> cstr1) (EDxApp e0 dict) t0
       t0 -> do
         t1 <- sendM (substUType env0 t0)
         pure (e0, t1, cstrs0)
@@ -103,16 +103,16 @@ inferPatn patn t_expr = case patn of
     ps1 <- zipWithM inferPatn ps0 t_fields
     pure (PCon dcon ps1)
 
-addTyCxAbs
+addTyDxAbs
   :: [TyVar]
   -> [DxBinder (UType s)]
   -> Expr (Aux s)
   -> UType s
   -> (Expr (Aux s), UType s)
-addTyCxAbs tyVars dxBinders expr typ
+addTyDxAbs tyVars dxBinders expr typ
   | null tyVars && null dxBinders = (expr, typ)
   | otherwise =
-      ( rewindr ETyAbs tyVars $ rewindr ECxAbs         dxBinders  $ ETyAnn typ expr
+      ( rewindr ETyAbs tyVars $ rewindr EDxAbs         dxBinders  $ ETyAnn typ expr
       , rewindr UTUni  tyVars $ rewindr UTCtx (map snd dxBinders)          typ
       )
 
@@ -122,7 +122,7 @@ inferLet (MkBind (tmVar, NoType) rhs0) = do
   (rhs1, t'_rhs1, cstrs) <- enterLevel @s (infer rhs0)
   (t_rhs1, toList -> tyVars) <- generalize t'_rhs1
   (rets, defs) <- solveConstraints cstrs
-  let (rhs2, t_rhs2) = addTyCxAbs tyVars rets rhs1 t_rhs1
+  let (rhs2, t_rhs2) = addTyDxAbs tyVars rets rhs1 t_rhs1
   pure (MkBind (tmVar, t_rhs2) rhs2, defs)
 
 -- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
@@ -142,13 +142,13 @@ inferRec binds0 = do
   let bound = Set.fromList binders0
   let addApps x
         | x `Set.member` bound =
-            foldl ECxApp (foldl ETyApp (EVar x) (map UTVar tyVars)) dicts
+            foldl EDxApp (foldl ETyApp (EVar x) (map UTVar tyVars)) dicts
         | otherwise = EVar x
   let binds2 =
         zipWith3
           (\binder0 rhs1 t_rhs1 ->
              let (rhs2, t_rhs2) =
-                   addTyCxAbs tyVars rets1 (substitute addApps rhs1) t_rhs1
+                   addTyDxAbs tyVars rets1 (substitute addApps rhs1) t_rhs1
               in  MkBind (binder0, t_rhs2) rhs2)
           binders0
           rhss1
@@ -228,7 +228,7 @@ inferFuncDecl (MkFuncDecl name NoType body0) t_decl = do
       unify t_body0 t_body1
       solveConstraints cstrs1
     assertM (null rets1 && null defs1)
-    let (body2, _) = addTyCxAbs vs0 ctxt1 body1 t_body1
+    let (body2, _) = addTyDxAbs vs0 ctxt1 body1 t_body1
     pure (MkFuncDecl name t_decl body2)
 
 inferInstDecl
@@ -294,11 +294,11 @@ freezeExpr = \case
   EAtm a -> pure (EAtm a)
   ETmApp fun arg -> ETmApp <$> freezeExpr fun <*> freezeExpr arg
   ETyApp e0 t    -> ETyApp <$> freezeExpr e0 <*> freezeType t
-  ECxApp e d -> ECxApp <$> freezeExpr e <*> freezeDict d
+  EDxApp e d -> EDxApp <$> freezeExpr e <*> freezeDict d
   EApp{} -> impossible
   ETmAbs binder body -> ETmAbs <$> _2 freezeType binder <*> freezeExpr body
   ETyAbs tvar body -> ETyAbs tvar <$> freezeExpr body
-  ECxAbs binder body -> ECxAbs <$> (_2 . _2) freezeType binder <*> freezeExpr body
+  EDxAbs binder body -> EDxAbs <$> (_2 . _2) freezeType binder <*> freezeExpr body
   EAbs{} -> impossible
   ELet m ds e0 -> ELet m <$> traverse freezeBind ds <*> freezeExpr e0
   EMat t e0 as -> EMat <$> freezeType t <*> freezeExpr e0 <*> traverse freezeAltn as

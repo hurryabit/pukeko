@@ -18,10 +18,10 @@ module Pukeko.AST.Expr
   , pattern ENum
   , pattern ETmApp
   , pattern ETyApp
-  , pattern ECxApp
+  , pattern EDxApp
   , pattern ETmAbs
   , pattern ETyAbs
-  , pattern ECxAbs
+  , pattern EDxAbs
 
   , b2binder
   , b2bound
@@ -39,7 +39,7 @@ module Pukeko.AST.Expr
   , _ETyApp
   , _EAbs
   , _ETyAbs
-  -- , _ECxAbs
+  -- , _EDxAbs
 
   , mkETmAbs
   , unwindEAbs
@@ -75,12 +75,12 @@ type TmBinder ty = (TmVar, ty)
 data Arg lg
   =                TmArg (Expr lg)
   | HasTyApp lg => TyArg (TypeOf lg)
-  | HasCxApp lg => CxArg (DictOf lg)
+  | HasDxApp lg => DxArg (DictOf lg)
 
 data Par lg
   = HasTmAbs lg => TmPar (TmBinder (TypeOf lg))
   | HasTyAbs lg => TyPar TyVar
-  | HasCxAbs lg => CxPar (DxBinder (TypeOf lg))
+  | HasDxAbs lg => DxPar (DxBinder (TypeOf lg))
 
 data BindMode = BindPar | BindRec
 
@@ -126,8 +126,8 @@ pattern ETmApp fun arg = EApp fun (TmArg arg)
 pattern ETyApp :: HasTyApp lg => Expr lg -> TypeOf lg -> Expr lg
 pattern ETyApp fun typ = EApp fun (TyArg typ)
 
-pattern ECxApp :: HasCxApp lg => Expr lg -> DictOf lg -> Expr lg
-pattern ECxApp fun cx = EApp fun (CxArg cx)
+pattern EDxApp :: HasDxApp lg => Expr lg -> DictOf lg -> Expr lg
+pattern EDxApp fun dict = EApp fun (DxArg dict)
 
 pattern ETmAbs :: (IsLambda lg ~ True, HasTmAbs lg) =>
   TmBinder (TypeOf lg) -> Expr lg -> Expr lg
@@ -136,9 +136,9 @@ pattern ETmAbs par body = EAbs (TmPar par) body
 pattern ETyAbs :: (IsLambda lg ~ True, HasTyAbs lg) => TyVar -> Expr lg -> Expr lg
 pattern ETyAbs par body = EAbs (TyPar par) body
 
-pattern ECxAbs :: (IsLambda lg ~ True, HasCxAbs lg) =>
+pattern EDxAbs :: (IsLambda lg ~ True, HasDxAbs lg) =>
   DxBinder (TypeOf lg) -> Expr lg -> Expr lg
-pattern ECxAbs cx body = EAbs (CxPar cx) body
+pattern EDxAbs dict body = EAbs (DxPar dict) body
 
 -- * Derived optics
 makePrisms ''Atom
@@ -202,7 +202,7 @@ mkTAbs :: TypeOf lg ~ Type => Par lg -> Type -> Type
 mkTAbs = \case
   TmPar (_, t) -> TFun t
   TyPar v      -> TUni' v
-  CxPar (_, c) -> TCtx c
+  DxPar (_, c) -> TCtx c
 
 unEAnn :: IsLambda lg ~ True => Expr lg -> Expr lg
 unEAnn = \case
@@ -246,13 +246,13 @@ instance IsTyped lg => Pretty (Arg lg) where
   pretty = \case
     TmArg e -> prettyPrec (succ Op.aprec) e
     TyArg t -> prettyTyArg t
-    CxArg d -> braces (pretty d)
+    DxArg d -> braces (pretty d)
 
 instance TypeOf lg ~ Type => Pretty (Par lg) where
   pretty = \case
     TmPar (x, t) -> parens (pretty (x ::: t))
     TyPar v      -> "@" <> pretty v
-    CxPar (_, c) -> braces (prettyCstr c)
+    DxPar (_, c) -> braces (prettyCstr c)
 
 instance IsTyped lg => Pretty (Expr lg)
 
