@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.AST.Dict
   ( NoDict (..)
   , Dict (..)

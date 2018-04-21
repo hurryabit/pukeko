@@ -27,10 +27,10 @@ where
 import Pukeko.Prelude
 
 import Data.Kind (Constraint)
-import GHC.TypeLits (Nat, type (<=?), type (-))
+import GHC.TypeLits (type (-), type (<=?), Nat)
 
+import Pukeko.AST.Dict (Dict, NoDict)
 import Pukeko.AST.Type (NoType, Type)
-import Pukeko.AST.Dict (NoDict, Dict)
 
 data Surface
 data PreTyped (t :: *) (d :: *)

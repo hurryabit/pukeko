@@ -6,18 +6,19 @@ where
 import Pukeko.Prelude
 
 import           Control.Monad.Freer.Supply
-import           Data.List         (sortOn)
+import           Data.List (sortOn)
 import qualified Data.Map.Extended as Map
-import qualified Data.Set          as Set
+import qualified Data.Set as Set
 
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.SuperCore hiding (Module (..), Expr, Bind, Altn, Par)
-import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
+import           Pukeko.AST.SuperCore hiding
+    (Altn, Bind, Expr, Module (..), Par)
+import qualified Pukeko.AST.SuperCore as Core
+import           Pukeko.AST.SystemF
+import           Pukeko.AST.Type
 import           Pukeko.FrontEnd.Gamma
 import           Pukeko.FrontEnd.Info
-import           Pukeko.AST.Type
 
 type In  = Unclassy
 type Out = SuperCore

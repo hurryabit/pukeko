@@ -21,7 +21,7 @@ constructorName tag arity = MkName ("C." ++ show tag ++ "." ++ show arity)
 
 findGlobal :: Name -> Either Failure Global
 findGlobal name = case Map.lookup (externalName name) globalTable of
-  Nothing -> Left ("unknown external:" <+> pretty name)
+  Nothing     -> Left ("unknown external:" <+> pretty name)
   Just global -> return global
 
 mkBuiltinGen :: Name -> Int -> [Inst] -> Global

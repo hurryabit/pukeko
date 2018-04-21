@@ -7,11 +7,11 @@ module Control.Lens.Freer
   , locally
   ) where
 
-import Control.Lens hiding (use, uses, view, views, modifying)
+import Control.Lens hiding (modifying, use, uses, view, views)
 import Control.Monad.Freer
 import Control.Monad.Freer.Reader
 import Control.Monad.Freer.State
-import Data.Profunctor.Unsafe         ((#.))
+import Data.Profunctor.Unsafe (( #. ))
 
 use :: (Member (State s) effs) => Getting a s a -> Eff effs a
 use l = gets (^.l)

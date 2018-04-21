@@ -5,9 +5,9 @@ where
 
 import Pukeko.Prelude
 
-import qualified Data.Graph    as G
-import qualified Data.Map      as Map
-import qualified Data.Set      as Set
+import qualified Data.Graph as G
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import           Pukeko.AST.Name
 import           Pukeko.AST.SuperCore

@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Pukeko.FrontEnd.Info
   ( ModuleInfo
@@ -22,14 +23,14 @@ module Pukeko.FrontEnd.Info
 
 import Pukeko.Prelude
 
-import           Control.Lens                (foldMapOf, _Right)
-import qualified Data.Map.Extended           as Map
-import qualified Pukeko.AST.SystemF    as SysF
-import qualified Pukeko.AST.SuperCore  as Core
-import           Pukeko.AST.Language
-import           Pukeko.AST.Name
+import           Control.Lens (foldMapOf, _Right)
+import qualified Data.Map.Extended as Map
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Expr
+import           Pukeko.AST.Language
+import           Pukeko.AST.Name
+import qualified Pukeko.AST.SuperCore as Core
+import qualified Pukeko.AST.SystemF as SysF
 import           Pukeko.AST.Type
 
 

@@ -4,12 +4,12 @@ module Pukeko.MiddleEnd.EtaReducer
 
 import Pukeko.Prelude
 
-import qualified Data.Set     as Set
+import qualified Data.Set as Set
 
-import           Pukeko.AST.Expr.Optics
-import           Pukeko.AST.Name
-import           Pukeko.AST.SuperCore
-import           Pukeko.AST.Type
+import Pukeko.AST.Expr.Optics
+import Pukeko.AST.Name
+import Pukeko.AST.SuperCore
+import Pukeko.AST.Type
 
 reduceModule :: Module -> Module
 reduceModule = over (mod2supcs . traverse) erSupCDecl

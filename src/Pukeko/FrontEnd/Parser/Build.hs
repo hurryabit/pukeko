@@ -5,10 +5,10 @@ module Pukeko.FrontEnd.Parser.Build
 import Pukeko.Prelude
 
 import qualified Data.DList as DL
-import qualified Data.Set   as Set
+import qualified Data.Set as Set
 import           System.FilePath
 
-import           Pukeko.AST.Surface
+import Pukeko.AST.Surface
 
 build ::
   (Member (Error Failure) effs) =>

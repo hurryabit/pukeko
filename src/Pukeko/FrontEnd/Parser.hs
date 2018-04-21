@@ -13,20 +13,20 @@ module Pukeko.FrontEnd.Parser
 import Pukeko.Prelude hiding (lctd, many, some)
 
 import qualified Control.Applicative.Combinators.NonEmpty as NE
-import qualified Control.Monad.RWS          as RWS
-import qualified Data.List.NE               as NE
-import qualified Data.Set                   as Set
-import           System.FilePath            as Sys
-import           Text.Megaparsec            hiding (parse, parseTest)
-import qualified Text.Megaparsec            as MP
-import           Text.Megaparsec.Char       hiding (space)
+import qualified Control.Monad.RWS as RWS
+import qualified Data.List.NE as NE
+import qualified Data.Set as Set
+import           System.FilePath as Sys
+import           Text.Megaparsec hiding (parse, parseTest)
+import qualified Text.Megaparsec as MP
+import           Text.Megaparsec.Char hiding (space)
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Text.Megaparsec.Expr
 
-import           Pukeko.AST.Name       hiding (Name)
-import           Pukeko.AST.Operator   (Spec (..))
+import           Pukeko.AST.Name hiding (Name)
+import           Pukeko.AST.Operator (Spec (..))
+import qualified Pukeko.AST.Operator as Op
 import           Pukeko.AST.Surface
-import qualified Pukeko.AST.Operator   as Op
 import           Pukeko.FrontEnd.Parser.Build (build)
 
 parseInput :: (Member (Error Failure) effs) => FilePath -> String -> Eff effs Module

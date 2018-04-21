@@ -10,9 +10,9 @@ import qualified Data.Array as A
 import qualified Data.Graph as G
 import           Data.Tuple.Extra (fst3)
 
-import           Pukeko.AST.Name
-import           Pukeko.AST.SuperCore
-import           Pukeko.AST.Expr.Optics
+import Pukeko.AST.Expr.Optics
+import Pukeko.AST.Name
+import Pukeko.AST.SuperCore
 
 data CallGraph m = CallGraph
   { graph     :: G.Graph

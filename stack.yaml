@@ -2,3 +2,7 @@ resolver: nightly-2018-04-21
 
 packages:
 - '.'
+
+extra-deps:
+- git: https://github.com/gwils/stylish-haskell.git
+  commit: 396aab08b74d0435e8fdf7b2982addf81428e74e

@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Pukeko.FrontEnd.Inferencer
   ( Out
   , inferModule
@@ -11,23 +10,23 @@ import Pukeko.Pretty
 -- import           Control.Lens (folded)
 import           Control.Monad.Extra
 import           Control.Monad.Freer.Supply
-import qualified Data.List.NE     as NE
+import qualified Data.List.NE as NE
 import qualified Data.Map.Extended as Map
-import qualified Data.Set         as Set
+import qualified Data.Set as Set
 import           Data.STRef
 
-import           Pukeko.AST.Dict
-import           Pukeko.AST.Expr.Optics
-import           Pukeko.AST.Name
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Language
-import           Pukeko.AST.ConDecl
-import           Pukeko.AST.Type       hiding ((~>))
-import           Pukeko.FrontEnd.Inferencer.Constraints
-import           Pukeko.FrontEnd.Inferencer.UType
-import           Pukeko.FrontEnd.Inferencer.Gamma
-import           Pukeko.FrontEnd.Inferencer.Unify
-import           Pukeko.FrontEnd.Info
+import Pukeko.AST.ConDecl
+import Pukeko.AST.Dict
+import Pukeko.AST.Expr.Optics
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.SystemF
+import Pukeko.AST.Type hiding ((~>))
+import Pukeko.FrontEnd.Inferencer.Constraints
+import Pukeko.FrontEnd.Inferencer.Gamma
+import Pukeko.FrontEnd.Inferencer.Unify
+import Pukeko.FrontEnd.Inferencer.UType
+import Pukeko.FrontEnd.Info
 
 type In    = Surface
 type Out   = Typed

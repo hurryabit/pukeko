@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.AST.ConDecl
   ( TyConDecl (..)
   , TmConDecl (..)
@@ -10,11 +10,11 @@ module Pukeko.AST.ConDecl
 import Pukeko.Prelude
 import Pukeko.Pretty
 
-import           Control.Lens (makeLensesFor, folded, nullOf)
-import           Data.Aeson.TH
+import Control.Lens (folded, makeLensesFor, nullOf)
+import Data.Aeson.TH
 
-import           Pukeko.AST.Name
-import           Pukeko.AST.Type
+import Pukeko.AST.Name
+import Pukeko.AST.Type
 
 -- TODO: We could make it @Type Int@!?
 data TyConDecl = MkTyConDecl

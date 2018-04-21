@@ -20,9 +20,10 @@ module Data.List.Sized
   )
 where
 
-import           Prelude        hiding ((++), map, unzip, zip, zipWith)
-import           Data.Bifunctor (bimap)
-import           Data.List.NonEmpty (NonEmpty (..))
+import Prelude hiding (map, unzip, zip, zipWith, (++))
+
+import Data.Bifunctor (bimap)
+import Data.List.NonEmpty (NonEmpty (..))
 
 data Nat = Zero | Succ Nat
 
@@ -73,7 +74,7 @@ zip :: List n a -> List n b -> List n (a, b)
 zip = zipWith (,)
 
 zipWith :: (a -> b -> c) -> List n a -> List n b -> List n c
-zipWith _ Nil Nil = Nil
+zipWith _ Nil Nil                 = Nil
 zipWith f (Cons x xs) (Cons y ys) = Cons (f x y) (zipWith f xs ys)
 
 unzip :: List n (a, b) -> (List n a, List n b)

@@ -10,15 +10,15 @@ import Pukeko.Pretty
 
 import           Control.Monad.Freer.Supply
 import           Control.Monad.ST
-import           Data.Forget      (Forget (..))
+import           Data.Forget (Forget (..))
 import qualified Data.Map.Extended as Map
 import           Data.STRef
 
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Language
-import           Pukeko.AST.Name
-import           Pukeko.AST.ConDecl
-import           Pukeko.AST.Type
+import Pukeko.AST.ConDecl
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.SystemF
+import Pukeko.AST.Type
 
 type In  = Surface
 

@@ -2,18 +2,18 @@ module Main where
 
 import Pukeko.Prelude
 
-import Options.Applicative hiding (renderFailure)
-import System.FilePath ((<.>), (-<.>))
-import System.Exit
-import qualified Data.Aeson               as Aeson
+import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
-import qualified Data.ByteString.Lazy     as BS
+import qualified Data.ByteString.Lazy as BS
+import           Options.Applicative hiding (renderFailure)
+import           System.Exit
+import           System.FilePath ((-<.>), (<.>))
 
 import           Pukeko.AST.Name
+import qualified Pukeko.BackEnd as BackEnd
+import qualified Pukeko.FrontEnd as FrontEnd
 import qualified Pukeko.FrontEnd.Parser as Parser
-import qualified Pukeko.FrontEnd        as FrontEnd
-import qualified Pukeko.MiddleEnd       as MiddleEnd
-import qualified Pukeko.BackEnd         as BackEnd
+import qualified Pukeko.MiddleEnd as MiddleEnd
 import           Pukeko.Pretty
 
 compile :: Bool -> Bool -> Bool -> Bool -> Bool -> Bool -> [MiddleEnd.Optimization] -> String -> IO ()

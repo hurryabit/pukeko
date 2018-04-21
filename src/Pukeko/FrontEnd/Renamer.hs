@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 -- | Transform AST to use type safe de Bruijn indices.
 module Pukeko.FrontEnd.Renamer
   ( renameModule
@@ -10,16 +11,16 @@ import Pukeko.Prelude
 import           Control.Lens (matching)
 import           Control.Monad.Extra
 import           Data.Bitraversable
-import           Data.List.Extra   (nubOrd)
+import           Data.List.Extra (nubOrd)
 import qualified Data.Map.Extended as Map
 
-import           Pukeko.AST.Dict
-import           Pukeko.AST.Name
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Language
 import           Pukeko.AST.ConDecl
-import qualified Pukeko.AST.Surface    as Ps
-import qualified Pukeko.AST.Operator   as Op
+import           Pukeko.AST.Dict
+import           Pukeko.AST.Language
+import           Pukeko.AST.Name
+import qualified Pukeko.AST.Operator as Op
+import qualified Pukeko.AST.Surface as Ps
+import           Pukeko.AST.SystemF
 import           Pukeko.AST.Type
 
 type Out = Surface
@@ -69,7 +70,7 @@ lookupGlobal tab sel desc (Lctd pos name) =
     Nothing -> throwAt pos (desc <:~> pretty name)
     Just gendecl ->
       case matching sel gendecl of
-        Left _ -> throwAt pos ("not a" <+> desc <:~> pretty name)
+        Left _     -> throwAt pos ("not a" <+> desc <:~> pretty name)
         Right decl -> pure decl
 
 lookupGlobalName :: (GlobalEffs effs, NameSpaceOf decl ~ nsp, HasName decl) =>
@@ -103,7 +104,7 @@ lookupTyVar
   => Ps.LctdName 'TyVar -> Map (Ps.Name 'TyVar) TyVar -> Eff effs TyVar
 lookupTyVar (unlctd -> x) env =
   case Map.lookup x env of
-    Just v -> pure v
+    Just v  -> pure v
     Nothing -> throwHere ("unknown type variable:" <+> pretty x)
 
 -- | Rename a type under the assumption that all its free variables are

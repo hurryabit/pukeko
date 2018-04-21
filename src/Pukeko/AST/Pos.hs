@@ -11,6 +11,7 @@ module Pukeko.AST.Pos
   ) where
 
 import Prelude
+
 import Control.Lens (Lens)
 import Control.Monad.Freer
 import Control.Monad.Freer.Reader

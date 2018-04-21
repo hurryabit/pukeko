@@ -40,8 +40,8 @@ import Pukeko.Prelude
 
 import qualified Data.Map.Extended as Map
 
-import           Pukeko.AST.Name       hiding (Name)
-import qualified Pukeko.AST.Operator   as Op
+import           Pukeko.AST.Name hiding (Name)
+import qualified Pukeko.AST.Operator as Op
 
 type Name (nsp :: NameSpace) = Tagged nsp String
 type LctdName nsp = Lctd (Name nsp)

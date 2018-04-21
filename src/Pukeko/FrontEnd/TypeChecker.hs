@@ -8,15 +8,15 @@ import Pukeko.Pretty
 import qualified Bound.Name as B
 import qualified Data.Map.Extended as Map
 
-import           Pukeko.FrontEnd.Gamma
-import           Pukeko.FrontEnd.Info
 import           Pukeko.AST.Dict
 import           Pukeko.AST.Expr
 import           Pukeko.AST.Expr.Optics (patn2binder)
-import qualified Pukeko.AST.SystemF   as SysF
-import qualified Pukeko.AST.SuperCore as Core
 import           Pukeko.AST.Language
+import qualified Pukeko.AST.SuperCore as Core
+import qualified Pukeko.AST.SystemF as SysF
 import           Pukeko.AST.Type
+import           Pukeko.FrontEnd.Gamma
+import           Pukeko.FrontEnd.Info
 
 type CanTC effs =
   (CanGamma effs, Members [Reader ModuleInfo, Reader SourcePos, Error Failure] effs)

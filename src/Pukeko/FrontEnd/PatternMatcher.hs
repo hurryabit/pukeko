@@ -1,7 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ViewPatterns #-}
 module Pukeko.FrontEnd.PatternMatcher
   ( compileModule
   )
@@ -11,15 +10,15 @@ import Pukeko.Prelude
 
 import           Control.Monad.Freer.Supply
 import           Data.List.NonEmpty (NonEmpty (..))
-import qualified Data.List.Sized  as LS
+import qualified Data.List.Sized as LS
 import qualified Data.Map.Extended as Map
 
-import           Pukeko.FrontEnd.Info
-import           Pukeko.AST.Type
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Language
-import           Pukeko.AST.Name
-import           Pukeko.AST.ConDecl
+import Pukeko.AST.ConDecl
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.SystemF
+import Pukeko.AST.Type
+import Pukeko.FrontEnd.Info
 
 type In  = Typed
 type Out = Unnested
@@ -245,13 +244,13 @@ groupCPatns :: forall m m' n effs. (CanPM effs, m ~ 'LS.Succ m') =>
 groupCPatns (MkCol (e, t) ds) (MkRowMatch es rs) = do
   let (tcon, targs) = case unwindl _TApp t of
         (TCon c, ts) -> (c, ts)
-        _ -> impossible  -- the type checker guarantees this
+        _            -> impossible  -- the type checker guarantees this
   MkTyConDecl _ tpars dcons0 <- findInfo info2tycons tcon
   let tsubst = Map.fromList (zipExact tpars targs)
   let drs = toList (LS.zip ds rs)
   let dcons1 = case dcons0 of
         Right (d:ds) -> d :| ds
-        _ -> impossible  -- the type checker guarantees this
+        _            -> impossible  -- the type checker guarantees this
   grps <- for dcons1 $ \(MkTmConDecl _ dcon1 _ fields0) -> do
     let fields1 = map (>>= (tsubst Map.!)) fields0
     let drs1 = filter (\(MkCPatn dcon2 _, _) -> dcon1 == dcon2) drs

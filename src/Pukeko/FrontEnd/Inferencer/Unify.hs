@@ -7,11 +7,11 @@ where
 
 import Pukeko.Prelude
 
-import           Data.STRef
+import Data.STRef
 
-import           Pukeko.Pretty
-import           Pukeko.FrontEnd.Inferencer.Gamma
-import           Pukeko.FrontEnd.Inferencer.UType
+import Pukeko.FrontEnd.Inferencer.Gamma
+import Pukeko.FrontEnd.Inferencer.UType
+import Pukeko.Pretty
 
 type CanUnify s effs = (CanThrowHere effs, CanGamma s effs, MemberST s effs)
 

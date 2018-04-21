@@ -34,13 +34,13 @@ instance Monoid Info where
 
 infoExpr :: Expr -> Info
 infoExpr expr = case expr of
-  Local{}  -> mempty
-  Global{} -> mempty
-  External{_name} -> external _name
-  Pack{_tag, _arity} -> constructor _tag _arity
-  Num{} -> mempty
-  Ap{_fun, _args} -> foldMap infoExpr (_fun : _args)
-  Let{_defns, _body} -> foldMap infoDefn _defns <> infoExpr _body
+  Local{}              -> mempty
+  Global{}             -> mempty
+  External{_name}      -> external _name
+  Pack{_tag, _arity}   -> constructor _tag _arity
+  Num{}                -> mempty
+  Ap{_fun, _args}      -> foldMap infoExpr (_fun : _args)
+  Let{_defns, _body}   -> foldMap infoDefn _defns <> infoExpr _body
   Match{_expr, _altns} -> infoExpr _expr <> foldMap infoAltn _altns
 
 infoDefn :: Defn -> Info
@@ -52,7 +52,7 @@ infoAltn MkAltn{_rhs} = infoExpr _rhs
 infoTopDefn :: TopLevel -> Info
 infoTopDefn top = case top of
   Def{_body} -> infoExpr _body
-  Asm{} -> mempty
+  Asm{}      -> mempty
 
 info :: Module -> Info
 info = foldMap infoTopDefn

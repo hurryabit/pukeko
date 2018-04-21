@@ -34,13 +34,13 @@ module Pukeko.Pretty
 import Prelude
 
 import           Data.Foldable
+import           Data.Semigroup (Semigroup (..))
 import           Data.Tagged
 import           Data.Void
-import           Data.Semigroup (Semigroup (..))
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)
 import qualified Text.PrettyPrint.Annotated as PP
 import           Text.PrettyPrint.Annotated.HughesPJ hiding
-                 (Doc, (<>), (<+>), render, hsep, vcat)
+    (Doc, hsep, render, vcat, (<+>), (<>))
 
 infixr 6 <+>, <:~>
 

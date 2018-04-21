@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.AST.Name
   ( NameSpace (..)
   , TmVar
@@ -29,17 +30,17 @@ module Pukeko.AST.Name
 
 import Prelude
 
-import           Control.Lens (Lens')
-import           Control.Monad.Freer
-import           Control.Monad.Freer.State
-import           Control.Monad.ST
-import           Data.Aeson
-import           Data.Aeson.TH
-import           Data.Char (toLower)
-import           Data.Function
-import           Data.Kind
-import           Data.Tagged
-import           Text.Megaparsec.Pos (SourcePos)
+import Control.Lens (Lens')
+import Control.Monad.Freer
+import Control.Monad.Freer.State
+import Control.Monad.ST
+import Data.Aeson
+import Data.Aeson.TH
+import Data.Char (toLower)
+import Data.Function
+import Data.Kind
+import Data.Tagged
+import Text.Megaparsec.Pos (SourcePos)
 
 import Pukeko.AST.Pos
 import Pukeko.Orphans ()

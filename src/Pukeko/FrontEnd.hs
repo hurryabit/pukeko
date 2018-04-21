@@ -6,17 +6,17 @@ module Pukeko.FrontEnd
 
 import Pukeko.Prelude hiding (run)
 
-import qualified Pukeko.AST.SystemF             as SystemF
 import           Pukeko.AST.Language
 import           Pukeko.AST.Name
+import qualified Pukeko.AST.SystemF as SystemF
 import qualified Pukeko.FrontEnd.ClassEliminator as ClassEliminator
-import qualified Pukeko.FrontEnd.Renamer        as Renamer
-import qualified Pukeko.FrontEnd.KindChecker    as KindChecker
-import qualified Pukeko.FrontEnd.Parser         as Parser
+import qualified Pukeko.FrontEnd.FunResolver as FunResolver
+import qualified Pukeko.FrontEnd.Inferencer as Inferencer
+import qualified Pukeko.FrontEnd.KindChecker as KindChecker
+import qualified Pukeko.FrontEnd.Parser as Parser
 import qualified Pukeko.FrontEnd.PatternMatcher as PatternMatcher
-import qualified Pukeko.FrontEnd.Inferencer     as Inferencer
-import qualified Pukeko.FrontEnd.TypeChecker    as TypeChecker
-import qualified Pukeko.FrontEnd.FunResolver    as FunResolver
+import qualified Pukeko.FrontEnd.Renamer as Renamer
+import qualified Pukeko.FrontEnd.TypeChecker as TypeChecker
 
 type Module = SystemF.Module SystemF
 

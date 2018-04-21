@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- | A type whose contents do not influence derive 'Eq' and 'Ord' instances.
 module Data.Forget
   ( Forget (Forget)
@@ -6,6 +7,7 @@ module Data.Forget
 where
 
 import Prelude
+
 import Control.Lens (Iso, iso)
 import Data.Aeson.TH
 

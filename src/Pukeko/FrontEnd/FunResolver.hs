@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- TODO: Evaluate if this stage needs its own tag on the AST. Also consider
 -- mergeing it with the type resolver. The result would be a stage which checks
 -- the declare-define-use cycle of all names.
@@ -8,12 +10,12 @@ module Pukeko.FrontEnd.FunResolver
 import Pukeko.Prelude
 
 import           Control.Monad.Extra
-import qualified Data.Map      as Map
-import qualified Data.Set      as Set
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import           Pukeko.AST.SystemF
-import           Pukeko.AST.Language
-import           Pukeko.AST.Name
+import Pukeko.AST.Language
+import Pukeko.AST.Name
+import Pukeko.AST.SystemF
 
 type In  = Surface
 

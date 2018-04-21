@@ -8,11 +8,12 @@ module Data.List.NE
   , toVector
   ) where
 
-import           Prelude            hiding ((++), unzip3, zipWith)
-import           Data.Foldable      (sequence_)
+import Prelude hiding (unzip3, zipWith, (++))
+
+import           Data.Foldable (sequence_)
+import qualified Data.List as L
 import           Data.List.NonEmpty
-import qualified Data.List          as L
-import qualified Data.Vector        as V
+import qualified Data.Vector as V
 
 (++) :: NonEmpty a -> NonEmpty a -> NonEmpty a
 (x:|xs) ++ ys = x :| (xs L.++ toList ys)

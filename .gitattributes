@@ -1,3 +1,4 @@
+*.hs filter=stylish-haskell
 *.pu linguist-language=PureScript
 *.golden linguist-language=PureScript linguist-generated
 test/backend/examples/*.golden linguist-language=Assembly linguist-generated
