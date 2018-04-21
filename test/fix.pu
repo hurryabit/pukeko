@@ -65,13 +65,13 @@ instance bifunctorListF :: Bifunctor ListF where
     | ConsF y z -> ConsF (f y) (g z)
 
 toList :: Fix2 ListF a -> List a
-toList = cata (fun x ->
+toList = cata (\x ->
   match x with
   | NilF       -> Nil
   | ConsF y ys -> Cons y ys) ∘ mono
 
 fromList :: List a -> Fix2 ListF a
-fromList = poly ∘ ana (fun x ->
+fromList = poly ∘ ana (\x ->
   match x with
   | Nil       -> NilF
   | Cons y ys -> ConsF y ys)
@@ -80,7 +80,7 @@ fromList = poly ∘ ana (fun x ->
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   sequence (replicate n input)
-  >>= fun xs ->
-  traverse_ print (toList (map (fun x -> 2*x) (fromList xs)))
+  >>= \xs ->
+  traverse_ print (toList (map (\x -> 2*x) (fromList xs)))

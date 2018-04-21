@@ -1,23 +1,23 @@
 data C a =
        | .C (a -> a)
 c :: forall a. C a -> a -> a =
-  fun @a (dict :: C a) ->
+  \@a (dict :: C a) ->
     match dict with
     | .C c -> c
 data D a =
        | .D (C a) (a -> a)
 D.C :: forall a. D a -> C a =
-  fun @a (dict :: D a) ->
+  \@a (dict :: D a) ->
     match dict with
     | .D D.C _ -> D.C
 d :: forall a. D a -> a -> a =
-  fun @a (dict :: D a) ->
+  \@a (dict :: D a) ->
     match dict with
     | .D _ d -> d
 cInt :: C Int = .C @Int cInt.c
-cInt.c :: Int -> Int = fun (x :: Int) -> x
+cInt.c :: Int -> Int = \(x :: Int) -> x
 dInt :: D Int = .D @Int dInt.C dInt.d
 dInt.C :: C Int = cInt
 dInt.d :: Int -> Int = c @Int cInt
 f :: forall a. D a -> a -> a =
-  fun @a (d.a :: D a) -> c @a (D.C @a d.a)
+  \@a (d.a :: D a) -> c @a (D.C @a d.a)

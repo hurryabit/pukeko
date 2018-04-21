@@ -25,18 +25,18 @@ type World = external
 type IO a = World -> Pair a World
 
 instance functorIO :: Functor IO where
-  map f mx = coerce@(_ -> IO) (fun world0 ->
+  map f mx = coerce@(_ -> IO) (\world0 ->
     match (coerce @(IO -> _) mx) world0 with
     | Pair x world1 -> Pair (f x) world1)
 
 instance monadIO :: Monad IO where
-  pure x = coerce @(_ -> IO) (fun world -> Pair x world)
-  bind mx f = coerce @(_ -> IO) (fun world0 ->
+  pure x = coerce @(_ -> IO) (\world -> Pair x world)
+  bind mx f = coerce @(_ -> IO) (\world0 ->
     match (coerce @(IO -> _) mx) world0 with
     | Pair x world1 -> (coerce @(IO -> _) (f x)) world1)
 
 io :: (a -> b) -> a -> IO b
-io f x = coerce @(_ -> IO) (fun world -> let y = f x in seq y (Pair y world))
+io f x = coerce @(_ -> IO) (\world -> let y = f x in seq y (Pair y world))
 
 print :: Int -> IO Unit
 print n = io puti n
@@ -45,7 +45,7 @@ input :: IO Int
 input = io geti Unit
 
 putChar :: Char -> IO Unit
-putChar c = io (fun c -> putc (ord c)) c
+putChar c = io (\c -> putc (ord c)) c
 
 getChar :: IO (Option Char)
-getChar = io (fun u -> let n = getc u in if n < 0 then None else Some (chr n)) Unit
+getChar = io (\u -> let n = getc u in if n < 0 then None else Some (chr n)) Unit

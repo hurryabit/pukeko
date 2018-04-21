@@ -10,7 +10,7 @@ class (Functor m) <= Monad m where
 infix >>= bind
 
 semi :: (Monad m) => m Unit -> m a -> m a
-semi m1 m2 = m1 >>= fun x -> m2
+semi m1 m2 = m1 >>= \x -> m2
 
 infix ; semi
 
@@ -20,13 +20,13 @@ sequence ms =
   | Nil -> pure Nil
   | Cons m ms ->
       m
-      >>= fun x ->
+      >>= \x ->
       sequence ms
-      >>= fun xs ->
+      >>= \xs ->
       pure (Cons x xs)
 
 traverse_ :: (Monad m, Foldable t) => (a -> m Unit) -> t a -> m Unit
-traverse_ f = foldr (fun x m -> f x; m) (pure Unit)
+traverse_ f = foldr (\x m -> f x; m) (pure Unit)
 
 when :: (Monad m) => Bool -> m Unit -> m Unit
 when p m = if p then m else pure Unit

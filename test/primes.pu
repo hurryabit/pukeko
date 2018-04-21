@@ -31,7 +31,7 @@ sieve :: List Int -> List Int
 sieve ks =
   match ks with
   | Nil -> abort
-  | Cons p ks -> Cons p (sieve (filter (fun k -> k % p != 0) ks))
+  | Cons p ks -> Cons p (sieve (filter (\k -> k % p != 0) ks))
 
 primes :: List Int
 primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
@@ -39,5 +39,5 @@ primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print (nth_exn primes n)

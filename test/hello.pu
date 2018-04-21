@@ -5,4 +5,4 @@ hello :: List Int
 hello = Cons 72 (Cons 101 (Cons 108 (Cons 108 (Cons 111 (Cons 32 (Cons 87 (Cons 111 (Cons 114 (Cons 108 (Cons 100 (Cons 33 (Cons 10 Nil))))))))))))
 
 main :: IO Unit
-main = traverse_ (fun x -> putChar (chr x)) hello
+main = traverse_ (\x -> putChar (chr x)) hello

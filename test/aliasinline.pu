@@ -1,10 +1,10 @@
 import std2/io
 
 h :: c -> c
-h z = (fun u -> u) z
+h z = (\u -> u) z
 
 g :: b -> b
-g y = (fun z -> h z) y
+g y = (\z -> h z) y
 
 f1 :: a -> a
 f1 = h

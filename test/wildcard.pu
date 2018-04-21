@@ -13,9 +13,9 @@ snd p =
 main :: IO Unit
 main =
   input
-  >>= fun x ->
+  >>= \x ->
   input
-  >>= fun y ->
+  >>= \y ->
   let p = Pair x y in
   print (fst p);
   print (snd p)

@@ -19,7 +19,7 @@ isort xs =
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   sequence (replicate n input)
-  >>= fun xs ->
+  >>= \xs ->
   traverse_ print (isort xs)

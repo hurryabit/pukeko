@@ -43,7 +43,7 @@ monadIO :: Monad IO =
 print :: Int -> IO Unit = io.L2 @Int @Unit puti
 input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 count_down :: Int -> IO Unit =
-  fun (k :: Int) ->
+  \(k :: Int) ->
     let p :: Bool = ge_int k 0
     and m :: IO Unit =
           let m1 :: IO Unit = print k
@@ -58,32 +58,32 @@ count_down :: Int -> IO Unit =
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 semi.L1 :: forall a m. m a -> Unit -> m a =
-  fun @a @m (m2 :: m a) (x :: Unit) -> m2
+  \@a @m (m2 :: m a) (x :: Unit) -> m2
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
+  \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
-  fun @a @b (f :: a -> b) (mx :: IO a) ->
+  \@a @b (f :: a -> b) (mx :: IO a) ->
     coerce @(_ -> IO) (functorIO.map.L1 @a @b f mx)
 monadIO.pure.L2 :: forall a. a -> IO a =
-  fun @a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
+  \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) ->
     coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
 io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (x :: a) (world :: World) ->
+  \@a @b (f :: a -> b) (x :: a) (world :: World) ->
     let y :: b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
 io.L2 :: forall a b. (a -> b) -> a -> IO b =
-  fun @a @b (f :: a -> b) (x :: a) ->
+  \@a @b (f :: a -> b) (x :: a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 repeat.L1 :: forall m. Monad m -> Int -> m Unit -> m Unit =
-  fun @m (monad.m :: Monad m) (k :: Int) (m :: m Unit) ->
+  \@m (monad.m :: Monad m) (k :: Int) (m :: m Unit) ->
     let p :: Bool = gt_int k 0
     and m :: m Unit =
           let m2 :: m Unit = repeat.L1 @m monad.m (sub_int k 1) m in
@@ -96,8 +96,8 @@ repeat.L1 :: forall m. Monad m -> Int -> m Unit -> m Unit =
        | .Monad _ pure _ -> pure) @Unit Unit
     | True -> m
 main.L1 :: Int -> Int -> IO Unit =
-  fun (k :: Int) (n :: Int) -> repeat.L1 @IO monadIO k (count_down n)
+  \(k :: Int) (n :: Int) -> repeat.L1 @IO monadIO k (count_down n)
 main.L2 :: Int -> IO Unit =
-  fun (k :: Int) ->
+  \(k :: Int) ->
     let f :: Int -> IO Unit = main.L1 k in
     coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)

@@ -66,19 +66,19 @@ replicate_io n act = sequence (replicate n act)
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   input
-  >>= fun m ->
+  >>= \m ->
   replicate_io n input
-  >>= fun xs ->
+  >>= \xs ->
   let t = build min xs in
   replicate_io m (
       input
-      >>= fun lo ->
+      >>= \lo ->
       input
-      >>= fun hi ->
+      >>= \hi ->
       let res = query infinity min lo hi t in
       print res
   )
-  >>= fun x ->
+  >>= \x ->
   pure Unit

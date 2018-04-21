@@ -5,13 +5,13 @@ qsort xs =
   match xs with
   | Nil -> Nil
   | Cons x xs ->
-    match partition (fun y -> y < x) xs with
+    match partition (\y -> y < x) xs with
     | Pair ys zs -> append (qsort ys) (Cons x (qsort zs))
 
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   sequence (replicate n input)
-  >>= fun xs ->
+  >>= \xs ->
   traverse_ print (qsort xs)

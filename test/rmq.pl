@@ -55,12 +55,12 @@ infinity :: Int = 1000000000
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L6)
 replicate.L1 :: forall a. Int -> a -> List a =
-  fun @a (n :: Int) (x :: a) ->
+  \@a (n :: Int) (x :: a) ->
     match le_int n 0 with
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
 zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
-  fun @a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
+  \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     match xs with
     | Nil -> Nil @c
     | Cons x xs ->
@@ -68,16 +68,16 @@ zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
-  fun @a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
+  \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (match monad.m with
      | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
-  fun @a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
+  \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
     (match monad.m with
      | .Monad _ _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
-  fun @a @m (monad.m :: Monad m) (ms :: List (m a)) ->
+  \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
     match ms with
     | Nil ->
       (match monad.m with
@@ -87,33 +87,33 @@ sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
        | .Monad _ _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
+  \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
-  fun @a @b (f :: a -> b) (mx :: IO a) ->
+  \@a @b (f :: a -> b) (mx :: IO a) ->
     coerce @(_ -> IO) (functorIO.map.L1 @a @b f mx)
 monadIO.pure.L2 :: forall a. a -> IO a =
-  fun @a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
+  \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) ->
     coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
 io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (x :: a) (world :: World) ->
+  \@a @b (f :: a -> b) (x :: a) (world :: World) ->
     let y :: b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
 io.L2 :: forall a b. (a -> b) -> a -> IO b =
-  fun @a @b (f :: a -> b) (x :: a) ->
+  \@a @b (f :: a -> b) (x :: a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 nats.L1 :: (Int -> List Int) -> Int -> List Int =
-  fun (nats_from :: Int -> List Int) (n :: Int) ->
+  \(nats_from :: Int -> List Int) (n :: Int) ->
     Cons @Int n (nats_from (add_int n 1))
 pair.L1 :: forall a. (a -> a -> a) -> List a -> List a =
-  fun @a (op :: a -> a -> a) (xs1 :: List a) ->
+  \@a (op :: a -> a -> a) (xs1 :: List a) ->
     match xs1 with
     | Nil -> Nil @a
     | Cons pm$1 pm$2 ->
@@ -121,10 +121,10 @@ pair.L1 :: forall a. (a -> a -> a) -> List a -> List a =
       | Nil -> xs1
       | Cons x2 xs3 -> Cons @a (op pm$1 x2) (pair.L1 @a op xs3)
 single.L1 :: forall a. Int -> a -> RmqTree a =
-  fun @a (i :: Int) (x :: a) ->
+  \@a (i :: Int) (x :: a) ->
     RmqNode @a i i x (RmqEmpty @a) (RmqEmpty @a)
 combine.L1 :: forall a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
-  fun @a (op :: a -> a -> a) (t1 :: RmqTree a) (t2 :: RmqTree a) ->
+  \@a (op :: a -> a -> a) (t1 :: RmqTree a) (t2 :: RmqTree a) ->
     match t1 with
     | RmqEmpty -> abort @(RmqTree a)
     | RmqNode s1 _ v1 _ _ ->
@@ -132,7 +132,7 @@ combine.L1 :: forall a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
       | RmqEmpty -> abort @(RmqTree a)
       | RmqNode _ e2 v2 _ _ -> RmqNode @a s1 e2 (op v1 v2) t1 t2
 build.L1 :: forall a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
-  fun @a (op :: a -> a -> a) (run :: List (RmqTree a) -> RmqTree a) (ts :: List (RmqTree a)) ->
+  \@a (op :: a -> a -> a) (run :: List (RmqTree a) -> RmqTree a) (ts :: List (RmqTree a)) ->
     match ts with
     | Nil -> abort @(RmqTree a)
     | Cons pm$1 pm$2 ->
@@ -140,7 +140,7 @@ build.L1 :: forall a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (
       | Nil -> pm$1
       | Cons _ _ -> run (pair.L1 @(RmqTree a) (combine.L1 @a op) ts)
 query.L1 :: forall a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
-  fun @a (one :: a) (op :: a -> a -> a) (q_lo :: Int) (q_hi :: Int) (aux :: RmqTree a -> a) (t :: RmqTree a) ->
+  \@a (one :: a) (op :: a -> a -> a) (q_lo :: Int) (q_hi :: Int) (aux :: RmqTree a -> a) (t :: RmqTree a) ->
     match t with
     | RmqEmpty -> one
     | RmqNode t_lo t_hi value left right ->
@@ -161,12 +161,12 @@ query.L1 :: forall a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> Rm
         | True -> value
       | True -> one
 min.L1 :: Int -> Int -> Int =
-  fun (x :: Int) (y :: Int) ->
+  \(x :: Int) (y :: Int) ->
     match le_int x y with
     | False -> y
     | True -> x
 main.L1 :: RmqTree Int -> Int -> Int -> IO Unit =
-  fun (t :: RmqTree Int) (lo :: Int) (hi :: Int) ->
+  \(t :: RmqTree Int) (lo :: Int) (hi :: Int) ->
     let res :: Int =
           let rec aux :: RmqTree Int -> Int =
                     query.L1 @Int infinity min.L1 lo hi aux
@@ -175,13 +175,13 @@ main.L1 :: RmqTree Int -> Int -> Int -> IO Unit =
     in
     print res
 main.L2 :: RmqTree Int -> Int -> IO Unit =
-  fun (t :: RmqTree Int) (lo :: Int) ->
+  \(t :: RmqTree Int) (lo :: Int) ->
     let f :: Int -> IO Unit = main.L1 t lo in
     coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)
 main.L3 :: List Unit -> IO Unit =
-  fun (x :: List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)
+  \(x :: List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)
 main.L4 :: Int -> List Int -> IO Unit =
-  fun (m :: Int) (xs :: List Int) ->
+  \(m :: Int) (xs :: List Int) ->
     let t :: RmqTree Int =
           let rec run :: List (RmqTree Int) -> RmqTree Int =
                     build.L1 @Int min.L1 run
@@ -197,13 +197,13 @@ main.L4 :: Int -> List Int -> IO Unit =
     in
     coerce @(_ -> IO) (monadIO.bind.L1 @(List Unit) @Unit mx main.L3)
 main.L5 :: Int -> Int -> IO Unit =
-  fun (n :: Int) (m :: Int) ->
+  \(n :: Int) (m :: Int) ->
     let mx :: IO (List Int) =
           sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
     and f :: List Int -> IO Unit = main.L4 m
     in
     coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx f)
 main.L6 :: Int -> IO Unit =
-  fun (n :: Int) ->
+  \(n :: Int) ->
     let f :: Int -> IO Unit = main.L5 n in
     coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)

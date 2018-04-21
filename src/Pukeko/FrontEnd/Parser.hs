@@ -97,8 +97,7 @@ parens = between (symbol "(") (symbol ")")
 -- TODO: Ideally we want a trie rather than a tree.
 reservedIdents :: Set String
 reservedIdents = Set.fromList
-      [ "fun"
-      , "let", "rec", "and", "in"
+      [ "let", "rec", "and", "in"
       , "if", "then", "else"
       , "match", "with"
       , "data", "class", "where", "instance"
@@ -118,7 +117,7 @@ identLetter :: Parser Char
 identLetter = alphaNumChar <|> satisfy (\c -> c == '_' || c == '\'')
 
 reservedOperators :: Set String
-reservedOperators = Set.fromList ["->", "<-", "=>", "=", "::", "|"]
+reservedOperators = Set.fromList ["->", "<-", "=>", "=", "::", "|", "\\"]
 
 opLetter :: Parser Char
 opLetter = oneOf Op.letters
@@ -156,12 +155,13 @@ decimal = lexeme L.decimal
 lctd :: Parser a -> Parser (Lctd a)
 lctd p = Lctd <$> getPosition <*> p
 
-equals, arrow, darrow, hasType, bar :: Parser ()
+equals, arrow, darrow, hasType, bar, lam :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
 darrow  = reservedOp "=>"
 hasType = reservedOp "::"
 bar     = reservedOp "|"
+lam     = reservedOp "\\"
 
 name :: Parser String -> Parser (LctdName nsp)
 name p = lctd (Tagged <$> p)
@@ -269,7 +269,7 @@ expr =
       <*> (reserved "else" *> expr)
     , exprMatch
     , ELam
-      <$> (reserved "fun" *> NE.some tmvar)
+      <$> (lam *> NE.some tmvar)
       <*> (arrow *> expr)
     , let_ ELet ERec <*> (reserved "in" *> expr)
     , ECoe <$> (reserved "coerce" *> char '@' *> parens coercion) <*> aexpr

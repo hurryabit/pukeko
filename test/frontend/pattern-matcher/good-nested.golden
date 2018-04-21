@@ -2,9 +2,9 @@ data List a =
        | Nil
        | Cons a (List a)
 last :: forall a. a -> List a -> a =
-  fun @a ->
-    fun (x0 :: a) ->
-      fun (xs :: List a) ->
+  \@a ->
+    \(x0 :: a) ->
+      \(xs :: List a) ->
         match xs with
         | Nil -> x0
         | Cons pm$1 pm$2 ->

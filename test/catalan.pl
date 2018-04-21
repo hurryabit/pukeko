@@ -53,17 +53,17 @@ sols :: List Int =
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 functorList.map.L1 :: forall a b. (a -> b) -> List a -> List b =
-  fun @a @b (f :: a -> b) (xs :: List a) ->
+  \@a @b (f :: a -> b) (xs :: List a) ->
     match xs with
     | Nil -> Nil @b
     | Cons x xs -> Cons @b (f x) (functorList.map.L1 @a @b f xs)
 foldableList.foldl.L1 :: forall a b. (b -> a -> b) -> b -> List a -> b =
-  fun @a @b (f :: b -> a -> b) (y0 :: b) (xs :: List a) ->
+  \@a @b (f :: b -> a -> b) (y0 :: b) (xs :: List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs -> foldableList.foldl.L1 @a @b f (f y0 x) xs
 nth_exn.L1 :: forall a. List a -> Int -> a =
-  fun @a (xs :: List a) (n :: Int) ->
+  \@a (xs :: List a) (n :: Int) ->
     match xs with
     | Nil -> abort @a
     | Cons x xs ->
@@ -71,7 +71,7 @@ nth_exn.L1 :: forall a. List a -> Int -> a =
       | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
 zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
-  fun @a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
+  \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     match xs with
     | Nil -> Nil @c
     | Cons x xs ->
@@ -79,31 +79,31 @@ zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (x :: a) (world :: World) ->
+  \@a @b (f :: a -> b) (x :: a) (world :: World) ->
     let y :: b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
 io.L2 :: forall a b. (a -> b) -> a -> IO b =
-  fun @a @b (f :: a -> b) (x :: a) ->
+  \@a @b (f :: a -> b) (x :: a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 mul_p.L1 :: Int -> Int -> Int =
-  fun (x :: Int) (y :: Int) -> mod (mul_int x y) p
+  \(x :: Int) (y :: Int) -> mod (mul_int x y) p
 add_p.L1 :: Int -> Int -> Int =
-  fun (x :: Int) (y :: Int) -> mod (add_int x y) p
+  \(x :: Int) (y :: Int) -> mod (add_int x y) p
 scanl.L1 :: forall a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a -> List b =
-  fun @a @b (f :: b -> a -> b) (scanl_f :: b -> List a -> List b) (y0 :: b) (xs :: List a) ->
+  \@a @b (f :: b -> a -> b) (scanl_f :: b -> List a -> List b) (y0 :: b) (xs :: List a) ->
     match xs with
     | Nil -> Nil @b
     | Cons x xs ->
       let y0 :: b = f y0 x in
       Cons @b y0 (scanl_f y0 xs)
 sols.L1 :: List Int -> Int =
-  fun (xs :: List Int) ->
+  \(xs :: List Int) ->
     sum_p (zip_with.L1 @Int @Int @Int mul_p.L1 sols xs)
 sols.L2 :: List Int -> Int -> List Int =
-  fun (xs :: List Int) (x :: Int) -> Cons @Int x xs
+  \(xs :: List Int) (x :: Int) -> Cons @Int x xs
 main.L1 :: Int -> IO Unit =
-  fun (n :: Int) -> print (nth_exn.L1 @Int sols n)
+  \(n :: Int) -> print (nth_exn.L1 @Int sols n)

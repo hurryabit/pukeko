@@ -70,12 +70,12 @@ main :: IO Unit =
   let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
   coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
-  fun @a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
+  \@a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
 take.L1 :: forall a. Int -> List a -> List a =
-  fun @a (n :: Int) (xs :: List a) ->
+  \@a (n :: Int) (xs :: List a) ->
     match le_int n 0 with
     | False ->
       match xs with
@@ -83,7 +83,7 @@ take.L1 :: forall a. Int -> List a -> List a =
       | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
     | True -> Nil @a
 zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
-  fun @a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
+  \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     match xs with
     | Nil -> Nil @c
     | Cons x xs ->
@@ -91,22 +91,22 @@ zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 semi.L1 :: forall a m. m a -> Unit -> m a =
-  fun @a @m (m2 :: m a) (x :: Unit) -> m2
+  \@a @m (m2 :: m a) (x :: Unit) -> m2
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
-  fun @a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
+  \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
     (match monad.m with
      | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
-  fun @a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
+  \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (match monad.m with
      | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
-  fun @a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
+  \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
     (match monad.m with
      | .Monad _ _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
-  fun @a @m (monad.m :: Monad m) (ms :: List (m a)) ->
+  \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
     match ms with
     | Nil ->
       (match monad.m with
@@ -116,35 +116,35 @@ sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
        | .Monad _ _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
-  fun @a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
+  \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
+  \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
-  fun @a @b (f :: a -> b) (mx :: IO a) ->
+  \@a @b (f :: a -> b) (mx :: IO a) ->
     coerce @(_ -> IO) (functorIO.map.L1 @a @b f mx)
 monadIO.pure.L2 :: forall a. a -> IO a =
-  fun @a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
+  \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
-  fun @a @b (mx :: IO a) (f :: a -> IO b) ->
+  \@a @b (mx :: IO a) (f :: a -> IO b) ->
     coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
 io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b (f :: a -> b) (x :: a) (world :: World) ->
+  \@a @b (f :: a -> b) (x :: a) (world :: World) ->
     let y :: b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
 io.L2 :: forall a b. (a -> b) -> a -> IO b =
-  fun @a @b (f :: a -> b) (x :: a) ->
+  \@a @b (f :: a -> b) (x :: a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
 gen.L1 :: forall a. (a -> a) -> a -> List a =
-  fun @a (f :: a -> a) (x :: a) -> Cons @a x (gen.L1 @a f (f x))
+  \@a (f :: a -> a) (x :: a) -> Cons @a x (gen.L1 @a f (f x))
 split_at.L1 :: forall a. Int -> List a -> Pair (List a) (List a) =
-  fun @a (n :: Int) (xs :: List a) ->
+  \@a (n :: Int) (xs :: List a) ->
     match le_int n 0 with
     | False ->
       match xs with
@@ -154,9 +154,9 @@ split_at.L1 :: forall a. Int -> List a -> Pair (List a) (List a) =
         | Pair ys zs -> Pair @(List a) @(List a) (Cons @a x ys) zs
     | True -> Pair @(List a) @(List a) (Nil @a) xs
 random.L1 :: Int -> Int =
-  fun (x :: Int) -> mod (mul_int 91 x) 1000000007
+  \(x :: Int) -> mod (mul_int 91 x) 1000000007
 main.L1 :: Int -> Int -> Int -> IO Unit =
-  fun (n :: Int) (y :: Int) (z :: Int) ->
+  \(n :: Int) (y :: Int) (z :: Int) ->
     let y :: Int = mod y n in
     let z :: Int = mod z n in
     match lt_int y z with
@@ -173,4 +173,4 @@ main.L1 :: Int -> Int -> Int -> IO Unit =
       let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
       coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 main.L2 :: List Unit -> IO Unit =
-  fun (x :: List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)
+  \(x :: List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)

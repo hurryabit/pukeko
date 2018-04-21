@@ -16,5 +16,5 @@ fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print (nth_exn fibs0 n)

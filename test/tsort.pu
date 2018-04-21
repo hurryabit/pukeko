@@ -2,12 +2,12 @@ import std2/io
 import std2/bag
 
 tsort :: List Int -> List Int
-tsort xs = to_list (foldl (fun s x -> bag_insert x s) bag_empty xs)
+tsort xs = to_list (foldl (\s x -> bag_insert x s) bag_empty xs)
 
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   sequence (replicate n input)
-  >>= fun xs ->
+  >>= \xs ->
   traverse_ print (tsort xs)

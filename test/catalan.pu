@@ -26,11 +26,11 @@ scanl f =
 sols :: List Int
 sols =
   Cons 1
-    (map (fun xs -> sum_p (zip_with mul_p sols xs))
-      (scanl (fun xs x -> Cons x xs) Nil sols))
+    (map (\xs -> sum_p (zip_with mul_p sols xs))
+      (scanl (\xs x -> Cons x xs) Nil sols))
 
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print (nth_exn sols n)

@@ -7,10 +7,10 @@ class Foldable t where
   foldl :: (b -> a -> b) -> b -> t a -> b
 
 foldMap :: (Foldable t, Monoid m) => (a -> m) -> t a -> m
-foldMap f = foldr (fun x m -> append (f x) m) empty
+foldMap f = foldr (\x m -> append (f x) m) empty
 
 fold :: (Foldable t, Monoid m) => t m -> m
 fold = foldr append empty
 
 length :: (Foldable t) => t a -> Int
-length = foldMap (fun x -> 1)
+length = foldMap (\x -> 1)

@@ -6,6 +6,6 @@ gen f x = Cons x (gen f (f x))
 main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print n;
-  traverse_ print (take n (gen (fun x -> (91*x) % 1000000007) 1))
+  traverse_ print (take n (gen (\x -> (91*x) % 1000000007) 1))

@@ -290,7 +290,7 @@ prettyEAbs prec pars body
   | null pars = prettyPrec prec body
   | otherwise =
       maybeParens (prec > 0) $
-      hang ("fun" <+> hsepMap pretty pars <+> "->") 2 (pretty body)
+      hang ("\\" <> hsepMap pretty pars <+> "->") 2 (pretty body)
 
 instance IsTyped lg => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)

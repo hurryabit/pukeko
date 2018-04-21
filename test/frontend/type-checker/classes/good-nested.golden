@@ -1,12 +1,12 @@
 data C a =
        | .C (a -> a)
 c :: forall a. C a -> a -> a =
-  fun @a (dict :: C a) ->
+  \@a (dict :: C a) ->
     match dict with
     | .C c -> c
 f :: forall a. C a -> a -> a =
-  fun @a (c.a :: C a) ->
+  \@a (c.a :: C a) ->
     let g :: forall _1. C _1 -> _1 -> _1 =
-          fun @_1 (c._1 :: C _1) -> c @_1 c._1
+          \@_1 (c._1 :: C _1) -> c @_1 c._1
     in
     g @a c.a

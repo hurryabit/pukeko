@@ -9,7 +9,7 @@ repeat k m = when (k > 0) (m; repeat (k-1) m)
 main :: IO Unit
 main =
   input
-  >>= fun k ->
+  >>= \k ->
   input
-  >>= fun n ->
+  >>= \n ->
   repeat k (count_down n)
