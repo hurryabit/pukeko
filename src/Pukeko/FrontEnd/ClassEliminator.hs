@@ -120,7 +120,7 @@ elimInstDecl (MkInstDecl inst clss tatom prms ctxt superI defns0) = do
   let mkFuncDecl name type0 body0 = do
         -- TODO: We might want to copy the dictionary binders here.
         let type1 = rewindr TUni' prms (rewindr TCtx (map snd ctxt) type0)
-        let body1 = rewindr ETyAbs prms (rewindr ECxAbs ctxt (ETyAnn type0 body0))
+        let body1 = rewindr ETyAbs prms (rewindr EDxAbs ctxt (ETyAnn type0 body0))
         MkFuncDecl name type1 <$> elimExpr body1
   -- TODO: Share code between @superDefn@ und @defns1@.
   superDefn <- for superI $ \dict -> do
@@ -135,7 +135,7 @@ elimInstDecl (MkInstDecl inst clss tatom prms ctxt superI defns0) = do
   let defns2 = maybeToList superDefn ++ defns1
   let e_dcon = foldl ETyApp (ECon dcon) [t_inst]
   let callDefn defn =
-        foldl ECxApp
+        foldl EDxApp
           (foldl ETyApp (EVal (nameOf defn)) (map TVar prms))
           (map (DVar . fst) ctxt)
   let e_body = foldl ETmApp e_dcon (map callDefn defns2)
@@ -164,11 +164,11 @@ elimExpr = \case
   EAtm a -> pure (EAtm a)
   ETmApp fun arg -> ETmApp <$> elimExpr fun <*> elimExpr arg
   ETyApp e0 ts0 -> ETyApp <$> elimExpr e0 <*> pure ts0
-  ECxApp e0 dict -> ETmApp <$> elimExpr e0 <*> pure (elimDict dict)
+  EDxApp e0 dict -> ETmApp <$> elimExpr e0 <*> pure (elimDict dict)
   EApp{} -> impossible
   ETmAbs binder body0 -> ETmAbs binder <$> elimExpr body0
   ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
-  ECxAbs (x, c) e0 -> ETmAbs (x, mkTDict c) <$> elimExpr e0
+  EDxAbs (x, c) e0 -> ETmAbs (x, mkTDict c) <$> elimExpr e0
   EAbs{} -> impossible
   ELet m ds0 e0 -> ELet m <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
   EMat t e0 as -> EMat t <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as

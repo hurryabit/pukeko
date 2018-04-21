@@ -68,7 +68,7 @@ introPar :: (CanGamma effs, TypeOf lg ~ Type) => Par lg -> Eff effs a -> Eff eff
 introPar = \case
   TmPar xt -> introTmVar xt
   TyPar v  -> introTyVar v
-  CxPar xc -> introDxVar xc
+  DxPar xc -> introDxVar xc
 
 introPars :: (CanGamma effs, TypeOf lg ~ Type) => [Par lg] -> Eff effs a -> Eff effs a
 introPars pars act = foldr introPar act pars
