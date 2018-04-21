@@ -96,8 +96,8 @@ main.L1 :: Int -> Int =
   \(x :: Int) -> mod (mul_int 91 x) 1000000007
 main.L2 :: Int -> IO Unit =
   \(n :: Int) ->
-    let m1 :: IO Unit = print n
-    and m2 :: IO Unit =
+    let m1 :: IO Unit = print n in
+    let m2 :: IO Unit =
           foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (take.L1 @Int n (gen.L1 @Int main.L1 1))
     in
     let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in

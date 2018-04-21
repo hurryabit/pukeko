@@ -144,9 +144,11 @@ main.L1 :: List Int -> IO Unit =
   \(xs :: List Int) ->
     foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f :: Int -> List Int -> List Int =
                                                                                                                                     Cons @Int
-                                                                                                                              and y0 :: List Int =
+                                                                                                                              in
+                                                                                                                              let y0 :: List Int =
                                                                                                                                     Nil @Int
-                                                                                                                              and bag :: Bag Int =
+                                                                                                                              in
+                                                                                                                              let bag :: Bag Int =
                                                                                                                                     foldableList.foldl.L1 @Int @(Bag Int) tsort.L1 (coerce @(_ -> Bag) (Leaf @Int)) xs
                                                                                                                               in
                                                                                                                               foldableBinTree.foldr.L1 @Int @(List Int) f y0 (coerce @(Bag -> _) bag))

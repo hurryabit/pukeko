@@ -170,7 +170,7 @@ elimExpr = \case
   ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
   EDxAbs (x, c) e0 -> ETmAbs (x, mkTDict c) <$> elimExpr e0
   EAbs{} -> impossible
-  ELet m ds0 e0 -> ELet m <$> traverse (b2bound elimExpr) ds0 <*> elimExpr e0
+  ELet b e0 -> ELet <$> bind2expr elimExpr b <*> elimExpr e0
   EMat t e0 as -> EMat t <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
   ECast coe e0 -> ECast coe <$> elimExpr e0
   ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0

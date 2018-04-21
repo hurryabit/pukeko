@@ -48,8 +48,8 @@ read :: List Char -> IO (List Char) =
     let f :: Option Char -> IO (List Char) = read.L1 cs in
     coerce @(_ -> IO) (monadIO.bind.L1 @(Option Char) @(List Char) getChar f)
 main :: IO Unit =
-  let mx :: IO (List Char) = read (Nil @Char)
-  and f :: List Char -> IO Unit =
+  let mx :: IO (List Char) = read (Nil @Char) in
+  let f :: List Char -> IO Unit =
         foldableList.foldr.L1 @Char @(IO Unit) (traverse_.L1 @Char @IO monadIO putChar) (coerce @(_ -> IO) (Pair @Unit @World Unit))
   in
   coerce @(_ -> IO) (monadIO.bind.L1 @(List Char) @Unit mx f)

@@ -44,9 +44,6 @@ ccExtnDecl (In.ExtnDecl z _ s) = do
     modify (Map.insert z n)
     pure (Asm n)
 
-ccDefn :: In.Bind -> CC Defn
-ccDefn (In.MkBind b t) = MkDefn (bindName b) <$> ccExpr t
-
 ccExpr :: In.Expr -> CC Expr
 ccExpr = \case
   In.EVar x -> pure (Local (name x))
@@ -63,10 +60,12 @@ ccExpr = \case
   In.EAtm{} -> impossible  -- all cases matched above
   e0@(In.EApp _ In.TmArg{})
     | (e1, as) <- In.unwindl In._ETmApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
-  In.ELet m ds t -> Let isrec <$> traverse ccDefn ds <*> ccExpr t
-    where isrec = case m of
-            In.BindRec -> True
-            In.BindPar -> False
+  In.ELet (In.TmNonRec b e0) e1 ->
+    Let False <$> ((:[]) <$> (MkDefn (bindName b) <$> ccExpr e0)) <*> ccExpr e1
+  In.ELet (In.TmRec bs) e1 ->
+    Let True
+    <$> traverse (\(b, e0) -> MkDefn (bindName b) <$> ccExpr e0) (toList bs)
+    <*> ccExpr e1
   In.EMat _ e cs -> Match <$> ccExpr e <*> traverse ccAltn (toList cs)
   In.EApp e0 In.TyArg{} -> ccExpr e0
   In.ECast  _   e0 -> ccExpr e0

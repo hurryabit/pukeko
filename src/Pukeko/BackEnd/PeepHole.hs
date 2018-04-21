@@ -27,6 +27,7 @@ opt :: [Inst] -> Maybe [Inst]
 opt code0 = case code0 of
  UNWIND:JUMP _:code      -> Just $ UNWIND:code
  POP 0:code              -> Just code
+ SLIDE k:SLIDE l:code    -> Just $ SLIDE (k+l):code
  MKAP 0:code             -> Just code
  MKAP k:MKAP l:code      -> Just $ MKAP (k+l):code
  MKAP a:UPDATE k:code    -> Just $ UPDAP a k:code

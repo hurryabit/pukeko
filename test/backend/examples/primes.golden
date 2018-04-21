@@ -164,8 +164,7 @@ g_updap 2, 1
 g_push 3
 g_push 1
 g_mkap 1
-g_slide 1
-g_slide 1
+g_slide 2
 g_pushglobal sieve
 g_mkap 1
 g_push 1
@@ -196,8 +195,7 @@ g_mkap 2
 g_slide 1
 g_update 1
 g_push 0
-g_slide 1
-g_slide 1
+g_slide 2
 g_pushint 5
 g_cons 1, 2
 g_pushglobal psums

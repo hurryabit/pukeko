@@ -57,7 +57,8 @@ main.L1 :: Int -> Int -> IO Unit =
     let m1 :: IO Unit =
           print (case p of
                  | Pair x _ -> x)
-    and m2 :: IO Unit =
+    in
+    let m2 :: IO Unit =
           print (case p of
                  | Pair _ y -> y)
     in

@@ -155,9 +155,7 @@ g_pushglobal main.L2
 g_push 1
 g_pushglobal monadIO.bind.L1
 g_mkap 2
-g_slide 1
-g_slide 1
-g_slide 2
+g_slide 4
 g_push 0
 g_pushglobal semi.L1
 g_mkap 1
@@ -165,9 +163,7 @@ g_push 0
 g_push 3
 g_pushglobal monadIO.bind.L1
 g_mkap 2
-g_slide 1
-g_slide 2
-g_slide 2
+g_slide 5
 g_push 0
 g_pushglobal semi.L1
 g_mkap 1
@@ -175,8 +171,7 @@ g_push 0
 g_push 3
 g_pushglobal monadIO.bind.L1
 g_mkap 2
-g_slide 1
-g_slide 2
+g_slide 3
 g_push 0
 g_pushglobal semi.L1
 g_mkap 1
