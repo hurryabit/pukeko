@@ -1,4 +1,4 @@
 data T a = | C a a
-f : T a -> a
+f :: T a -> a
 f t = match t with
   | C x -> x

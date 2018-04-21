@@ -1,6 +1,6 @@
 import std2/prelude
 
-insert : Int -> List Int -> List Int
+insert :: Int -> List Int -> List Int
 insert y xs =
   match xs with
   | Nil -> Cons y Nil
@@ -10,13 +10,13 @@ insert y xs =
     else
       Cons x (insert y xs')
 
-isort : List Int -> List Int
+isort :: List Int -> List Int
 isort xs =
   match xs with
   | Nil -> Nil
   | Cons x xs -> insert x (isort xs)
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

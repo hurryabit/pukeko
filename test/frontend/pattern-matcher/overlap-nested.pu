@@ -2,7 +2,7 @@ data Pair a b = | Pair a b
 data Option a =
   | None
   | Some a
-f : Pair (Option a) a -> a
+f :: Pair (Option a) a -> a
 f xy =
   match xy with
   | Pair None     y -> y

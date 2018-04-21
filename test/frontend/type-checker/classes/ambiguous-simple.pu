@@ -1,4 +1,4 @@
 class C a where
-  c : Int
-f : Int
+  c :: Int
+f :: Int
 f = c

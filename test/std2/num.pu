@@ -1,10 +1,10 @@
 -- Class for numbers/algebraic structures
 
 class Ring a where
-  neg : a -> a
-  add : a -> a -> a
-  sub : a -> a -> a
-  mul : a -> a -> a
+  neg :: a -> a
+  add :: a -> a -> a
+  sub :: a -> a -> a
+  mul :: a -> a -> a
 
 infix + add
 infix - sub

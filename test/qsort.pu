@@ -1,6 +1,6 @@
 import std2/prelude
 
-qsort : List Int -> List Int
+qsort :: List Int -> List Int
 qsort xs =
   match xs with
   | Nil -> Nil
@@ -8,7 +8,7 @@ qsort xs =
     match partition (fun y -> y < x) xs with
     | Pair ys zs -> append (qsort ys) (Cons x (qsort zs))
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

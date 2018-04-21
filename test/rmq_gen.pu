@@ -1,9 +1,9 @@
 import std2/prelude
 
-gen : (a -> a) -> a -> List a
+gen :: (a -> a) -> a -> List a
 gen f x = Cons x (gen f (f x))
 
-split_at : Int -> List a -> Pair (List a) (List a)
+split_at :: Int -> List a -> Pair (List a) (List a)
 split_at n xs =
   if n <= 0 then
     Pair Nil xs
@@ -14,10 +14,10 @@ split_at n xs =
       match split_at (n-1) xs with
       | Pair ys zs -> Pair (Cons x ys) zs
 
-random : List Int
+random :: List Int
 random = gen (fun x -> (91*x) % 1000000007) 1
 
-main : IO Unit
+main :: IO Unit
 main =
   let n = 400000 in
   print n;

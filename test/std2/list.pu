@@ -9,7 +9,7 @@ data List a =
   | Nil
   | Cons a (List a)
 
-instance eqList : (Eq a) => Eq (List a) where
+instance eqList :: (Eq a) => Eq (List a) where
   eq xs ys = match xs with
     | Nil -> match ys with
       | Nil -> True
@@ -18,16 +18,16 @@ instance eqList : (Eq a) => Eq (List a) where
       | Nil -> False
       | Cons y ys -> x == y && xs == ys
 
-instance monoidList : Monoid (List a) where
+instance monoidList :: Monoid (List a) where
   empty = Nil
   append xs ys = foldr Cons ys xs
 
-instance functorList : Functor List where
+instance functorList :: Functor List where
   map f xs = match xs with
     | Nil -> Nil
     | Cons x xs -> Cons (f x) (map f xs)
 
-instance foldableList : Foldable List where
+instance foldableList :: Foldable List where
   foldr f y0 xs = match xs with
     | Nil -> y0
     | Cons x xs -> f x (foldr f y0 xs)
@@ -35,16 +35,16 @@ instance foldableList : Foldable List where
     | Nil -> y0
     | Cons x xs -> foldl f (f y0 x) xs
 
-to_list : (Foldable t) => t a -> List a
+to_list :: (Foldable t) => t a -> List a
 to_list = foldr Cons Nil
 
-nth_exn : List a -> Int -> a
+nth_exn :: List a -> Int -> a
 nth_exn xs n =
   match xs with
   | Nil -> abort
   | Cons x xs -> if n <= 0 then x else nth_exn xs (n-1)
 
-take : Int -> List a -> List a
+take :: Int -> List a -> List a
 take n xs =
   if n <= 0 then
     Nil
@@ -53,11 +53,11 @@ take n xs =
     | Nil       -> Nil
     | Cons x xs -> Cons x (take (n-1) xs)
 
-replicate : Int -> a -> List a
+replicate :: Int -> a -> List a
 replicate n x =
   if n <= 0 then Nil else Cons x (replicate (n-1) x)
 
-zip_with : (a -> b -> c) -> List a -> List b -> List c
+zip_with :: (a -> b -> c) -> List a -> List b -> List c
 zip_with f xs ys =
   match xs with
   | Nil -> Nil
@@ -66,7 +66,7 @@ zip_with f xs ys =
     | Nil -> Nil
     | Cons y ys -> Cons (f x y) (zip_with f xs ys)
 
-partition : (a -> Bool) -> List a -> Pair (List a) (List a)
+partition :: (a -> Bool) -> List a -> Pair (List a) (List a)
 partition p xs =
   match xs with
   | Nil -> Pair Nil Nil

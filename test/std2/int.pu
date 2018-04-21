@@ -5,27 +5,27 @@ import std2/monoid
 import std2/num
 
 -- Equality
-eq_int : Int -> Int -> Bool
+eq_int :: Int -> Int -> Bool
 external eq_int = "eq"
 
-instance eqInt : Eq Int where
+instance eqInt :: Eq Int where
   eq = eq_int
 
 
 -- Ordering
-lt_int : Int -> Int -> Bool
+lt_int :: Int -> Int -> Bool
 external lt_int = "lt"
 
-le_int : Int -> Int -> Bool
+le_int :: Int -> Int -> Bool
 external le_int = "le"
 
-ge_int : Int -> Int -> Bool
+ge_int :: Int -> Int -> Bool
 external ge_int = "ge"
 
-gt_int : Int -> Int -> Bool
+gt_int :: Int -> Int -> Bool
 external gt_int = "gt"
 
-instance ordInt : Ord Int where
+instance ordInt :: Ord Int where
   lt = lt_int
   le = le_int
   ge = ge_int
@@ -33,33 +33,33 @@ instance ordInt : Ord Int where
 
 
 -- Algebra
-neg_int : Int -> Int
+neg_int :: Int -> Int
 external neg_int = "neg"
 
-add_int : Int -> Int -> Int
+add_int :: Int -> Int -> Int
 external add_int = "add"
 
-sub_int : Int -> Int -> Int
+sub_int :: Int -> Int -> Int
 external sub_int = "sub"
 
-mul_int : Int -> Int -> Int
+mul_int :: Int -> Int -> Int
 external mul_int = "mul"
 
-instance ringInt : Ring Int where
+instance ringInt :: Ring Int where
   neg = neg_int
   add = add_int
   sub = sub_int
   mul = mul_int
 
-div : Int -> Int -> Int
+div :: Int -> Int -> Int
 external div = "div"
 
-mod : Int -> Int -> Int
+mod :: Int -> Int -> Int
 external mod = "mod"
 
 infix / div
 infix % mod
 
-instance monoidInt : Monoid Int where
+instance monoidInt :: Monoid Int where
   empty = 0
   append = add_int

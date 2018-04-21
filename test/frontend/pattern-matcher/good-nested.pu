@@ -1,7 +1,7 @@
 data List a =
   | Nil
   | Cons a (List a)
-last : a -> List a -> a
+last :: a -> List a -> a
 last x0 xs =
   match xs with
   | Nil                -> x0

@@ -1,6 +1,6 @@
 import std2/prelude
 
-diff : List Int -> List Int -> List Int
+diff :: List Int -> List Int -> List Int
 diff xs ys =
   match xs with
   | Nil -> Nil
@@ -15,12 +15,12 @@ diff xs ys =
       else
         diff xs ys'
 
-ints : List Int
+ints :: List Int
 ints =
   let rec go k = Cons k (go (k+1)) in
   go 1
 
-solve_aux : List (List Int) -> List (List Int)
+solve_aux :: List (List Int) -> List (List Int)
 solve_aux kss =
   match kss with
   | Nil -> Cons Nil Nil
@@ -33,10 +33,10 @@ solve_aux kss =
             ints)))
     ks
 
-solve : Int -> List (List Int)
+solve :: Int -> List (List Int)
 solve n = solve_aux (replicate n (take n ints))
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

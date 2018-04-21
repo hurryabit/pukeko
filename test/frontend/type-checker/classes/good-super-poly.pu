@@ -1,19 +1,19 @@
 class C a where
-  c : a -> Int
+  c :: a -> Int
 class (C a) <= D a where
-  d : a -> Int
+  d :: a -> Int
 data T a = | C a
-instance cInt : C Int where
+instance cInt :: C Int where
   c x = x
-instance dInt : D Int where
+instance dInt :: D Int where
   d x = x
-instance cT : (C a) => C (T a) where
+instance cT :: (C a) => C (T a) where
   c t =
     match t with
     | C x -> c x
-instance dT : (D a) => D (T a) where
+instance dT :: (D a) => D (T a) where
   d t =
     match t with
     | C x -> d x
-f : (D a) => T a -> Int
+f :: (D a) => T a -> Int
 f x = c x

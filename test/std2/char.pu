@@ -3,9 +3,9 @@ import std2/int
 
 type Char = external
 
-ord : Char -> Int
+ord :: Char -> Int
 external ord = "ord"
 
 -- Does not check for overflow, just takes the least significant byte.
-chr : Int -> Char
+chr :: Int -> Char
 external chr = "chr"

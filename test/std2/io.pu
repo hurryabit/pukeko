@@ -4,19 +4,19 @@ import std2/int
 import std2/monad
 
 -- Primitives used for I/O
-seq : a -> b -> b
+seq :: a -> b -> b
 external seq = "seq"
 
-puti : Int -> Unit
+puti :: Int -> Unit
 external puti = "puti"
 
-geti : Unit -> Int
+geti :: Unit -> Int
 external geti = "geti"
 
-putc : Int -> Unit
+putc :: Int -> Unit
 external putc = "putc"
 
-getc : Unit -> Int
+getc :: Unit -> Int
 external getc = "getc"
 
 -- The IO monad
@@ -24,28 +24,28 @@ type World = external
 
 type IO a = World -> Pair a World
 
-instance functorIO : Functor IO where
+instance functorIO :: Functor IO where
   map f mx = coerce@(_ -> IO) (fun world0 ->
     match (coerce @(IO -> _) mx) world0 with
     | Pair x world1 -> Pair (f x) world1)
 
-instance monadIO : Monad IO where
+instance monadIO :: Monad IO where
   pure x = coerce @(_ -> IO) (fun world -> Pair x world)
   bind mx f = coerce @(_ -> IO) (fun world0 ->
     match (coerce @(IO -> _) mx) world0 with
     | Pair x world1 -> (coerce @(IO -> _) (f x)) world1)
 
-io : (a -> b) -> a -> IO b
+io :: (a -> b) -> a -> IO b
 io f x = coerce @(_ -> IO) (fun world -> let y = f x in seq y (Pair y world))
 
-print : Int -> IO Unit
+print :: Int -> IO Unit
 print n = io puti n
 
-input : IO Int
+input :: IO Int
 input = io geti Unit
 
-putChar : Char -> IO Unit
+putChar :: Char -> IO Unit
 putChar c = io (fun c -> putc (ord c)) c
 
-getChar : IO (Option Char)
+getChar :: IO (Option Char)
 getChar = io (fun u -> let n = getc u in if n < 0 then None else Some (chr n)) Unit

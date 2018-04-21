@@ -4,17 +4,17 @@ import std2/functor
 import std2/list
 
 class (Functor m) <= Monad m where
-  pure : a -> m a
-  bind : m a -> (a -> m b) -> m b
+  pure :: a -> m a
+  bind :: m a -> (a -> m b) -> m b
 
 infix >>= bind
 
-semi : (Monad m) => m Unit -> m a -> m a
+semi :: (Monad m) => m Unit -> m a -> m a
 semi m1 m2 = m1 >>= fun x -> m2
 
 infix ; semi
 
-sequence : (Monad m) => List (m a) -> m (List a)
+sequence :: (Monad m) => List (m a) -> m (List a)
 sequence ms =
   match ms with
   | Nil -> pure Nil
@@ -25,8 +25,8 @@ sequence ms =
       >>= fun xs ->
       pure (Cons x xs)
 
-traverse_ : (Monad m, Foldable t) => (a -> m Unit) -> t a -> m Unit
+traverse_ :: (Monad m, Foldable t) => (a -> m Unit) -> t a -> m Unit
 traverse_ f = foldr (fun x m -> f x; m) (pure Unit)
 
-when : (Monad m) => Bool -> m Unit -> m Unit
+when :: (Monad m) => Bool -> m Unit -> m Unit
 when p m = if p then m else pure Unit

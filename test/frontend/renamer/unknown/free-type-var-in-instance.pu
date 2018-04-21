@@ -1,4 +1,4 @@
 class C a where
-  f : a -> a
-instance cInt : (C a) => C Int where
+  f :: a -> a
+instance cInt :: (C a) => C Int where
   f x = x

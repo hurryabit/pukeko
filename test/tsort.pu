@@ -1,10 +1,10 @@
 import std2/io
 import std2/bag
 
-tsort : List Int -> List Int
+tsort :: List Int -> List Int
 tsort xs = to_list (foldl (fun s x -> bag_insert x s) bag_empty xs)
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

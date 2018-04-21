@@ -1,16 +1,16 @@
 import std2/prelude
 
-fst : Pair a b -> a
+fst :: Pair a b -> a
 fst p =
   match p with
   | Pair x _ -> x
 
-snd : Pair a b -> b
+snd :: Pair a b -> b
 snd p =
   match p with
   | Pair _ y -> y
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun x ->

@@ -1,9 +1,9 @@
 import std2/prelude
 
-gen : (a -> a) -> a -> List a
+gen :: (a -> a) -> a -> List a
 gen f x = Cons x (gen f (f x))
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

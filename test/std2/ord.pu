@@ -2,10 +2,10 @@
 import std2/basic
 
 class (Eq a) <= Ord a where
-  ge : a -> a -> Bool
-  gt : a -> a -> Bool
-  le : a -> a -> Bool
-  lt : a -> a -> Bool
+  ge :: a -> a -> Bool
+  gt :: a -> a -> Bool
+  le :: a -> a -> Bool
+  lt :: a -> a -> Bool
 
 infix >= ge
 infix >  gt

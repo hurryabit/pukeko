@@ -1,7 +1,7 @@
 -- Operations and instances on pairs
 import std2/basic
 
-instance eqPair : (Eq a, Eq b) => Eq (Pair a b) where
+instance eqPair :: (Eq a, Eq b) => Eq (Pair a b) where
   eq x y =
     match x with
     | Pair x1 x2 ->

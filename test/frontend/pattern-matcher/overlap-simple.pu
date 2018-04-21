@@ -1,5 +1,5 @@
 data Pair a b = | Pair a b
-f : Pair a a -> a
+f :: Pair a a -> a
 f xy =
   match xy with
   | Pair x _ -> x

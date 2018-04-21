@@ -1,11 +1,11 @@
 import std2/prelude
 
-nats : List Int
+nats :: List Int
 nats =
   let rec nats_from n = Cons n (nats_from (n+1)) in
   nats_from 0
 
-pair : (a -> a -> a) -> List a -> List a
+pair :: (a -> a -> a) -> List a -> List a
 pair op xs1 =
   match xs1 with
   | Nil -> Nil
@@ -16,10 +16,10 @@ data RmqTree a =
   | RmqEmpty
   | RmqNode Int Int a (RmqTree a) (RmqTree a)
 
-single : Int -> a -> RmqTree a
+single :: Int -> a -> RmqTree a
 single i x = RmqNode i i x RmqEmpty RmqEmpty
 
-combine : (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a
+combine :: (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a
 combine op t1 t2 =
   match t1 with
   | RmqEmpty -> abort
@@ -29,7 +29,7 @@ combine op t1 t2 =
     | RmqNode _ e2 v2 _ _ ->
       RmqNode s1 e2 (op v1 v2) t1 t2
 
-build : (a -> a -> a) -> List a -> RmqTree a
+build :: (a -> a -> a) -> List a -> RmqTree a
 build op xs =
   let rec run ts =
     match ts with
@@ -39,7 +39,7 @@ build op xs =
   in
   run (zip_with single nats xs)
 
-query : a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a
+query :: a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a
 query one op q_lo q_hi =
   let rec aux t =
     match t with
@@ -54,16 +54,16 @@ query one op q_lo q_hi =
   in
   aux
 
-infinity : Int
+infinity :: Int
 infinity = 1000000000
 
-min : Int -> Int -> Int
+min :: Int -> Int -> Int
 min x y = if x <= y then x else y
 
-replicate_io : Int -> IO a -> IO (List a)
+replicate_io :: Int -> IO a -> IO (List a)
 replicate_io n act = sequence (replicate n act)
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

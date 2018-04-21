@@ -1,7 +1,7 @@
 data Option a =
   | None
   | Some a
-f : a -> Option a -> a
+f :: a -> Option a -> a
 f x0 x_opt =
   match x_opt with
   | Some x -> x

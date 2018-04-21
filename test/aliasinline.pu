@@ -1,16 +1,16 @@
 import std2/io
 
-h : c -> c
+h :: c -> c
 h z = (fun u -> u) z
 
-g : b -> b
+g :: b -> b
 g y = (fun z -> h z) y
 
-f1 : a -> a
+f1 :: a -> a
 f1 = h
 
-f2 : a -> a
+f2 :: a -> a
 f2 x = g x
 
-main : IO Unit
+main :: IO Unit
 main = pure (f1 (f2 Unit))

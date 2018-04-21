@@ -1,42 +1,42 @@
 data C a =
        | .C (a -> Int)
-c : forall a. C a -> a -> Int =
-  fun @a (dict : C a) ->
+c :: forall a. C a -> a -> Int =
+  fun @a (dict :: C a) ->
     match dict with
     | .C c -> c
 data D a =
        | .D (C a) (a -> Int)
-D.C : forall a. D a -> C a =
-  fun @a (dict : D a) ->
+D.C :: forall a. D a -> C a =
+  fun @a (dict :: D a) ->
     match dict with
     | .D D.C _ -> D.C
-d : forall a. D a -> a -> Int =
-  fun @a (dict : D a) ->
+d :: forall a. D a -> a -> Int =
+  fun @a (dict :: D a) ->
     match dict with
     | .D _ d -> d
 data T a =
        | C a
-cInt : C Int = .C @Int cInt.c
-cInt.c : Int -> Int = fun (x : Int) -> x
-dInt : D Int = .D @Int dInt.C dInt.d
-dInt.C : C Int = cInt
-dInt.d : Int -> Int = fun (x : Int) -> x
-cT : forall a. C a -> C (T a) =
-  fun @a (c.a : C a) -> .C @(T a) (cT.c @a c.a)
-cT.c : forall a. C a -> T a -> Int =
-  fun @a (c.a : C a) ->
-    fun (t : T a) ->
+cInt :: C Int = .C @Int cInt.c
+cInt.c :: Int -> Int = fun (x :: Int) -> x
+dInt :: D Int = .D @Int dInt.C dInt.d
+dInt.C :: C Int = cInt
+dInt.d :: Int -> Int = fun (x :: Int) -> x
+cT :: forall a. C a -> C (T a) =
+  fun @a (c.a :: C a) -> .C @(T a) (cT.c @a c.a)
+cT.c :: forall a. C a -> T a -> Int =
+  fun @a (c.a :: C a) ->
+    fun (t :: T a) ->
       match t with
       | C x -> c @a c.a x
-dT : forall a. D a -> D (T a) =
-  fun @a (d.a : D a) -> .D @(T a) (dT.C @a d.a) (dT.d @a d.a)
-dT.C : forall a. D a -> C (T a) =
-  fun @a (d.a : D a) -> cT @a (D.C @a d.a)
-dT.d : forall a. D a -> T a -> Int =
-  fun @a (d.a : D a) ->
-    fun (t : T a) ->
+dT :: forall a. D a -> D (T a) =
+  fun @a (d.a :: D a) -> .D @(T a) (dT.C @a d.a) (dT.d @a d.a)
+dT.C :: forall a. D a -> C (T a) =
+  fun @a (d.a :: D a) -> cT @a (D.C @a d.a)
+dT.d :: forall a. D a -> T a -> Int =
+  fun @a (d.a :: D a) ->
+    fun (t :: T a) ->
       match t with
       | C x -> d @a d.a x
-f : forall a. D a -> T a -> Int =
-  fun @a (d.a : D a) ->
-    fun (x : T a) -> c @(T a) (cT @a (D.C @a d.a)) x
+f :: forall a. D a -> T a -> Int =
+  fun @a (d.a :: D a) ->
+    fun (x :: T a) -> c @(T a) (cT @a (D.C @a d.a)) x

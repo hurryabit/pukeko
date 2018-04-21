@@ -1,23 +1,23 @@
 data C a =
        | .C (a -> a)
-c : forall a. C a -> a -> a =
-  fun @a (dict : C a) ->
+c :: forall a. C a -> a -> a =
+  fun @a (dict :: C a) ->
     match dict with
     | .C c -> c
 data D a =
        | .D (C a) (a -> a)
-D.C : forall a. D a -> C a =
-  fun @a (dict : D a) ->
+D.C :: forall a. D a -> C a =
+  fun @a (dict :: D a) ->
     match dict with
     | .D D.C _ -> D.C
-d : forall a. D a -> a -> a =
-  fun @a (dict : D a) ->
+d :: forall a. D a -> a -> a =
+  fun @a (dict :: D a) ->
     match dict with
     | .D _ d -> d
-f : forall a. D a -> a -> a =
-  fun @a (d.a : D a) ->
-    let g : forall _5. C _5 -> D _5 -> _5 -> _5 =
-          fun @_5 (c._5 : C _5) (d._5 : D _5) ->
-            fun (x : _5) -> c @_5 c._5 (d @_5 d._5 x)
+f :: forall a. D a -> a -> a =
+  fun @a (d.a :: D a) ->
+    let g :: forall _5. C _5 -> D _5 -> _5 -> _5 =
+          fun @_5 (c._5 :: C _5) (d._5 :: D _5) ->
+            fun (x :: _5) -> c @_5 c._5 (d @_5 d._5 x)
     in
     g @a (D.C @a d.a) d.a

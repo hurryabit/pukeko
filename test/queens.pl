@@ -31,88 +31,88 @@ data Monad m =
        | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
-external eq_int : Int -> Int -> Bool = "eq"
-external lt_int : Int -> Int -> Bool = "lt"
-external le_int : Int -> Int -> Bool = "le"
-external add_int : Int -> Int -> Int = "add"
-external sub_int : Int -> Int -> Int = "sub"
-external seq : forall a b. a -> b -> b = "seq"
-external puti : Int -> Unit = "puti"
-external geti : Unit -> Int = "geti"
-monoidInt : Monoid Int = .Monoid @Int monoidInt.empty add_int
-print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
-ints : List Int =
-  let rec go : Int -> List Int = ints.L1 go in
+external eq_int :: Int -> Int -> Bool = "eq"
+external lt_int :: Int -> Int -> Bool = "lt"
+external le_int :: Int -> Int -> Bool = "le"
+external add_int :: Int -> Int -> Int = "add"
+external sub_int :: Int -> Int -> Int = "sub"
+external seq :: forall a b. a -> b -> b = "seq"
+external puti :: Int -> Unit = "puti"
+external geti :: Unit -> Int = "geti"
+monoidInt :: Monoid Int = .Monoid @Int monoidInt.empty add_int
+print :: Int -> IO Unit = io.L2 @Int @Unit puti
+input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
+ints :: List Int =
+  let rec go :: Int -> List Int = ints.L1 go in
   go 1
-solve_aux : List (List Int) -> List (List Int) =
-  fun (kss : List (List Int)) ->
+solve_aux :: List (List Int) -> List (List Int) =
+  fun (kss :: List (List Int)) ->
     match kss with
     | Nil -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
     | Cons ks kss ->
-      let monoid.m : Monoid (List (List Int)) =
+      let monoid.m :: Monoid (List (List Int)) =
             .Monoid @(List (List Int)) (monoidList.empty @(List Int)) (monoidList.append.L1 @(List Int))
-      and f : Int -> List (List Int) = solve_aux.L2 kss
+      and f :: Int -> List (List Int) = solve_aux.L2 kss
       in
       foldableList.foldr.L1 @Int @(List (List Int)) (foldMap.L1 @Int @(List (List Int)) monoid.m f) (match monoid.m with
                                                                                                      | .Monoid empty _ ->
                                                                                                        empty) ks
-main : IO Unit =
+main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
-monoidInt.empty : Int = 0
-monoidList.empty : forall a. List a = Nil
-foldMap.L1 : forall a m. Monoid m -> (a -> m) -> a -> m -> m =
-  fun @a @m (monoid.m : Monoid m) (f : a -> m) (x : a) ->
+monoidInt.empty :: Int = 0
+monoidList.empty :: forall a. List a = Nil
+foldMap.L1 :: forall a m. Monoid m -> (a -> m) -> a -> m -> m =
+  fun @a @m (monoid.m :: Monoid m) (f :: a -> m) (x :: a) ->
     (match monoid.m with
      | .Monoid _ append -> append) (f x)
-length.L1 : forall a. a -> Int = fun @a (x : a) -> 1
-monoidList.append.L1 : forall a. List a -> List a -> List a =
-  fun @a (xs : List a) (ys : List a) ->
+length.L1 :: forall a. a -> Int = fun @a (x :: a) -> 1
+monoidList.append.L1 :: forall a. List a -> List a -> List a =
+  fun @a (xs :: List a) (ys :: List a) ->
     foldableList.foldr.L1 @a @(List a) (Cons @a) ys xs
-functorList.map.L1 : forall a b. (a -> b) -> List a -> List b =
-  fun @a @b (f : a -> b) (xs : List a) ->
+functorList.map.L1 :: forall a b. (a -> b) -> List a -> List b =
+  fun @a @b (f :: a -> b) (xs :: List a) ->
     match xs with
     | Nil -> Nil @b
     | Cons x xs -> Cons @b (f x) (functorList.map.L1 @a @b f xs)
-foldableList.foldr.L1 : forall a b. (a -> b -> b) -> b -> List a -> b =
-  fun @a @b (f : a -> b -> b) (y0 : b) (xs : List a) ->
+foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
+  fun @a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
     match xs with
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
-take.L1 : forall a. Int -> List a -> List a =
-  fun @a (n : Int) (xs : List a) ->
+take.L1 :: forall a. Int -> List a -> List a =
+  fun @a (n :: Int) (xs :: List a) ->
     match le_int n 0 with
     | False ->
       match xs with
       | Nil -> Nil @a
       | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
     | True -> Nil @a
-replicate.L1 : forall a. Int -> a -> List a =
-  fun @a (n : Int) (x : a) ->
+replicate.L1 :: forall a. Int -> a -> List a =
+  fun @a (n :: Int) (x :: a) ->
     match le_int n 0 with
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-zip_with.L1 : forall a b c. (a -> b -> c) -> List a -> List b -> List c =
-  fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+  fun @a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     match xs with
     | Nil -> Nil @c
     | Cons x xs ->
       match ys with
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
-monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
+monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
+  fun @a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     match coerce @(IO -> _) mx world0 with
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b (f : a -> b) (x : a) (world : World) ->
-    let y : b = f x in
+io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
+  fun @a @b (f :: a -> b) (x :: a) (world :: World) ->
+    let y :: b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : forall a b. (a -> b) -> a -> IO b =
-  fun @a @b (f : a -> b) (x : a) ->
+io.L2 :: forall a b. (a -> b) -> a -> IO b =
+  fun @a @b (f :: a -> b) (x :: a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
-diff.L1 : List Int -> List Int -> List Int =
-  fun (xs : List Int) (ys : List Int) ->
+diff.L1 :: List Int -> List Int -> List Int =
+  fun (xs :: List Int) (ys :: List Int) ->
     match xs with
     | Nil -> Nil @Int
     | Cons x xs' ->
@@ -125,16 +125,16 @@ diff.L1 : List Int -> List Int -> List Int =
           | False -> diff.L1 xs ys'
           | True -> diff.L1 xs' ys'
         | True -> Cons @Int x (diff.L1 xs' ys)
-ints.L1 : (Int -> List Int) -> Int -> List Int =
-  fun (go : Int -> List Int) (k : Int) ->
+ints.L1 :: (Int -> List Int) -> Int -> List Int =
+  fun (go :: Int -> List Int) (k :: Int) ->
     Cons @Int k (go (add_int k 1))
-solve_aux.L1 : Int -> List Int -> Int -> List Int =
-  fun (k : Int) (ls : List Int) (i : Int) ->
+solve_aux.L1 :: Int -> List Int -> Int -> List Int =
+  fun (k :: Int) (ls :: List Int) (i :: Int) ->
     diff.L1 ls (Cons @Int (sub_int k i) (Cons @Int k (Cons @Int (add_int k i) (Nil @Int))))
-solve_aux.L2 : List (List Int) -> Int -> List (List Int) =
-  fun (kss : List (List Int)) (k : Int) ->
+solve_aux.L2 :: List (List Int) -> Int -> List (List Int) =
+  fun (kss :: List (List Int)) (k :: Int) ->
     functorList.map.L1 @(List Int) @(List Int) (Cons @Int k) (solve_aux (zip_with.L1 @(List Int) @Int @(List Int) (solve_aux.L1 k) kss ints))
-main.L1 : Int -> IO Unit =
-  fun (n : Int) ->
-    print (let f : List Int -> Int = length.L1 @(List Int) in
+main.L1 :: Int -> IO Unit =
+  fun (n :: Int) ->
+    print (let f :: List Int -> Int = length.L1 @(List Int) in
            foldableList.foldr.L1 @(List Int) @Int (foldMap.L1 @(List Int) @Int monoidInt f) monoidInt.empty (solve_aux (replicate.L1 @(List Int) n (take.L1 @Int n ints))))

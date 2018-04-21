@@ -118,7 +118,7 @@ identLetter :: Parser Char
 identLetter = alphaNumChar <|> satisfy (\c -> c == '_' || c == '\'')
 
 reservedOperators :: Set String
-reservedOperators = Set.fromList ["->", "<-", "=>", "=", ":", "|"]
+reservedOperators = Set.fromList ["->", "<-", "=>", "=", "::", "|"]
 
 opLetter :: Parser Char
 opLetter = oneOf Op.letters
@@ -156,11 +156,11 @@ decimal = lexeme L.decimal
 lctd :: Parser a -> Parser (Lctd a)
 lctd p = Lctd <$> getPosition <*> p
 
-equals, arrow, darrow, colon, bar :: Parser ()
+equals, arrow, darrow, hasType, bar :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
 darrow  = reservedOp "=>"
-colon   = reservedOp ":"
+hasType = reservedOp "::"
 bar     = reservedOp "|"
 
 name :: Parser String -> Parser (LctdName nsp)
@@ -306,7 +306,7 @@ dconDecl = indented_ bar (MkTmConDecl <$> tmcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
-  (try (indented tmvar (\z -> colon $> z)))
+  (try (indented tmvar (\z -> hasType $> z)))
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
@@ -321,7 +321,7 @@ clssDecl = do
 instDecl :: Parser InstDecl
 instDecl = do
   n       <- tmvar
-  colon
+  hasType
   q       <- typeCstr
   c       <- clasz
   (t, vs) <- (,) <$> typeAtom <*> pure [] <|>

@@ -1,11 +1,11 @@
 import std2/prelude
 
-repeat : List a -> List a
+repeat :: List a -> List a
 repeat xs =
   let rec ys = append xs ys in
   ys
 
-psums : List Int -> List Int
+psums :: List Int -> List Int
 psums =
   let rec psums0 n xs =
     match xs with
@@ -16,7 +16,7 @@ psums =
   in
   psums0 0
 
-filter : (a -> Bool) -> List a -> List a
+filter :: (a -> Bool) -> List a -> List a
 filter p =
   let rec filter_p xs =
     match xs with
@@ -27,16 +27,16 @@ filter p =
   in
   filter_p
 
-sieve : List Int -> List Int
+sieve :: List Int -> List Int
 sieve ks =
   match ks with
   | Nil -> abort
   | Cons p ks -> Cons p (sieve (filter (fun k -> k % p != 0) ks))
 
-primes : List Int
+primes :: List Int
 primes = Cons 2 (Cons 3 (sieve (psums (Cons 5 (repeat (Cons 2 (Cons 4 Nil)))))))
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

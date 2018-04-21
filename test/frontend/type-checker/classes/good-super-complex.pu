@@ -1,8 +1,8 @@
 class C a where
-  c : a -> a
+  c :: a -> a
 class (C a) <= D a where
-  d : a -> a
-f : (D a) => a -> a
+  d :: a -> a
+f :: (D a) => a -> a
 f =
   let g x = c (d x)
   in  g

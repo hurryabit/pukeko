@@ -3,50 +3,50 @@ import std2/prelude
 -- Fixpoint of a functor
 type Fix f = f (Fix f)
 
-fix : f (Fix f) -> Fix f
+fix :: f (Fix f) -> Fix f
 fix x = coerce @(_ -> Fix) x
 
-unFix : Fix f -> f (Fix f)
+unFix :: Fix f -> f (Fix f)
 unFix x = coerce @(Fix -> _) x
 
-cata : (Functor f) => (f a -> a) -> Fix f -> a
+cata :: (Functor f) => (f a -> a) -> Fix f -> a
 cata f = f ∘ map (cata f) ∘ unFix
 
-ana : (Functor f) => (a -> f a) -> a -> Fix f
+ana :: (Functor f) => (a -> f a) -> a -> Fix f
 ana f = fix ∘ map (ana f) ∘ f
 
-hylo : (Functor f) => (f b -> b) -> (a -> f a) -> a -> b
+hylo :: (Functor f) => (f b -> b) -> (a -> f a) -> a -> b
 hylo f g = cata f ∘ ana g
 
 class Bifunctor p where
-  bimap : (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2
+  bimap :: (a1 -> a2) -> (b1 -> b2) -> p a1 b1 -> p a2 b2
 
 type Fix2 p a = p a (Fix2 p a)
 
-fix2 : p a (Fix2 p a) -> Fix2 p a
+fix2 :: p a (Fix2 p a) -> Fix2 p a
 fix2 x = coerce @(_ -> Fix2) x
 
-unFix2 : Fix2 p a -> p a (Fix2 p a)
+unFix2 :: Fix2 p a -> p a (Fix2 p a)
 unFix2 x = coerce @(Fix2 -> _) x
 
-instance functorFox2 : (Bifunctor p) => Functor (Fix2 p) where
+instance functorFox2 :: (Bifunctor p) => Functor (Fix2 p) where
   map f = fix2 ∘ bimap f (map f) ∘ unFix2
 
-poly : (Bifunctor p) => Fix (p a) -> Fix2 p a
+poly :: (Bifunctor p) => Fix (p a) -> Fix2 p a
 poly = fix2 ∘ bimap id poly ∘ unFix
 
-mono : (Bifunctor p) => Fix2 p a -> Fix (p a)
+mono :: (Bifunctor p) => Fix2 p a -> Fix (p a)
 mono = fix ∘ bimap id mono ∘ unFix2
 
 type FixPoly p a = Fix (p a)
 
-fixPoly : Fix (p a) -> FixPoly p a
+fixPoly :: Fix (p a) -> FixPoly p a
 fixPoly x = coerce @(_ -> FixPoly) x
 
-unFixPoly : FixPoly p a -> Fix (p a)
+unFixPoly :: FixPoly p a -> Fix (p a)
 unFixPoly x = coerce @(FixPoly -> _) x
 
-instance functorFixPoly : (Bifunctor p) => Functor (FixPoly p) where
+instance functorFixPoly :: (Bifunctor p) => Functor (FixPoly p) where
   map f = fixPoly ∘ mono ∘ map f ∘ poly ∘ unFixPoly
 
 
@@ -55,29 +55,29 @@ data ListF a b =
   | NilF
   | ConsF a b
 
-instance functorListF : Functor (ListF a) where
+instance functorListF :: Functor (ListF a) where
   map = bimap id
 
-instance bifunctorListF : Bifunctor ListF where
+instance bifunctorListF :: Bifunctor ListF where
   bimap f g x =
     match x with
     | NilF      -> NilF
     | ConsF y z -> ConsF (f y) (g z)
 
-toList : Fix2 ListF a -> List a
+toList :: Fix2 ListF a -> List a
 toList = cata (fun x ->
   match x with
   | NilF       -> Nil
   | ConsF y ys -> Cons y ys) ∘ mono
 
-fromList : List a -> Fix2 ListF a
+fromList :: List a -> Fix2 ListF a
 fromList = poly ∘ ana (fun x ->
   match x with
   | Nil       -> NilF
   | Cons y ys -> ConsF y ys)
 
 
-main : IO Unit
+main :: IO Unit
 main =
   input
   >>= fun n ->

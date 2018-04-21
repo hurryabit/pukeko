@@ -1,8 +1,8 @@
 import std2/char
 import std2/prelude
 
-hello : List Int
+hello :: List Int
 hello = Cons 72 (Cons 101 (Cons 108 (Cons 108 (Cons 111 (Cons 32 (Cons 87 (Cons 111 (Cons 114 (Cons 108 (Cons 100 (Cons 33 (Cons 10 Nil))))))))))))
 
-main : IO Unit
+main :: IO Unit
 main = traverse_ (fun x -> putChar (chr x)) hello

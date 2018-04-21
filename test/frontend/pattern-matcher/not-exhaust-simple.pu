@@ -1,7 +1,7 @@
 data Choice a b =
   | First a
   | Second b
-f : Choice a b -> a
+f :: Choice a b -> a
 f xy =
   match xy with
   | First x -> x
