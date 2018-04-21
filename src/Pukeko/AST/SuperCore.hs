@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.AST.SuperCore
   ( module Pukeko.AST.SuperCore
   , module Pukeko.AST.Expr

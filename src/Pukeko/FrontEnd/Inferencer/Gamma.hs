@@ -1,5 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
--- TODO: Fix naming.
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.FrontEnd.Inferencer.Gamma
   ( Gamma
   , CanGamma

@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 -- | Transform AST to use type safe de Bruijn indices.
 module Pukeko.FrontEnd.Renamer
   ( renameModule

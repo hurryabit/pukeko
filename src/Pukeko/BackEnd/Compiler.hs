@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.BackEnd.Compiler
   ( compile
   , Program

@@ -1,4 +1,4 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.AST.ConDecl
   ( TyConDecl (..)
   , TmConDecl (..)

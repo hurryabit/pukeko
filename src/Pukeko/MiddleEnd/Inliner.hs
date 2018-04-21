@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.MiddleEnd.Inliner where
 
 import Pukeko.Prelude

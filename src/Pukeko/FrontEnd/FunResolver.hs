@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- TODO: Evaluate if this stage needs its own tag on the AST. Also consider
 -- mergeing it with the type resolver. The result would be a stage which checks
 -- the declare-define-use cycle of all names.

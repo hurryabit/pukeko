@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Pukeko.FrontEnd.Inferencer
   ( Out
   , inferModule
