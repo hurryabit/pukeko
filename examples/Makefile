@@ -8,12 +8,15 @@ BENCH = bench $(BENCH_OPTS)
 HEAP_SIZE  = 0x10000000 # 256 MB
 STACK_SIZE = 0x04000000 #  64 MB
 
-RUNTIME = ../runtime.inc
+ROOT = ..
+RUNTIME = $(ROOT)/runtime.inc
 LIBS = -lc
 
 NASM_FLAGS = -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64
 
 SOURCES     = monad_io.pu \
+							hello.pu \
+							rev.pu \
 							fibs.pu \
 							qsort.pu \
 							isort.pu \
@@ -24,12 +27,8 @@ SOURCES     = monad_io.pu \
 							wildcard.pu \
 							rmq.pu \
 							fix.pu \
-							lambdalift.pu \
-              aliasinline.pu \
 							sort_gen.pu \
 							rmq_gen.pu
-LAMBDAS     = $(SOURCES:.pu=.pl)
-TYPES       = $(SOURCES:.pu=.ti)
 ASSEMBLES   = $(SOURCES:.pu=.asm)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
 EXECUTABLES = $(SOURCES:.pu=)
@@ -41,15 +40,10 @@ BENCHMARKS  = qsort.bench \
 
 all: $(EXECUTABLES)
 
-types: $(TYPES)
-
 asm: $(ASSEMBLES)
 
 %.asm: %.pu std2/*.pu $(COMP)
-	$(COMP) $(OPTS) -l $<
-
-%.ti: %.pu std2/*.pu $(COMP)
-	$(COMP) $(OPTS) -t $<
+	$(COMP) $(OPTS) $<
 
 %.dot: %.pu std2/*.pu $(COMP)
 	$(COMP) $(OPTS) -g $<
@@ -70,11 +64,9 @@ gc.o: ../gc.c
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 clean:
-	rm -f $(LAMBDAS) $(TYPES) $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
+	rm -f $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
 
-.PHONEY: all asm clean bench clean.bench types
-
-.PRECIOUS: %.asm %.ll %.ti
+.PHONEY: all asm clean bench clean.bench
 
 bench: $(BENCHMARKS)
 

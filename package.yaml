@@ -99,24 +99,24 @@ executables:
     - text
 
 tests:
-  frontend:
-    main: FrontEnd
+  golden:
+    main: Golden
     other-modules: []
     source-dirs: test
     ghc-options:
-    - -Wno-missing-signatures
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
     - bytestring
+    - extra
     - filepath
     - pukeko
     - tasty
     - tasty-golden
 
-  examples:
-    main: Examples
+  run-examples:
+    main: RunExamples
     other-modules: []
     source-dirs: test
     ghc-options:

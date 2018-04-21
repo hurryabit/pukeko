@@ -338,9 +338,9 @@ infxDecl :: Parser InfxDecl
 infxDecl = MkInfxDecl <$> lctd binOp <*> tmvar
 
 import_ :: Parser FilePath
-import_ = indented_ (reserved "import") $ do
-  comps <- lexeme (sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/'))
-  pure (Sys.joinPath comps Sys.<.> "pu")
+import_ = indented_ (reserved "import") $
+  Sys.joinPath
+  <$> lexeme (sepBy1 (some (lowerChar <|> digitChar <|> char '_')) (char '/'))
 
 module_ :: FilePath -> Parser Module
 module_ file = do

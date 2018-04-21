@@ -1,0 +1,12 @@
+import std2/prelude
+
+read :: List Char -> IO (List Char)
+read cs =
+  getChar
+  >>= \c_opt ->
+  case c_opt of
+  | None -> pure cs
+  | Some c -> read (Cons c cs)
+
+main :: IO Unit
+main = read Nil >>= traverse_ putChar

@@ -1,0 +1,84 @@
+data Unit =
+       | Unit
+data Bool =
+       | False
+       | True
+data Pair a b =
+       | Pair a b
+data Option a =
+       | None
+       | Some a
+data Choice a b =
+       | First a
+       | Second b
+data Eq a =
+       | .Eq (a -> a -> Bool)
+data Ord a =
+       | .Ord (Eq a) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
+data Monoid m =
+       | .Monoid m (m -> m -> m)
+data Ring a =
+       | .Ring (a -> a) (a -> a -> a) (a -> a -> a) (a -> a -> a)
+data Char
+data Functor f =
+       | .Functor (forall a b. (a -> b) -> f a -> f b)
+data Foldable t =
+       | .Foldable (forall a b. (a -> b -> b) -> b -> t a -> b) (forall a b. (b -> a -> b) -> b -> t a -> b)
+data List a =
+       | Nil
+       | Cons a (List a)
+data Monad m =
+       | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
+data World
+data IO a = World -> Pair a World
+external ord :: Char -> Int = "ord"
+external chr :: Int -> Char = "chr"
+external seq :: forall a b. a -> b -> b = "seq"
+external putc :: Int -> Unit = "putc"
+functorIO :: Functor IO = .Functor @IO functorIO.map.L2
+monadIO :: Monad IO =
+  .Monad @IO functorIO monadIO.pure.L2 monadIO.bind.L2
+putChar :: Char -> IO Unit = io.L2 @Char @Unit putChar.L1
+hello :: List Int =
+  Cons @Int 72 (Cons @Int 101 (Cons @Int 108 (Cons @Int 108 (Cons @Int 111 (Cons @Int 32 (Cons @Int 87 (Cons @Int 111 (Cons @Int 114 (Cons @Int 108 (Cons @Int 100 (Cons @Int 33 (Cons @Int 10 (Nil @Int)))))))))))))
+main :: IO Unit =
+  foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO main.L1) (coerce @(_ -> IO) (Pair @Unit @World Unit)) hello
+foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
+  \@a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
+    case xs of
+    | Nil -> y0
+    | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
+semi.L1 :: forall a m. m a -> Unit -> m a =
+  \@a @m (m2 :: m a) (x :: Unit) -> m2
+semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
+  \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
+    (case monad.m of
+     | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
+traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
+  \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
+    semi.L2 @Unit @m monad.m (f x)
+functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
+  \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
+    case coerce @(IO -> _) mx world0 of
+    | Pair x world1 -> Pair @b @World (f x) world1
+functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
+  \@a @b (f :: a -> b) (mx :: IO a) ->
+    coerce @(_ -> IO) (functorIO.map.L1 @a @b f mx)
+monadIO.pure.L2 :: forall a. a -> IO a =
+  \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
+monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
+  \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
+    case coerce @(IO -> _) mx world0 of
+    | Pair x world1 -> coerce @(IO -> _) (f x) world1
+monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
+  \@a @b (mx :: IO a) (f :: a -> IO b) ->
+    coerce @(_ -> IO) (monadIO.bind.L1 @a @b mx f)
+io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
+  \@a @b (f :: a -> b) (x :: a) (world :: World) ->
+    let y :: b = f x in
+    seq @b @(Pair b World) y (Pair @b @World y world)
+io.L2 :: forall a b. (a -> b) -> a -> IO b =
+  \@a @b (f :: a -> b) (x :: a) ->
+    coerce @(_ -> IO) (io.L1 @a @b f x)
+putChar.L1 :: Char -> Unit = \(c :: Char) -> putc (ord c)
+main.L1 :: Int -> IO Unit = \(x :: Int) -> putChar (chr x)

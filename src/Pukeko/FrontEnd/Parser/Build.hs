@@ -6,26 +6,28 @@ import Pukeko.Prelude
 
 import qualified Data.DList as DL
 import qualified Data.Set   as Set
+import           System.FilePath
 
 import           Pukeko.AST.Surface
 
 build ::
   (Member (Error Failure) effs) =>
   (FilePath -> Eff effs Module) -> FilePath -> Eff effs Package
-build parse file = do
+build parse rootFile = do
   (_, mdls) <-
     evalState @(Set FilePath) mempty
     $ runWriter @(DList Module)
     $ runReader @(Set FilePath) mempty
-    $ go (raise . raise . raise . parse) file
-  pure (MkPackage file (toList mdls))
+    $ go rootFile
+  pure (MkPackage rootFile (toList mdls))
   where
-    go parse file = do
+    go file = do
       cyc <- asks (file `Set.member`)
       when cyc $ throwFailure ("detected import cycle at file" <+> pretty file)
       done <- gets (file `Set.member`)
       unless done $ do
-        mdl <- parse file
+        mdl <- raise . raise . raise $ parse file
         modify (file `Set.insert`)
-        local (file `Set.insert`) $ for_ (_mod2imports mdl) (go parse)
+        local (file `Set.insert`) $ for_ (_mod2imports mdl) $ \imp ->
+          go (takeDirectory rootFile </> imp <.> "pu")
         tell (DL.singleton mdl)

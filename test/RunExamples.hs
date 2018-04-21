@@ -1,4 +1,5 @@
-module Examples where
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+module RunExamples where
 
 import Pukeko.Prelude hiding (assert, run)
 
@@ -12,22 +13,24 @@ import Test.QuickCheck.Monadic
 format :: [Int] -> String
 format = unlines . map show
 
-runProg :: FilePath -> [Int] -> IO (ExitCode, String)
+runProg :: FilePath -> String -> IO (ExitCode, String)
 runProg prog input = do
-  (exitCode, stdout, _) <- readProcessWithExitCode ("./" ++ prog) [] (format input)
+  (exitCode, stdout, _) <- readProcessWithExitCode ("./" ++ prog) [] input
   return (exitCode, stdout)
 
 build prog = void (readProcess "make" [prog] "")
 
 specifyProg name = beforeAll_ (build name) . specify name
 
-testBasic name input output =
-  specifyProg name $ runProg name input `shouldReturn` (ExitSuccess, format output)
+testText name input output =
+  specifyProg name $ runProg name input `shouldReturn` (ExitSuccess, output)
+
+testNumeric name input output = testText name (format input) (format output)
 
 prop_prog_correct :: Gen [Int] -> ([Int] -> [Int]) -> FilePath -> Property
 prop_prog_correct gen spec prog = monadicIO $ do
   xs <- pick gen
-  (exitCode, stdout) <- run $ runProg prog xs
+  (exitCode, stdout) <- run $ runProg prog (format xs)
   assert (exitCode == ExitSuccess)
   let ys = spec xs
   assert (stdout == format ys)
@@ -101,18 +104,19 @@ prop_rmq_correct prog = monadicIO $ do
       return (lo, hi)
     return (m, n, xs, qs)
   let input = m:n:xs ++ concatMap (\(lo, hi) -> [lo, hi]) qs
-  (exitCode, stdout) <- run $ runProg prog input
+  (exitCode, stdout) <- run $ runProg prog (format input)
   assert (exitCode == ExitSuccess)
   let output = map (\(lo, hi) -> minimum $ take (hi-lo+1) $ drop lo xs) qs
   assert (stdout == format output)
 
 main :: IO ()
-main = hspec $ beforeAll_ (setCurrentDirectory "test") $ do
+main = hspec $ beforeAll_ (setCurrentDirectory "examples") $ do
   describe "test basics" $ do
-    testBasic "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
-    testBasic "wildcard" [7, 13] [7, 13]
-    testBasic "lambdalift" [] [1]
-    testBasic "fix"      (10:[1 .. 10]) [2, 4 .. 20]
+    testText    "hello" "" "Hello World!\n"
+    testText    "rev" "abc" "cba"
+    testNumeric "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
+    testNumeric "wildcard" [7, 13] [7, 13]
+    testNumeric "fix"      (10:[1 .. 10]) [2, 4 .. 20]
   describe "test sorting" $ mapM_ testSort
     [ "isort"
     , "qsort"
@@ -121,6 +125,6 @@ main = hspec $ beforeAll_ (setCurrentDirectory "test") $ do
   describe "test number theory/combinatorics" $ do
     testFunction "fibs"    1000 spec_fibs
     testFunction "catalan"  100 spec_catalan
-    testBasic    "queens"   [8] [92]
+    testNumeric  "queens"   [8] [92]
     testFunction "primes"   100 spec_primes
     specifyProg "rmq" (prop_rmq_correct "rmq")
