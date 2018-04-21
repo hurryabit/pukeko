@@ -8,7 +8,7 @@
 
 # Warnings currently triggered by your code
 - ignore: {name: "Reduce duplication", within: Pukeko.FrontEnd.Renamer}
-- ignore: {name: "Use camelCase", within: Examples}
+- ignore: {name: "Use camelCase", within: RunExamples}
 
 
 # Specify additional command line arguments

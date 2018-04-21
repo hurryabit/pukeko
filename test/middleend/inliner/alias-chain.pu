@@ -1,5 +1,3 @@
-import std2/io
-
 h :: c -> c
 h z = (\u -> u) z
 
@@ -12,5 +10,5 @@ f1 = h
 f2 :: a -> a
 f2 x = g x
 
-main :: IO Unit
-main = pure (f1 (f2 Unit))
+main :: Int
+main = f1 (f2 0)

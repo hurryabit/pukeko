@@ -41,4 +41,4 @@ script:
 # Run hlint
 - stack exec hlint -- --git
 # Build the package, its tests, and its docs and run the tests
-- stack -j1 --no-terminal test --ghc-options=-Werror :frontend
+- stack -j1 --no-terminal test --ghc-options=-Werror :golden
