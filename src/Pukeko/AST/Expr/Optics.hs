@@ -3,6 +3,8 @@ module Pukeko.AST.Expr.Optics
   , substitute
   , patn2binder
   , patn2type
+  , bind2tmBinder
+  , bind2expr
   , arg2expr
   , expr2atom
   , expr2type
@@ -30,13 +32,14 @@ substitute' f = go Set.empty
       EAtm a      -> pure (EAtm a)
       EApp e a -> EApp   <$> go bound e <*> arg2expr (go bound) a
       EAbs (TmPar x) e -> ETmAbs x <$> go (Set.insert (nameOf x) bound) e
-      EAbs p         e -> EAbs   p <$> go bound e
-      ELet m ds e -> ELet m <$> (traverse . b2bound) (go bound0) ds <*> go bound1 e
+      EAbs p e -> EAbs   p <$> go bound e
+      ELet b e -> ELet <$> bind2expr (go boundRhs) b <*> go boundBody e
         where
-          bound1 = bound <> setOf (traverse . b2binder . to nameOf) ds
-          bound0 = case m of
-            BindRec -> bound1
-            BindPar -> bound
+          (boundRhs, boundBody) = case b of
+            TmNonRec (x, _) _ -> (bound, Set.insert x bound)
+            TmRec bs ->
+              let bound' = bound <> Set.fromList (map (fst . fst) (toList bs))
+              in  (bound', bound')
       EMat t e as -> EMat t <$> go bound e <*> traverse (goAltn bound) as
       ECast coe e -> ECast coe <$> go bound e
       ETyAnn t  e -> ETyAnn t <$> go bound e
@@ -69,15 +72,27 @@ expr2atom f = \case
   EAtm a       -> EAtm <$> f a
   EApp e a     -> EApp   <$> expr2atom f e <*> (arg2expr . expr2atom) f a
   EAbs p  e    -> EAbs p <$> expr2atom f e
-  ELet m ds t  -> ELet m <$> (traverse . b2bound . expr2atom) f ds <*> expr2atom f t
+  ELet b e     -> ELet <$> (bind2expr . expr2atom) f b <*> expr2atom f e
   EMat t e as  -> EMat t <$> expr2atom f e <*> (traverse . altn2expr . expr2atom) f as
   ECast coe e  -> ECast coe <$> expr2atom f e
   ETyAnn t e   -> ETyAnn t <$> expr2atom f e
 
--- | Traverse over all types in a definition, i.e., the type in the binder on
--- the LHS and the types on the RHS.
-b2type :: IsTyped lg => Traversal' (Bind lg) Type
-b2type f (MkBind b e) = MkBind <$> _2 f b <*> expr2type f e
+bind2type :: IsTyped lg => Traversal' (Bind lg) Type
+bind2type f = \case
+  TmNonRec b e -> TmNonRec <$> _2 f b <*> expr2type f e
+  TmRec bs -> TmRec <$> traverse (\(b, e) -> (,) <$> _2 f b <*> expr2type f e) bs
+
+bind2expr
+  :: TypeOf lg1 ~ TypeOf lg2
+  => Traversal (Bind lg1) (Bind lg2) (Expr lg1) (Expr lg2)
+bind2expr f = \case
+  TmNonRec b e -> TmNonRec b <$> f e
+  TmRec bs -> TmRec <$> (traverse . _2) f bs
+
+bind2tmBinder :: Traversal' (Bind lg) (TmBinder (TypeOf lg))
+bind2tmBinder f = \case
+  TmNonRec b e -> TmNonRec <$> f b <*> pure e
+  TmRec bs -> TmRec <$> (traverse . _1) f bs
 
 arg2type :: IsTyped lg => Traversal' (Arg lg) Type
 arg2type f = \case
@@ -99,7 +114,7 @@ expr2type f = \case
   EAtm a       -> pure (EAtm a)
   EApp e  a    -> EApp <$> expr2type f e <*> arg2type f a
   EAbs p  e    -> EAbs <$> par2type f p <*> expr2type f e
-  ELet m ds e0 -> ELet m <$> traverse (b2type f) ds <*> expr2type f e0
+  ELet b e     -> ELet <$> bind2type f b <*> expr2type f e
   EMat t e0 as -> EMat <$> f t <*> expr2type f e0 <*> traverse (altn2type f) as
   ECast (c, t) e -> ECast . (c, ) <$> f t <*> expr2type f e
   ETyAnn t  e0 -> ETyAnn <$> f t <*> expr2type f e0

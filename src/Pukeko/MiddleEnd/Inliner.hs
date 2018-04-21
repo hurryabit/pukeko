@@ -23,9 +23,7 @@ newtype InState = InState
 
 type CanInline effs = Members [State InState, NameSource] effs
 
-type BindGroup = (BindMode, [Bind])
-
-type CtxtExpr = ([BindGroup], Expr, [Arg])
+type CtxtExpr = ([Bind], Expr, [Arg])
 
 data InlineMode
   = Normal
@@ -33,27 +31,27 @@ data InlineMode
 
 makeLenses ''InState
 
-simplifyLets :: [BindGroup] -> (Map TmVar Expr, [BindGroup])
-simplifyLets = mapAccumR step Map.empty
+simplifyLets :: [Bind] -> (Map TmVar Expr, [Bind])
+simplifyLets = second catMaybes . mapAccumR step Map.empty
   where
-    step :: Map TmVar Expr -> BindGroup -> (Map TmVar Expr, BindGroup)
-    step subst0 (m, bs0) = case m of
-      BindRec -> (subst0, (m, bs0))
-      BindPar ->
-        let f b@(MkBind (x, _) e) = case e of
-              EVar y -> Right (x, Map.findWithDefault e y subst0)
-              EAtm{} -> Right (x, e)
-              _      -> Left  b
-            (bs1, subst1) = partitionEithers (map f bs0)
-        in  (Map.unionWith impossible subst0 (Map.fromList subst1), (m, bs1))
+    step :: Map TmVar Expr -> Bind -> (Map TmVar Expr, Maybe Bind)
+    step subst0 b = case b of
+      TmRec{} -> (subst0, Just b)
+      TmNonRec (x, _) e0 ->
+        case e0 of
+          EVar y -> (Map.insertWith impossible x e1 subst0, Nothing)
+            where
+              e1 = Map.findWithDefault e0 y subst0
+          EAtm{} -> (Map.insertWith impossible x e0 subst0, Nothing)
+          _ -> (subst0, Just b)
 
 initCtxt :: Expr -> CtxtExpr
 initCtxt e = ([], e, [])
 
 closeCtxt :: CtxtExpr -> Expr
-closeCtxt (gs0, e0, as0) =
-  let (subst, gs1) = simplifyLets gs0
-      e1 = foldl (\e (m, bs) -> mkELet m bs e) (rewindl EApp e0 as0) gs1
+closeCtxt (bs0, e0, as0) =
+  let (subst, bs1) = simplifyLets bs0
+      e1 = foldl (flip ELet) (rewindl EApp e0 as0) bs1
   in  substitute (\x -> Map.findWithDefault (EVar x) x subst) e1
 
 makeInlinable :: CanInline effs => FuncDecl (Only SupC) -> Eff effs ()
@@ -73,11 +71,11 @@ matchArgs :: [(Par, Arg)] -> ([Bind], Map TyVar Type)
 matchArgs pas =
   let f :: (Par, Arg) -> ([Bind], Map TyVar Type)
       f = \case
-        (TmPar (x, t), TmArg e) -> ([MkBind (x, t) e], Map.empty)
+        (TmPar (x, t), TmArg e) -> ([TmNonRec (x, t) e], Map.empty)
         (TyPar v     , TyArg t) -> ([], Map.singleton v t)
         _ -> impossible
       (bs, subst) = foldMap f pas
-  in  (over (traverse . b2binder . _2) (>>= (subst Map.!)) bs, subst)
+  in  (over (traverse . bind2tmBinder . _2) (>>= (subst Map.!)) bs, subst)
 
 findAltn :: TmCon -> [Altn] -> Altn
 findAltn tmCon = Safe.findJust (\(MkAltn (PSimple tmCon' _) _) -> tmCon == tmCon')
@@ -86,9 +84,9 @@ inline :: (CanInline effs, Member (Reader SourcePos) effs) =>
   InlineMode -> CtxtExpr -> Eff effs CtxtExpr
 inline mode ce0@(gs0, e0, as0) =
   case e0 of
-    ELet m bs0 e1 -> do
-      bs1 <- (traverse . b2bound) inlineExpr bs0
-      inline mode ((m, bs1):gs0, e1, as0)
+    ELet b0 e1 -> do
+      b1 <- bind2expr inlineExpr b0
+      inline mode (b1:gs0, e1, as0)
 
     EApp e1 a0 -> do
       a1 <- arg2expr inlineExpr a0
@@ -120,7 +118,7 @@ inline mode ce0@(gs0, e0, as0) =
                   let (as1, as2) = splitAt (length ps1) as0
                       (bs, subst) = matchArgs (zip ps1 as1)
                       e2 = over expr2type (>>= (subst Map.!)) e1
-                  inline mode ((BindPar, bs):gs0, e2, as2)
+                  inline mode (reverse bs ++ gs0, e2, as2)
 
     EMat t scrut altns -> do
       ce1@(gs1, e1, as1) <- inline Scrutinee (initCtxt scrut)
@@ -130,8 +128,8 @@ inline mode ce0@(gs0, e0, as0) =
           let args =
                 fromRight' . traverse (matching _TmArg) . dropWhile (is _TyArg) $ as1
           let bs =
-                catMaybes (zipWithExact (\b a -> MkBind <$> b <*> pure a) binders args)
-          inline mode ((BindPar, bs):gs1 ++ gs0, rhs, as0)
+                catMaybes (zipWithExact (\b a -> TmNonRec <$> b <*> pure a) binders args)
+          inline mode (reverse bs ++ gs1 ++ gs0, rhs, as0)
 
         _ -> do
           e2 <- EMat t (closeCtxt ce1) <$> (traverse . altn2expr) inlineExpr altns

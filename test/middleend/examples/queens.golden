@@ -52,8 +52,8 @@ solve_aux :: List (List Int) -> List (List Int) =
     | Cons ks kss ->
       let monoid.m :: Monoid (List (List Int)) =
             .Monoid @(List (List Int)) (monoidList.empty @(List Int)) (monoidList.append.L1 @(List Int))
-      and f :: Int -> List (List Int) = solve_aux.L2 kss
       in
+      let f :: Int -> List (List Int) = solve_aux.L2 kss in
       foldableList.foldr.L1 @Int @(List (List Int)) (foldMap.L1 @Int @(List (List Int)) monoid.m f) (case monoid.m of
                                                                                                      | .Monoid empty _ ->
                                                                                                        empty) ks

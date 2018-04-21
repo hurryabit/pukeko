@@ -203,9 +203,9 @@ rnExpr = \case
     names <- traverse mkName binders0
     let env = Map.fromList (zipExact (map unlctd binders0) names)
     exprs1 <- traverse rnExpr exprs0
-    let binds1 = zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
+    let binds1 = zipWithExact (\name -> TmNonRec (name, NoType)) names exprs1
     body1 <- local (env `Map.union`) (rnExpr body0)
-    pure (ELet BindPar binds1 body1)
+    pure (rewindr ELet binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkBind binder expr) -> (binder, expr)) binds0)
@@ -213,10 +213,9 @@ rnExpr = \case
     let env = Map.fromList (zipExact (map unlctd binders0) names)
     local (env `Map.union`) $ do
       exprs1 <- traverse rnExpr exprs0
-      let binds1 =
-            zipWithExact (\name expr -> MkBind (name, NoType) expr) names exprs1
+      let binds1 = zipWithExact (\name -> (,) (name, NoType)) names exprs1
       body1 <- rnExpr body0
-      pure (ELet BindRec binds1 body1)
+      pure (ELet (TmRec binds1) body1)
   Ps.ECoe c e -> ECast . (, NoType) <$> rnCoercion c <*> rnExpr e
 
 

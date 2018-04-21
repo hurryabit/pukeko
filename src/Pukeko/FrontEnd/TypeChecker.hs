@@ -57,13 +57,13 @@ typeOf = \case
       TmPar binder -> TFun (snd binder) <$> introTmVar binder (typeOf e0)
       TyPar v      -> TUni' v           <$> introTyVar v      (typeOf e0)
       DxPar binder -> TCtx (snd binder) <$> introDxVar binder (typeOf e0)
-  ELet BindPar ds e0 -> do
-    traverse_ checkBind ds
-    introTmVars (map _b2binder ds) (typeOf e0)
-  ELet BindRec ds e0 ->
-    introTmVars (map _b2binder ds) $ do
-      traverse_ checkBind ds
-      typeOf e0
+  ELet (TmNonRec b e0) e1 -> do
+    checkExpr e0 (snd b)
+    introTmVar b (typeOf e1)
+  ELet (TmRec bs) e1 ->
+    introTmVars (fmap fst bs) $ do
+      traverse_ (\(b, e0) -> checkExpr e0 (snd b)) bs
+      typeOf e1
   EMat t0 e0 (a1 :| as) -> do
     checkExpr e0 t0
     t1 <- typeOfAltn a1
@@ -118,9 +118,6 @@ match t0 t1 =
 
 checkExpr :: IsTyped lg => Expr lg -> Type -> TC ()
 checkExpr e t0 = typeOf e >>= match t0
-
-checkBind :: IsTyped lg => Bind lg -> TC ()
-checkBind (MkBind (_, t) e) = checkExpr e t
 
 instance (IsTyped lg, IsTyped lg) => TypeCheckable (SysF.Module lg) where
   checkModule (SysF.MkModule decls) = for_ decls $ here' $ \case

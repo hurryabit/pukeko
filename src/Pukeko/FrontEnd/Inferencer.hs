@@ -116,21 +116,17 @@ addTyDxAbs tyVars dxBinders expr typ
       , rewindr UTUni  tyVars $ rewindr UTCtx (map snd dxBinders)          typ
       )
 
-inferLet :: forall s effs.
-  CanInfer s effs => Bind In -> Eff effs (Bind (Aux s), UnsolvedCstrs s)
-inferLet (MkBind (tmVar, NoType) rhs0) = do
+inferBind
+  :: forall s effs. CanInfer s effs
+  => Bind In -> Eff effs (Bind (Aux s), UnsolvedCstrs s)
+inferBind (TmNonRec (tmVar, NoType) rhs0) = do
   (rhs1, t'_rhs1, cstrs) <- enterLevel @s (infer rhs0)
   (t_rhs1, toList -> tyVars) <- generalize t'_rhs1
   (rets, defs) <- solveConstraints cstrs
   let (rhs2, t_rhs2) = addTyDxAbs tyVars rets rhs1 t_rhs1
-  pure (MkBind (tmVar, t_rhs2) rhs2, defs)
-
--- TODO: It would be nice to use Liquid Haskell to show that the resulting lists
--- have the same length as the input list.
-inferRec :: forall s effs. CanInfer s effs =>
-  [Bind In] -> Eff effs ([Bind (Aux s)], UnsolvedCstrs s)
-inferRec binds0 = do
-  let (binders0, rhss0) = unzip (map (\(MkBind (b, NoType) r) -> (b, r)) binds0)
+  pure (TmNonRec (tmVar, t_rhs2) rhs2, defs)
+inferBind (TmRec binds0) = do
+  let (binders0, rhss0) = unzip (fmap (first fst) binds0)
   (rhss1, t'_rhss1, cstrs1) <- enterLevel @s $ do
     binders1 <- for binders0 $ \b -> (,) b <$> freshUVar
     (rhss1, t'_rhss1, cstrs1) <- unzip3 <$> introTmVars binders1 (traverse infer rhss0)
@@ -149,11 +145,11 @@ inferRec binds0 = do
           (\binder0 rhs1 t_rhs1 ->
              let (rhs2, t_rhs2) =
                    addTyDxAbs tyVars rets1 (substitute addApps rhs1) t_rhs1
-              in  MkBind (binder0, t_rhs2) rhs2)
+              in  ((binder0, t_rhs2), rhs2))
           binders0
           rhss1
           t_rhss1
-  pure (binds2, defs1)
+  pure (TmRec binds2, defs1)
 
 infer :: forall s effs. CanInfer s effs =>
   Expr In -> Eff effs (Expr (Aux s), UType s, UnsolvedCstrs s)
@@ -174,12 +170,11 @@ infer = \case
       let binder = (param, t_param)
       (body1, t_body, cstrs) <- introTmVar @s binder (infer body0)
       pure (ETmAbs binder (ETyAnn t_body body1), t_param ~> t_body, cstrs)
-    ELet mode binds0 body0 -> do
-      (binds1, cstrs_binds) <- case mode of
-        BindPar -> second fold . unzip <$> traverse inferLet binds0
-        BindRec -> inferRec binds0
-      (body1, t_body1, cstrs_body) <- introTmVars (map _b2binder binds1) $ infer body0
-      pure (ELet mode binds1 body1, t_body1, cstrs_binds <> cstrs_body)
+    ELet bind0 body0 -> do
+      (bind1, cstrs_bind) <- inferBind bind0
+      (body1, t_body1, cstrs_body) <-
+        introTmVars (toListOf bind2tmBinder bind1) $ infer body0
+      pure (ELet bind1 body1, t_body1, cstrs_bind <> cstrs_body)
     EMat NoType expr0 altns0 -> do
       (expr1, t_expr, cstrs0) <- infer expr0
       t_res <- freshUVar
@@ -285,7 +280,11 @@ inferModule' = module2decls $ \decls ->
                                         & runReader (getPos decl)
 
 freezeBind :: Bind (Aux s) -> ST s (Bind Out)
-freezeBind (MkBind (x, t0) e0) = MkBind <$> ((x,) <$> freezeType t0) <*> freezeExpr e0
+freezeBind = \case
+  TmNonRec (b, t) e -> TmNonRec <$> ((,) b <$> freezeType t) <*> freezeExpr e
+  TmRec bs ->
+    TmRec
+    <$> traverse (\((b, t), e) -> (,) <$> ((,) b <$> freezeType t) <*> freezeExpr e) bs
 
 freezeExpr :: Expr (Aux s) -> ST s (Expr Out)
 freezeExpr = \case
@@ -300,7 +299,7 @@ freezeExpr = \case
   ETyAbs tvar body -> ETyAbs tvar <$> freezeExpr body
   EDxAbs binder body -> EDxAbs <$> (_2 . _2) freezeType binder <*> freezeExpr body
   EAbs{} -> impossible
-  ELet m ds e0 -> ELet m <$> traverse freezeBind ds <*> freezeExpr e0
+  ELet b e0 -> ELet <$> freezeBind b <*> freezeExpr e0
   EMat t e0 as -> EMat <$> freezeType t <*> freezeExpr e0 <*> traverse freezeAltn as
   ECast (c, t) e0 -> ECast . (c,) <$> freezeType t <*> freezeExpr e0
   ETyAnn t  e  -> ETyAnn <$> freezeType t <*> freezeExpr e
@@ -309,9 +308,8 @@ freezeAltn :: Altn (Aux s) -> ST s (Altn Out)
 freezeAltn (MkAltn p e) = MkAltn <$> patn2type freezeType p <*> freezeExpr e
 
 freezeFuncDecl :: FuncDecl (Aux s) tv -> ST s (FuncDecl Out tv)
-freezeFuncDecl (MkFuncDecl name type0 body0) = do
-  MkBind (_, type1) body1 <- freezeBind (MkBind (name, type0) body0)
-  pure (MkFuncDecl name type1 body1)
+freezeFuncDecl (MkFuncDecl name type0 body0) =
+  MkFuncDecl name <$> freezeType type0 <*> freezeExpr body0
 
 freezeDecl :: Decl (Aux s) -> ST s (Decl Out)
 freezeDecl = \case

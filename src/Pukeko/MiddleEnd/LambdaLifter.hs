@@ -123,13 +123,11 @@ llExpr = \case
   EAtm a -> pure (EAtm a)
   EApp fun (TmArg arg) -> ETmApp <$> llExpr fun <*> llExpr arg
   EMat t e cs -> EMat t <$> llExpr e <*> traverse llAltn cs
-  ELet BindPar ds e0 ->
-    ELet BindPar
-    <$> (traverse . b2bound) llExpr ds
-    <*> introTmVars (map _b2binder ds) (llExpr e0)
-  ELet BindRec ds e0 ->
-    introTmVars (map _b2binder ds) $
-      ELet BindRec <$> (traverse . b2bound) llExpr ds <*> llExpr e0
+  ELet (TmNonRec b e0) e1 ->
+    ELet <$> (TmNonRec b <$> llExpr e0) <*> introTmVar b (llExpr e1)
+  ELet (TmRec bs) e1 ->
+    introTmVars (fmap fst bs) $
+      ELet <$> (TmRec <$> (traverse . _2) llExpr bs) <*> llExpr e1
   elam@EAbs{}
     | (pars, ETyAnn t_rhs rhs0) <- unwindEAbs elam -> do
         rhs1 <- introPars pars (llExpr rhs0)

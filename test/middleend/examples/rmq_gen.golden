@@ -44,15 +44,16 @@ monadIO :: Monad IO =
 print :: Int -> IO Unit = io.L2 @Int @Unit puti
 random :: List Int = gen.L1 @Int random.L1 1
 main :: IO Unit =
-  let m1 :: IO Unit = print 400000
-  and m2 :: IO Unit =
-        let m1 :: IO Unit = print 100000
-        and m2 :: IO Unit =
+  let m1 :: IO Unit = print 400000 in
+  let m2 :: IO Unit =
+        let m1 :: IO Unit = print 100000 in
+        let m2 :: IO Unit =
               case split_at.L1 @Int 400000 random of
               | Pair xs random ->
                 let m1 :: IO Unit =
                       foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) xs
-                and m2 :: IO Unit =
+                in
+                let m2 :: IO Unit =
                       case split_at.L1 @Int 100000 random of
                       | Pair ys random ->
                         let zs :: List Int = take.L1 @Int 100000 random in
@@ -161,15 +162,13 @@ main.L1 :: Int -> Int -> Int -> IO Unit =
     let z :: Int = mod z n in
     case lt_int y z of
     | False ->
-      let m1 :: IO Unit = print z
-      and m2 :: IO Unit = print y
-      in
+      let m1 :: IO Unit = print z in
+      let m2 :: IO Unit = print y in
       let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
       coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
     | True ->
-      let m1 :: IO Unit = print y
-      and m2 :: IO Unit = print z
-      in
+      let m1 :: IO Unit = print y in
+      let m2 :: IO Unit = print z in
       let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
       coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 main.L2 :: List Unit -> IO Unit =

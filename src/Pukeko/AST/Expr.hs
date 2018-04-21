@@ -23,8 +23,6 @@ module Pukeko.AST.Expr
   , pattern ETyAbs
   , pattern EDxAbs
 
-  , b2binder
-  , b2bound
   , altn2patn
   , altn2expr
 
@@ -43,7 +41,6 @@ module Pukeko.AST.Expr
 
   , mkETmAbs
   , unwindEAbs
-  , mkELet
   , mkTAbs
   , unEAnn
 
@@ -84,10 +81,9 @@ data Par lg
 
 data BindMode = BindPar | BindRec
 
-data Bind lg = MkBind
-  { _b2binder :: TmBinder (TypeOf lg)
-  , _b2bound  :: Expr lg
-  }
+data Bind lg
+  = TmNonRec (TmBinder (TypeOf lg)) (Expr lg)
+  | TmRec [(TmBinder (TypeOf lg),  Expr lg)]
 
 data Patn lg
   = IsNested lg ~ True  => PWld
@@ -106,7 +102,7 @@ data Expr lg
   |                         EAtm Atom
   |                         EApp (Expr lg) (Arg  lg)
   | IsLambda lg ~ True   => EAbs (Par  lg) (Expr lg)
-  |                         ELet BindMode [Bind lg] (Expr lg)
+  |                         ELet (Bind lg) (Expr lg)
   |                         EMat (TypeOf lg) (Expr lg) (NonEmpty (Altn lg))
   |                         ECast (Coercion, TypeOf lg) (Expr lg)
   | (IsLambda lg ~ True, IsPreTyped lg ~ True) => ETyAnn (TypeOf lg) (Expr lg )
@@ -146,11 +142,6 @@ makePrisms ''Expr
 makePrisms ''Arg
 makePrisms ''Par
 makeLensesFor [("_altn2patn", "altn2patn")]''Altn
-makeLensesFor [("_b2binder", "b2binder")] ''Bind
-
--- NOTE: The generated lens would not be polymorphic in @lg@.
-b2bound :: (TypeOf lg1 ~ TypeOf lg2) => Lens (Bind lg1) (Bind lg2) (Expr lg1) (Expr lg2)
-b2bound f (MkBind b e) = MkBind b <$> f e
 
 altn2expr :: (TypeOf lg1 ~ TypeOf lg2, IsNested lg1 ~ IsNested lg2) =>
   Lens (Altn lg1) (Altn lg2) (Expr lg1) (Expr lg2)
@@ -193,11 +184,6 @@ unwindEAbs = go []
       ETyAnn _ expr@EAbs{} -> go params expr
       body -> (reverse params, body)
 
-mkELet :: BindMode -> [Bind lg] -> Expr lg -> Expr lg
-mkELet m bs e
-  | null bs   = e
-  | otherwise = ELet m bs e
-
 mkTAbs :: TypeOf lg ~ Type => Par lg -> Type -> Type
 mkTAbs = \case
   TmPar (_, t) -> TFun t
@@ -209,29 +195,16 @@ unEAnn = \case
   ETyAnn _ e -> unEAnn e
   e          -> e
 
--- * Instances
-
-type instance NameSpaceOf (Bind lg) = 'TmVar
-instance HasName (Bind lg) where nameOf = nameOf . _b2binder
-instance HasPos  (Bind lg) where getPos = getPos . nameOf
-
-
 -- * Pretty printing
 
 instance IsTyped lg => Pretty (Bind lg) where
-  pretty (MkBind (z, t) e) =
-    hang (pretty (z ::: t) <+> "=") 2 (prettyPrec 0 e)
-
-prettyBinds :: IsTyped lg => BindMode -> [Bind lg] -> Doc
-prettyBinds mode ds = case ds of
-    [] -> impossible  -- maintained invariant
-    d0:ds ->
-      let_ <+> pretty d0
-      $$ vcatMap (\d -> "and" <+> pretty d) ds
+  pretty = \case
+    TmNonRec b e -> "let" <+> prettyBind (b, e)
+    TmRec [] -> impossible
+    TmRec (b0:bs) ->
+      "let rec" <+> prettyBind b0 $$ vcatMap (\b -> "and" <+> prettyBind b) bs
     where
-      let_ = case mode of
-        BindRec -> "let rec"
-        BindPar -> "let"
+      prettyBind ((x, t), e) = hang (pretty (x ::: t) <+> "=") 2 (pretty e)
 
 instance Pretty Atom where
   pretty = \case
@@ -267,7 +240,7 @@ instance IsTyped lg => PrettyPrec (Expr lg) where
     EAbs{} ->
       let (ps, e1) = unwindr _EAbs e0
       in  prettyEAbs prec ps e1
-    ELet m ds t -> maybeParens (prec > 0) (sep [prettyBinds m ds, "in"] $$ pretty t)
+    ELet bs e -> maybeParens (prec > 0) (sep [pretty bs, "in"] $$ pretty e)
     -- FIXME: Collect lambdas.
     EMat _ e as ->
       maybeParens (prec > 0) $

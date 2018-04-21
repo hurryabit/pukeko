@@ -144,16 +144,14 @@ query.L1 :: forall a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> Rm
     case t of
     | RmqEmpty -> one
     | RmqNode t_lo t_hi value left right ->
-      case let x :: Bool = lt_int q_hi t_lo
-           and y :: Bool = gt_int q_lo t_hi
-           in
+      case let x :: Bool = lt_int q_hi t_lo in
+           let y :: Bool = gt_int q_lo t_hi in
            case x of
            | False -> y
            | True -> True of
       | False ->
-        case let x :: Bool = le_int q_lo t_lo
-             and y :: Bool = le_int t_hi q_hi
-             in
+        case let x :: Bool = le_int q_lo t_lo in
+             let y :: Bool = le_int t_hi q_hi in
              case x of
              | False -> False
              | True -> y of
@@ -200,8 +198,8 @@ main.L5 :: Int -> Int -> IO Unit =
   \(n :: Int) (m :: Int) ->
     let mx :: IO (List Int) =
           sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
-    and f :: List Int -> IO Unit = main.L4 m
     in
+    let f :: List Int -> IO Unit = main.L4 m in
     coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx f)
 main.L6 :: Int -> IO Unit =
   \(n :: Int) ->

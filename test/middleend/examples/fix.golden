@@ -181,9 +181,11 @@ main.L2 :: List Int -> IO Unit =
   \(xs :: List Int) ->
     foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f :: Fix (ListF Int) -> List Int =
                                                                                                                                     cata.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (toList.L1 @Int)
-                                                                                                                              and g :: Fix2 ListF Int -> Fix (ListF Int) =
+                                                                                                                              in
+                                                                                                                              let g :: Fix2 ListF Int -> Fix (ListF Int) =
                                                                                                                                     mono @Int @ListF bifunctorListF
-                                                                                                                              and x :: Fix2 ListF Int =
+                                                                                                                              in
+                                                                                                                              let x :: Fix2 ListF Int =
                                                                                                                                     let dict :: Functor (Fix2 ListF) =
                                                                                                                                           functorFox2 @ListF bifunctorListF
                                                                                                                                     in
@@ -191,7 +193,8 @@ main.L2 :: List Int -> IO Unit =
                                                                                                                                      | .Functor map ->
                                                                                                                                        map) @Int @Int main.L1 (let f :: Fix (ListF Int) -> Fix2 ListF Int =
                                                                                                                                                                      poly @Int @ListF bifunctorListF
-                                                                                                                                                               and g :: List Int -> Fix (ListF Int) =
+                                                                                                                                                               in
+                                                                                                                                                               let g :: List Int -> Fix (ListF Int) =
                                                                                                                                                                      ana.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (fromList.L1 @Int)
                                                                                                                                                                in
                                                                                                                                                                f (g xs))
