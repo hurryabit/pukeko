@@ -1,5 +1,5 @@
 -- Fundamental functions
-abort : a
+abort :: a
 external abort = "abort"
 
 -- Fundamental types
@@ -23,20 +23,20 @@ data Choice a b =
 
 -- Fundamental classes
 class Eq a where
-  eq : a -> a -> Bool
+  eq :: a -> a -> Bool
 
 infix == eq
 
-neq : (Eq a) => a -> a -> Bool
+neq :: (Eq a) => a -> a -> Bool
 neq x y = if x == y then False else True
 
 infix != neq
 
 -- Fundamental functions
-id : a -> a
+id :: a -> a
 id x = x
 
-compose : (b -> c) -> (a -> b) -> (a -> c)
+compose :: (b -> c) -> (a -> b) -> (a -> c)
 compose f g x = f (g x)
 
 infix ∘ compose

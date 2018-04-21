@@ -1,21 +1,21 @@
 import std2/prelude
 
-p : Int
+p :: Int
 p = 100000007
 
-mul_p : Int -> Int -> Int
+mul_p :: Int -> Int -> Int
 mul_p x y = (x*y) % p
 
-add_p : Int -> Int -> Int
+add_p :: Int -> Int -> Int
 add_p x y = (x+y) % p
 
-sum_p : List Int -> Int
+sum_p :: List Int -> Int
 sum_p = foldl add_p 0
 
-scanl : (b -> a -> b) -> b -> List a -> List b
+scanl :: (b -> a -> b) -> b -> List a -> List b
 scanl f =
   let rec scanl_f y0 xs =
-    match xs with
+    case xs of
     | Nil -> Nil
     | Cons x xs ->
       let y0 = f y0 x in
@@ -23,14 +23,14 @@ scanl f =
   in
   scanl_f
 
-sols : List Int
+sols :: List Int
 sols =
   Cons 1
-    (map (fun xs -> sum_p (zip_with mul_p sols xs))
-      (scanl (fun xs x -> Cons x xs) Nil sols))
+    (map (\xs -> sum_p (zip_with mul_p sols xs))
+      (scanl (\xs x -> Cons x xs) Nil sols))
 
-main : IO Unit
+main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print (nth_exn sols n)

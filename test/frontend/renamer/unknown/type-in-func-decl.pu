@@ -1,1 +1,1 @@
-bad : Typ
+bad :: Typ

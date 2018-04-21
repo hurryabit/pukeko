@@ -1,8 +1,8 @@
 data Option a =
   | None
   | Some a
-f : a -> Option a -> a
+f :: a -> Option a -> a
 f x0 x_opt =
-  match x_opt with
+  case x_opt of
   | Some x -> x
   | _      -> x0

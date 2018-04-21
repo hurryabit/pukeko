@@ -1,9 +1,9 @@
 data List a =
   | Nil
   | Cons a (List a)
-last : a -> List a -> a
+last :: a -> List a -> a
 last x0 xs =
-  match xs with
+  case xs of
   | Nil                -> x0
   | Cons x Nil         -> x
   | Cons _ (Cons x xs) -> last x xs

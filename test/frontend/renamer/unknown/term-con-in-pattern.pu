@@ -1,4 +1,4 @@
-f : a
+f :: a
 f x =
-  match x with
+  case x of
   | Con -> 1

@@ -1,6 +1,6 @@
 class C a where
-  c : a -> a
+  c :: a -> a
 class D a where
-  d : a -> a
-f : (D a) => a -> a
+  d :: a -> a
+f :: (D a) => a -> a
 f = c

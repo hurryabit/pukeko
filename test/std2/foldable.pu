@@ -3,14 +3,14 @@ import std2/int
 import std2/monoid
 
 class Foldable t where
-  foldr : (a -> b -> b) -> b -> t a -> b
-  foldl : (b -> a -> b) -> b -> t a -> b
+  foldr :: (a -> b -> b) -> b -> t a -> b
+  foldl :: (b -> a -> b) -> b -> t a -> b
 
-foldMap : (Foldable t, Monoid m) => (a -> m) -> t a -> m
-foldMap f = foldr (fun x m -> append (f x) m) empty
+foldMap :: (Foldable t, Monoid m) => (a -> m) -> t a -> m
+foldMap f = foldr (\x m -> append (f x) m) empty
 
-fold : (Foldable t, Monoid m) => t m -> m
+fold :: (Foldable t, Monoid m) => t m -> m
 fold = foldr append empty
 
-length : (Foldable t) => t a -> Int
-length = foldMap (fun x -> 1)
+length :: (Foldable t) => t a -> Int
+length = foldMap (\x -> 1)

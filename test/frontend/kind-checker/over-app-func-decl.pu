@@ -1,2 +1,2 @@
-bad : Int Int
+bad :: Int Int
 bad = 0

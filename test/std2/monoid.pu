@@ -1,5 +1,5 @@
 -- Monoids
 
 class Monoid m where
-  empty : m
-  append : m -> m -> m
+  empty :: m
+  append :: m -> m -> m

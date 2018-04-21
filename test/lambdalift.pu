@@ -1,13 +1,13 @@
 import std2/io
 
-g : Int -> Int -> Int -> Int -> Int
+g :: Int -> Int -> Int -> Int -> Int
 g a b c d = a
 
-f : Int -> Int -> Int -> Int -> Int
-f = fun x -> fun y1 y2 -> fun z -> g x y1 y2 z
+f :: Int -> Int -> Int -> Int -> Int
+f = \x -> \y1 y2 -> \z -> g x y1 y2 z
 
-h : Int -> Int
+h :: Int -> Int
 h x = x + x
 
-main : IO Unit
+main :: IO Unit
 main = print (f 1 2 3 (h 2))

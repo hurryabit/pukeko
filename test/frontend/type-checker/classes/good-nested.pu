@@ -1,4 +1,4 @@
 class C a where
-  c : a -> a
-f : (C a) => a -> a
+  c :: a -> a
+f :: (C a) => a -> a
 f = let g = c in g

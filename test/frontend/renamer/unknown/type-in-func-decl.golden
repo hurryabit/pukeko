@@ -1,1 +1,1 @@
-test/frontend/renamer/unknown/type-in-func-decl.pu:1:7: unknown type constructor: Typ
+test/frontend/renamer/unknown/type-in-func-decl.pu:1:8: unknown type constructor: Typ

@@ -1,8 +1,8 @@
 import std2/prelude
 
-insert : Int -> List Int -> List Int
+insert :: Int -> List Int -> List Int
 insert y xs =
-  match xs with
+  case xs of
   | Nil -> Cons y Nil
   | Cons x xs' ->
     if y <= x then
@@ -10,16 +10,16 @@ insert y xs =
     else
       Cons x (insert y xs')
 
-isort : List Int -> List Int
+isort :: List Int -> List Int
 isort xs =
-  match xs with
+  case xs of
   | Nil -> Nil
   | Cons x xs -> insert x (isort xs)
 
-main : IO Unit
+main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   sequence (replicate n input)
-  >>= fun xs ->
+  >>= \xs ->
   traverse_ print (isort xs)

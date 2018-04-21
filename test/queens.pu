@@ -1,11 +1,11 @@
 import std2/prelude
 
-diff : List Int -> List Int -> List Int
+diff :: List Int -> List Int -> List Int
 diff xs ys =
-  match xs with
+  case xs of
   | Nil -> Nil
   | Cons x xs' ->
-    match ys with
+    case ys of
     | Nil -> xs
     | Cons y ys' ->
       if x < y then
@@ -15,29 +15,29 @@ diff xs ys =
       else
         diff xs ys'
 
-ints : List Int
+ints :: List Int
 ints =
   let rec go k = Cons k (go (k+1)) in
   go 1
 
-solve_aux : List (List Int) -> List (List Int)
+solve_aux :: List (List Int) -> List (List Int)
 solve_aux kss =
-  match kss with
+  case kss of
   | Nil -> Cons Nil Nil
   | Cons ks kss ->
-    foldMap (fun k ->
+    foldMap (\k ->
         map (Cons k)
-          (solve_aux (zip_with (fun ls i ->
+          (solve_aux (zip_with (\ls i ->
               diff ls (Cons (k-i) (Cons k (Cons (k+i) Nil))))
             kss
             ints)))
     ks
 
-solve : Int -> List (List Int)
+solve :: Int -> List (List Int)
 solve n = solve_aux (replicate n (take n ints))
 
-main : IO Unit
+main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print (length (solve n))

@@ -270,7 +270,7 @@ instance IsTyped lg => PrettyPrec (Expr lg) where
     -- FIXME: Collect lambdas.
     EMat _ e as ->
       maybeParens (prec > 0) $
-        "match" <+> pretty e <+> "with"
+        "case" <+> pretty e <+> "of"
         $$ vcatMap pretty as
     ECast (MkCoercion dir tcon, _typ) e0 ->
       maybeParens (prec > Op.aprec) $
@@ -290,7 +290,7 @@ prettyEAbs prec pars body
   | null pars = prettyPrec prec body
   | otherwise =
       maybeParens (prec > 0) $
-      hang ("fun" <+> hsepMap pretty pars <+> "->") 2 (pretty body)
+      hang ("\\" <> hsepMap pretty pars <+> "->") 2 (pretty body)
 
 instance IsTyped lg => Pretty (Altn lg) where
   pretty (MkAltn p t) = hang ("|" <+> pretty p <+> "->") 2 (pretty t)

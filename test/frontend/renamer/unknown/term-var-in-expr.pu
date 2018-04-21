@@ -1,2 +1,2 @@
-f : a -> a
+f :: a -> a
 f x = g x

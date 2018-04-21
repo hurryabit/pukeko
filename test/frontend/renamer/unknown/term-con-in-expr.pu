@@ -1,2 +1,2 @@
-bad : a
+bad :: a
 bad = Con

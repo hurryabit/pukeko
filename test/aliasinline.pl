@@ -31,4 +31,4 @@ data Monad m =
        | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
-main : IO Unit = coerce @(_ -> IO) (Pair @Unit @World Unit)
+main :: IO Unit = coerce @(_ -> IO) (Pair @Unit @World Unit)

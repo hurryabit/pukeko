@@ -1,18 +1,18 @@
 -- Boolean operations
 import std2/basic
 
-not : Bool -> Bool
+not :: Bool -> Bool
 not x = if x then False else True
 
-conj : Bool -> Bool -> Bool
+conj :: Bool -> Bool -> Bool
 conj x y = if x then y else False
 
 infix && conj
 
-disj : Bool -> Bool -> Bool
+disj :: Bool -> Bool -> Bool
 disj x y = if x then True else y
 
 infix || disj
 
-instance eqBool : Eq Bool where
+instance eqBool :: Eq Bool where
   eq x y = if x then y else if y then False else True

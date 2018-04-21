@@ -205,7 +205,7 @@ prettyTUni prec vs tq =
 
 instance (Pretty a, Pretty t) => Pretty (a ::: t) where
 instance (Pretty a, Pretty t) => PrettyPrec (a ::: t) where
-  prettyPrec prec (x ::: t) = maybeParens (prec > 0) (pretty x <+> ":" <+> pretty t)
+  prettyPrec prec (x ::: t) = maybeParens (prec > 0) (pretty x <+> "::" <+> pretty t)
 
 deriving instance Functor     GenType
 deriving instance Foldable    GenType

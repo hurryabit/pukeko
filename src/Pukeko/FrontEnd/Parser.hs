@@ -97,10 +97,9 @@ parens = between (symbol "(") (symbol ")")
 -- TODO: Ideally we want a trie rather than a tree.
 reservedIdents :: Set String
 reservedIdents = Set.fromList
-      [ "fun"
-      , "let", "rec", "and", "in"
+      [ "let", "rec", "and", "in"
       , "if", "then", "else"
-      , "match", "with"
+      , "case", "of"
       , "data", "class", "where", "instance"
       , "external"
       , "import"
@@ -118,7 +117,7 @@ identLetter :: Parser Char
 identLetter = alphaNumChar <|> satisfy (\c -> c == '_' || c == '\'')
 
 reservedOperators :: Set String
-reservedOperators = Set.fromList ["->", "<-", "=>", "=", ":", "|"]
+reservedOperators = Set.fromList ["->", "<-", "=>", "=", "::", "|", "\\"]
 
 opLetter :: Parser Char
 opLetter = oneOf Op.letters
@@ -156,12 +155,13 @@ decimal = lexeme L.decimal
 lctd :: Parser a -> Parser (Lctd a)
 lctd p = Lctd <$> getPosition <*> p
 
-equals, arrow, darrow, colon, bar :: Parser ()
+equals, arrow, darrow, hasType, bar, lam :: Parser ()
 equals  = reservedOp "="
 arrow   = reservedOp "->"
 darrow  = reservedOp "=>"
-colon   = reservedOp ":"
+hasType = reservedOp "::"
 bar     = reservedOp "|"
+lam     = reservedOp "\\"
 
 name :: Parser String -> Parser (LctdName nsp)
 name p = lctd (Tagged <$> p)
@@ -224,16 +224,16 @@ exprMatch :: Parser (Expr (LctdName 'TmVar))
 exprMatch = do
   tokCol <- indentGuard
   fstCol <- RWS.gets sourceColumn
-  reserved "match"
+  reserved "case"
   if tokCol == fstCol && fstCol > pos1
     then
       EMat
-      <$> block tokCol GT (expr <* reserved "with")
+      <$> block tokCol GT (expr <* reserved "of")
       <*> block tokCol EQ (some altn)
     else
       block fstCol GT $
       EMat
-      <$> (expr <* reserved "with")
+      <$> (expr <* reserved "of")
       <*> aligned (some altn)
 
 altn :: Parser (Altn (LctdName 'TmVar))
@@ -269,7 +269,7 @@ expr =
       <*> (reserved "else" *> expr)
     , exprMatch
     , ELam
-      <$> (reserved "fun" *> NE.some tmvar)
+      <$> (lam *> NE.some tmvar)
       <*> (arrow *> expr)
     , let_ ELet ERec <*> (reserved "in" *> expr)
     , ECoe <$> (reserved "coerce" *> char '@' *> parens coercion) <*> aexpr
@@ -306,7 +306,7 @@ dconDecl = indented_ bar (MkTmConDecl <$> tmcon <*> many atype)
 
 signDecl :: Parser SignDecl
 signDecl = indented
-  (try (indented tmvar (\z -> colon $> z)))
+  (try (indented tmvar (\z -> hasType $> z)))
   (\z -> MkSignDecl z <$> typeScheme)
 
 clssDecl :: Parser ClssDecl
@@ -321,7 +321,7 @@ clssDecl = do
 instDecl :: Parser InstDecl
 instDecl = do
   n       <- tmvar
-  colon
+  hasType
   q       <- typeCstr
   c       <- clasz
   (t, vs) <- (,) <$> typeAtom <*> pure [] <|>

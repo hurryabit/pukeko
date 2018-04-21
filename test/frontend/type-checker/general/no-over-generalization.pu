@@ -1,7 +1,7 @@
 data Bool =
   | False
   | True
-f : Int
+f :: Int
 f =
   let g x =
     let h y = x in

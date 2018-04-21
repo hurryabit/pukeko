@@ -1,20 +1,20 @@
 import std2/prelude
 
-prime : Int
+prime :: Int
 prime = 1000000*1000000+39
 
-add_mod_prime : Int -> Int -> Int
+add_mod_prime :: Int -> Int -> Int
 add_mod_prime x y =
   let z = x+y in
   if z < prime then z else z - prime
 
-fibs0 : List Int
-fibs1 : List Int
+fibs0 :: List Int
+fibs1 :: List Int
 fibs0 = Cons 0 fibs1
 fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
 
-main : IO Unit
+main :: IO Unit
 main =
   input
-  >>= fun n ->
+  >>= \n ->
   print (nth_exn fibs0 n)

@@ -31,55 +31,55 @@ data Monad m =
        | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 data World
 data IO a = World -> Pair a World
-external abort : forall a. a = "abort"
-external lt_int : Int -> Int -> Bool = "lt"
-external le_int : Int -> Int -> Bool = "le"
-external add_int : Int -> Int -> Int = "add"
-external sub_int : Int -> Int -> Int = "sub"
-external mul_int : Int -> Int -> Int = "mul"
-external seq : forall a b. a -> b -> b = "seq"
-external puti : Int -> Unit = "puti"
-external geti : Unit -> Int = "geti"
-print : Int -> IO Unit = io.L2 @Int @Unit puti
-input : IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
-prime : Int = add_int (mul_int 1000000 1000000) 39
-fibs0 : List Int = Cons @Int 0 fibs1
-fibs1 : List Int =
+external abort :: forall a. a = "abort"
+external lt_int :: Int -> Int -> Bool = "lt"
+external le_int :: Int -> Int -> Bool = "le"
+external add_int :: Int -> Int -> Int = "add"
+external sub_int :: Int -> Int -> Int = "sub"
+external mul_int :: Int -> Int -> Int = "mul"
+external seq :: forall a b. a -> b -> b = "seq"
+external puti :: Int -> Unit = "puti"
+external geti :: Unit -> Int = "geti"
+print :: Int -> IO Unit = io.L2 @Int @Unit puti
+input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
+prime :: Int = add_int (mul_int 1000000 1000000) 39
+fibs0 :: List Int = Cons @Int 0 fibs1
+fibs1 :: List Int =
   Cons @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
-main : IO Unit =
+main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
-nth_exn.L1 : forall a. List a -> Int -> a =
-  fun @a (xs : List a) (n : Int) ->
-    match xs with
+nth_exn.L1 :: forall a. List a -> Int -> a =
+  \@a (xs :: List a) (n :: Int) ->
+    case xs of
     | Nil -> abort @a
     | Cons x xs ->
-      match le_int n 0 with
+      case le_int n 0 of
       | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
-zip_with.L1 : forall a b c. (a -> b -> c) -> List a -> List b -> List c =
-  fun @a @b @c (f : a -> b -> c) (xs : List a) (ys : List b) ->
-    match xs with
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+  \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
+    case xs of
     | Nil -> Nil @c
     | Cons x xs ->
-      match ys with
+      case ys of
       | Nil -> Nil @c
       | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
-monadIO.bind.L1 : forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
-  fun @a @b (mx : IO a) (f : a -> IO b) (world0 : World) ->
-    match coerce @(IO -> _) mx world0 with
+monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
+  \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
-io.L1 : forall a b. (a -> b) -> a -> World -> Pair b World =
-  fun @a @b (f : a -> b) (x : a) (world : World) ->
-    let y : b = f x in
+io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
+  \@a @b (f :: a -> b) (x :: a) (world :: World) ->
+    let y :: b = f x in
     seq @b @(Pair b World) y (Pair @b @World y world)
-io.L2 : forall a b. (a -> b) -> a -> IO b =
-  fun @a @b (f : a -> b) (x : a) ->
+io.L2 :: forall a b. (a -> b) -> a -> IO b =
+  \@a @b (f :: a -> b) (x :: a) ->
     coerce @(_ -> IO) (io.L1 @a @b f x)
-add_mod_prime.L1 : Int -> Int -> Int =
-  fun (x : Int) (y : Int) ->
-    let z : Int = add_int x y in
-    match lt_int z prime with
+add_mod_prime.L1 :: Int -> Int -> Int =
+  \(x :: Int) (y :: Int) ->
+    let z :: Int = add_int x y in
+    case lt_int z prime of
     | False -> sub_int z prime
     | True -> z
-main.L1 : Int -> IO Unit =
-  fun (n : Int) -> print (nth_exn.L1 @Int fibs0 n)
+main.L1 :: Int -> IO Unit =
+  \(n :: Int) -> print (nth_exn.L1 @Int fibs0 n)
