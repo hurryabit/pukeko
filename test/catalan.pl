@@ -70,14 +70,14 @@ nth_exn.L1 :: forall a. List a -> Int -> a =
       case le_int n 0 of
       | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
-zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     case xs of
     | Nil -> Nil @c
     | Cons x xs ->
       case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     case coerce @(IO -> _) mx world0 of
@@ -102,7 +102,7 @@ scanl.L1 :: forall a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a 
       Cons @b y0 (scanl_f y0 xs)
 sols.L1 :: List Int -> Int =
   \(xs :: List Int) ->
-    sum_p (zip_of.L1 @Int @Int @Int mul_p.L1 sols xs)
+    sum_p (zip_with.L1 @Int @Int @Int mul_p.L1 sols xs)
 sols.L2 :: List Int -> Int -> List Int =
   \(xs :: List Int) (x :: Int) -> Cons @Int x xs
 main.L1 :: Int -> IO Unit =

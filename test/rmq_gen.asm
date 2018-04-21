@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.3, 3, C.1.2, 2, B.lt, 2, B.le, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, functorIO, 0, monadIO, 0, print, 0, random, 0, main, 0, foldableList.foldr.L1, 3, take.L1, 2, zip_of.L1, 3, semi.L1, 2, semi.L2, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, traverse_.L1, 3, functorIO.map.L1, 3, functorIO.map.L2, 2, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, gen.L1, 2, split_at.L1, 2, random.L1, 1, main.L1, 3, main.L2, 1
+g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.3, 3, C.1.2, 2, B.lt, 2, B.le, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, functorIO, 0, monadIO, 0, print, 0, random, 0, main, 0, foldableList.foldr.L1, 3, take.L1, 2, zip_with.L1, 3, semi.L1, 2, semi.L2, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, traverse_.L1, 3, functorIO.map.L1, 3, functorIO.map.L2, 2, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, gen.L1, 2, split_at.L1, 2, random.L1, 1, main.L1, 3, main.L2, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -146,7 +146,7 @@ g_push 2
 g_pushint 400000
 g_pushglobal main.L1
 g_mkap 1
-g_pushglobal zip_of.L1
+g_pushglobal zip_with.L1
 g_mkap 3
 g_pushglobal monadIO
 g_pushglobal sequence.L3
@@ -251,7 +251,7 @@ g_pop 2
 g_unwind
 g_label .2
 
-g_globstart zip_of.L1, 3
+g_globstart zip_with.L1, 3
 g_push 1
 g_eval
 g_jumpcase .0, .1
@@ -277,7 +277,7 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 6
-g_pushglobal zip_of.L1
+g_pushglobal zip_with.L1
 g_mkap 3
 g_push 1
 g_push 4

@@ -26,7 +26,7 @@ scanl f =
 sols :: List Int
 sols =
   Cons 1
-    (map (\xs -> sum_p (zip_of mul_p sols xs))
+    (map (\xs -> sum_p (zip_with mul_p sols xs))
       (scanl (\xs x -> Cons x xs) Nil sols))
 
 main :: IO Unit

@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.abort, 0, B.le, 2, B.add, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, B.geti, 1, print, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, functorList.map.L1, 2, foldableList.foldl.L1, 3, nth_exn.L1, 2, zip_of.L1, 3, monadIO.bind.L1, 3, io.L1, 3, io.L2, 2, mul_p.L1, 2, add_p.L1, 2, scanl.L1, 4, sols.L1, 1, sols.L2, 2, main.L1, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.abort, 0, B.le, 2, B.add, 2, B.sub, 2, B.mul, 2, B.mod, 2, B.seq, 2, B.puti, 1, B.geti, 1, print, 0, input, 0, p, 0, sum_p, 0, sols, 0, main, 0, functorList.map.L1, 2, foldableList.foldl.L1, 3, nth_exn.L1, 2, zip_with.L1, 3, monadIO.bind.L1, 3, io.L1, 3, io.L2, 2, mul_p.L1, 2, add_p.L1, 2, scanl.L1, 4, sols.L1, 1, sols.L2, 2, main.L1, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -219,7 +219,7 @@ g_label .5
 g_jump .2
 g_label .2
 
-g_globstart zip_of.L1, 3
+g_globstart zip_with.L1, 3
 g_push 1
 g_eval
 g_jumpcase .0, .1
@@ -245,7 +245,7 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 6
-g_pushglobal zip_of.L1
+g_pushglobal zip_with.L1
 g_mkap 3
 g_push 1
 g_push 4
@@ -350,7 +350,7 @@ g_globstart sols.L1, 1
 g_push 0
 g_pushglobal sols
 g_pushglobal mul_p.L1
-g_pushglobal zip_of.L1
+g_pushglobal zip_with.L1
 g_mkap 3
 g_pushglobal sum_p
 g_updap 1, 2

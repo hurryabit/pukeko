@@ -59,14 +59,14 @@ replicate.L1 :: forall a. Int -> a -> List a =
     case le_int n 0 of
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     case xs of
     | Nil -> Nil @c
     | Cons x xs ->
       case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (case monad.m of
@@ -186,7 +186,7 @@ main.L4 :: Int -> List Int -> IO Unit =
           let rec run :: List (RmqTree Int) -> RmqTree Int =
                     build.L1 @Int min.L1 run
           in
-          run (zip_of.L1 @Int @Int @(RmqTree Int) (single.L1 @Int) nats xs)
+          run (zip_with.L1 @Int @Int @(RmqTree Int) (single.L1 @Int) nats xs)
     in
     let mx :: IO (List Unit) =
           let act :: IO Unit =

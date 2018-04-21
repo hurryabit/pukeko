@@ -57,14 +57,14 @@ replicate :: Int -> a -> List a
 replicate n x =
   if n <= 0 then Nil else Cons x (replicate (n-1) x)
 
-zip_of :: (a -> b -> c) -> List a -> List b -> List c
-zip_of f xs ys =
+zip_with :: (a -> b -> c) -> List a -> List b -> List c
+zip_with f xs ys =
   case xs of
   | Nil -> Nil
   | Cons x xs ->
     case ys of
     | Nil -> Nil
-    | Cons y ys -> Cons (f x y) (zip_of f xs ys)
+    | Cons y ys -> Cons (f x y) (zip_with f xs ys)
 
 partition :: (a -> Bool) -> List a -> Pair (List a) (List a)
 partition p xs =

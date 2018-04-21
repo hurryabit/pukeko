@@ -30,7 +30,7 @@ main =
     | Pair ys random ->
       let zs = take m random in
       sequence (
-        zip_of
+        zip_with
           (\y z ->
              let y = y % n in
              let z = z % n in

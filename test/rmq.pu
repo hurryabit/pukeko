@@ -37,7 +37,7 @@ build op xs =
     | Cons t1 Nil -> t1
     | Cons t1 (Cons _ _) -> run (pair (combine op) ts)
   in
-  run (zip_of single nats xs)
+  run (zip_with single nats xs)
 
 query :: a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a
 query one op q_lo q_hi =

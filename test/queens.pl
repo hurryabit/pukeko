@@ -92,14 +92,14 @@ replicate.L1 :: forall a. Int -> a -> List a =
     case le_int n 0 of
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     case xs of
     | Nil -> Nil @c
     | Cons x xs ->
       case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     case coerce @(IO -> _) mx world0 of
@@ -133,7 +133,7 @@ solve_aux.L1 :: Int -> List Int -> Int -> List Int =
     diff.L1 ls (Cons @Int (sub_int k i) (Cons @Int k (Cons @Int (add_int k i) (Nil @Int))))
 solve_aux.L2 :: List (List Int) -> Int -> List (List Int) =
   \(kss :: List (List Int)) (k :: Int) ->
-    functorList.map.L1 @(List Int) @(List Int) (Cons @Int k) (solve_aux (zip_of.L1 @(List Int) @Int @(List Int) (solve_aux.L1 k) kss ints))
+    functorList.map.L1 @(List Int) @(List Int) (Cons @Int k) (solve_aux (zip_with.L1 @(List Int) @Int @(List Int) (solve_aux.L1 k) kss ints))
 main.L1 :: Int -> IO Unit =
   \(n :: Int) ->
     print (let f :: List Int -> Int = length.L1 @(List Int) in

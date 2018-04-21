@@ -45,7 +45,7 @@ input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 prime :: Int = add_int (mul_int 1000000 1000000) 39
 fibs0 :: List Int = Cons @Int 0 fibs1
 fibs1 :: List Int =
-  Cons @Int 1 (zip_of.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
+  Cons @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 nth_exn.L1 :: forall a. List a -> Int -> a =
@@ -56,14 +56,14 @@ nth_exn.L1 :: forall a. List a -> Int -> a =
       case le_int n 0 of
       | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
-zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     case xs of
     | Nil -> Nil @c
     | Cons x xs ->
       case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
     case coerce @(IO -> _) mx world0 of

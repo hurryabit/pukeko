@@ -57,7 +57,7 @@ main :: IO Unit =
                       | Pair ys random ->
                         let zs :: List Int = take.L1 @Int 100000 random in
                         let mx :: IO (List Unit) =
-                              sequence.L3 @Unit @IO monadIO (zip_of.L1 @Int @Int @(IO Unit) (main.L1 400000) ys zs)
+                              sequence.L3 @Unit @IO monadIO (zip_with.L1 @Int @Int @(IO Unit) (main.L1 400000) ys zs)
                         in
                         coerce @(_ -> IO) (monadIO.bind.L1 @(List Unit) @Unit mx main.L2)
                 in
@@ -82,14 +82,14 @@ take.L1 :: forall a. Int -> List a -> List a =
       | Nil -> Nil @a
       | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
     | True -> Nil @a
-zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
     case xs of
     | Nil -> Nil @c
     | Cons x xs ->
       case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
 semi.L1 :: forall a m. m a -> Unit -> m a =
   \@a @m (m2 :: m a) (x :: Unit) -> m2
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
