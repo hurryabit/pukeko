@@ -2,17 +2,17 @@ data C a =
        | .C (a -> a)
 c :: forall a. C a -> a -> a =
   \@a (dict :: C a) ->
-    match dict with
+    case dict of
     | .C c -> c
 data D a =
        | .D (C a) (a -> a)
 D.C :: forall a. D a -> C a =
   \@a (dict :: D a) ->
-    match dict with
+    case dict of
     | .D D.C _ -> D.C
 d :: forall a. D a -> a -> a =
   \@a (dict :: D a) ->
-    match dict with
+    case dict of
     | .D _ d -> d
 cInt :: C Int = .C @Int cInt.c
 cInt.c :: Int -> Int = \(x :: Int) -> x

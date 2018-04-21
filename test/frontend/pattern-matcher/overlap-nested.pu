@@ -4,7 +4,7 @@ data Option a =
   | Some a
 f :: Pair (Option a) a -> a
 f xy =
-  match xy with
+  case xy of
   | Pair None     y -> y
   | Pair (Some x) _ -> x
   | Pair (Some _) y -> y

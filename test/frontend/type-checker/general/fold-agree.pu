@@ -3,6 +3,6 @@ data List a =
   | Cons a (List a)
 fold :: (b -> a -> b) -> b -> List a -> b
 fold f y0 xs =
-  match xs with
+  case xs of
   | Nil -> y0
   | Cons x xs -> fold f (f y0 x) xs

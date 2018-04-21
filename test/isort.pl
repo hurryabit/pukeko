@@ -43,44 +43,44 @@ print :: Int -> IO Unit = io.L2 @Int @Unit puti
 input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 isort :: List Int -> List Int =
   \(xs :: List Int) ->
-    match xs with
+    case xs of
     | Nil -> Nil @Int
     | Cons x xs -> insert.L1 x (isort xs)
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
   \@a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
-    match xs with
+    case xs of
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
 replicate.L1 :: forall a. Int -> a -> List a =
   \@a (n :: Int) (x :: a) ->
-    match le_int n 0 with
+    case le_int n 0 of
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
 semi.L1 :: forall a m. m a -> Unit -> m a =
   \@a @m (m2 :: m a) (x :: Unit) -> m2
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
-    (match monad.m with
+    (case monad.m of
      | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
-    (match monad.m with
+    (case monad.m of
      | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
-    (match monad.m with
+    (case monad.m of
      | .Monad _ _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
-    match ms with
+    case ms of
     | Nil ->
-      (match monad.m with
+      (case monad.m of
        | .Monad _ pure _ -> pure) @(List a) (Nil @a)
     | Cons m ms ->
-      (match monad.m with
+      (case monad.m of
        | .Monad _ _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
@@ -88,7 +88,7 @@ traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
     semi.L2 @Unit @m monad.m (f x)
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
   \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
   \@a @b (f :: a -> b) (mx :: IO a) ->
@@ -97,7 +97,7 @@ monadIO.pure.L2 :: forall a. a -> IO a =
   \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
   \@a @b (mx :: IO a) (f :: a -> IO b) ->
@@ -111,10 +111,10 @@ io.L2 :: forall a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io.L1 @a @b f x)
 insert.L1 :: Int -> List Int -> List Int =
   \(y :: Int) (xs :: List Int) ->
-    match xs with
+    case xs of
     | Nil -> Cons @Int y (Nil @Int)
     | Cons x xs' ->
-      match le_int y x with
+      case le_int y x of
       | False -> Cons @Int x (insert.L1 y xs')
       | True -> Cons @Int y xs
 main.L1 :: List Int -> IO Unit =

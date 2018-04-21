@@ -42,7 +42,7 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
   \@a @m (m2 :: m a) (x :: Unit) -> m2
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
   \@a @b (f :: a -> b) (x :: a) (world :: World) ->
@@ -55,10 +55,10 @@ main.L1 :: Int -> Int -> IO Unit =
   \(x :: Int) (y :: Int) ->
     let p :: Pair Int Int = Pair @Int @Int x y in
     let m1 :: IO Unit =
-          print (match p with
+          print (case p of
                  | Pair x _ -> x)
     and m2 :: IO Unit =
-          print (match p with
+          print (case p of
                  | Pair _ y -> y)
     in
     let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in

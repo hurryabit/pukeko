@@ -47,14 +47,14 @@ main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
   \@a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
-    match xs with
+    case xs of
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
 take.L1 :: forall a. Int -> List a -> List a =
   \@a (n :: Int) (xs :: List a) ->
-    match le_int n 0 with
+    case le_int n 0 of
     | False ->
-      match xs with
+      case xs of
       | Nil -> Nil @a
       | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
     | True -> Nil @a
@@ -62,14 +62,14 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
   \@a @m (m2 :: m a) (x :: Unit) -> m2
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
-    (match monad.m with
+    (case monad.m of
      | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
   \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
   \@a @b (f :: a -> b) (mx :: IO a) ->
@@ -78,7 +78,7 @@ monadIO.pure.L2 :: forall a. a -> IO a =
   \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
   \@a @b (mx :: IO a) (f :: a -> IO b) ->

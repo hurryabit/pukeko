@@ -6,7 +6,7 @@ data Option a =
   | Some a
 f :: a -> List (Option a) -> a
 f x0 ys =
-  match ys with
+  case ys of
   | Nil              -> x0
   | Cons (Some x) _  -> x
   | Cons _        ys -> f x0 ys

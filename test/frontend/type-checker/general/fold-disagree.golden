@@ -6,6 +6,6 @@ fold :: forall a b. (a -> b -> a) -> a -> List b -> a =
     \(f :: a -> b -> a) ->
       \(y0 :: a) ->
         \(xs :: List b) ->
-          match xs with
+          case xs of
           | Nil -> y0
           | Cons x xs -> fold @a @b f (f y0 x) xs

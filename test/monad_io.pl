@@ -52,7 +52,7 @@ count_down :: Int -> IO Unit =
           let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
           coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
     in
-    match p with
+    case p of
     | False -> coerce @(_ -> IO) (Pair @Unit @World Unit)
     | True -> m
 main :: IO Unit =
@@ -61,7 +61,7 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
   \@a @m (m2 :: m a) (x :: Unit) -> m2
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
   \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
   \@a @b (f :: a -> b) (mx :: IO a) ->
@@ -70,7 +70,7 @@ monadIO.pure.L2 :: forall a. a -> IO a =
   \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
   \@a @b (mx :: IO a) (f :: a -> IO b) ->
@@ -87,12 +87,12 @@ repeat.L1 :: forall m. Monad m -> Int -> m Unit -> m Unit =
     let p :: Bool = gt_int k 0
     and m :: m Unit =
           let m2 :: m Unit = repeat.L1 @m monad.m (sub_int k 1) m in
-          (match monad.m with
+          (case monad.m of
            | .Monad _ _ bind -> bind) @Unit @Unit m (semi.L1 @Unit @m m2)
     in
-    match p with
+    case p of
     | False ->
-      (match monad.m with
+      (case monad.m of
        | .Monad _ pure _ -> pure) @Unit Unit
     | True -> m
 main.L1 :: Int -> Int -> IO Unit =

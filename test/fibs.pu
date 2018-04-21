@@ -11,7 +11,7 @@ add_mod_prime x y =
 fibs0 :: List Int
 fibs1 :: List Int
 fibs0 = Cons 0 fibs1
-fibs1 = Cons 1 (zip_with add_mod_prime fibs0 fibs1)
+fibs1 = Cons 1 (zip_of add_mod_prime fibs0 fibs1)
 
 main :: IO Unit
 main =

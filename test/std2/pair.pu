@@ -3,8 +3,8 @@ import std2/basic
 
 instance eqPair :: (Eq a, Eq b) => Eq (Pair a b) where
   eq x y =
-    match x with
+    case x of
     | Pair x1 x2 ->
-      match y with
+      case y of
       | Pair y1 y2 ->
         eq x1 y1 && eq x2 y2

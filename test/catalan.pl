@@ -54,33 +54,33 @@ main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 functorList.map.L1 :: forall a b. (a -> b) -> List a -> List b =
   \@a @b (f :: a -> b) (xs :: List a) ->
-    match xs with
+    case xs of
     | Nil -> Nil @b
     | Cons x xs -> Cons @b (f x) (functorList.map.L1 @a @b f xs)
 foldableList.foldl.L1 :: forall a b. (b -> a -> b) -> b -> List a -> b =
   \@a @b (f :: b -> a -> b) (y0 :: b) (xs :: List a) ->
-    match xs with
+    case xs of
     | Nil -> y0
     | Cons x xs -> foldableList.foldl.L1 @a @b f (f y0 x) xs
 nth_exn.L1 :: forall a. List a -> Int -> a =
   \@a (xs :: List a) (n :: Int) ->
-    match xs with
+    case xs of
     | Nil -> abort @a
     | Cons x xs ->
-      match le_int n 0 with
+      case le_int n 0 of
       | False -> nth_exn.L1 @a xs (sub_int n 1)
       | True -> x
-zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
-    match xs with
+    case xs of
     | Nil -> Nil @c
     | Cons x xs ->
-      match ys with
+      case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 io.L1 :: forall a b. (a -> b) -> a -> World -> Pair b World =
   \@a @b (f :: a -> b) (x :: a) (world :: World) ->
@@ -95,14 +95,14 @@ add_p.L1 :: Int -> Int -> Int =
   \(x :: Int) (y :: Int) -> mod (add_int x y) p
 scanl.L1 :: forall a b. (b -> a -> b) -> (b -> List a -> List b) -> b -> List a -> List b =
   \@a @b (f :: b -> a -> b) (scanl_f :: b -> List a -> List b) (y0 :: b) (xs :: List a) ->
-    match xs with
+    case xs of
     | Nil -> Nil @b
     | Cons x xs ->
       let y0 :: b = f y0 x in
       Cons @b y0 (scanl_f y0 xs)
 sols.L1 :: List Int -> Int =
   \(xs :: List Int) ->
-    sum_p (zip_with.L1 @Int @Int @Int mul_p.L1 sols xs)
+    sum_p (zip_of.L1 @Int @Int @Int mul_p.L1 sols xs)
 sols.L2 :: List Int -> Int -> List Int =
   \(xs :: List Int) (x :: Int) -> Cons @Int x xs
 main.L1 :: Int -> IO Unit =

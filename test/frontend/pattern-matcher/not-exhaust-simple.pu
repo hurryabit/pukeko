@@ -3,5 +3,5 @@ data Choice a b =
   | Second b
 f :: Choice a b -> a
 f xy =
-  match xy with
+  case xy of
   | First x -> x

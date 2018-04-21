@@ -15,7 +15,7 @@ sum_p = foldl add_p 0
 scanl :: (b -> a -> b) -> b -> List a -> List b
 scanl f =
   let rec scanl_f y0 xs =
-    match xs with
+    case xs of
     | Nil -> Nil
     | Cons x xs ->
       let y0 = f y0 x in
@@ -26,7 +26,7 @@ scanl f =
 sols :: List Int
 sols =
   Cons 1
-    (map (\xs -> sum_p (zip_with mul_p sols xs))
+    (map (\xs -> sum_p (zip_of mul_p sols xs))
       (scanl (\xs x -> Cons x xs) Nil sols))
 
 main :: IO Unit

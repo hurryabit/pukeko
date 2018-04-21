@@ -8,16 +8,16 @@ data BinTree a =
 
 instance functorBinTree :: Functor BinTree where
   map f t =
-    match t with
+    case t of
     | Leaf -> Leaf
     | Branch l x r -> Branch (map f l) (f x) (map f r)
 
 instance foldableBinTree :: Foldable BinTree where
   foldr f y0 t =
-    match t with
+    case t of
     | Leaf -> y0
     | Branch l x r -> foldr f (f x (foldr f y0 r)) l
   foldl f y0 t =
-    match t with
+    case t of
     | Leaf -> y0
     | Branch l x r -> foldl f (f (foldl f y0 l) x) r

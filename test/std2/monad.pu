@@ -16,7 +16,7 @@ infix ; semi
 
 sequence :: (Monad m) => List (m a) -> m (List a)
 sequence ms =
-  match ms with
+  case ms of
   | Nil -> pure Nil
   | Cons m ms ->
       m

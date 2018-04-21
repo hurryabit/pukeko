@@ -2,7 +2,7 @@ data C a =
        | .C (a -> a)
 c :: forall a. C a -> a -> a =
   \@a (dict :: C a) ->
-    match dict with
+    case dict of
     | .C c -> c
 f :: forall a. C a -> a -> a =
   \@a (c.a :: C a) ->

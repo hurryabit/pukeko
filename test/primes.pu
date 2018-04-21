@@ -8,7 +8,7 @@ repeat xs =
 psums :: List Int -> List Int
 psums =
   let rec psums0 n xs =
-    match xs with
+    case xs of
     | Nil -> Nil
     | Cons x xs ->
       let y = x + n in
@@ -19,7 +19,7 @@ psums =
 filter :: (a -> Bool) -> List a -> List a
 filter p =
   let rec filter_p xs =
-    match xs with
+    case xs of
     | Nil -> Nil
     | Cons x xs ->
       let ys = filter_p xs in
@@ -29,7 +29,7 @@ filter p =
 
 sieve :: List Int -> List Int
 sieve ks =
-  match ks with
+  case ks of
   | Nil -> abort
   | Cons p ks -> Cons p (sieve (filter (\k -> k % p != 0) ks))
 

@@ -2,17 +2,17 @@ data C a =
        | .C (a -> Int)
 c :: forall a. C a -> a -> Int =
   \@a (dict :: C a) ->
-    match dict with
+    case dict of
     | .C c -> c
 data D a =
        | .D (C a) (a -> Int)
 D.C :: forall a. D a -> C a =
   \@a (dict :: D a) ->
-    match dict with
+    case dict of
     | .D D.C _ -> D.C
 d :: forall a. D a -> a -> Int =
   \@a (dict :: D a) ->
-    match dict with
+    case dict of
     | .D _ d -> d
 data T a =
        | C a
@@ -26,7 +26,7 @@ cT :: forall a. C a -> C (T a) =
 cT.c :: forall a. C a -> T a -> Int =
   \@a (c.a :: C a) ->
     \(t :: T a) ->
-      match t with
+      case t of
       | C x -> c @a c.a x
 dT :: forall a. D a -> D (T a) =
   \@a (d.a :: D a) -> .D @(T a) (dT.C @a d.a) (dT.d @a d.a)
@@ -35,7 +35,7 @@ dT.C :: forall a. D a -> C (T a) =
 dT.d :: forall a. D a -> T a -> Int =
   \@a (d.a :: D a) ->
     \(t :: T a) ->
-      match t with
+      case t of
       | C x -> d @a d.a x
 f :: forall a. D a -> T a -> Int =
   \@a (d.a :: D a) -> \(x :: T a) -> c @(T a) (cT @a (D.C @a d.a)) x

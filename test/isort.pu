@@ -2,7 +2,7 @@ import std2/prelude
 
 insert :: Int -> List Int -> List Int
 insert y xs =
-  match xs with
+  case xs of
   | Nil -> Cons y Nil
   | Cons x xs' ->
     if y <= x then
@@ -12,7 +12,7 @@ insert y xs =
 
 isort :: List Int -> List Int
 isort xs =
-  match xs with
+  case xs of
   | Nil -> Nil
   | Cons x xs -> insert x (isort xs)
 

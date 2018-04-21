@@ -56,39 +56,39 @@ main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L6)
 replicate.L1 :: forall a. Int -> a -> List a =
   \@a (n :: Int) (x :: a) ->
-    match le_int n 0 with
+    case le_int n 0 of
     | False -> Cons @a x (replicate.L1 @a (sub_int n 1) x)
     | True -> Nil @a
-zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
+zip_of.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
   \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
-    match xs with
+    case xs of
     | Nil -> Nil @c
     | Cons x xs ->
-      match ys with
+      case ys of
       | Nil -> Nil @c
-      | Cons y ys -> Cons @c (f x y) (zip_with.L1 @a @b @c f xs ys)
+      | Cons y ys -> Cons @c (f x y) (zip_of.L1 @a @b @c f xs ys)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
-    (match monad.m with
+    (case monad.m of
      | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
-    (match monad.m with
+    (case monad.m of
      | .Monad _ _ bind ->
        bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
-    match ms with
+    case ms of
     | Nil ->
-      (match monad.m with
+      (case monad.m of
        | .Monad _ pure _ -> pure) @(List a) (Nil @a)
     | Cons m ms ->
-      (match monad.m with
+      (case monad.m of
        | .Monad _ _ bind ->
          bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
   \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> Pair @b @World (f x) world1
 functorIO.map.L2 :: forall a b. (a -> b) -> IO a -> IO b =
   \@a @b (f :: a -> b) (mx :: IO a) ->
@@ -97,7 +97,7 @@ monadIO.pure.L2 :: forall a. a -> IO a =
   \@a (x :: a) -> coerce @(_ -> IO) (Pair @a @World x)
 monadIO.bind.L1 :: forall a b. IO a -> (a -> IO b) -> World -> Pair b World =
   \@a @b (mx :: IO a) (f :: a -> IO b) (world0 :: World) ->
-    match coerce @(IO -> _) mx world0 with
+    case coerce @(IO -> _) mx world0 of
     | Pair x world1 -> coerce @(IO -> _) (f x) world1
 monadIO.bind.L2 :: forall a b. IO a -> (a -> IO b) -> IO b =
   \@a @b (mx :: IO a) (f :: a -> IO b) ->
@@ -114,10 +114,10 @@ nats.L1 :: (Int -> List Int) -> Int -> List Int =
     Cons @Int n (nats_from (add_int n 1))
 pair.L1 :: forall a. (a -> a -> a) -> List a -> List a =
   \@a (op :: a -> a -> a) (xs1 :: List a) ->
-    match xs1 with
+    case xs1 of
     | Nil -> Nil @a
     | Cons pm$1 pm$2 ->
-      match pm$2 with
+      case pm$2 of
       | Nil -> xs1
       | Cons x2 xs3 -> Cons @a (op pm$1 x2) (pair.L1 @a op xs3)
 single.L1 :: forall a. Int -> a -> RmqTree a =
@@ -125,44 +125,44 @@ single.L1 :: forall a. Int -> a -> RmqTree a =
     RmqNode @a i i x (RmqEmpty @a) (RmqEmpty @a)
 combine.L1 :: forall a. (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a =
   \@a (op :: a -> a -> a) (t1 :: RmqTree a) (t2 :: RmqTree a) ->
-    match t1 with
+    case t1 of
     | RmqEmpty -> abort @(RmqTree a)
     | RmqNode s1 _ v1 _ _ ->
-      match t2 with
+      case t2 of
       | RmqEmpty -> abort @(RmqTree a)
       | RmqNode _ e2 v2 _ _ -> RmqNode @a s1 e2 (op v1 v2) t1 t2
 build.L1 :: forall a. (a -> a -> a) -> (List (RmqTree a) -> RmqTree a) -> List (RmqTree a) -> RmqTree a =
   \@a (op :: a -> a -> a) (run :: List (RmqTree a) -> RmqTree a) (ts :: List (RmqTree a)) ->
-    match ts with
+    case ts of
     | Nil -> abort @(RmqTree a)
     | Cons pm$1 pm$2 ->
-      match pm$2 with
+      case pm$2 of
       | Nil -> pm$1
       | Cons _ _ -> run (pair.L1 @(RmqTree a) (combine.L1 @a op) ts)
 query.L1 :: forall a. a -> (a -> a -> a) -> Int -> Int -> (RmqTree a -> a) -> RmqTree a -> a =
   \@a (one :: a) (op :: a -> a -> a) (q_lo :: Int) (q_hi :: Int) (aux :: RmqTree a -> a) (t :: RmqTree a) ->
-    match t with
+    case t of
     | RmqEmpty -> one
     | RmqNode t_lo t_hi value left right ->
-      match let x :: Bool = lt_int q_hi t_lo
-            and y :: Bool = gt_int q_lo t_hi
-            in
-            match x with
-            | False -> y
-            | True -> True with
+      case let x :: Bool = lt_int q_hi t_lo
+           and y :: Bool = gt_int q_lo t_hi
+           in
+           case x of
+           | False -> y
+           | True -> True of
       | False ->
-        match let x :: Bool = le_int q_lo t_lo
-              and y :: Bool = le_int t_hi q_hi
-              in
-              match x with
-              | False -> False
-              | True -> y with
+        case let x :: Bool = le_int q_lo t_lo
+             and y :: Bool = le_int t_hi q_hi
+             in
+             case x of
+             | False -> False
+             | True -> y of
         | False -> op (aux left) (aux right)
         | True -> value
       | True -> one
 min.L1 :: Int -> Int -> Int =
   \(x :: Int) (y :: Int) ->
-    match le_int x y with
+    case le_int x y of
     | False -> y
     | True -> x
 main.L1 :: RmqTree Int -> Int -> Int -> IO Unit =
@@ -186,7 +186,7 @@ main.L4 :: Int -> List Int -> IO Unit =
           let rec run :: List (RmqTree Int) -> RmqTree Int =
                     build.L1 @Int min.L1 run
           in
-          run (zip_with.L1 @Int @Int @(RmqTree Int) (single.L1 @Int) nats xs)
+          run (zip_of.L1 @Int @Int @(RmqTree Int) (single.L1 @Int) nats xs)
     in
     let mx :: IO (List Unit) =
           let act :: IO Unit =

@@ -99,7 +99,7 @@ reservedIdents :: Set String
 reservedIdents = Set.fromList
       [ "let", "rec", "and", "in"
       , "if", "then", "else"
-      , "match", "with"
+      , "case", "of"
       , "data", "class", "where", "instance"
       , "external"
       , "import"
@@ -224,16 +224,16 @@ exprMatch :: Parser (Expr (LctdName 'TmVar))
 exprMatch = do
   tokCol <- indentGuard
   fstCol <- RWS.gets sourceColumn
-  reserved "match"
+  reserved "case"
   if tokCol == fstCol && fstCol > pos1
     then
       EMat
-      <$> block tokCol GT (expr <* reserved "with")
+      <$> block tokCol GT (expr <* reserved "of")
       <*> block tokCol EQ (some altn)
     else
       block fstCol GT $
       EMat
-      <$> (expr <* reserved "with")
+      <$> (expr <* reserved "of")
       <*> aligned (some altn)
 
 altn :: Parser (Altn (LctdName 'TmVar))

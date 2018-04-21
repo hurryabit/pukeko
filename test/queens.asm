@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.eq, 2, B.lt, 2, B.le, 2, B.add, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, monoidInt, 0, print, 0, input, 0, ints, 0, solve_aux, 1, main, 0, monoidInt.empty, 0, monoidList.empty, 0, foldMap.L1, 3, length.L1, 1, monoidList.append.L1, 2, functorList.map.L1, 2, foldableList.foldr.L1, 3, take.L1, 2, replicate.L1, 2, zip_with.L1, 3, monadIO.bind.L1, 3, io.L1, 3, io.L2, 2, diff.L1, 2, ints.L1, 2, solve_aux.L1, 3, solve_aux.L2, 2, main.L1, 1
+g_declare_globals C.0.0, 0, C.0.2, 2, C.1.2, 2, B.eq, 2, B.lt, 2, B.le, 2, B.add, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, monoidInt, 0, print, 0, input, 0, ints, 0, solve_aux, 1, main, 0, monoidInt.empty, 0, monoidList.empty, 0, foldMap.L1, 3, length.L1, 1, monoidList.append.L1, 2, functorList.map.L1, 2, foldableList.foldr.L1, 3, take.L1, 2, replicate.L1, 2, zip_of.L1, 3, monadIO.bind.L1, 3, io.L1, 3, io.L2, 2, diff.L1, 2, ints.L1, 2, solve_aux.L1, 3, solve_aux.L2, 2, main.L1, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -309,7 +309,7 @@ g_pop 2
 g_unwind
 g_label .2
 
-g_globstart zip_with.L1, 3
+g_globstart zip_of.L1, 3
 g_push 1
 g_eval
 g_jumpcase .0, .1
@@ -335,7 +335,7 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 6
-g_pushglobal zip_with.L1
+g_pushglobal zip_of.L1
 g_mkap 3
 g_push 1
 g_push 4
@@ -492,7 +492,7 @@ g_push 1
 g_push 3
 g_pushglobal solve_aux.L1
 g_mkap 1
-g_pushglobal zip_with.L1
+g_pushglobal zip_of.L1
 g_mkap 3
 g_pushglobal solve_aux
 g_mkap 1

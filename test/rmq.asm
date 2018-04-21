@@ -1,4 +1,4 @@
-g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.3, 3, C.1.0, 0, C.1.2, 2, C.1.5, 5, B.abort, 0, B.lt, 2, B.le, 2, B.gt, 2, B.add, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, functorIO, 0, monadIO, 0, print, 0, input, 0, nats, 0, infinity, 0, main, 0, replicate.L1, 2, zip_with.L1, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, functorIO.map.L1, 3, functorIO.map.L2, 2, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, nats.L1, 2, pair.L1, 2, single.L1, 2, combine.L1, 3, build.L1, 3, query.L1, 6, min.L1, 2, main.L1, 3, main.L2, 2, main.L3, 1, main.L4, 2, main.L5, 2, main.L6, 1
+g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.3, 3, C.1.0, 0, C.1.2, 2, C.1.5, 5, B.abort, 0, B.lt, 2, B.le, 2, B.gt, 2, B.add, 2, B.sub, 2, B.seq, 2, B.puti, 1, B.geti, 1, functorIO, 0, monadIO, 0, print, 0, input, 0, nats, 0, infinity, 0, main, 0, replicate.L1, 2, zip_of.L1, 3, sequence.L1, 3, sequence.L2, 3, sequence.L3, 2, functorIO.map.L1, 3, functorIO.map.L2, 2, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, nats.L1, 2, pair.L1, 2, single.L1, 2, combine.L1, 3, build.L1, 3, query.L1, 6, min.L1, 2, main.L1, 3, main.L2, 2, main.L3, 1, main.L4, 2, main.L5, 2, main.L6, 1
 g_declare_main main
 
 g_globstart C.0.0, 0
@@ -176,7 +176,7 @@ g_pop 2
 g_unwind
 g_label .2
 
-g_globstart zip_with.L1, 3
+g_globstart zip_of.L1, 3
 g_push 1
 g_eval
 g_jumpcase .0, .1
@@ -202,7 +202,7 @@ g_uncons 2
 g_push 1
 g_push 4
 g_push 6
-g_pushglobal zip_with.L1
+g_pushglobal zip_of.L1
 g_mkap 3
 g_push 1
 g_push 4
@@ -642,7 +642,7 @@ g_updap 2, 1
 g_push 2
 g_pushglobal nats
 g_pushglobal single.L1
-g_pushglobal zip_with.L1
+g_pushglobal zip_of.L1
 g_mkap 3
 g_push 1
 g_mkap 1
