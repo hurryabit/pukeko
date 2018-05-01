@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Pukeko.BackEnd.PeepHole
   ( optimize
   )

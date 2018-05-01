@@ -246,10 +246,10 @@ instance IsTyped lg => PrettyPrec (Expr lg) where
       maybeParens (prec > 0) $
         "case" <+> pretty e <+> "of"
         $$ vcatMap pretty as
-    ECast (MkCoercion dir tcon, _typ) e0 ->
+    ECast (MkCoercion dir tcon, _typ) e1 ->
       maybeParens (prec > Op.aprec) $
         "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
-        <+> prettyPrec (Op.aprec+1) e0
+        <+> prettyPrec (Op.aprec+1) e1
       where
         (d_from, d_to) = case dir of
           Inject  -> ("_", pretty tcon)

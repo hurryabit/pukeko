@@ -17,12 +17,13 @@ module Data.List.Sized
   , unzip
   , unzipWith
   , transpose
+  , findDelete
   )
 where
 
 import Prelude hiding (map, unzip, zip, zipWith, (++))
 
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (bimap, second)
 import Data.List.NonEmpty (NonEmpty (..))
 
 data Nat = Zero | Succ Nat
@@ -89,6 +90,12 @@ unzipWith f (Cons x xs) = bimap (Cons y) (Cons z) (unzipWith f xs)
 transpose :: List n b -> List m (List n a) -> List n (List m a)
 transpose zs Nil           = map (const Nil) zs
 transpose zs (Cons xs xss) = zipWith Cons xs (transpose zs xss)
+
+findDelete :: (a -> Maybe b) -> List ('Succ n) a -> Maybe (b, List n a)
+findDelete f (Cons x xs)
+  | Just y <- f x = Just (y, xs)
+  | Nil    <- xs  = Nothing
+  | Cons{} <- xs  = second (Cons x) <$> findDelete f xs
 
 deriving instance Functor (List n)
 deriving instance Foldable (List n)

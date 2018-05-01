@@ -36,8 +36,6 @@ default-extensions:
 - ViewPatterns
 ghc-options:
 - -Wall
-- -Wno-name-shadowing
-- -Wno-partial-type-signatures
 - -O0
 
 library:

@@ -7,3 +7,8 @@ examples/*
 !examples/Makefile
 !examples/*.pu
 !examples/*.bench
+test/*
+!test/backend/
+!test/frontend/
+!test/middleend/
+!test/*.hs
