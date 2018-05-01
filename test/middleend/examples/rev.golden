@@ -46,11 +46,16 @@ getChar :: IO (Option Char) =
 read :: List Char -> IO (List Char) =
   \(cs :: List Char) ->
     let f :: Option Char -> IO (List Char) = read.L1 cs in
-    coerce @(_ -> IO) (monadIO.bind.L1 @(Option Char) @(List Char) getChar f)
+    coerce
+      @(_ -> IO) (monadIO.bind.L1 @(Option Char) @(List Char) getChar f)
 main :: IO Unit =
   let mx :: IO (List Char) = read (Nil @Char) in
   let f :: List Char -> IO Unit =
-        foldableList.foldr.L1 @Char @(IO Unit) (traverse_.L1 @Char @IO monadIO putChar) (coerce @(_ -> IO) (Pair @Unit @World Unit))
+        foldableList.foldr.L1
+          @Char
+          @(IO Unit)
+          (traverse_.L1 @Char @IO monadIO putChar)
+          (coerce @(_ -> IO) (Pair @Unit @World Unit))
   in
   coerce @(_ -> IO) (monadIO.bind.L1 @(List Char) @Unit mx f)
 foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
@@ -63,7 +68,8 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
     (case monad.m of
-     | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
+     | .Monad _ _ bind -> bind)
+      @Unit @a m1 (semi.L1 @a @m m2)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)

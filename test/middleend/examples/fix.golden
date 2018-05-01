@@ -55,14 +55,34 @@ functorFox2 :: forall p. Bifunctor p -> Functor (Fix2 p) =
     .Functor @(Fix2 p) (functorFox2.map.L1 @p bifunctor.p)
 poly :: forall a p. Bifunctor p -> Fix (p a) -> Fix2 p a =
   \@a @p (bifunctor.p :: Bifunctor p) ->
-    compose.L1 @(Fix (p a)) @(p a (Fix2 p a)) @(Fix2 p a) (fix2.L1 @a @p) (compose.L1 @(Fix (p a)) @(p a (Fix (p a))) @(p a (Fix2 p a)) ((case bifunctor.p of
-                                                                                                                                          | .Bifunctor bimap ->
-                                                                                                                                            bimap) @a @a @(Fix (p a)) @(Fix2 p a) (id.L1 @a) (poly @a @p bifunctor.p)) (unFix.L1 @(p a)))
+    compose.L1
+      @(Fix (p a))
+      @(p a (Fix2 p a))
+      @(Fix2 p a)
+      (fix2.L1 @a @p)
+      (compose.L1
+         @(Fix (p a))
+         @(p a (Fix (p a)))
+         @(p a (Fix2 p a))
+         ((case bifunctor.p of
+           | .Bifunctor bimap -> bimap)
+            @a @a @(Fix (p a)) @(Fix2 p a) (id.L1 @a) (poly @a @p bifunctor.p))
+         (unFix.L1 @(p a)))
 mono :: forall a p. Bifunctor p -> Fix2 p a -> Fix (p a) =
   \@a @p (bifunctor.p :: Bifunctor p) ->
-    compose.L1 @(Fix2 p a) @(p a (Fix (p a))) @(Fix (p a)) (fix.L1 @(p a)) (compose.L1 @(Fix2 p a) @(p a (Fix2 p a)) @(p a (Fix (p a))) ((case bifunctor.p of
-                                                                                                                                          | .Bifunctor bimap ->
-                                                                                                                                            bimap) @a @a @(Fix2 p a) @(Fix (p a)) (id.L1 @a) (mono @a @p bifunctor.p)) (unFix2.L1 @a @p))
+    compose.L1
+      @(Fix2 p a)
+      @(p a (Fix (p a)))
+      @(Fix (p a))
+      (fix.L1 @(p a))
+      (compose.L1
+         @(Fix2 p a)
+         @(p a (Fix2 p a))
+         @(p a (Fix (p a)))
+         ((case bifunctor.p of
+           | .Bifunctor bimap -> bimap)
+            @a @a @(Fix2 p a) @(Fix (p a)) (id.L1 @a) (mono @a @p bifunctor.p))
+         (unFix2.L1 @a @p))
 bifunctorListF :: Bifunctor ListF =
   .Bifunctor @ListF bifunctorListF.bimap.L1
 main :: IO Unit =
@@ -85,26 +105,32 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
     (case monad.m of
-     | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
+     | .Monad _ _ bind -> bind)
+      @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (case monad.m of
-     | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
+     | .Monad _ pure _ -> pure)
+      @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
     (case monad.m of
-     | .Monad _ _ bind ->
-       bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
+     | .Monad _ _ bind -> bind)
+      @(List a)
+      @(List a)
+      (sequence.L3 @a @m monad.m ms)
+      (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
     case ms of
     | Nil ->
       (case monad.m of
-       | .Monad _ pure _ -> pure) @(List a) (Nil @a)
+       | .Monad _ pure _ -> pure)
+        @(List a) (Nil @a)
     | Cons m ms ->
       (case monad.m of
-       | .Monad _ _ bind ->
-         bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
+       | .Monad _ _ bind -> bind)
+        @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)
@@ -137,28 +163,61 @@ unFix.L1 :: forall f. Fix f -> f (Fix f) =
   \@f (x :: Fix f) -> coerce @(Fix -> _) x
 cata.L1 :: forall a f. Functor f -> (f a -> a) -> Fix f -> a =
   \@a @f (functor.f :: Functor f) (f :: f a -> a) ->
-    compose.L1 @(Fix f) @(f a) @a f (compose.L1 @(Fix f) @(f (Fix f)) @(f a) ((case functor.f of
-                                                                               | .Functor map ->
-                                                                                 map) @(Fix f) @a (cata.L1 @a @f functor.f f)) (unFix.L1 @f))
+    compose.L1
+      @(Fix f)
+      @(f a)
+      @a
+      f
+      (compose.L1
+         @(Fix f)
+         @(f (Fix f))
+         @(f a)
+         ((case functor.f of
+           | .Functor map -> map)
+            @(Fix f) @a (cata.L1 @a @f functor.f f))
+         (unFix.L1 @f))
 ana.L1 :: forall a f. Functor f -> (a -> f a) -> a -> Fix f =
   \@a @f (functor.f :: Functor f) (f :: a -> f a) ->
-    compose.L1 @a @(f (Fix f)) @(Fix f) (fix.L1 @f) (compose.L1 @a @(f a) @(f (Fix f)) ((case functor.f of
-                                                                                         | .Functor map ->
-                                                                                           map) @a @(Fix f) (ana.L1 @a @f functor.f f)) f)
+    compose.L1
+      @a
+      @(f (Fix f))
+      @(Fix f)
+      (fix.L1 @f)
+      (compose.L1
+         @a
+         @(f a)
+         @(f (Fix f))
+         ((case functor.f of
+           | .Functor map -> map)
+            @a @(Fix f) (ana.L1 @a @f functor.f f))
+         f)
 fix2.L1 :: forall a p. p a (Fix2 p a) -> Fix2 p a =
   \@a @p (x :: p a (Fix2 p a)) -> coerce @(_ -> Fix2) x
 unFix2.L1 :: forall a p. Fix2 p a -> p a (Fix2 p a) =
   \@a @p (x :: Fix2 p a) -> coerce @(Fix2 -> _) x
 functorFox2.map.L1 :: forall p. Bifunctor p -> (forall a b. (a -> b) -> Fix2 p a -> Fix2 p b) =
   \@p (bifunctor.p :: Bifunctor p) @a @b (f :: a -> b) ->
-    compose.L1 @(Fix2 p a) @(p b (Fix2 p b)) @(Fix2 p b) (fix2.L1 @b @p) (compose.L1 @(Fix2 p a) @(p a (Fix2 p a)) @(p b (Fix2 p b)) ((case bifunctor.p of
-                                                                                                                                       | .Bifunctor bimap ->
-                                                                                                                                         bimap) @a @b @(Fix2 p a) @(Fix2 p b) f (let dict :: Functor (Fix2 p) =
-                                                                                                                                                                                       functorFox2 @p bifunctor.p
-                                                                                                                                                                                 in
-                                                                                                                                                                                 (case dict of
-                                                                                                                                                                                  | .Functor map ->
-                                                                                                                                                                                    map) @a @b f)) (unFix2.L1 @a @p))
+    compose.L1
+      @(Fix2 p a)
+      @(p b (Fix2 p b))
+      @(Fix2 p b)
+      (fix2.L1 @b @p)
+      (compose.L1
+         @(Fix2 p a)
+         @(p a (Fix2 p a))
+         @(p b (Fix2 p b))
+         ((case bifunctor.p of
+           | .Bifunctor bimap -> bimap)
+            @a
+            @b
+            @(Fix2 p a)
+            @(Fix2 p b)
+            f
+            (let dict :: Functor (Fix2 p) = functorFox2 @p bifunctor.p in
+             (case dict of
+              | .Functor map -> map)
+               @a @b f))
+         (unFix2.L1 @a @p))
 functorListF.map.L1 :: forall a a b. (a -> b) -> ListF a a -> ListF a b =
   \@a @a @b -> bifunctorListF.bimap.L1 @a @a @a @b (id.L1 @a)
 bifunctorListF.bimap.L1 :: forall a1 a2 b1 b2. (a1 -> a2) -> (b1 -> b2) -> ListF a1 b1 -> ListF a2 b2 =
@@ -179,27 +238,43 @@ fromList.L1 :: forall a. List a -> ListF a (List a) =
 main.L1 :: Int -> Int = mul_int 2
 main.L2 :: List Int -> IO Unit =
   \(xs :: List Int) ->
-    foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f :: Fix (ListF Int) -> List Int =
-                                                                                                                                    cata.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (toList.L1 @Int)
-                                                                                                                              in
-                                                                                                                              let g :: Fix2 ListF Int -> Fix (ListF Int) =
-                                                                                                                                    mono @Int @ListF bifunctorListF
-                                                                                                                              in
-                                                                                                                              let x :: Fix2 ListF Int =
-                                                                                                                                    let dict :: Functor (Fix2 ListF) =
-                                                                                                                                          functorFox2 @ListF bifunctorListF
-                                                                                                                                    in
-                                                                                                                                    (case dict of
-                                                                                                                                     | .Functor map ->
-                                                                                                                                       map) @Int @Int main.L1 (let f :: Fix (ListF Int) -> Fix2 ListF Int =
-                                                                                                                                                                     poly @Int @ListF bifunctorListF
-                                                                                                                                                               in
-                                                                                                                                                               let g :: List Int -> Fix (ListF Int) =
-                                                                                                                                                                     ana.L1 @(List Int) @(ListF Int) (.Functor @(ListF Int) (functorListF.map.L1 @Int)) (fromList.L1 @Int)
-                                                                                                                                                               in
-                                                                                                                                                               f (g xs))
-                                                                                                                              in
-                                                                                                                              f (g x))
+    foldableList.foldr.L1
+      @Int
+      @(IO Unit)
+      (traverse_.L1 @Int @IO monadIO print)
+      (coerce @(_ -> IO) (Pair @Unit @World Unit))
+      (let f :: Fix (ListF Int) -> List Int =
+             cata.L1
+               @(List Int)
+               @(ListF Int)
+               (.Functor @(ListF Int) (functorListF.map.L1 @Int))
+               (toList.L1 @Int)
+       in
+       let g :: Fix2 ListF Int -> Fix (ListF Int) =
+             mono @Int @ListF bifunctorListF
+       in
+       let x :: Fix2 ListF Int =
+             let dict :: Functor (Fix2 ListF) =
+                   functorFox2 @ListF bifunctorListF
+             in
+             (case dict of
+              | .Functor map -> map)
+               @Int
+               @Int
+               main.L1
+               (let f :: Fix (ListF Int) -> Fix2 ListF Int =
+                      poly @Int @ListF bifunctorListF
+                in
+                let g :: List Int -> Fix (ListF Int) =
+                      ana.L1
+                        @(List Int)
+                        @(ListF Int)
+                        (.Functor @(ListF Int) (functorListF.map.L1 @Int))
+                        (fromList.L1 @Int)
+                in
+                f (g xs))
+       in
+       f (g x))
 main.L3 :: Int -> IO Unit =
   \(n :: Int) ->
     let mx :: IO (List Int) =

@@ -225,7 +225,7 @@ instance TypeOf lg ~ Type => Pretty (Par lg) where
   pretty = \case
     TmPar (x, t) -> parens (pretty (x ::: t))
     TyPar v      -> "@" <> pretty v
-    DxPar (_, c) -> braces (prettyCstr c)
+    DxPar (x, c) -> braces (pretty (x ::: c))
 
 instance IsTyped lg => Pretty (Expr lg)
 
@@ -235,21 +235,26 @@ instance IsTyped lg => PrettyPrec (Expr lg) where
     EVar x -> pretty x
     EAtm a -> pretty a
     EApp{} ->
-      let (e1, as) = unwindl _EApp e0
-      in  maybeParens (prec > Op.aprec) $ prettyPrec Op.aprec e1 <+> hsepMap pretty as
+      maybeParens (prec > Op.aprec) $
+        hang (prettyPrec Op.aprec e1) 2 (sep (map pretty as))
+      where
+        (e1, as) = unwindl _EApp e0
     EAbs{} ->
-      let (ps, e1) = unwindr _EAbs e0
-      in  prettyEAbs prec ps e1
-    ELet bs e -> maybeParens (prec > 0) (sep [pretty bs, "in"] $$ pretty e)
-    -- FIXME: Collect lambdas.
+      prettyEAbs prec ps e1
+      where
+        (ps, e1) = unwindEAbs e0
+    ELet bs e ->
+      maybeParens (prec > 0) $
+        sep [pretty bs, "in"] $$ pretty e
     EMat _ e as ->
       maybeParens (prec > 0) $
         "case" <+> pretty e <+> "of"
         $$ vcatMap pretty as
     ECast (MkCoercion dir tcon, _typ) e1 ->
       maybeParens (prec > Op.aprec) $
-        "coerce" <+> "@" <> parens (d_from <+> "->" <+> d_to)
-        <+> prettyPrec (Op.aprec+1) e1
+        hang "coerce" 2
+          (sep [ "@" <> parens (d_from <+> "->" <+> d_to)
+               , prettyPrec (Op.aprec+1) e1])
       where
         (d_from, d_to) = case dir of
           Inject  -> ("_", pretty tcon)
@@ -277,10 +282,11 @@ instance TypeOf lg ~ Type => PrettyPrec (Patn lg) where
     PWld -> "_"
     PVar x    -> pretty (fst x)
     PCon c ps ->
-      maybeParens (prec > 0 && not (null ps)) $ pretty c <+> hsepMap (prettyPrec 1) ps
+      maybeParens (prec > 0 && not (null ps)) $
+        pretty c <+> hsepMap (prettyPrec 1) ps
     PSimple c bs ->
-      maybeParens (prec > 0 && not (null bs))
-      $ pretty c <+> hsepMap (maybe "_" (pretty . fst)) bs
+      maybeParens (prec > 0 && not (null bs)) $
+        pretty c <+> hsepMap (maybe "_" (pretty . fst)) bs
 
 deriving instance                     Show  BindMode
 deriving instance IsTyped lg => Show (Bind lg)

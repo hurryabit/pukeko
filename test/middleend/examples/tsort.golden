@@ -73,26 +73,32 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
     (case monad.m of
-     | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
+     | .Monad _ _ bind -> bind)
+      @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (case monad.m of
-     | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
+     | .Monad _ pure _ -> pure)
+      @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
     (case monad.m of
-     | .Monad _ _ bind ->
-       bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
+     | .Monad _ _ bind -> bind)
+      @(List a)
+      @(List a)
+      (sequence.L3 @a @m monad.m ms)
+      (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
     case ms of
     | Nil ->
       (case monad.m of
-       | .Monad _ pure _ -> pure) @(List a) (Nil @a)
+       | .Monad _ pure _ -> pure)
+        @(List a) (Nil @a)
     | Cons m ms ->
       (case monad.m of
-       | .Monad _ _ bind ->
-         bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
+       | .Monad _ _ bind -> bind)
+        @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)
@@ -124,14 +130,16 @@ foldableBinTree.foldr.L1 :: forall a b. (a -> b -> b) -> b -> BinTree a -> b =
     case t of
     | Leaf -> y0
     | Branch l x r ->
-      foldableBinTree.foldr.L1 @a @b f (f x (foldableBinTree.foldr.L1 @a @b f y0 r)) l
+      foldableBinTree.foldr.L1
+        @a @b f (f x (foldableBinTree.foldr.L1 @a @b f y0 r)) l
 bag_insert.L1 :: (forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) -> (forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) =
   \(insert :: forall _14. Ord _14 -> _14 -> BinTree _14 -> BinTree _14) @_14 (ord._14 :: Ord _14) (x :: _14) (t :: BinTree _14) ->
     case t of
     | Leaf -> Branch @_14 (Leaf @_14) x (Leaf @_14)
     | Branch l y r ->
       case (case ord._14 of
-            | .Ord _ _ _ _ lt -> lt) x y of
+            | .Ord _ _ _ _ lt -> lt)
+             x y of
       | False -> Branch @_14 l y (insert @_14 ord._14 x r)
       | True -> Branch @_14 (insert @_14 ord._14 x l) y r
 tsort.L1 :: Bag Int -> Int -> Bag Int =
@@ -142,16 +150,19 @@ tsort.L1 :: Bag Int -> Int -> Bag Int =
     coerce @(_ -> Bag) (insert @Int ordInt x (coerce @(Bag -> _) s))
 main.L1 :: List Int -> IO Unit =
   \(xs :: List Int) ->
-    foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (let f :: Int -> List Int -> List Int =
-                                                                                                                                    Cons @Int
-                                                                                                                              in
-                                                                                                                              let y0 :: List Int =
-                                                                                                                                    Nil @Int
-                                                                                                                              in
-                                                                                                                              let bag :: Bag Int =
-                                                                                                                                    foldableList.foldl.L1 @Int @(Bag Int) tsort.L1 (coerce @(_ -> Bag) (Leaf @Int)) xs
-                                                                                                                              in
-                                                                                                                              foldableBinTree.foldr.L1 @Int @(List Int) f y0 (coerce @(Bag -> _) bag))
+    foldableList.foldr.L1
+      @Int
+      @(IO Unit)
+      (traverse_.L1 @Int @IO monadIO print)
+      (coerce @(_ -> IO) (Pair @Unit @World Unit))
+      (let f :: Int -> List Int -> List Int = Cons @Int in
+       let y0 :: List Int = Nil @Int in
+       let bag :: Bag Int =
+             foldableList.foldl.L1
+               @Int @(Bag Int) tsort.L1 (coerce @(_ -> Bag) (Leaf @Int)) xs
+       in
+       foldableBinTree.foldr.L1
+         @Int @(List Int) f y0 (coerce @(Bag -> _) bag))
 main.L2 :: Int -> IO Unit =
   \(n :: Int) ->
     let mx :: IO (List Int) =

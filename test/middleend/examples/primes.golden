@@ -55,24 +55,38 @@ sieve :: List Int -> List Int =
     case ks of
     | Nil -> abort @(List Int)
     | Cons p ks ->
-      Cons @Int p (sieve (let p :: Int -> Bool = sieve.L1 p in
-                          let rec filter_p :: List Int -> List Int =
-                                    filter.L1 @Int p filter_p
-                          in
-                          filter_p ks))
+      Cons
+        @Int
+        p
+        (sieve
+           (let p :: Int -> Bool = sieve.L1 p in
+            let rec filter_p :: List Int -> List Int =
+                      filter.L1 @Int p filter_p
+            in
+            filter_p ks))
 primes :: List Int =
-  Cons @Int 2 (Cons @Int 3 (sieve (psums (Cons @Int 5 (let xs :: List Int =
-                                                             Cons @Int 2 (Cons @Int 4 (Nil @Int))
-                                                       in
-                                                       let rec ys :: List Int =
-                                                                 let dict :: Monoid (List Int) =
-                                                                       .Monoid @(List Int) (monoidList.empty @Int) (monoidList.append.L1 @Int)
-                                                                 in
-                                                                 (case dict of
-                                                                  | .Monoid _ append ->
-                                                                    append) xs ys
-                                                       in
-                                                       ys)))))
+  Cons
+    @Int
+    2
+    (Cons
+       @Int
+       3
+       (sieve
+          (psums
+             (Cons
+                @Int
+                5
+                (let xs :: List Int = Cons @Int 2 (Cons @Int 4 (Nil @Int)) in
+                 let rec ys :: List Int =
+                           let dict :: Monoid (List Int) =
+                                 .Monoid
+                                   @(List Int) (monoidList.empty @Int) (monoidList.append.L1 @Int)
+                           in
+                           (case dict of
+                            | .Monoid _ append -> append)
+                             xs ys
+                 in
+                 ys)))))
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 monoidList.empty :: forall a. List a = Nil
@@ -110,7 +124,8 @@ psums.L1 :: (forall _10. Ring _10 -> _10 -> List _10 -> List _10) -> (forall _10
     | Cons x xs ->
       let y :: _10 =
             (case ring._10 of
-             | .Ring _ add _ _ -> add) x n
+             | .Ring _ add _ _ -> add)
+              x n
       in
       Cons @_10 y (psums0 @_10 ring._10 y xs)
 filter.L1 :: forall a. (a -> Bool) -> (List a -> List a) -> List a -> List a =

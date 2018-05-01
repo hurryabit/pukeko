@@ -104,8 +104,8 @@ checkDict dict cstr =
   where
     matchCstr cstr0 cstr1 =
       unless (cstr0 == cstr1) $
-        throwHere ("expected evidence for" <+> prettyCstr cstr0 <> ","
-                   <+> "but found evidence for" <+> prettyCstr cstr1)
+        throwHere ("expected evidence for" <+> pretty cstr0 <> ","
+                   <+> "but found evidence for" <+> pretty cstr1)
 
 typeOfAltn :: IsTyped lg => Altn lg -> TC Type
 typeOfAltn (MkAltn p e) =

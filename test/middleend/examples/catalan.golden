@@ -46,10 +46,17 @@ p :: Int = 100000007
 sum_p :: List Int -> Int =
   foldableList.foldl.L1 @Int @Int add_p.L1 0
 sols :: List Int =
-  Cons @Int 1 (functorList.map.L1 @(List Int) @Int sols.L1 (let rec scanl_f :: List Int -> List Int -> List (List Int) =
-                                                                      scanl.L1 @Int @(List Int) sols.L2 scanl_f
-                                                            in
-                                                            scanl_f (Nil @Int) sols))
+  Cons
+    @Int
+    1
+    (functorList.map.L1
+       @(List Int)
+       @Int
+       sols.L1
+       (let rec scanl_f :: List Int -> List Int -> List (List Int) =
+                  scanl.L1 @Int @(List Int) sols.L2 scanl_f
+        in
+        scanl_f (Nil @Int) sols))
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 functorList.map.L1 :: forall a b. (a -> b) -> List a -> List b =

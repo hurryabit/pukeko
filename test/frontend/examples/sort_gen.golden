@@ -19,43 +19,37 @@ eq :: forall a. Eq a -> a -> a -> Bool =
     case dict of
     | .Eq eq -> eq
 neq :: forall a. Eq a -> a -> a -> Bool =
-  \@a (eq.a :: Eq a) ->
-    \(x :: a) ->
-      \(y :: a) ->
-        case eq @a eq.a x y of
-        | False -> True
-        | True -> False
-id :: forall a. a -> a = \@a -> \(x :: a) -> x
+  \@a (eq.a :: Eq a) (x :: a) (y :: a) ->
+    case eq @a eq.a x y of
+    | False -> True
+    | True -> False
+id :: forall a. a -> a = \@a (x :: a) -> x
 compose :: forall a b c. (b -> c) -> (a -> b) -> a -> c =
-  \@a @b @c ->
-    \(f :: b -> c) -> \(g :: a -> b) -> \(x :: a) -> f (g x)
+  \@a @b @c (f :: b -> c) (g :: a -> b) (x :: a) -> f (g x)
 not :: Bool -> Bool =
   \(x :: Bool) ->
     case x of
     | False -> True
     | True -> False
 conj :: Bool -> Bool -> Bool =
-  \(x :: Bool) ->
-    \(y :: Bool) ->
-      case x of
-      | False -> False
-      | True -> y
+  \(x :: Bool) (y :: Bool) ->
+    case x of
+    | False -> False
+    | True -> y
 disj :: Bool -> Bool -> Bool =
-  \(x :: Bool) ->
-    \(y :: Bool) ->
-      case x of
-      | False -> y
-      | True -> True
+  \(x :: Bool) (y :: Bool) ->
+    case x of
+    | False -> y
+    | True -> True
 eqBool :: Eq Bool = .Eq @Bool eqBool.eq
 eqBool.eq :: Bool -> Bool -> Bool =
-  \(x :: Bool) ->
-    \(y :: Bool) ->
-      case x of
-      | False ->
-        case y of
-        | False -> True
-        | True -> False
-      | True -> y
+  \(x :: Bool) (y :: Bool) ->
+    case x of
+    | False ->
+      case y of
+      | False -> True
+      | True -> False
+    | True -> y
 data Ord a =
        | .Ord (Eq a) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool) (a -> a -> Bool)
 Ord.Eq :: forall a. Ord a -> Eq a =
@@ -156,10 +150,14 @@ foldl :: forall t. Foldable t -> (forall a b. (b -> a -> b) -> b -> t a -> b) =
     case dict of
     | .Foldable _ foldl -> foldl
 foldMap :: forall a m t. Foldable t -> Monoid m -> (a -> m) -> t a -> m =
-  \@a @m @t (foldable.t :: Foldable t) (monoid.m :: Monoid m) ->
-    \(f :: a -> m) ->
-      foldr @t foldable.t @a @m (\(x :: a) ->
-                                   \(m :: m) -> append @m monoid.m (f x) m) (empty @m monoid.m)
+  \@a @m @t (foldable.t :: Foldable t) (monoid.m :: Monoid m) (f :: a -> m) ->
+    foldr
+      @t
+      foldable.t
+      @a
+      @m
+      (\(x :: a) (m :: m) -> append @m monoid.m (f x) m)
+      (empty @m monoid.m)
 fold :: forall m t. Foldable t -> Monoid m -> t m -> m =
   \@m @t (foldable.t :: Foldable t) (monoid.m :: Monoid m) ->
     foldr @t foldable.t @m @m (append @m monoid.m) (empty @m monoid.m)
@@ -172,107 +170,84 @@ data List a =
 eqList :: forall a. Eq a -> Eq (List a) =
   \@a (eq.a :: Eq a) -> .Eq @(List a) (eqList.eq @a eq.a)
 eqList.eq :: forall a. Eq a -> List a -> List a -> Bool =
-  \@a (eq.a :: Eq a) ->
-    \(xs :: List a) ->
-      \(ys :: List a) ->
-        case xs of
-        | Nil ->
-          case ys of
-          | Nil -> True
-          | Cons _ _ -> False
-        | Cons x xs ->
-          case ys of
-          | Nil -> False
-          | Cons y ys ->
-            conj (eq @a eq.a x y) (eq @(List a) (eqList @a eq.a) xs ys)
+  \@a (eq.a :: Eq a) (xs :: List a) (ys :: List a) ->
+    case xs of
+    | Nil ->
+      case ys of
+      | Nil -> True
+      | Cons _ _ -> False
+    | Cons x xs ->
+      case ys of
+      | Nil -> False
+      | Cons y ys ->
+        conj (eq @a eq.a x y) (eq @(List a) (eqList @a eq.a) xs ys)
 monoidList :: forall a. Monoid (List a) =
   \@a ->
     .Monoid @(List a) (monoidList.empty @a) (monoidList.append @a)
 monoidList.empty :: forall a. List a = \@a -> Nil @a
 monoidList.append :: forall a. List a -> List a -> List a =
-  \@a ->
-    \(xs :: List a) ->
-      \(ys :: List a) ->
-        foldr @List foldableList @a @(List a) (Cons @a) ys xs
+  \@a (xs :: List a) (ys :: List a) ->
+    foldr @List foldableList @a @(List a) (Cons @a) ys xs
 functorList :: Functor List = .Functor @List functorList.map
 functorList.map :: forall a b. (a -> b) -> List a -> List b =
-  \@a @b ->
-    \(f :: a -> b) ->
-      \(xs :: List a) ->
-        case xs of
-        | Nil -> Nil @b
-        | Cons x xs -> Cons @b (f x) (map @List functorList @a @b f xs)
+  \@a @b (f :: a -> b) (xs :: List a) ->
+    case xs of
+    | Nil -> Nil @b
+    | Cons x xs -> Cons @b (f x) (map @List functorList @a @b f xs)
 foldableList :: Foldable List =
   .Foldable @List foldableList.foldr foldableList.foldl
 foldableList.foldr :: forall a b. (a -> b -> b) -> b -> List a -> b =
-  \@a @b ->
-    \(f :: a -> b -> b) ->
-      \(y0 :: b) ->
-        \(xs :: List a) ->
-          case xs of
-          | Nil -> y0
-          | Cons x xs -> f x (foldr @List foldableList @a @b f y0 xs)
+  \@a @b (f :: a -> b -> b) (y0 :: b) (xs :: List a) ->
+    case xs of
+    | Nil -> y0
+    | Cons x xs -> f x (foldr @List foldableList @a @b f y0 xs)
 foldableList.foldl :: forall a b. (b -> a -> b) -> b -> List a -> b =
-  \@a @b ->
-    \(f :: b -> a -> b) ->
-      \(y0 :: b) ->
-        \(xs :: List a) ->
-          case xs of
-          | Nil -> y0
-          | Cons x xs -> foldl @List foldableList @a @b f (f y0 x) xs
+  \@a @b (f :: b -> a -> b) (y0 :: b) (xs :: List a) ->
+    case xs of
+    | Nil -> y0
+    | Cons x xs -> foldl @List foldableList @a @b f (f y0 x) xs
 to_list :: forall a t. Foldable t -> t a -> List a =
   \@a @t (foldable.t :: Foldable t) ->
     foldr @t foldable.t @a @(List a) (Cons @a) (Nil @a)
 nth_exn :: forall a. List a -> Int -> a =
-  \@a ->
-    \(xs :: List a) ->
-      \(n :: Int) ->
-        case xs of
-        | Nil -> abort @a
-        | Cons x xs ->
-          case le @Int ordInt n 0 of
-          | False -> nth_exn @a xs (sub @Int ringInt n 1)
-          | True -> x
+  \@a (xs :: List a) (n :: Int) ->
+    case xs of
+    | Nil -> abort @a
+    | Cons x xs ->
+      case le @Int ordInt n 0 of
+      | False -> nth_exn @a xs (sub @Int ringInt n 1)
+      | True -> x
 take :: forall a. Int -> List a -> List a =
-  \@a ->
-    \(n :: Int) ->
-      \(xs :: List a) ->
-        case le @Int ordInt n 0 of
-        | False ->
-          case xs of
-          | Nil -> Nil @a
-          | Cons x xs -> Cons @a x (take @a (sub @Int ringInt n 1) xs)
-        | True -> Nil @a
+  \@a (n :: Int) (xs :: List a) ->
+    case le @Int ordInt n 0 of
+    | False ->
+      case xs of
+      | Nil -> Nil @a
+      | Cons x xs -> Cons @a x (take @a (sub @Int ringInt n 1) xs)
+    | True -> Nil @a
 replicate :: forall a. Int -> a -> List a =
-  \@a ->
-    \(n :: Int) ->
-      \(x :: a) ->
-        case le @Int ordInt n 0 of
-        | False -> Cons @a x (replicate @a (sub @Int ringInt n 1) x)
-        | True -> Nil @a
+  \@a (n :: Int) (x :: a) ->
+    case le @Int ordInt n 0 of
+    | False -> Cons @a x (replicate @a (sub @Int ringInt n 1) x)
+    | True -> Nil @a
 zip_with :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
-  \@a @b @c ->
-    \(f :: a -> b -> c) ->
-      \(xs :: List a) ->
-        \(ys :: List b) ->
-          case xs of
-          | Nil -> Nil @c
-          | Cons x xs ->
-            case ys of
-            | Nil -> Nil @c
-            | Cons y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
+  \@a @b @c (f :: a -> b -> c) (xs :: List a) (ys :: List b) ->
+    case xs of
+    | Nil -> Nil @c
+    | Cons x xs ->
+      case ys of
+      | Nil -> Nil @c
+      | Cons y ys -> Cons @c (f x y) (zip_with @a @b @c f xs ys)
 partition :: forall a. (a -> Bool) -> List a -> Pair (List a) (List a) =
-  \@a ->
-    \(p :: a -> Bool) ->
-      \(xs :: List a) ->
-        case xs of
-        | Nil -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
-        | Cons x xs ->
-          case partition @a p xs of
-          | Pair ys zs ->
-            case p x of
-            | False -> Pair @(List a) @(List a) ys (Cons @a x zs)
-            | True -> Pair @(List a) @(List a) (Cons @a x ys) zs
+  \@a (p :: a -> Bool) (xs :: List a) ->
+    case xs of
+    | Nil -> Pair @(List a) @(List a) (Nil @a) (Nil @a)
+    | Cons x xs ->
+      case partition @a p xs of
+      | Pair ys zs ->
+        case p x of
+        | False -> Pair @(List a) @(List a) ys (Cons @a x zs)
+        | True -> Pair @(List a) @(List a) (Cons @a x ys) zs
 data Monad m =
        | .Monad (Functor m) (forall a. a -> m a) (forall a b. m a -> (a -> m b) -> m b)
 Monad.Functor :: forall m. Monad m -> Functor m =
@@ -288,31 +263,41 @@ bind :: forall m. Monad m -> (forall a b. m a -> (a -> m b) -> m b) =
     case dict of
     | .Monad _ _ bind -> bind
 semi :: forall a m. Monad m -> m Unit -> m a -> m a =
-  \@a @m (monad.m :: Monad m) ->
-    \(m1 :: m Unit) ->
-      \(m2 :: m a) -> bind @m monad.m @Unit @a m1 (\(x :: Unit) -> m2)
+  \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
+    bind @m monad.m @Unit @a m1 (\(x :: Unit) -> m2)
 sequence :: forall a m. Monad m -> List (m a) -> m (List a) =
-  \@a @m (monad.m :: Monad m) ->
-    \(ms :: List (m a)) ->
-      case ms of
-      | Nil -> pure @m monad.m @(List a) (Nil @a)
-      | Cons m ms ->
-        bind @m monad.m @a @(List a) m (\(x :: a) ->
-                                          bind @m monad.m @(List a) @(List a) (sequence @a @m monad.m ms) (\(xs :: List a) ->
-                                                                                                             pure @m monad.m @(List a) (Cons @a x xs)))
+  \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
+    case ms of
+    | Nil -> pure @m monad.m @(List a) (Nil @a)
+    | Cons m ms ->
+      bind
+        @m
+        monad.m
+        @a
+        @(List a)
+        m
+        (\(x :: a) ->
+           bind
+             @m
+             monad.m
+             @(List a)
+             @(List a)
+             (sequence @a @m monad.m ms)
+             (\(xs :: List a) -> pure @m monad.m @(List a) (Cons @a x xs)))
 traverse_ :: forall a m t. Monad m -> Foldable t -> (a -> m Unit) -> t a -> m Unit =
-  \@a @m @t (monad.m :: Monad m) (foldable.t :: Foldable t) ->
-    \(f :: a -> m Unit) ->
-      foldr @t foldable.t @a @(m Unit) (\(x :: a) ->
-                                          \(m :: m Unit) ->
-                                            semi @Unit @m monad.m (f x) m) (pure @m monad.m @Unit Unit)
+  \@a @m @t (monad.m :: Monad m) (foldable.t :: Foldable t) (f :: a -> m Unit) ->
+    foldr
+      @t
+      foldable.t
+      @a
+      @(m Unit)
+      (\(x :: a) (m :: m Unit) -> semi @Unit @m monad.m (f x) m)
+      (pure @m monad.m @Unit Unit)
 when :: forall m. Monad m -> Bool -> m Unit -> m Unit =
-  \@m (monad.m :: Monad m) ->
-    \(p :: Bool) ->
-      \(m :: m Unit) ->
-        case p of
-        | False -> pure @m monad.m @Unit Unit
-        | True -> m
+  \@m (monad.m :: Monad m) (p :: Bool) (m :: m Unit) ->
+    case p of
+    | False -> pure @m monad.m @Unit Unit
+    | True -> m
 external seq :: forall a b. a -> b -> b = "seq"
 external puti :: Int -> Unit = "puti"
 external geti :: Unit -> Int = "geti"
@@ -322,57 +307,79 @@ data World
 data IO a = World -> Pair a World
 functorIO :: Functor IO = .Functor @IO functorIO.map
 functorIO.map :: forall a b. (a -> b) -> IO a -> IO b =
-  \@a @b ->
-    \(f :: a -> b) ->
-      \(mx :: IO a) ->
-        coerce @(_ -> IO) (\(world0 :: World) ->
-                             case coerce @(IO -> _) mx world0 of
-                             | Pair x world1 -> Pair @b @World (f x) world1)
+  \@a @b (f :: a -> b) (mx :: IO a) ->
+    coerce
+      @(_ -> IO)
+      (\(world0 :: World) ->
+         case coerce @(IO -> _) mx world0 of
+         | Pair x world1 -> Pair @b @World (f x) world1)
 monadIO :: Monad IO =
   .Monad @IO monadIO.Functor monadIO.pure monadIO.bind
 monadIO.Functor :: Functor IO = functorIO
 monadIO.pure :: forall a. a -> IO a =
-  \@a ->
-    \(x :: a) ->
-      coerce @(_ -> IO) (\(world :: World) -> Pair @a @World x world)
+  \@a (x :: a) ->
+    coerce @(_ -> IO) (\(world :: World) -> Pair @a @World x world)
 monadIO.bind :: forall a b. IO a -> (a -> IO b) -> IO b =
-  \@a @b ->
-    \(mx :: IO a) ->
-      \(f :: a -> IO b) ->
-        coerce @(_ -> IO) (\(world0 :: World) ->
-                             case coerce @(IO -> _) mx world0 of
-                             | Pair x world1 -> coerce @(IO -> _) (f x) world1)
+  \@a @b (mx :: IO a) (f :: a -> IO b) ->
+    coerce
+      @(_ -> IO)
+      (\(world0 :: World) ->
+         case coerce @(IO -> _) mx world0 of
+         | Pair x world1 -> coerce @(IO -> _) (f x) world1)
 io :: forall a b. (a -> b) -> a -> IO b =
-  \@a @b ->
-    \(f :: a -> b) ->
-      \(x :: a) ->
-        coerce @(_ -> IO) (\(world :: World) ->
-                             let y :: b = f x in
-                             seq @b @(Pair b World) y (Pair @b @World y world))
+  \@a @b (f :: a -> b) (x :: a) ->
+    coerce
+      @(_ -> IO)
+      (\(world :: World) ->
+         let y :: b = f x in
+         seq @b @(Pair b World) y (Pair @b @World y world))
 print :: Int -> IO Unit = \(n :: Int) -> io @Int @Unit puti n
 input :: IO Int = io @Unit @Int geti Unit
 putChar :: Char -> IO Unit =
   \(c :: Char) -> io @Char @Unit (\(c :: Char) -> putc (ord c)) c
 getChar :: IO (Option Char) =
-  io @Unit @(Option Char) (\(u :: Unit) ->
-                             let n :: Int = getc u in
-                             case lt @Int ordInt n 0 of
-                             | False -> Some @Char (chr n)
-                             | True -> None @Char) Unit
+  io
+    @Unit
+    @(Option Char)
+    (\(u :: Unit) ->
+       let n :: Int = getc u in
+       case lt @Int ordInt n 0 of
+       | False -> Some @Char (chr n)
+       | True -> None @Char)
+    Unit
 eqPair :: forall a b. Eq a -> Eq b -> Eq (Pair a b) =
   \@a @b (eq.a :: Eq a) (eq.b :: Eq b) ->
     .Eq @(Pair a b) (eqPair.eq @a @b eq.a eq.b)
 eqPair.eq :: forall a b. Eq a -> Eq b -> Pair a b -> Pair a b -> Bool =
-  \@a @b (eq.a :: Eq a) (eq.b :: Eq b) ->
-    \(x :: Pair a b) ->
-      \(y :: Pair a b) ->
-        case x of
-        | Pair x1 x2 ->
-          case y of
-          | Pair y1 y2 -> conj (eq @a eq.a x1 y1) (eq @b eq.b x2 y2)
+  \@a @b (eq.a :: Eq a) (eq.b :: Eq b) (x :: Pair a b) (y :: Pair a b) ->
+    case x of
+    | Pair x1 x2 ->
+      case y of
+      | Pair y1 y2 -> conj (eq @a eq.a x1 y1) (eq @b eq.b x2 y2)
 gen :: forall a. (a -> a) -> a -> List a =
-  \@a -> \(f :: a -> a) -> \(x :: a) -> Cons @a x (gen @a f (f x))
+  \@a (f :: a -> a) (x :: a) -> Cons @a x (gen @a f (f x))
 main :: IO Unit =
-  bind @IO monadIO @Int @Unit input (\(n :: Int) ->
-                                       semi @Unit @IO monadIO (print n) (traverse_ @Int @IO @List monadIO foldableList print (take @Int n (gen @Int (\(x :: Int) ->
-                                                                                                                                                       mod (mul @Int ringInt 91 x) 1000000007) 1))))
+  bind
+    @IO
+    monadIO
+    @Int
+    @Unit
+    input
+    (\(n :: Int) ->
+       semi
+         @Unit
+         @IO
+         monadIO
+         (print n)
+         (traverse_
+            @Int
+            @IO
+            @List
+            monadIO
+            foldableList
+            print
+            (take
+               @Int
+               n
+               (gen
+                  @Int (\(x :: Int) -> mod (mul @Int ringInt 91 x) 1000000007) 1))))

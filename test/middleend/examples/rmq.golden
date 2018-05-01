@@ -70,22 +70,27 @@ zip_with.L1 :: forall a b c. (a -> b -> c) -> List a -> List b -> List c =
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (case monad.m of
-     | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
+     | .Monad _ pure _ -> pure)
+      @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
     (case monad.m of
-     | .Monad _ _ bind ->
-       bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
+     | .Monad _ _ bind -> bind)
+      @(List a)
+      @(List a)
+      (sequence.L3 @a @m monad.m ms)
+      (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
     case ms of
     | Nil ->
       (case monad.m of
-       | .Monad _ pure _ -> pure) @(List a) (Nil @a)
+       | .Monad _ pure _ -> pure)
+        @(List a) (Nil @a)
     | Cons m ms ->
       (case monad.m of
-       | .Monad _ _ bind ->
-         bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
+       | .Monad _ _ bind -> bind)
+        @a @(List a) m (sequence.L2 @a @m monad.m ms)
 functorIO.map.L1 :: forall a b. (a -> b) -> IO a -> World -> Pair b World =
   \@a @b (f :: a -> b) (mx :: IO a) (world0 :: World) ->
     case coerce @(IO -> _) mx world0 of

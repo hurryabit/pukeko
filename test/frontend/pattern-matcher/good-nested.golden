@@ -2,12 +2,10 @@ data List a =
        | Nil
        | Cons a (List a)
 last :: forall a. a -> List a -> a =
-  \@a ->
-    \(x0 :: a) ->
-      \(xs :: List a) ->
-        case xs of
-        | Nil -> x0
-        | Cons pm$1 pm$2 ->
-          case pm$2 of
-          | Nil -> pm$1
-          | Cons x xs -> last @a x xs
+  \@a (x0 :: a) (xs :: List a) ->
+    case xs of
+    | Nil -> x0
+    | Cons pm$1 pm$2 ->
+      case pm$2 of
+      | Nil -> pm$1
+      | Cons x xs -> last @a x xs
