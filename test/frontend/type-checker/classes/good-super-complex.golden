@@ -17,7 +17,7 @@ d :: forall a. D a -> a -> a =
 f :: forall a. D a -> a -> a =
   \@a (d.a :: D a) ->
     let g :: forall _5. C _5 -> D _5 -> _5 -> _5 =
-          \@_5 (c._5 :: C _5) (d._5 :: D _5) ->
-            \(x :: _5) -> c @_5 c._5 (d @_5 d._5 x)
+          \@_5 (c._5 :: C _5) (d._5 :: D _5) (x :: _5) ->
+            c @_5 c._5 (d @_5 d._5 x)
     in
     g @a (D.C @a d.a) d.a

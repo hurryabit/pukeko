@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Pukeko.FrontEnd.Inferencer
   ( Out
   , inferModule
@@ -256,7 +257,7 @@ inferDecl = \case
   DType ds -> yield (DType ds)
   DSign{} -> pure Nothing
   DFunc func0 -> do
-    t_decl :: UType _ <- open <$> typeOfFunc (nameOf func0)
+    t_decl <- open <$> typeOfFunc (nameOf func0)
     func1 <- inferFuncDecl func0 t_decl
     yield (DFunc func1)
   DExtn (MkExtnDecl name NoType s) -> do

@@ -45,7 +45,8 @@ input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 prime :: Int = add_int (mul_int 1000000 1000000) 39
 fibs0 :: List Int = Cons @Int 0 fibs1
 fibs1 :: List Int =
-  Cons @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
+  Cons
+    @Int 1 (zip_with.L1 @Int @Int @Int add_mod_prime.L1 fibs0 fibs1)
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 nth_exn.L1 :: forall a. List a -> Int -> a =

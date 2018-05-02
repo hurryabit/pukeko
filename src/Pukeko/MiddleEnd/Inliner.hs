@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Pukeko.MiddleEnd.Inliner where
 

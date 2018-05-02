@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -29,7 +30,6 @@ module Pukeko.AST.Type
   , (*~>)
   , mkTApp
   , typeAtomText
-  , prettyCstr
   , prettyContext
   , prettyTUni
 
@@ -192,13 +192,13 @@ instance Pretty v => PrettyPrec (GenType v) where
           in  maybeParens (prec > 0)
               (parens (hsep (punctuate "," cstrs1)) <+> "=>" <+> go prettyVar 0 t1)
 
-prettyCstr :: TypeCstr -> Doc
-prettyCstr (clss, typ) = pretty clss <+> prettyPrec 3 typ
+instance Pretty TypeCstr where
+  pretty (clss, typ) = pretty clss <+> prettyPrec 3 typ
 
 prettyContext :: [TypeCstr] -> Doc
 prettyContext cstrs
   | null cstrs = mempty
-  | otherwise  = parens (hsep (punctuate "," (map prettyCstr cstrs))) <+> "=>"
+  | otherwise  = parens (hsep (punctuate "," (map pretty cstrs))) <+> "=>"
 
 prettyTUni :: Foldable t => Int -> t TyVar -> Doc -> Doc
 prettyTUni prec vs tq =

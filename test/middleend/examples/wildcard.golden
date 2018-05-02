@@ -55,12 +55,14 @@ main.L1 :: Int -> Int -> IO Unit =
   \(x :: Int) (y :: Int) ->
     let p :: Pair Int Int = Pair @Int @Int x y in
     let m1 :: IO Unit =
-          print (case p of
-                 | Pair x _ -> x)
+          print
+            (case p of
+             | Pair x _ -> x)
     in
     let m2 :: IO Unit =
-          print (case p of
-                 | Pair _ y -> y)
+          print
+            (case p of
+             | Pair _ y -> y)
     in
     let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
     coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)

@@ -24,18 +24,16 @@ dInt.d :: Int -> Int = \(x :: Int) -> x
 cT :: forall a. C a -> C (T a) =
   \@a (c.a :: C a) -> .C @(T a) (cT.c @a c.a)
 cT.c :: forall a. C a -> T a -> Int =
-  \@a (c.a :: C a) ->
-    \(t :: T a) ->
-      case t of
-      | C x -> c @a c.a x
+  \@a (c.a :: C a) (t :: T a) ->
+    case t of
+    | C x -> c @a c.a x
 dT :: forall a. D a -> D (T a) =
   \@a (d.a :: D a) -> .D @(T a) (dT.C @a d.a) (dT.d @a d.a)
 dT.C :: forall a. D a -> C (T a) =
   \@a (d.a :: D a) -> cT @a (D.C @a d.a)
 dT.d :: forall a. D a -> T a -> Int =
-  \@a (d.a :: D a) ->
-    \(t :: T a) ->
-      case t of
-      | C x -> d @a d.a x
+  \@a (d.a :: D a) (t :: T a) ->
+    case t of
+    | C x -> d @a d.a x
 f :: forall a. D a -> T a -> Int =
-  \@a (d.a :: D a) -> \(x :: T a) -> c @(T a) (cT @a (D.C @a d.a)) x
+  \@a (d.a :: D a) (x :: T a) -> c @(T a) (cT @a (D.C @a d.a)) x

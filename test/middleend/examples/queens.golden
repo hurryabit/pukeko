@@ -51,12 +51,19 @@ solve_aux :: List (List Int) -> List (List Int) =
     | Nil -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
     | Cons ks kss ->
       let monoid.m :: Monoid (List (List Int)) =
-            .Monoid @(List (List Int)) (monoidList.empty @(List Int)) (monoidList.append.L1 @(List Int))
+            .Monoid
+              @(List (List Int))
+              (monoidList.empty @(List Int))
+              (monoidList.append.L1 @(List Int))
       in
       let f :: Int -> List (List Int) = solve_aux.L2 kss in
-      foldableList.foldr.L1 @Int @(List (List Int)) (foldMap.L1 @Int @(List (List Int)) monoid.m f) (case monoid.m of
-                                                                                                     | .Monoid empty _ ->
-                                                                                                       empty) ks
+      foldableList.foldr.L1
+        @Int
+        @(List (List Int))
+        (foldMap.L1 @Int @(List (List Int)) monoid.m f)
+        (case monoid.m of
+         | .Monoid empty _ -> empty)
+        ks
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 monoidInt.empty :: Int = 0
@@ -64,7 +71,8 @@ monoidList.empty :: forall a. List a = Nil
 foldMap.L1 :: forall a m. Monoid m -> (a -> m) -> a -> m -> m =
   \@a @m (monoid.m :: Monoid m) (f :: a -> m) (x :: a) ->
     (case monoid.m of
-     | .Monoid _ append -> append) (f x)
+     | .Monoid _ append -> append)
+      (f x)
 length.L1 :: forall a. a -> Int = \@a (x :: a) -> 1
 monoidList.append.L1 :: forall a. List a -> List a -> List a =
   \@a (xs :: List a) (ys :: List a) ->
@@ -130,11 +138,28 @@ ints.L1 :: (Int -> List Int) -> Int -> List Int =
     Cons @Int k (go (add_int k 1))
 solve_aux.L1 :: Int -> List Int -> Int -> List Int =
   \(k :: Int) (ls :: List Int) (i :: Int) ->
-    diff.L1 ls (Cons @Int (sub_int k i) (Cons @Int k (Cons @Int (add_int k i) (Nil @Int))))
+    diff.L1
+      ls
+      (Cons
+         @Int
+         (sub_int k i)
+         (Cons @Int k (Cons @Int (add_int k i) (Nil @Int))))
 solve_aux.L2 :: List (List Int) -> Int -> List (List Int) =
   \(kss :: List (List Int)) (k :: Int) ->
-    functorList.map.L1 @(List Int) @(List Int) (Cons @Int k) (solve_aux (zip_with.L1 @(List Int) @Int @(List Int) (solve_aux.L1 k) kss ints))
+    functorList.map.L1
+      @(List Int)
+      @(List Int)
+      (Cons @Int k)
+      (solve_aux
+         (zip_with.L1
+            @(List Int) @Int @(List Int) (solve_aux.L1 k) kss ints))
 main.L1 :: Int -> IO Unit =
   \(n :: Int) ->
-    print (let f :: List Int -> Int = length.L1 @(List Int) in
-           foldableList.foldr.L1 @(List Int) @Int (foldMap.L1 @(List Int) @Int monoidInt f) monoidInt.empty (solve_aux (replicate.L1 @(List Int) n (take.L1 @Int n ints))))
+    print
+      (let f :: List Int -> Int = length.L1 @(List Int) in
+       foldableList.foldr.L1
+         @(List Int)
+         @Int
+         (foldMap.L1 @(List Int) @Int monoidInt f)
+         monoidInt.empty
+         (solve_aux (replicate.L1 @(List Int) n (take.L1 @Int n ints))))

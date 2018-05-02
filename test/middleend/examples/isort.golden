@@ -63,26 +63,32 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
     (case monad.m of
-     | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
+     | .Monad _ _ bind -> bind)
+      @Unit @a m1 (semi.L1 @a @m m2)
 sequence.L1 :: forall a m. Monad m -> a -> List a -> m (List a) =
   \@a @m (monad.m :: Monad m) (x :: a) (xs :: List a) ->
     (case monad.m of
-     | .Monad _ pure _ -> pure) @(List a) (Cons @a x xs)
+     | .Monad _ pure _ -> pure)
+      @(List a) (Cons @a x xs)
 sequence.L2 :: forall a m. Monad m -> List (m a) -> a -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) (x :: a) ->
     (case monad.m of
-     | .Monad _ _ bind ->
-       bind) @(List a) @(List a) (sequence.L3 @a @m monad.m ms) (sequence.L1 @a @m monad.m x)
+     | .Monad _ _ bind -> bind)
+      @(List a)
+      @(List a)
+      (sequence.L3 @a @m monad.m ms)
+      (sequence.L1 @a @m monad.m x)
 sequence.L3 :: forall a m. Monad m -> List (m a) -> m (List a) =
   \@a @m (monad.m :: Monad m) (ms :: List (m a)) ->
     case ms of
     | Nil ->
       (case monad.m of
-       | .Monad _ pure _ -> pure) @(List a) (Nil @a)
+       | .Monad _ pure _ -> pure)
+        @(List a) (Nil @a)
     | Cons m ms ->
       (case monad.m of
-       | .Monad _ _ bind ->
-         bind) @a @(List a) m (sequence.L2 @a @m monad.m ms)
+       | .Monad _ _ bind -> bind)
+        @a @(List a) m (sequence.L2 @a @m monad.m ms)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)
@@ -119,7 +125,12 @@ insert.L1 :: Int -> List Int -> List Int =
       | True -> Cons @Int y xs
 main.L1 :: List Int -> IO Unit =
   \(xs :: List Int) ->
-    foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (isort xs)
+    foldableList.foldr.L1
+      @Int
+      @(IO Unit)
+      (traverse_.L1 @Int @IO monadIO print)
+      (coerce @(_ -> IO) (Pair @Unit @World Unit))
+      (isort xs)
 main.L2 :: Int -> IO Unit =
   \(n :: Int) ->
     let mx :: IO (List Int) =

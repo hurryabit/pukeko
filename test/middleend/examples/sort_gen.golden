@@ -63,7 +63,8 @@ semi.L1 :: forall a m. m a -> Unit -> m a =
 semi.L2 :: forall a m. Monad m -> m Unit -> m a -> m a =
   \@a @m (monad.m :: Monad m) (m1 :: m Unit) (m2 :: m a) ->
     (case monad.m of
-     | .Monad _ _ bind -> bind) @Unit @a m1 (semi.L1 @a @m m2)
+     | .Monad _ _ bind -> bind)
+      @Unit @a m1 (semi.L1 @a @m m2)
 traverse_.L1 :: forall a m. Monad m -> (a -> m Unit) -> a -> m Unit -> m Unit =
   \@a @m (monad.m :: Monad m) (f :: a -> m Unit) (x :: a) ->
     semi.L2 @Unit @m monad.m (f x)
@@ -98,7 +99,12 @@ main.L2 :: Int -> IO Unit =
   \(n :: Int) ->
     let m1 :: IO Unit = print n in
     let m2 :: IO Unit =
-          foldableList.foldr.L1 @Int @(IO Unit) (traverse_.L1 @Int @IO monadIO print) (coerce @(_ -> IO) (Pair @Unit @World Unit)) (take.L1 @Int n (gen.L1 @Int main.L1 1))
+          foldableList.foldr.L1
+            @Int
+            @(IO Unit)
+            (traverse_.L1 @Int @IO monadIO print)
+            (coerce @(_ -> IO) (Pair @Unit @World Unit))
+            (take.L1 @Int n (gen.L1 @Int main.L1 1))
     in
     let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
     coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)

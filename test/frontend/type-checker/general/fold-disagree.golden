@@ -2,10 +2,7 @@ data List a =
        | Nil
        | Cons a (List a)
 fold :: forall a b. (a -> b -> a) -> a -> List b -> a =
-  \@a @b ->
-    \(f :: a -> b -> a) ->
-      \(y0 :: a) ->
-        \(xs :: List b) ->
-          case xs of
-          | Nil -> y0
-          | Cons x xs -> fold @a @b f (f y0 x) xs
+  \@a @b (f :: a -> b -> a) (y0 :: a) (xs :: List b) ->
+    case xs of
+    | Nil -> y0
+    | Cons x xs -> fold @a @b f (f y0 x) xs

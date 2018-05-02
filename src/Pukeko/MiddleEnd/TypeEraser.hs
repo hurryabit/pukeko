@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module Pukeko.MiddleEnd.TypeEraser
   ( Module
   , eraseModule
@@ -31,7 +32,7 @@ runCC mod0 = run . evalState mempty . runInfo mod0
 name :: In.TmVar -> Name
 name = MkName . untag . In.nameText
 
-bindName :: In.TmBinder _ -> Name
+bindName :: In.TmBinder t -> Name
 bindName = name . In.nameOf
 
 ccSupCDecl :: In.FuncDecl (In.Only In.SupC) -> CC TopLevel

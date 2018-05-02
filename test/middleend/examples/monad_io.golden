@@ -87,12 +87,14 @@ repeat.L1 :: forall m. Monad m -> Int -> m Unit -> m Unit =
     let m :: m Unit =
           let m2 :: m Unit = repeat.L1 @m monad.m (sub_int k 1) m in
           (case monad.m of
-           | .Monad _ _ bind -> bind) @Unit @Unit m (semi.L1 @Unit @m m2)
+           | .Monad _ _ bind -> bind)
+            @Unit @Unit m (semi.L1 @Unit @m m2)
     in
     case p of
     | False ->
       (case monad.m of
-       | .Monad _ pure _ -> pure) @Unit Unit
+       | .Monad _ pure _ -> pure)
+        @Unit Unit
     | True -> m
 main.L1 :: Int -> Int -> IO Unit =
   \(k :: Int) (n :: Int) -> repeat.L1 @IO monadIO k (count_down n)

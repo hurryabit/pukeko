@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE GADTs #-}
 -- | Check that all type constructor are applied to the right number of
 -- variables and all variables are bound.

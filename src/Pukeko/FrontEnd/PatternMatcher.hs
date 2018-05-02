@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -199,15 +200,9 @@ patnToCPatn = \case
 findCPatnCol :: CanPM effs =>
   ColMatch m ('LS.Succ n) -> Eff effs (Col m CPatn, ColMatch m n)
 findCPatnCol (MkColMatch cs0 us) =
-  case find (colPatn patnToCPatn) cs0 of
+  case LS.findDelete (colPatn patnToCPatn) cs0 of
     Nothing       -> throwHere "cannot apply constructor rule"
     Just (c, cs1) -> pure (c, MkColMatch cs1 us)
-  where
-    find :: (a -> Maybe b) -> LS.List ('LS.Succ n) a -> Maybe (b, LS.List n a)
-    find f = \case
-      LS.Cons (f -> Just y) xs           -> Just (y, xs)
-      LS.Cons _             LS.Nil       -> Nothing
-      LS.Cons x             xs@LS.Cons{} -> fmap (second (LS.Cons x)) (find f xs)
 
 -- | A single group of a grouped pattern match.
 data GrpMatchItem =

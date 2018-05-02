@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-missing-signatures -Wno-name-shadowing #-}
 module RunExamples where
 
 import Pukeko.Prelude hiding (assert, run)
