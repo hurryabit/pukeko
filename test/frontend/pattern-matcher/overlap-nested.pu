@@ -5,6 +5,6 @@ data Option a =
 f :: Pair (Option a) a -> a
 f xy =
   case xy of
-  | Pair None     y -> y
-  | Pair (Some x) _ -> x
-  | Pair (Some _) y -> y
+    Pair None     y -> y
+    Pair (Some x) _ -> x
+    Pair (Some _) y -> y

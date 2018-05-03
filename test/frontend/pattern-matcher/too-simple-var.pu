@@ -1,4 +1,5 @@
+-- FIXME: This should not fail in the parser but in the pattern match compiler.
 f :: a -> a
 f x =
   case x of
-  | y -> y
+    y -> y

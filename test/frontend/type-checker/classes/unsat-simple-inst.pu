@@ -4,6 +4,6 @@ class C a where
 instance cT :: (C a) => C (T a) where
   c t =
     case t of
-    | C x -> c x
+      C x -> c x
 f :: T a -> Int
 f = c

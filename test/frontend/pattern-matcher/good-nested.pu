@@ -4,6 +4,6 @@ data List a =
 last :: a -> List a -> a
 last x0 xs =
   case xs of
-  | Nil                -> x0
-  | Cons x Nil         -> x
-  | Cons _ (Cons x xs) -> last x xs
+    Nil                -> x0
+    Cons x Nil         -> x
+    Cons _ (Cons x xs) -> last x xs

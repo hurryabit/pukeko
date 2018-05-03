@@ -221,23 +221,14 @@ bind :: Parser (Bind (LctdName 'TmVar))
 bind = indented tmvar $ \z -> MkBind z <$> (mkLam <$> many tmvar <*> (equals *> expr))
 
 exprMatch :: Parser (Expr (LctdName 'TmVar))
-exprMatch = do
-  tokCol <- indentGuard
-  fstCol <- RWS.gets sourceColumn
-  reserved "case"
-  if tokCol == fstCol && fstCol > pos1
-    then
-      EMat
-      <$> block tokCol GT (expr <* reserved "of")
-      <*> block tokCol EQ (some altn)
-    else
-      block fstCol GT $
-      EMat
-      <$> (expr <* reserved "of")
-      <*> aligned (some altn)
+exprMatch = indented_ (reserved "case") $ do
+  EMat
+  <$> (expr <* reserved "of")
+  <*> aligned (some altn)
 
 altn :: Parser (Altn (LctdName 'TmVar))
-altn = indented_ bar (MkAltn <$> patn <*> (arrow *> expr))
+altn = indented tmcon $ \con ->
+  MkAltn <$> (PCon con <$> many apatn) <*> (arrow *> expr)
 
 let_ ::
   (NonEmpty (Bind (LctdName 'TmVar)) -> a) ->

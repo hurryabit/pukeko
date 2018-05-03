@@ -2,5 +2,5 @@ data Pair a b = | Pair a b
 f :: Pair a b -> a
 f xy =
   case xy of
-  | Pair x _ -> x
-  | Pair _ y -> y
+    Pair x _ -> x
+    Pair _ y -> y

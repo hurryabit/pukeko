@@ -4,4 +4,4 @@ data Choice a b =
 f :: Choice a b -> a
 f xy =
   case xy of
-  | First x -> x
+    First x -> x

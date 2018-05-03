@@ -1,8 +1,9 @@
+data Id a = | Id a
 data Option a =
   | None
   | Some a
-f :: a -> Option a -> a
+f :: a -> Id (Option a) -> a
 f x0 x_opt =
   case x_opt of
-  | Some x -> x
-  | _      -> x0
+    Id (Some x) -> x
+    Id _        -> x0

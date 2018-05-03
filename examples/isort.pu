@@ -3,18 +3,18 @@ import std2/prelude
 insert :: Int -> List Int -> List Int
 insert y xs =
   case xs of
-  | Nil -> Cons y Nil
-  | Cons x xs' ->
-    if y <= x then
-      Cons y xs
-    else
-      Cons x (insert y xs')
+    Nil -> Cons y Nil
+    Cons x xs' ->
+      if y <= x then
+        Cons y xs
+      else
+        Cons x (insert y xs')
 
 isort :: List Int -> List Int
 isort xs =
   case xs of
-  | Nil -> Nil
-  | Cons x xs -> insert x (isort xs)
+    Nil -> Nil
+    Cons x xs -> insert x (isort xs)
 
 main :: IO Unit
 main =

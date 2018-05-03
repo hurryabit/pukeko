@@ -5,4 +5,4 @@ data Choice a b =
 f :: Pair (Choice a b) c -> a
 f xyz =
   case xyz of
-  | Pair (First x) z -> x
+    Pair (First x) z -> x

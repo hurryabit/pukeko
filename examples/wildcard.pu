@@ -3,12 +3,12 @@ import std2/prelude
 fst :: Pair a b -> a
 fst p =
   case p of
-  | Pair x _ -> x
+    Pair x _ -> x
 
 snd :: Pair a b -> b
 snd p =
   case p of
-  | Pair _ y -> y
+    Pair _ y -> y
 
 main :: IO Unit
 main =

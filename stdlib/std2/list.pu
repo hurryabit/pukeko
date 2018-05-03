@@ -11,12 +11,12 @@ data List a =
 
 instance eqList :: (Eq a) => Eq (List a) where
   eq xs ys = case xs of
-    | Nil -> case ys of
-      | Nil -> True
-      | Cons _ _ -> False
-    | Cons x xs -> case ys of
-      | Nil -> False
-      | Cons y ys -> x == y && xs == ys
+    Nil -> case ys of
+      Nil -> True
+      Cons _ _ -> False
+    Cons x xs -> case ys of
+      Nil -> False
+      Cons y ys -> x == y && xs == ys
 
 instance monoidList :: Monoid (List a) where
   empty = Nil
@@ -24,16 +24,16 @@ instance monoidList :: Monoid (List a) where
 
 instance functorList :: Functor List where
   map f xs = case xs of
-    | Nil -> Nil
-    | Cons x xs -> Cons (f x) (map f xs)
+    Nil -> Nil
+    Cons x xs -> Cons (f x) (map f xs)
 
 instance foldableList :: Foldable List where
   foldr f y0 xs = case xs of
-    | Nil -> y0
-    | Cons x xs -> f x (foldr f y0 xs)
+    Nil -> y0
+    Cons x xs -> f x (foldr f y0 xs)
   foldl f y0 xs = case xs of
-    | Nil -> y0
-    | Cons x xs -> foldl f (f y0 x) xs
+    Nil -> y0
+    Cons x xs -> foldl f (f y0 x) xs
 
 to_list :: (Foldable t) => t a -> List a
 to_list = foldr Cons Nil
@@ -41,8 +41,8 @@ to_list = foldr Cons Nil
 nth_exn :: List a -> Int -> a
 nth_exn xs n =
   case xs of
-  | Nil -> abort
-  | Cons x xs -> if n <= 0 then x else nth_exn xs (n-1)
+    Nil -> abort
+    Cons x xs -> if n <= 0 then x else nth_exn xs (n-1)
 
 take :: Int -> List a -> List a
 take n xs =
@@ -50,8 +50,8 @@ take n xs =
     Nil
   else
     case xs of
-    | Nil       -> Nil
-    | Cons x xs -> Cons x (take (n-1) xs)
+      Nil       -> Nil
+      Cons x xs -> Cons x (take (n-1) xs)
 
 replicate :: Int -> a -> List a
 replicate n x =
@@ -60,20 +60,20 @@ replicate n x =
 zip_with :: (a -> b -> c) -> List a -> List b -> List c
 zip_with f xs ys =
   case xs of
-  | Nil -> Nil
-  | Cons x xs ->
-    case ys of
-    | Nil -> Nil
-    | Cons y ys -> Cons (f x y) (zip_with f xs ys)
+    Nil -> Nil
+    Cons x xs ->
+      case ys of
+        Nil -> Nil
+        Cons y ys -> Cons (f x y) (zip_with f xs ys)
 
 partition :: (a -> Bool) -> List a -> Pair (List a) (List a)
 partition p xs =
   case xs of
-  | Nil -> Pair Nil Nil
-  | Cons x xs ->
-    case partition p xs of
-    | Pair ys zs ->
-      if p x then
-        Pair (Cons x ys) zs
-      else
-        Pair ys (Cons x zs)
+    Nil -> Pair Nil Nil
+    Cons x xs ->
+      case partition p xs of
+        Pair ys zs ->
+          if p x then
+            Pair (Cons x ys) zs
+          else
+            Pair ys (Cons x zs)

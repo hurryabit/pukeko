@@ -1,4 +1,4 @@
 data T a b = | C a b
 f :: T a b -> a
 f t = case t of
-  | C x y -> y
+  C x y -> y
