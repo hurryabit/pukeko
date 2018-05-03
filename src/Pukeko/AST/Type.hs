@@ -32,6 +32,7 @@ module Pukeko.AST.Type
   , typeAtomText
   , prettyContext
   , prettyTUni
+  , prettyTyArg
 
   , module Pukeko.AST.Unwind
   )
@@ -203,6 +204,9 @@ prettyContext cstrs
 prettyTUni :: Foldable t => Int -> t TyVar -> Doc -> Doc
 prettyTUni prec vs tq =
   maybeParens (prec > 0) ("forall" <+> hsepMap pretty vs <> "." <+> tq)
+
+prettyTyArg :: Type -> Doc
+prettyTyArg t = "@" <> prettyPrec 3 t
 
 instance (Pretty a, Pretty t) => Pretty (a ::: t) where
 instance (Pretty a, Pretty t) => PrettyPrec (a ::: t) where

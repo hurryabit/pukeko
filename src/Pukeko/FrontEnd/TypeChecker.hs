@@ -64,6 +64,9 @@ typeOf = \case
     introTmVars (fmap fst bs) $ do
       traverse_ (\(b, e0) -> checkExpr e0 (snd b)) bs
       typeOf e1
+  ELet (DxLet binder dict) body -> do
+    checkDict dict (snd binder)
+    introDxVar binder (typeOf body)
   EMat t0 e0 (a1 :| as) -> do
     checkExpr e0 t0
     t1 <- typeOfAltn a1

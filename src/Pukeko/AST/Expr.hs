@@ -82,8 +82,9 @@ data Par lg
 data BindMode = BindPar | BindRec
 
 data Bind lg
-  = TmNonRec (TmBinder (TypeOf lg)) (Expr lg)
-  | TmRec [(TmBinder (TypeOf lg),  Expr lg)]
+  =                TmNonRec (TmBinder (TypeOf lg)) (Expr lg)
+  |                TmRec   [(TmBinder (TypeOf lg),  Expr lg)]
+  | HasDxAbs lg => DxLet    (DxBinder (TypeOf lg)) (DictOf lg)
 
 data Patn lg
   = IsNested lg ~ True  => PWld
@@ -203,6 +204,9 @@ instance IsTyped lg => Pretty (Bind lg) where
     TmRec [] -> impossible
     TmRec (b0:bs) ->
       "let rec" <+> prettyBind b0 $$ vcatMap (\b -> "and" <+> prettyBind b) bs
+    DxLet (x, c) d ->
+      "let"
+      <+> hang (braces (pretty (x ::: c)) <+> "=") 2 (braces (pretty d))
     where
       prettyBind ((x, t), e) = hang (pretty (x ::: t) <+> "=") 2 (pretty e)
 
@@ -211,9 +215,6 @@ instance Pretty Atom where
     AVal z -> pretty z
     ACon c -> pretty c
     ANum n -> pretty n
-
-prettyTyArg :: Type -> Doc
-prettyTyArg t = "@" <> prettyPrec 3 t
 
 instance IsTyped lg => Pretty (Arg lg) where
   pretty = \case

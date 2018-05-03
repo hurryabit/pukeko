@@ -157,6 +157,12 @@ elimDict = \case
   DDer z ts ds -> foldl ETmApp (foldl ETyApp (EVal z) ts) (map elimDict ds)
   DSub z _c t d -> ETmApp (ETyApp (EVal z) t) (elimDict d)
 
+elimBind :: Bind In -> CE (Bind Out)
+elimBind = \case
+  TmNonRec b e -> TmNonRec b <$> elimExpr e
+  TmRec bs -> TmRec <$> (traverse . _2) elimExpr bs
+  DxLet (x, c) d -> pure (TmNonRec (x, mkTDict c) (elimDict d))
+
 elimExpr :: Expr In -> CE (Expr Out)
 elimExpr = \case
   ELoc (Lctd _pos e0) -> elimExpr e0
@@ -170,7 +176,7 @@ elimExpr = \case
   ETyAbs vs0 e0 -> ETyAbs vs0 <$> elimExpr e0
   EDxAbs (x, c) e0 -> ETmAbs (x, mkTDict c) <$> elimExpr e0
   EAbs{} -> impossible
-  ELet b e0 -> ELet <$> bind2expr elimExpr b <*> elimExpr e0
+  ELet b e0 -> ELet <$> elimBind b <*> elimExpr e0
   EMat t e0 as -> EMat t <$> elimExpr e0 <*> traverse (altn2expr elimExpr) as
   ECast coe e0 -> ECast coe <$> elimExpr e0
   ETyAnn t0 e0 -> ETyAnn t0 <$> elimExpr e0

@@ -40,6 +40,7 @@ substitute' f = go Set.empty
             TmRec bs ->
               let bound' = bound <> Set.fromList (map (fst . fst) (toList bs))
               in  (bound', bound')
+            DxLet{} -> (bound, bound)
       EMat t e as -> EMat t <$> go bound e <*> traverse (goAltn bound) as
       ECast coe e -> ECast coe <$> go bound e
       ETyAnn t  e -> ETyAnn t <$> go bound e
@@ -81,18 +82,21 @@ bind2type :: IsTyped lg => Traversal' (Bind lg) Type
 bind2type f = \case
   TmNonRec b e -> TmNonRec <$> _2 f b <*> expr2type f e
   TmRec bs -> TmRec <$> traverse (\(b, e) -> (,) <$> _2 f b <*> expr2type f e) bs
+  DxLet (x, (c, t)) d -> DxLet <$> ((,) x <$> ((,) c <$> f t)) <*> dict2type f d
 
 bind2expr
-  :: TypeOf lg1 ~ TypeOf lg2
+  :: (TypeOf lg1 ~ TypeOf lg2, DictOf lg1 ~ DictOf lg2, HasDxAbs lg1 ~ HasDxAbs lg2)
   => Traversal (Bind lg1) (Bind lg2) (Expr lg1) (Expr lg2)
 bind2expr f = \case
   TmNonRec b e -> TmNonRec b <$> f e
   TmRec bs -> TmRec <$> (traverse . _2) f bs
+  DxLet b d -> pure (DxLet b d)
 
 bind2tmBinder :: Traversal' (Bind lg) (TmBinder (TypeOf lg))
 bind2tmBinder f = \case
   TmNonRec b e -> TmNonRec <$> f b <*> pure e
   TmRec bs -> TmRec <$> (traverse . _1) f bs
+  DxLet b e -> pure (DxLet b e)
 
 arg2type :: IsTyped lg => Traversal' (Arg lg) Type
 arg2type f = \case

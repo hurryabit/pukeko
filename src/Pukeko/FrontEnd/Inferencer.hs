@@ -286,6 +286,7 @@ freezeBind = \case
   TmRec bs ->
     TmRec
     <$> traverse (\((b, t), e) -> (,) <$> ((,) b <$> freezeType t) <*> freezeExpr e) bs
+  DxLet binder dict -> DxLet <$> (_2 . _2) freezeType binder <*> freezeDict dict
 
 freezeExpr :: Expr (Aux s) -> ST s (Expr Out)
 freezeExpr = \case

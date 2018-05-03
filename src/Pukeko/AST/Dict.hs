@@ -31,7 +31,15 @@ dict2type f = \case
 
 instance Pretty Dict
 instance PrettyPrec Dict where
-  prettyPrec _prec _dict = "{Dict}"
+  prettyPrec prec = \case
+    DVar x -> pretty x
+    DDer inst targs dargs ->
+      maybeParens (prec > 0) $
+        hang (pretty inst) 2
+          (sep (map prettyTyArg targs ++ map (prettyPrec 1) dargs))
+    DSub _ clss targ darg ->
+      maybeParens (prec > 0) $
+        hang "super" 2 (sep [pretty clss, prettyTyArg targ, prettyPrec 1 darg])
 
 deriving instance Show Dict
 
