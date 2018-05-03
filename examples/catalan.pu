@@ -16,10 +16,10 @@ scanl :: (b -> a -> b) -> b -> List a -> List b
 scanl f =
   let rec scanl_f y0 xs =
     case xs of
-    | Nil -> Nil
-    | Cons x xs ->
-      let y0 = f y0 x in
-      Cons y0 (scanl_f y0 xs)
+      Nil -> Nil
+      Cons x xs ->
+        let y0 = f y0 x in
+        Cons y0 (scanl_f y0 xs)
   in
   scanl_f
 

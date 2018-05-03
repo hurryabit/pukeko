@@ -14,9 +14,9 @@ bag_insert :: (Ord a) => a -> Bag a -> Bag a
 bag_insert x s =
   let rec insert x t =
     case t of
-    | Leaf -> Branch Leaf x Leaf
-    | Branch l y r ->
-      if x < y then Branch (insert x l) y r
-      else Branch l y (insert x r)
+      Leaf -> Branch Leaf x Leaf
+      Branch l y r ->
+        if x < y then Branch (insert x l) y r
+        else Branch l y (insert x r)
   in
   coerce @(_ -> Bag) (insert x (coerce @(Bag -> _) s))

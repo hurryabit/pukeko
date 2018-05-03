@@ -1,1 +1,1 @@
-test/frontend/type-checker/general/no-over-generalization.pu:8:5: mismatching types Int and Bool
+test/frontend/type-checker/general/no-over-generalization.pu:6:5: mismatching types Int and Bool

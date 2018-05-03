@@ -1,4 +1,2 @@
-data Typ1 =
-  | Con
-data Typ2 =
-  | Con
+data Typ1 = Con
+data Typ2 = Con

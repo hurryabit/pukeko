@@ -1,1 +1,4 @@
-test/frontend/pattern-matcher/too-simple-var.pu:3:3: pattern match too simple, use a let binding instead
+test/frontend/pattern-matcher/too-simple-var.pu:5:5:
+unexpected 'y'
+expecting data constructor
+

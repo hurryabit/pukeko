@@ -1,3 +1,2 @@
 -- FIXME: This should fail.
-data Typ a a =
-  | Con a
+data Typ a a = Con a

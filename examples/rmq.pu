@@ -8,12 +8,12 @@ nats =
 pair :: (a -> a -> a) -> List a -> List a
 pair op xs1 =
   case xs1 of
-  | Nil -> Nil
-  | Cons x1 Nil -> xs1
-  | Cons x1 (Cons x2 xs3) -> Cons (op x1 x2) (pair op xs3)
+    Nil -> Nil
+    Cons x1 Nil -> xs1
+    Cons x1 (Cons x2 xs3) -> Cons (op x1 x2) (pair op xs3)
 
-data RmqTree a =
-  | RmqEmpty
+data RmqTree a
+  = RmqEmpty
   | RmqNode Int Int a (RmqTree a) (RmqTree a)
 
 single :: Int -> a -> RmqTree a
@@ -22,20 +22,20 @@ single i x = RmqNode i i x RmqEmpty RmqEmpty
 combine :: (a -> a -> a) -> RmqTree a -> RmqTree a -> RmqTree a
 combine op t1 t2 =
   case t1 of
-  | RmqEmpty -> abort
-  | RmqNode s1 _ v1 _ _ ->
-    case t2 of
-    | RmqEmpty -> abort
-    | RmqNode _ e2 v2 _ _ ->
-      RmqNode s1 e2 (op v1 v2) t1 t2
+    RmqEmpty -> abort
+    RmqNode s1 _ v1 _ _ ->
+      case t2 of
+        RmqEmpty -> abort
+        RmqNode _ e2 v2 _ _ ->
+          RmqNode s1 e2 (op v1 v2) t1 t2
 
 build :: (a -> a -> a) -> List a -> RmqTree a
 build op xs =
   let rec run ts =
     case ts of
-    | Nil -> abort
-    | Cons t1 Nil -> t1
-    | Cons t1 (Cons _ _) -> run (pair (combine op) ts)
+      Nil -> abort
+      Cons t1 Nil -> t1
+      Cons t1 (Cons _ _) -> run (pair (combine op) ts)
   in
   run (zip_with single nats xs)
 
@@ -43,14 +43,14 @@ query :: a -> (a -> a -> a) -> Int -> Int -> RmqTree a -> a
 query one op q_lo q_hi =
   let rec aux t =
     case t of
-    | RmqEmpty -> one
-    | RmqNode t_lo t_hi value left right ->
-      if q_hi < t_lo || q_lo > t_hi then
-        one
-      else if q_lo <= t_lo && t_hi <= q_hi then
-        value
-      else
-        op (aux left) (aux right)
+      RmqEmpty -> one
+      RmqNode t_lo t_hi value left right ->
+        if q_hi < t_lo || q_lo > t_hi then
+          one
+        else if q_lo <= t_lo && t_hi <= q_hi then
+          value
+        else
+          op (aux left) (aux right)
   in
   aux
 

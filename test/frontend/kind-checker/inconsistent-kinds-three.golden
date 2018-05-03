@@ -1,1 +1,1 @@
-test/frontend/kind-checker/inconsistent-kinds-three.pu:6:5: cannot unify kinds * -> * and *
+test/frontend/kind-checker/inconsistent-kinds-three.pu:3:17: cannot unify kinds * -> * and *

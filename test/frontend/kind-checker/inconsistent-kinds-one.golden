@@ -1,1 +1,1 @@
-test/frontend/kind-checker/inconsistent-kinds-one.pu:2:5: cannot unify kinds * and _4 -> *
+test/frontend/kind-checker/inconsistent-kinds-one.pu:1:16: cannot unify kinds * and _4 -> *

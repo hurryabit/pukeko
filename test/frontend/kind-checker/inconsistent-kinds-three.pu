@@ -1,6 +1,3 @@
-data Typ1 a =
-  | Con1
-data Typ2 a b =
-  | Con2 (a b)
-data Typ3 f a =
-  | Con3 (Typ1 f) (Typ2 f a)
+data Typ1 a = Con1
+data Typ2 a b = Con2 (a b)
+data Typ3 f a = Con3 (Typ1 f) (Typ2 f a)

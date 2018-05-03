@@ -3,10 +3,10 @@ import std2/prelude
 qsort :: List Int -> List Int
 qsort xs =
   case xs of
-  | Nil -> Nil
-  | Cons x xs ->
-    case partition (\y -> y < x) xs of
-    | Pair ys zs -> append (qsort ys) (Cons x (qsort zs))
+    Nil -> Nil
+    Cons x xs ->
+      case partition (\y -> y < x) xs of
+        Pair ys zs -> append (qsort ys) (Cons x (qsort zs))
 
 main :: IO Unit
 main =

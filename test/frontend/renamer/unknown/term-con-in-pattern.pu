@@ -1,4 +1,4 @@
 f :: a
 f x =
   case x of
-  | Con -> 1
+    Con -> 1

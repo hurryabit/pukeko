@@ -51,9 +51,7 @@ instance functorFixPoly :: (Bifunctor p) => Functor (FixPoly p) where
 
 
 -- Bifunctor whose fixpoint is isomorphic to lists
-data ListF a b =
-  | NilF
-  | ConsF a b
+data ListF a b = NilF | ConsF a b
 
 instance functorListF :: Functor (ListF a) where
   map = bimap id
@@ -61,20 +59,20 @@ instance functorListF :: Functor (ListF a) where
 instance bifunctorListF :: Bifunctor ListF where
   bimap f g x =
     case x of
-    | NilF      -> NilF
-    | ConsF y z -> ConsF (f y) (g z)
+      NilF      -> NilF
+      ConsF y z -> ConsF (f y) (g z)
 
 toList :: Fix2 ListF a -> List a
 toList = cata (\x ->
   case x of
-  | NilF       -> Nil
-  | ConsF y ys -> Cons y ys) ∘ mono
+    NilF       -> Nil
+    ConsF y ys -> Cons y ys) ∘ mono
 
 fromList :: List a -> Fix2 ListF a
 fromList = poly ∘ ana (\x ->
   case x of
-  | Nil       -> NilF
-  | Cons y ys -> ConsF y ys)
+    Nil       -> NilF
+    Cons y ys -> ConsF y ys)
 
 
 main :: IO Unit

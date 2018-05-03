@@ -1,2 +1,1 @@
-data Typ a =
-  | Con (Typ a a)
+data Typ a = Con (Typ a a)

@@ -1,8 +1,6 @@
-data Pair a b = | Pair a b
-data Choice a b =
-  | First a
-  | Second b
+data Pair a b = Pair a b
+data Choice a b = First a | Second b
 f :: Pair (Choice a b) c -> a
 f xyz =
   case xyz of
-  | Pair (First x) z -> x
+    Pair (First x) z -> x
