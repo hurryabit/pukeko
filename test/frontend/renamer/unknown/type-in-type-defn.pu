@@ -1,2 +1,1 @@
-data Typ =
-  | Con Bad
+data Typ = Con Bad

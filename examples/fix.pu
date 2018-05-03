@@ -51,9 +51,7 @@ instance functorFixPoly :: (Bifunctor p) => Functor (FixPoly p) where
 
 
 -- Bifunctor whose fixpoint is isomorphic to lists
-data ListF a b =
-  | NilF
-  | ConsF a b
+data ListF a b = NilF | ConsF a b
 
 instance functorListF :: Functor (ListF a) where
   map = bimap id

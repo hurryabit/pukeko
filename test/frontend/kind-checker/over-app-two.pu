@@ -1,3 +1,2 @@
-data Typ1 a = | A
-data Typ2 a =
-  | Con (Typ1 a a)
+data Typ1 a = A
+data Typ2 a = Con (Typ1 a a)

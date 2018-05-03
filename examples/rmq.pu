@@ -12,8 +12,8 @@ pair op xs1 =
     Cons x1 Nil -> xs1
     Cons x1 (Cons x2 xs3) -> Cons (op x1 x2) (pair op xs3)
 
-data RmqTree a =
-  | RmqEmpty
+data RmqTree a
+  = RmqEmpty
   | RmqNode Int Int a (RmqTree a) (RmqTree a)
 
 single :: Int -> a -> RmqTree a

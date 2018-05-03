@@ -221,7 +221,7 @@ bind :: Parser (Bind (LctdName 'TmVar))
 bind = indented tmvar $ \z -> MkBind z <$> (mkLam <$> many tmvar <*> (equals *> expr))
 
 exprMatch :: Parser (Expr (LctdName 'TmVar))
-exprMatch = indented_ (reserved "case") $ do
+exprMatch = indented_ (reserved "case") $
   EMat
   <$> (expr <* reserved "of")
   <*> aligned (some altn)
@@ -290,10 +290,10 @@ tconDecl :: Parser TyConDecl
 tconDecl = MkTyConDecl
   <$> tycon
   <*> (many tyvar <* equals)
-  <*> (Right <$> aligned (some dconDecl))
+  <*> (Right <$> sepBy1 dconDecl bar)
 
 dconDecl :: Parser TmConDecl
-dconDecl = indented_ bar (MkTmConDecl <$> tmcon <*> many atype)
+dconDecl = MkTmConDecl <$> tmcon <*> many atype
 
 signDecl :: Parser SignDecl
 signDecl = indented

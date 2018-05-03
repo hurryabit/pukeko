@@ -1,2 +1,1 @@
-data Typ f =
-  | Con (f f)
+data Typ f = Con (f f)

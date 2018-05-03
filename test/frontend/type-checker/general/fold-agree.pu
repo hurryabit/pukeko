@@ -1,6 +1,4 @@
-data List a =
-  | Nil
-  | Cons a (List a)
+data List a = Nil | Cons a (List a)
 fold :: (b -> a -> b) -> b -> List a -> b
 fold f y0 xs =
   case xs of

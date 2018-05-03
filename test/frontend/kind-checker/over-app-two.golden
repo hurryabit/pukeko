@@ -1,1 +1,1 @@
-test/frontend/kind-checker/over-app-two.pu:3:5: cannot unify kinds * and * -> *
+test/frontend/kind-checker/over-app-two.pu:2:15: cannot unify kinds * and * -> *

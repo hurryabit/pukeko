@@ -1,1 +1,1 @@
-test/frontend/pattern-matcher/not-exhaust-simple.pu:6:3: unmatched constructor: Second
+test/frontend/pattern-matcher/not-exhaust-simple.pu:4:3: unmatched constructor: Second

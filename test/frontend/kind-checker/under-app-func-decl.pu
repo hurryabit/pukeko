@@ -1,3 +1,3 @@
-data T a = | C
+data T a = C
 bad :: T
 bad = C

@@ -1,6 +1,4 @@
-data List a =
-  | Nil
-  | Cons a (List a)
+data List a = Nil | Cons a (List a)
 last :: a -> List a -> a
 last x0 xs =
   case xs of

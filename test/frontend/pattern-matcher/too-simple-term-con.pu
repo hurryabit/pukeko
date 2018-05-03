@@ -1,5 +1,5 @@
 -- FIXME: This should not fail in the parser but in the pattern match compiler.
-data T a = | C a
+data T a = C a
 f :: a -> T a
 f x = case C x of
   y -> y

@@ -1,3 +1,1 @@
-data Typ =
-  | Con
-  | Con
+data Typ = Con | Con

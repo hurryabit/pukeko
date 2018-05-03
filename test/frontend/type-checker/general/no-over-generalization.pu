@@ -1,6 +1,4 @@
-data Bool =
-  | False
-  | True
+data Bool = False | True
 f :: Int
 f =
   let g x =

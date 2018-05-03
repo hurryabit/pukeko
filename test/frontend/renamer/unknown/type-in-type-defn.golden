@@ -1,1 +1,1 @@
-test/frontend/renamer/unknown/type-in-type-defn.pu:2:9: unknown type constructor: Bad
+test/frontend/renamer/unknown/type-in-type-defn.pu:1:16: unknown type constructor: Bad

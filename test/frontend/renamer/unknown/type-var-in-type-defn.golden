@@ -1,1 +1,1 @@
-test/frontend/renamer/unknown/type-var-in-type-defn.pu:2:5: unknown type variable: b
+test/frontend/renamer/unknown/type-var-in-type-defn.pu:1:14: unknown type variable: b

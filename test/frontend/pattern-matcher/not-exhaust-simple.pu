@@ -1,6 +1,4 @@
-data Choice a b =
-  | First a
-  | Second b
+data Choice a b = First a | Second b
 f :: Choice a b -> a
 f xy =
   case xy of

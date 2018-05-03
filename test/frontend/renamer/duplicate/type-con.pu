@@ -1,2 +1,2 @@
-data Typ = | A
-data Typ = | B
+data Typ = A
+data Typ = B

@@ -1,1 +1,1 @@
-test/frontend/kind-checker/over-app-rec.pu:2:5: cannot unify kinds * and _4 -> *
+test/frontend/kind-checker/over-app-rec.pu:1:14: cannot unify kinds * and _4 -> *

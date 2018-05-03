@@ -1,3 +1,3 @@
-data T a = | C a
+data T a = C a
 f :: a -> T a
 f x = C x x

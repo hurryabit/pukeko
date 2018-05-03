@@ -5,9 +5,7 @@ import std2/foldable
 import std2/functor
 import std2/monoid
 
-data List a =
-  | Nil
-  | Cons a (List a)
+data List a = Nil | Cons a (List a)
 
 instance eqList :: (Eq a) => Eq (List a) where
   eq xs ys = case xs of

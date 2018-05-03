@@ -2,7 +2,7 @@ class C a where
   c :: a -> Int
 class (C a) <= D a where
   d :: a -> Int
-data T a = | C a
+data T a = C a
 instance cInt :: C Int where
   c x = x
 instance dInt :: D Int where
