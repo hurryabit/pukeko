@@ -1,8 +1,8 @@
-resolver: nightly-2018-04-21
+resolver: nightly-2018-05-04
 
 packages:
 - '.'
 
 extra-deps:
-- git: https://github.com/gwils/stylish-haskell.git
-  commit: 396aab08b74d0435e8fdf7b2982addf81428e74e
+- git: https://github.com/jaspervdj/stylish-haskell.git
+  commit: 7fac380bd83d51191e223560449d808e323d7ca6
