@@ -92,9 +92,11 @@ introLocal
   => Ps.LctdName 'TmVar
   -> (TmBinder NoType -> Eff effs a)
   -> Eff effs a
-introLocal name cont = do
-  binder <- mkName name
-  local (Map.insert (unlctd name) binder) $ cont (binder, NoType)
+introLocal lname@(Lctd pos name) cont = do
+  whenM (asks @Env (Map.member name)) $
+    throwAt pos ("shadowing variable" <:~> pretty name)
+  binder <- mkName lname
+  local (Map.insert name binder) $ cont (binder, NoType)
 
 introLocals
   :: LocalEffs effs
@@ -250,6 +252,7 @@ rnTypeDecl (Ps.MkTyConDecl name params0 dcons0) = do
   -- NOTE: Since the type definition might be recursive, we need to introduce a
   -- dummy version of the type constructor first and overwrite it in the end.
   let mkDummy binder = DType (MkTyConDecl binder [] (Right []))
+  -- FIXME: The names need to be mutually distinct.
   binder <- introGlobal tconTab "type constructor" name mkDummy pure
   params1 <- traverse mkName params0
   let env = Map.fromList (zip (map unlctd params0) params1)

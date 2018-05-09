@@ -18,10 +18,10 @@ sequence :: (Monad m) => List (m a) -> m (List a)
 sequence ms =
   case ms of
     Nil -> pure Nil
-    Cons m ms ->
+    Cons m ms1 ->
       m
       >>= \x ->
-      sequence ms
+      sequence ms1
       >>= \xs ->
       pure (Cons x xs)
 

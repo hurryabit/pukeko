@@ -45,7 +45,7 @@ input :: IO Int
 input = io geti Unit
 
 putChar :: Char -> IO Unit
-putChar c = io (\c -> putc (ord c)) c
+putChar c = io (\d -> putc (ord d)) c
 
 getChar :: IO (Option Char)
 getChar = io (\u -> let n = getc u in if n < 0 then None else Some (chr n)) Unit

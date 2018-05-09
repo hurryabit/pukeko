@@ -73,8 +73,7 @@ type family (?:>) (nsp1 :: Super k) (nsp2 :: k) :: Constraint where
 
 -- | A name which shall be unique across one run of the compiler.
 data Name (nsp :: NameSpace) = Name
-  { _id   :: Int
-  , _text :: String
+  { _text :: String
   , _pos  :: SourcePos
   } deriving (Show)
 
@@ -82,7 +81,7 @@ nameText :: Name nsp -> Tagged nsp String
 nameText = Tagged . _text
 
 namePos :: Lens' (Name nsp) SourcePos
-namePos f (Name i t p) = Name i t <$> f p
+namePos f (Name t p) = Name t <$> f p
 
 newtype NameSource a = NameSource{toState :: State Int a}
 
@@ -99,9 +98,9 @@ runSTBelowNameSource act = do
 
 mkName :: Member NameSource effs => Lctd (Tagged nsp String) -> Eff effs (Name nsp)
 mkName (Lctd pos (Tagged text)) = do
-  n <- send (NameSource Get)
-  send (NameSource (Put (n+1)))
-  pure (Name n text pos)
+  -- n <- send (NameSource Get)
+  -- send (NameSource (Put (n+1)))
+  pure (Name text pos)
 
 copyName :: Member NameSource effs => Name nsp -> Eff effs (Name nsp)
 copyName = copyName' id
@@ -109,7 +108,7 @@ copyName = copyName' id
 copyName'
   :: Member NameSource effs
   => (String -> String) -> Name nsp1 -> Eff effs (Name nsp2)
-copyName' f (Name _ text _) = mkName (Lctd noPos (Tagged (f text)))
+copyName' f (Name text _) = mkName (Lctd noPos (Tagged (f text)))
 
 synthName
   :: Member NameSource effs
@@ -150,13 +149,13 @@ instance HasPos (Name name) where
   getPos = _pos
 
 instance Eq (Name nsp) where
-  (==) = (==) `on` _id
+  (==) = (==) `on` _text
 
 instance Ord (Name nsp) where
-  compare = compare `on` _id
+  compare = compare `on` _text
 
 instance Pretty (Name nsp) where
-  pretty (Name i t _) = annotateId i (pretty t)
+  pretty (Name t _) = pretty t
 
 -- NOTE: This is necessary to make ''Name avaliable below.
 $(return [])

@@ -22,6 +22,7 @@ module Pukeko.FrontEnd.Inferencer.Gamma
 
 import Pukeko.Prelude
 
+import           Control.Monad.Extra (whenM)
 import qualified Data.Map.Extended as Map
 
 import Pukeko.AST.Dict (DxBinder)
@@ -36,13 +37,18 @@ data Gamma s = Gamma
   }
 makeLenses ''Gamma
 
-type CanGamma s effs = Member (Reader (Gamma s)) effs
+type CanGamma s effs = (Member (Reader (Gamma s)) effs, CanThrowHere effs)
 
 runGamma :: Eff (Reader (Gamma s) : effs) a -> Eff effs a
 runGamma = runReader (Gamma Map.empty topLevel Map.empty)
 
-introTmVar :: CanGamma s effs => TmBinder (UType s) -> Eff effs a -> Eff effs a
-introTmVar (x, t) = locally tmVars (Map.insertWith impossible x t)
+introTmVar
+  :: forall s effs a. CanGamma s effs
+  => TmBinder (UType s) -> Eff effs a -> Eff effs a
+introTmVar (x, t) act = do
+  whenM (views (tmVars @s) (Map.member x)) $
+    throwHere ("TC: shadowing variable" <:~> pretty x)
+  locally tmVars (Map.insertWith impossible x t) act
 
 introTmVars :: CanGamma s effs => [TmBinder (UType s)] -> Eff effs a -> Eff effs a
 introTmVars = flip (foldr introTmVar)
