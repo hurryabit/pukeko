@@ -32,12 +32,11 @@ data Tabs = Tabs
   , _evarTab  :: Map (Ps.Name 'TmVar) (GenDecl (Only 'TmVar) Out)
   }
 
-type Env = Reader (Map (Ps.Name 'TmVar) TmVar)
+type Env = Map (Ps.Name 'TmVar) TmVar
 
-type CanRn effs = Members [State Tabs, Reader SourcePos, NameSource, Error Failure] effs
+type GlobalEffs effs = (Members [State Tabs, NameSource] effs, CanThrowHere effs)
 
-type GlobalEffs effs = CanRn effs
--- type LocalEffs nsp effs = (GlobalEffs effs, Member (Reader (Env nsp)) effs)
+type LocalEffs effs = (GlobalEffs effs, Member (Reader Env) effs)
 
 makeLenses ''Tabs
 
@@ -81,12 +80,35 @@ lookupGlobalName :: (GlobalEffs effs, NameSpaceOf decl ~ nsp, HasName decl) =>
   Eff effs (Name nsp)
 lookupGlobalName tab sel desc name = nameOf <$> lookupGlobal tab sel desc name
 
-lookupBinop :: CanRn effs => Op.Binary -> Eff effs TmVar
+lookupBinop :: GlobalEffs effs => Op.Binary -> Eff effs TmVar
 lookupBinop op = do
   fun_mb <- uses binopTab (Map.lookup op)
   case fun_mb of
     Just fun -> pure fun
     Nothing  -> throwHere ("unknown operator:" <+> pretty op)
+
+introLocal
+  :: LocalEffs effs
+  => Ps.LctdName 'TmVar
+  -> (TmBinder NoType -> Eff effs a)
+  -> Eff effs a
+introLocal name cont = do
+  binder <- mkName name
+  local (Map.insert (unlctd name) binder) $ cont (binder, NoType)
+
+introLocals
+  :: LocalEffs effs
+  => [Ps.LctdName 'TmVar]
+  -> ([TmBinder NoType] -> Eff effs a)
+  -> Eff effs a
+introLocals names0 cont = go names0 []
+  where
+    go [] binders = cont (reverse binders)
+    go (name:names) binders = introLocal name $ \binder -> go names (binder:binders)
+
+lookupLocal :: LocalEffs effs => Ps.LctdName 'TmVar -> Eff effs (Maybe TmVar)
+lookupLocal name = asks (Map.lookup (unlctd name))
+
 
 -- * Renaming of types
 
@@ -100,7 +122,7 @@ rnTypeAtom = \case
     TACon <$> lookupGlobalName tconTab _DType "unknown type constructor" name
 
 lookupTyVar
-  :: CanRn effs
+  :: GlobalEffs effs
   => Ps.LctdName 'TyVar -> Map (Ps.Name 'TyVar) TyVar -> Eff effs TyVar
 lookupTyVar (unlctd -> x) env =
   case Map.lookup x env of
@@ -110,7 +132,7 @@ lookupTyVar (unlctd -> x) env =
 -- | Rename a type under the assumption that all its free variables are
 -- contained in the map. All references to type constructors are renamed as
 -- well.
-rnType :: CanRn effs => Map (Ps.Name 'TyVar) TyVar -> Ps.Type -> Eff effs Type
+rnType :: GlobalEffs effs => Map (Ps.Name 'TyVar) TyVar -> Ps.Type -> Eff effs Type
 rnType env = go
   where
     go = \case
@@ -131,7 +153,7 @@ rnConstraints env (Ps.MkTypeCstr constraints) =
 
 -- | Rename a type scheme. Fails if there are constraints on type variables
 -- which are contained in the map or not in the type.
-rnTypeScheme :: CanRn effs =>
+rnTypeScheme :: GlobalEffs effs =>
   Map (Ps.Name 'TyVar) TyVar -> Ps.TypeScheme -> Eff effs Type
 rnTypeScheme env0 (Ps.MkTypeScheme cstrs0 t0) = do
   env1 <- traverse mkName (Ps.freeTyVars t0 `Map.difference` env0)
@@ -151,39 +173,34 @@ rnCoercion (Ps.MkCoercion dir0 tname) = do
 -- * Renaming of expressions
 
 -- | Rename a pattern.
-rnPatn :: CanRn effs =>
-  Ps.Patn -> Eff effs (Patn Out, Map (Ps.Name 'TmVar) TmVar)
-rnPatn = \case
-  Ps.PWld -> pure (PWld, mempty)
-  Ps.PVar name -> do
-    binder <- mkName name
-    pure (PVar (binder, NoType), Map.singleton (unlctd name) binder)
+rnPatn :: LocalEffs effs => Ps.Patn -> (Patn Out -> Eff effs a) -> Eff effs a
+rnPatn patn cont = case patn of
+  Ps.PWld -> cont PWld
+  Ps.PVar name ->
+    introLocal name $ cont . PVar
   Ps.PCon dcon0 patns0 -> do
     dcon1 <- lookupGlobalName dconTab id "unknown data constructor" dcon0
-    (patns1, envs) <- unzip <$> traverse rnPatn patns0
-    pure (PCon dcon1 patns1, fold envs)
+    let go [] outPatns = cont (PCon dcon1 (reverse outPatns))
+        go (inPatn:inPatns) outPatns =
+          rnPatn inPatn $ \outPatn -> go inPatns (outPatn:outPatns)
+    go patns0 []
 
 -- | Rename a pattern match alternative.
-rnAltn :: CanRn effs => Ps.Altn (Ps.LctdName 'TmVar) -> Eff (Env : effs) (Altn Out )
-rnAltn (Ps.MkAltn patn0 rhs) = do
-  (patn1, env) <- rnPatn patn0
-  MkAltn patn1 <$> local (env `Map.union`) (rnExpr rhs)
+rnAltn :: LocalEffs effs => Ps.Altn (Ps.LctdName 'TmVar) -> Eff effs (Altn Out )
+rnAltn (Ps.MkAltn patn0 rhs) = rnPatn patn0 $ \patn1 -> MkAltn patn1 <$> rnExpr rhs
 
 -- | Rename a value abstraction (lambda).
-rnELam :: CanRn effs =>
-  [Ps.LctdName 'TmVar] -> Ps.Expr (Ps.LctdName 'TmVar) -> Eff (Env : effs) (Expr Out)
-rnELam [] body = rnExpr body
-rnELam (name:names) body = do
-  binder <- mkName name
-  ETmAbs (binder, NoType) <$> local (Map.insert (unlctd name) binder) (rnELam names body)
+rnELam :: LocalEffs effs =>
+  [Ps.LctdName 'TmVar] -> Ps.Expr (Ps.LctdName 'TmVar) -> Eff effs (Expr Out)
+rnELam names body = introLocals names $ \binders ->
+  rewindr ETmAbs binders <$> rnExpr body
 
 -- | Rename an expression.
-rnExpr :: CanRn effs => Ps.Expr (Ps.LctdName 'TmVar) -> Eff (Env : effs) (Expr Out)
+rnExpr :: LocalEffs effs => Ps.Expr (Ps.LctdName 'TmVar) -> Eff effs (Expr Out)
 rnExpr = \case
   Ps.ELoc le -> here le $ ELoc <$> lctd rnExpr le
-  Ps.EVar x -> do
-    y_mb <- asks (unlctd x `Map.lookup`)
-    case y_mb of
+  Ps.EVar x ->
+    lookupLocal x >>= \case
       Just y -> pure (EVar y)
       Nothing -> EVal <$> lookupGlobalName evarTab _DSign "unknown variable" x
   Ps.ECon name ->
@@ -200,20 +217,17 @@ rnExpr = \case
   Ps.ELet (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkBind binder expr) -> (binder, expr)) binds0)
-    names <- traverse mkName binders0
-    let env = Map.fromList (zipExact (map unlctd binders0) names)
     exprs1 <- traverse rnExpr exprs0
-    let binds1 = zipWithExact (\name -> TmNonRec (name, NoType)) names exprs1
-    body1 <- local (env `Map.union`) (rnExpr body0)
-    pure (rewindr ELet binds1 body1)
+    introLocals binders0 $ \names -> do
+      let binds1 = zipWithExact TmNonRec names exprs1
+      body1 <- rnExpr body0
+      pure (rewindr ELet binds1 body1)
   Ps.ERec (toList -> binds0) body0 -> do
     let (binders0, exprs0) =
           unzip (map (\(Ps.MkBind binder expr) -> (binder, expr)) binds0)
-    names <- traverse mkName binders0
-    let env = Map.fromList (zipExact (map unlctd binders0) names)
-    local (env `Map.union`) $ do
+    introLocals binders0 $ \names -> do
       exprs1 <- traverse rnExpr exprs0
-      let binds1 = zipWithExact (\name -> (,) (name, NoType)) names exprs1
+      let binds1 = zipWithExact (,) names exprs1
       body1 <- rnExpr body0
       pure (ELet (TmRec binds1) body1)
   Ps.ECoe c e -> ECast . (, NoType) <$> rnCoercion c <*> rnExpr e
@@ -224,7 +238,7 @@ rnExpr = \case
 -- | Rename a data constructor declaration. Assumes that the corresponding type
 -- constructor (or at least some dummy version of it) has already been
 -- introduced to the global environment.
-rnTmConDecl :: CanRn effs =>
+rnTmConDecl :: GlobalEffs effs =>
   TyCon -> Map (Ps.Name 'TyVar) TyVar -> Int -> Ps.TmConDecl -> Eff effs TmConDecl
 rnTmConDecl tcon env tag (Ps.MkTmConDecl name fields) = here name $
   introGlobal dconTab "data constructor" name id $ \dcon ->
@@ -249,7 +263,7 @@ rnTypeDecl (Ps.MkTyConDecl name params0 dcons0) = do
 -- signatures, we have @tv = TScope Int Void@, the map contains the class
 -- paramaters and the function adds universal quantification over the class
 -- parameters.
-rnSignDecl :: CanRn effs =>
+rnSignDecl :: GlobalEffs effs =>
   Map (Ps.Name 'TyVar) TyVar -> (Type -> Type) -> Ps.SignDecl -> Eff effs (SignDecl tv)
 rnSignDecl env preClose (Ps.MkSignDecl binder typeScheme) =
   introGlobal evarTab "function declaration" binder mkDSign $ \name ->
@@ -260,14 +274,14 @@ rnSignDecl env preClose (Ps.MkSignDecl binder typeScheme) =
 -- | Rename a function declaration. The filled in type is bogus. For top level
 -- functions, we have @tv = Void@. For method definitions, we have @tv = TScope
 -- Int Void@.
-rnFuncDecl :: CanRn effs => Ps.Bind (Ps.LctdName 'TmVar) -> Eff effs (FuncDecl Out tv)
+rnFuncDecl :: GlobalEffs effs => Ps.Bind (Ps.LctdName 'TmVar) -> Eff effs (FuncDecl Out tv)
 rnFuncDecl (Ps.MkBind binder body) = do
   name0 <- lookupGlobalName evarTab _DSign "undeclared function" binder
   let name1 = set namePos (getPos binder) name0
-  MkFuncDecl name1 NoType <$> runReader mempty (rnExpr body)
+  MkFuncDecl name1 NoType <$> runReader @Env mempty (rnExpr body)
 
 -- | Rename an external function declaration. The filled in type is bogus.
-rnExtnDecl :: CanRn effs => Ps.ExtnDecl -> Eff effs (ExtnDecl Out)
+rnExtnDecl :: GlobalEffs effs => Ps.ExtnDecl -> Eff effs (ExtnDecl Out)
 rnExtnDecl (Ps.MkExtnDecl binder extn) = do
   name0 <- lookupGlobalName evarTab _DSign "undeclared function" binder
   let name1 = set namePos (getPos binder) name0
@@ -315,7 +329,7 @@ rnInfxDecl (Ps.MkInfxDecl (Lctd pos op) func) = do
   modifying binopTab (Map.insert op bound)
 
 -- | Rename a top level declaration.
-rnDecl :: CanRn effs => Ps.Decl -> Eff effs (Maybe (Decl Out))
+rnDecl :: GlobalEffs effs => Ps.Decl -> Eff effs (Maybe (Decl Out))
 rnDecl = \case
   Ps.DType tcon -> Just . DType <$> rnTypeDecl tcon
   Ps.DSign sign -> Just . DSign <$> rnSignDecl mempty id sign
