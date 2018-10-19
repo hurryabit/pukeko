@@ -6,11 +6,7 @@ import Bound
 import Bound.Name
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Void
 import Text.Megaparsec.Pos (Pos, SourcePos)
-
-instance ToJSON Void where
-  toJSON = absurd
 
 -- from megaparsec
 deriveToJSON defaultOptions ''Pos
