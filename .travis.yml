@@ -31,7 +31,7 @@ before_install:
 - export PATH=$HOME/.local/bin:$PATH
 - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
 # Install hlint
-- stack -j1 --no-terminal --install-ghc build hlint
+- stack -j1 --no-terminal --install-ghc build # hlint
 
 install:
 # Build dependencies
@@ -39,6 +39,6 @@ install:
 
 script:
 # Run hlint
-- stack exec hlint -- --git
+# - stack exec hlint -- --git
 # Build the package, its tests, and its docs and run the tests
 - stack -j1 --no-terminal test --pedantic :golden
