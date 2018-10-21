@@ -8,10 +8,10 @@ module Pukeko.BackEnd.Compiler
 
 import Pukeko.Prelude
 
-import           Control.Lens ((+~))
+import           Control.Lens              ((+~))
 import           Control.Monad.Freer.Fresh
-import qualified Data.Map.Extended as Map
-import qualified Data.Set as Set
+import qualified Data.Map.Extended         as Map
+import qualified Data.Set                  as Set
 
 import Pukeko.AST.NoLambda
 import Pukeko.BackEnd.Builtins as Builtins
@@ -138,13 +138,11 @@ ccExpr mode expr =
                     Redex -> eval $ continueRedex RETURN
               | otherwise -> ccDefault
         _ -> ccDefault
-    Let{ _isrec = False, _defns, _body } -> do
-      let n = length _defns
-          (idents, rhss) = unzipDefns _defns
-      zipWithM_ (\rhs k -> local (depth +~ k) $ ccExpr Stack rhs) rhss [0 ..]
-      localDecls (map Just idents) $ ccExpr mode _body
-      whenStackOrEval mode $ output [SLIDE n]
-    Let{ _isrec = True, _defns, _body } -> do
+    Let{_defn = MkDefn{_lhs, _rhs}, _body } -> do
+      ccExpr Stack _rhs
+      localDecls [Just _lhs] $ ccExpr mode _body
+      whenStackOrEval mode $ output [SLIDE 1]
+    LetRec{_defns, _body } -> do
       let n = length _defns
           (idents, rhss) = unzipDefns _defns
       output [ALLOC n]

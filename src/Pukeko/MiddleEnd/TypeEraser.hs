@@ -62,9 +62,9 @@ ccExpr = \case
   e0@(In.EApp _ In.TmArg{})
     | (e1, as) <- In.unwindl In._ETmApp e0 -> Ap <$> ccExpr e1 <*> traverse ccExpr as
   In.ELet (In.TmNonRec b e0) e1 ->
-    Let False <$> ((:[]) <$> (MkDefn (bindName b) <$> ccExpr e0)) <*> ccExpr e1
+    Let <$> (MkDefn (bindName b) <$> ccExpr e0) <*> ccExpr e1
   In.ELet (In.TmRec bs) e1 ->
-    Let True
+    LetRec
     <$> traverse (\(b, e0) -> MkDefn (bindName b) <$> ccExpr e0) (toList bs)
     <*> ccExpr e1
   In.EMat _ e cs -> Match <$> ccExpr e <*> traverse ccAltn (toList cs)

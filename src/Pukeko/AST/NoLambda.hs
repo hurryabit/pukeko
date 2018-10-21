@@ -27,7 +27,8 @@ data Expr
   | Pack    {_tag, _arity :: Int}
   | Num     {_int :: Int}
   | Ap      {_fun :: Expr, _args :: [Expr]}
-  | Let     {_isrec :: Bool, _defns :: [Defn], _body :: Expr}
+  | Let     {_defn :: Defn, _body :: Expr}
+  | LetRec  {_defns :: [Defn], _body :: Expr}
   | Match   {_expr  :: Expr, _altns :: [Altn]}
   deriving (Show)
 
@@ -79,16 +80,22 @@ instance PrettyPrec Expr where
       Ap{ _fun, _args } ->
         maybeParens (prec > 0) $ hsep $
           prettyPrec 1 _fun : map (prettyPrec 1) _args
-      Let{ _isrec, _defns, _body } ->
+      Let{_defn, _body} ->
+        vcat
+        [ sep
+          [ "let" <+> pretty _defn
+          , "in"
+          ]
+        , pretty _body
+        ]
+      LetRec{_defns, _body} ->
         case _defns of
           [] -> impossible  -- maintained invariant
           defn0:defns ->
-            let let_ | _isrec    = "let rec"
-                     | otherwise = "let"
-            in  vcat
+                vcat
                 [ sep
                   [ vcat $
-                    (let_ <+> pretty defn0) :
+                    ("let rec" <+> pretty defn0) :
                     map (\defn -> "and" <+> pretty defn) defns
                   , "in"
                   ]
