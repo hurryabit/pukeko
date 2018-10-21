@@ -1,0 +1,8 @@
+add :: Int -> Int -> Int
+external add = "add"
+
+main :: Int -> Int
+main x =
+  let rec y = add x z
+  and z = add y z
+  in add x y

@@ -1,8 +1,8 @@
 benchmarking ruceki isort.pub < sort2.in > /dev/null
-time                 3.256 s    (NaN s .. 3.725 s)
-                     0.998 R²   (0.993 R² .. 1.000 R²)
-mean                 3.174 s    (3.098 s .. 3.226 s)
-std dev              78.41 ms   (0.0 s .. 90.42 ms)
+time                 1.897 s    (1.867 s .. 1.947 s)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.886 s    (1.880 s .. 1.898 s)
+std dev              9.760 ms   (0.0 s .. 10.03 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
 Loaded!
