@@ -19,6 +19,7 @@ module Pukeko.Prelude
   , assertM
   , impossible
   , traceJSON
+  , serdeJsonOptions
   ) where
 
 import Prelude as X
@@ -146,3 +147,14 @@ traceJSON :: ToJSON a => a -> b -> b
 traceJSON =
   let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
   in  trace . BSL.unpack . Aeson.encodePretty' config . toJSON
+
+serdeJsonOptions :: Options
+serdeJsonOptions = defaultOptions
+  { fieldLabelModifier = stripUnderscore
+  , sumEncoding = ObjectWithSingleField
+  , unwrapUnaryRecords = True
+  }
+  where
+    stripUnderscore = \case
+      '_':f -> f
+      f -> f

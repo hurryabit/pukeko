@@ -24,7 +24,7 @@ import qualified Pukeko.MiddleEnd.LambdaLifter as LambdaLifter
 import qualified Pukeko.MiddleEnd.Prettifier as Prettifier
 import qualified Pukeko.MiddleEnd.TypeEraser as TypeEraser
 
-type Module = NoLambda.Module
+type Module = (Core.Module, NoLambda.Module)
 
 data Optimization
   = EtaReduction
@@ -53,7 +53,7 @@ runOptimization = \case
   Prettification      -> pure . Prettifier.prettifyModule
 
 run :: forall effs. Members [NameSource, Error Failure] effs =>
-  Config -> SysF.Module SystemF -> Eff effs (Core.Module, NoLambda.Module)
+  Config -> SysF.Module SystemF -> Eff effs Module
 run cfg module_sf = do
   let typeChecked ::
         (Core.Module -> Eff effs Core.Module) -> (Core.Module -> Eff effs Core.Module)

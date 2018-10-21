@@ -42,28 +42,6 @@ external geti :: Unit -> Int = "geti"
 monoidInt :: Monoid Int = .Monoid @Int monoidInt.empty add_int
 print :: Int -> IO Unit = io.L2 @Int @Unit puti
 input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
-ints :: List Int =
-  let rec go :: Int -> List Int = ints.L1 go in
-  go 1
-solve_aux :: List (List Int) -> List (List Int) =
-  \(kss :: List (List Int)) ->
-    case kss of
-    | Nil -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
-    | Cons ks kss ->
-      let monoid.m :: Monoid (List (List Int)) =
-            .Monoid
-              @(List (List Int))
-              (monoidList.empty @(List Int))
-              (monoidList.append.L1 @(List Int))
-      in
-      let f :: Int -> List (List Int) = solve_aux.L2 kss in
-      foldableList.foldr.L1
-        @Int
-        @(List (List Int))
-        (foldMap.L1 @Int @(List (List Int)) monoid.m f)
-        (case monoid.m of
-         | .Monoid empty _ -> empty)
-        ks
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L1)
 monoidInt.empty :: Int = 0
@@ -87,14 +65,6 @@ foldableList.foldr.L1 :: forall a b. (a -> b -> b) -> b -> List a -> b =
     case xs of
     | Nil -> y0
     | Cons x xs -> f x (foldableList.foldr.L1 @a @b f y0 xs)
-take.L1 :: forall a. Int -> List a -> List a =
-  \@a (n :: Int) (xs :: List a) ->
-    case le_int n 0 of
-    | False ->
-      case xs of
-      | Nil -> Nil @a
-      | Cons x xs -> Cons @a x (take.L1 @a (sub_int n 1) xs)
-    | True -> Nil @a
 replicate.L1 :: forall a. Int -> a -> List a =
   \@a (n :: Int) (x :: a) ->
     case le_int n 0 of
@@ -133,9 +103,11 @@ diff.L1 :: List Int -> List Int -> List Int =
           | False -> diff.L1 xs ys'
           | True -> diff.L1 xs' ys'
         | True -> Cons @Int x (diff.L1 xs' ys)
-ints.L1 :: (Int -> List Int) -> Int -> List Int =
-  \(go :: Int -> List Int) (k :: Int) ->
-    Cons @Int k (go (add_int k 1))
+range.L1 :: Int -> Int -> List Int =
+  \(m :: Int) (n :: Int) ->
+    case le_int m n of
+    | False -> Nil @Int
+    | True -> Cons @Int m (range.L1 (add_int m 1) n)
 solve_aux.L1 :: Int -> List Int -> Int -> List Int =
   \(k :: Int) (ls :: List Int) (i :: Int) ->
     diff.L1
@@ -144,15 +116,35 @@ solve_aux.L1 :: Int -> List Int -> Int -> List Int =
          @Int
          (sub_int k i)
          (Cons @Int k (Cons @Int (add_int k i) (Nil @Int))))
-solve_aux.L2 :: List (List Int) -> Int -> List (List Int) =
-  \(kss :: List (List Int)) (k :: Int) ->
+solve_aux.L2 :: List Int -> List (List Int) -> Int -> List (List Int) =
+  \(ints :: List Int) (kss :: List (List Int)) (k :: Int) ->
     functorList.map.L1
       @(List Int)
       @(List Int)
       (Cons @Int k)
-      (solve_aux
+      (solve_aux.L3
+         ints
          (zip_with.L1
             @(List Int) @Int @(List Int) (solve_aux.L1 k) kss ints))
+solve_aux.L3 :: List Int -> List (List Int) -> List (List Int) =
+  \(ints :: List Int) (kss :: List (List Int)) ->
+    case kss of
+    | Nil -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
+    | Cons ks kss ->
+      let monoid.m :: Monoid (List (List Int)) =
+            .Monoid
+              @(List (List Int))
+              (monoidList.empty @(List Int))
+              (monoidList.append.L1 @(List Int))
+      in
+      let f :: Int -> List (List Int) = solve_aux.L2 ints kss in
+      foldableList.foldr.L1
+        @Int
+        @(List (List Int))
+        (foldMap.L1 @Int @(List (List Int)) monoid.m f)
+        (case monoid.m of
+         | .Monoid empty _ -> empty)
+        ks
 main.L1 :: Int -> IO Unit =
   \(n :: Int) ->
     print
@@ -162,4 +154,5 @@ main.L1 :: Int -> IO Unit =
          @Int
          (foldMap.L1 @(List Int) @Int monoidInt f)
          monoidInt.empty
-         (solve_aux (replicate.L1 @(List Int) n (take.L1 @Int n ints))))
+         (let ints :: List Int = range.L1 1 n in
+          solve_aux.L3 ints (replicate.L1 @(List Int) n ints)))

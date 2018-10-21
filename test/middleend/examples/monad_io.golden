@@ -44,16 +44,13 @@ print :: Int -> IO Unit = io.L2 @Int @Unit puti
 input :: IO Int = coerce @(_ -> IO) (io.L1 @Unit @Int geti Unit)
 count_down :: Int -> IO Unit =
   \(k :: Int) ->
-    let p :: Bool = ge_int k 0 in
-    let m :: IO Unit =
-          let m1 :: IO Unit = print k in
-          let m2 :: IO Unit = count_down (sub_int k 1) in
-          let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
-          coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
-    in
-    case p of
+    case ge_int k 0 of
     | False -> coerce @(_ -> IO) (Pair @Unit @World Unit)
-    | True -> m
+    | True ->
+      let m1 :: IO Unit = print k in
+      let m2 :: IO Unit = count_down (sub_int k 1) in
+      let f :: Unit -> IO Unit = semi.L1 @Unit @IO m2 in
+      coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 main :: IO Unit =
   coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input main.L2)
 semi.L1 :: forall a m. m a -> Unit -> m a =
@@ -83,19 +80,16 @@ io.L2 :: forall a b. (a -> b) -> a -> IO b =
     coerce @(_ -> IO) (io.L1 @a @b f x)
 repeat.L1 :: forall m. Monad m -> Int -> m Unit -> m Unit =
   \@m (monad.m :: Monad m) (k :: Int) (m :: m Unit) ->
-    let p :: Bool = gt_int k 0 in
-    let m :: m Unit =
-          let m2 :: m Unit = repeat.L1 @m monad.m (sub_int k 1) m in
-          (case monad.m of
-           | .Monad _ _ bind -> bind)
-            @Unit @Unit m (semi.L1 @Unit @m m2)
-    in
-    case p of
+    case gt_int k 0 of
     | False ->
       (case monad.m of
        | .Monad _ pure _ -> pure)
         @Unit Unit
-    | True -> m
+    | True ->
+      let m2 :: m Unit = repeat.L1 @m monad.m (sub_int k 1) m in
+      (case monad.m of
+       | .Monad _ _ bind -> bind)
+        @Unit @Unit m (semi.L1 @Unit @m m2)
 main.L1 :: Int -> Int -> IO Unit =
   \(k :: Int) (n :: Int) -> repeat.L1 @IO monadIO k (count_down n)
 main.L2 :: Int -> IO Unit =

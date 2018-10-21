@@ -123,6 +123,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - directory
+    - filepath
     - hspec
     - HUnit
     - process

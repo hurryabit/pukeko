@@ -1,10 +1,13 @@
 import std2/io
 
+-- TODO: Get `when` working in ruceki.
 count_down :: Int -> IO Unit
-count_down k = when (k >= 0) (print k; count_down (k-1))
+-- count_down k = when (k >= 0) (print k; count_down (k-1))
+count_down k = if k >= 0 then print k; count_down (k-1) else pure Unit
 
 repeat :: (Monad m) => Int -> m Unit -> m Unit
-repeat k m = when (k > 0) (m; repeat (k-1) m)
+-- repeat k m = when (k > 0) (m; repeat (k-1) m)
+repeat k m = if k > 0 then m; repeat (k-1) m else pure Unit
 
 main :: IO Unit
 main =

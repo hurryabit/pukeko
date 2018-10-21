@@ -30,12 +30,16 @@ SOURCES     = monad_io.pu \
 							sort_gen.pu \
 							rmq_gen.pu
 ASSEMBLES   = $(SOURCES:.pu=.asm)
+BYTECODES   = $(SOURCES:.pu=.pub)
 OBJECTS     = $(SOURCES:.pu=.o) gc.o
 EXECUTABLES = $(SOURCES:.pu=)
 BENCHMARKS  = qsort.bench \
+							qsort.ruceki.bench \
 							tsort.bench \
 							isort.bench \
+							isort.ruceki.bench \
 							queens.bench \
+							queens.ruceki.bench \
 							catalan.bench
 
 all: $(EXECUTABLES)
@@ -43,16 +47,13 @@ all: $(EXECUTABLES)
 asm: $(ASSEMBLES)
 
 %.asm: %.pu std2/*.pu $(COMP)
-	$(COMP) $(OPTS) $<
-
-%.dot: %.pu std2/*.pu $(COMP)
-	$(COMP) $(OPTS) -g $<
-
-%.pdf: %.dot
-	dot -o $@ -Tpdf $<
+	$(COMP) compile $(OPTS) $<
 
 %.pp.asm: %.asm
 	$(NASM) -DNOATAT $(NASM_FLAGS) -E $< | grep '^ *[^% ]' > $@
+
+%.pub: %.pu std2/*.pu $(COMP)
+	$(COMP) bytecode $(OPTS) $<
 
 %.o: %.asm $(RUNTIME)
 	$(NASM) -DDEBUG $(NASM_FLAGS) -o $@ $<
@@ -64,7 +65,7 @@ gc.o: ../gc.c
 	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
 
 clean:
-	rm -f $(ASSEMBLES) $(OBJECTS) $(EXECUTABLES) *.in
+	rm -f $(ASSEMBLES) $(BYTECODES) $(OBJECTS) $(EXECUTABLES) *.in
 
 .PHONEY: all asm clean bench clean.bench
 
@@ -75,6 +76,9 @@ sort400.in: sort_gen
 
 sort20.in: sort_gen
 	echo 20000 | ./$< > $@
+
+sort2.in: sort_gen
+	echo 2000 | ./$< > $@
 
 qsort.bench: qsort sort400.in
 	$(BENCH) "./$< < sort400.in > /dev/null" > $@
@@ -88,9 +92,21 @@ isort.bench: isort sort20.in
 	$(BENCH) "./$< < sort20.in > /dev/null" > $@
 	./$< < sort20.in > /dev/null 2>> $@
 
+isort.ruceki.bench: isort.pub sort2.in
+	$(BENCH) "ruceki $< < sort2.in > /dev/null" > $@
+	ruceki $< < sort2.in > /dev/null 2>> $@
+
+qsort.ruceki.bench: qsort.pub sort20.in
+	$(BENCH) "ruceki $< < sort20.in > /dev/null" > $@
+	ruceki $< < sort20.in > /dev/null 2>> $@
+
 queens.bench: queens
 	$(BENCH) "echo 13 | ./$< > /dev/null" > $@
 	echo 13 | ./$< > /dev/null 2>> $@
+
+queens.ruceki.bench: queens.pub
+	$(BENCH) "echo 10 | ruceki $< > /dev/null" > $@
+	echo 10 | ruceki $< > /dev/null 2>> $@
 
 catalan.bench: catalan
 	$(BENCH) "echo 1666 | ./$< > /dev/null" > $@

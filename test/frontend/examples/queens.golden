@@ -370,13 +370,13 @@ diff :: List Int -> List Int -> List Int =
           | False -> diff xs ys'
           | True -> diff xs' ys'
         | True -> Cons @Int x (diff xs' ys)
-ints :: List Int =
-  let rec go :: Int -> List Int =
-            \(k :: Int) -> Cons @Int k (go (add @Int ringInt k 1))
-  in
-  go 1
-solve_aux :: List (List Int) -> List (List Int) =
-  \(kss :: List (List Int)) ->
+range :: Int -> Int -> List Int =
+  \(m :: Int) (n :: Int) ->
+    case le @Int ordInt m n of
+    | False -> Nil @Int
+    | True -> Cons @Int m (range (add @Int ringInt m 1) n)
+solve_aux :: List Int -> List (List Int) -> List (List Int) =
+  \(ints :: List Int) (kss :: List (List Int)) ->
     case kss of
     | Nil -> Cons @(List Int) (Nil @Int) (Nil @(List Int))
     | Cons ks kss ->
@@ -394,6 +394,7 @@ solve_aux :: List (List Int) -> List (List Int) =
              @(List Int)
              (Cons @Int k)
              (solve_aux
+                ints
                 (zip_with
                    @(List Int)
                    @Int
@@ -410,7 +411,8 @@ solve_aux :: List (List Int) -> List (List Int) =
         ks
 solve :: Int -> List (List Int) =
   \(n :: Int) ->
-    solve_aux (replicate @(List Int) n (take @Int n ints))
+    let ints :: List Int = range 1 n in
+    solve_aux ints (replicate @(List Int) n ints)
 main :: IO Unit =
   bind
     @IO

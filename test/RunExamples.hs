@@ -3,22 +3,41 @@ module RunExamples where
 
 import Pukeko.Prelude hiding (assert, run)
 
+import Data.IORef
 import System.Directory (setCurrentDirectory)
 import System.Exit (ExitCode (..))
+import System.FilePath
 import System.Process (readProcess, readProcessWithExitCode)
+import System.IO.Unsafe
 import Test.Hspec
+import Test.Hspec.QuickCheck
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
+
+data Mode = Native | Ruceki
+
+modeRef :: IORef Mode
+modeRef = unsafePerformIO $ newIORef Native
+{-# NOINLINE modeRef #-}
+
+getMode :: IO Mode
+getMode = readIORef modeRef
 
 format :: [Int] -> String
 format = unlines . map show
 
 runProg :: FilePath -> String -> IO (ExitCode, String)
 runProg prog input = do
-  (exitCode, stdout, _) <- readProcessWithExitCode ("./" ++ prog) [] input
+  mode <- getMode
+  let (cmd, args) = case mode of
+        Native -> ("." </> prog, [])
+        Ruceki -> ("ruceki", [prog <.> "pub"])
+  (exitCode, stdout, _) <- readProcessWithExitCode cmd args input
   return (exitCode, stdout)
 
-build prog = void (readProcess "make" [prog] "")
+build prog = getMode >>= \case
+  Native -> void (readProcess "make" [prog] "")
+  Ruceki -> void (readProcess "make" [prog <.> "pub"] "")
 
 specifyProg name = beforeAll_ (build name) . specify name
 
@@ -111,20 +130,33 @@ prop_rmq_correct prog = monadicIO $ do
 
 main :: IO ()
 main = hspec $ beforeAll_ (setCurrentDirectory "examples") $ do
-  describe "test basics" $ do
-    testText    "hello" "" "Hello World!\n"
-    testText    "rev" "abc" "cba"
-    testNumeric "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
-    testNumeric "wildcard" [7, 13] [7, 13]
-    testNumeric "fix"      (10:[1 .. 10]) [2, 4 .. 20]
-  describe "test sorting" $ mapM_ testSort
-    [ "isort"
-    , "qsort"
-    , "tsort"
-    ]
-  describe "test number theory/combinatorics" $ do
-    testFunction "fibs"    1000 spec_fibs
-    testFunction "catalan"  100 spec_catalan
-    testNumeric  "queens"   [8] [92]
-    testFunction "primes"   100 spec_primes
-    specifyProg "rmq" (prop_rmq_correct "rmq")
+  describe "native" $ do
+    describe "test basics" $ do
+      testText    "hello" "" "Hello World!\n"
+      testText    "rev" "abc" "cba"
+      testNumeric "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
+      testNumeric "wildcard" [7, 13] [7, 13]
+      testNumeric "fix"      (10:[1 .. 10]) [2, 4 .. 20]
+    describe "test sorting" $ mapM_ testSort
+      [ "isort"
+      , "qsort"
+      , "tsort"
+      ]
+    describe "test number theory/combinatorics" $ do
+      testFunction "fibs"    1000 spec_fibs
+      testFunction "catalan"  100 spec_catalan
+      testNumeric  "queens"   [8] [92]
+      testFunction "primes"   100 spec_primes
+      specifyProg "rmq" (prop_rmq_correct "rmq")
+  beforeAll_ (writeIORef modeRef Ruceki) $ describe "interpreted" $ do
+    describe "test basics" $ do
+      testText    "hello" "" "Hello World!\n"
+      testText    "rev" "abc" "cba"
+      testNumeric "monad_io" [3, 2]  (concat $ replicate 3 [2, 1, 0])
+      testNumeric "wildcard" [7, 13] [7, 13]
+    describe "test sorting" $ modifyMaxSuccess (const 10) $ mapM_ testSort
+      [ "isort"
+      , "qsort"
+      ]
+    describe "test number theory/combinatorics" $ do
+      testNumeric  "queens"   [8] [92]
