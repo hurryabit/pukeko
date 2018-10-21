@@ -47,13 +47,13 @@ all: $(EXECUTABLES)
 asm: $(ASSEMBLES)
 
 %.asm: %.pu std2/*.pu $(COMP)
-	$(COMP) compile $(OPTS) $<
+	$(COMP) compile $(OPTS) -o $@ $<
 
 %.pp.asm: %.asm
 	$(NASM) -DNOATAT $(NASM_FLAGS) -E $< | grep '^ *[^% ]' > $@
 
 %.pub: %.pu std2/*.pu $(COMP)
-	$(COMP) bytecode $(OPTS) $<
+	$(COMP) bytecode $(OPTS) -o $@ $<
 
 %.o: %.asm $(RUNTIME)
 	$(NASM) -DDEBUG $(NASM_FLAGS) -o $@ $<
