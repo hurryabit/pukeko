@@ -4,10 +4,9 @@ import Pukeko.Prelude
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as Aeson
-import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy.Char8 as BS
 import           Options.Applicative hiding (renderFailure)
 import           System.Exit
-import           System.FilePath ((-<.>), (<.>))
 
 import           Pukeko.AST.Name
 import qualified Pukeko.BackEnd as BackEnd
@@ -19,18 +18,24 @@ import           Pukeko.Pretty
 type CompilerM = Eff [Error Failure, NameSource, IO]
 
 data Options = Options
-  { optUnsafe :: Bool
+  { optInfile :: FilePath
+  , optOutfile :: Maybe FilePath
+  , optUnsafe :: Bool
   , optDetailed :: Bool
   }
 
-writeFilePretty :: Pretty a => Options -> FilePath -> a -> CompilerM ()
-writeFilePretty opts file x =
-  sendM $ writeFile file (render (optDetailed opts) (pretty x) ++ "\n")
+writeFileString :: Options -> String -> CompilerM ()
+writeFileString opts x =
+  sendM $ maybe putStr writeFile (optOutfile opts) x
 
-writeFileJSON :: Aeson.ToJSON a => FilePath -> a -> CompilerM ()
-writeFileJSON file x = do
+writeFilePretty :: Pretty a => Options -> a -> CompilerM ()
+writeFilePretty opts x = writeFileString opts $ render (optDetailed opts) (pretty x) ++ "\n"
+
+writeFileJSON :: Aeson.ToJSON a => Options -> a -> CompilerM ()
+writeFileJSON opts x = do
   let config = Aeson.defConfig{Aeson.confIndent = Aeson.Spaces 2}
-  sendM $ BS.writeFile file (Aeson.encodePretty' config (Aeson.toJSON x))
+  sendM $ maybe BS.putStrLn BS.writeFile (optOutfile opts) $
+    Aeson.encodePretty' config (Aeson.toJSON x)
 
 runCompilerM :: CompilerM () -> IO ()
 runCompilerM act =
@@ -40,42 +45,50 @@ runCompilerM act =
       exitWith (ExitFailure 1)
     Right () -> exitSuccess
 
-frontEnd :: Options -> FilePath -> CompilerM FrontEnd.Module
-frontEnd opts file = do
-  package <- Parser.parsePackage file
+frontEnd :: Options -> CompilerM FrontEnd.Module
+frontEnd opts = do
+  package <- Parser.parsePackage (optInfile opts)
   FrontEnd.run (optUnsafe opts) package
 
-middleEnd :: Options -> [MiddleEnd.Optimization] -> FilePath -> CompilerM MiddleEnd.Module
-middleEnd opts optims file = do
-  module_sf <- frontEnd opts file
+middleEnd :: Options -> [MiddleEnd.Optimization] -> CompilerM MiddleEnd.Module
+middleEnd opts optims = do
+  module_sf <- frontEnd opts
   let cfg = MiddleEnd.Config optims (not (optUnsafe opts))
   MiddleEnd.run cfg module_sf
 
 
-check :: Options -> FilePath -> IO ()
-check opts file = runCompilerM $
-  frontEnd opts file >>= writeFilePretty opts (file -<.> "put")
+check :: Options -> IO ()
+check opts = runCompilerM $
+  frontEnd opts >>= writeFilePretty opts
 
-core :: Options -> [MiddleEnd.Optimization] -> FilePath -> IO ()
-core opts optims file = runCompilerM $
-  middleEnd opts optims file >>= writeFilePretty opts (file -<.> "puc") . fst
+core :: Options -> [MiddleEnd.Optimization] -> IO ()
+core opts optims = runCompilerM $
+  middleEnd opts optims >>= writeFilePretty opts . fst
 
-bytecode :: Options -> [MiddleEnd.Optimization] -> FilePath -> IO ()
-bytecode opts optims file = runCompilerM $ do
-  module_bc <- snd <$> middleEnd opts optims file
+bytecode :: Options -> [MiddleEnd.Optimization] -> IO ()
+bytecode opts optims = runCompilerM $ do
+  module_bc <- snd <$> middleEnd opts optims
   if optDetailed opts
-    then writeFilePretty opts (file -<.> "pub" <.> "txt") module_bc
-    else writeFileJSON (file -<.> "pub") module_bc
+    then writeFilePretty opts module_bc
+    else writeFileJSON opts module_bc
 
-compile :: Options -> [MiddleEnd.Optimization] -> String -> IO ()
-compile opts optims file = runCompilerM $ do
-  module_bc <- snd <$> middleEnd opts optims file
+compile :: Options -> [MiddleEnd.Optimization] -> IO ()
+compile opts optims = runCompilerM $ do
+  module_bc <- snd <$> middleEnd opts optims
   nasm <- BackEnd.run module_bc
-  sendM $ writeFile (file -<.> "asm") nasm
+  writeFileString opts nasm
 
 options :: Parser Options
 options = Options
-  <$> switch (long "unsafe" <> help "Don't run the type checker")
+  <$> strArgument
+      (  metavar "INFILE"
+      <> help "Read input from INFILE")
+  <*> optional (strOption
+      (  long "output"
+      <> short 'o'
+      <> metavar "OUTFILE"
+      <> help "Write output to OUTFILE" ))
+  <*> switch (long "unsafe" <> help "Don't run the type checker")
   <*> switch (long "detailed" <> help "Render output in detailed mode")
 
 optimizations :: Parser [MiddleEnd.Optimization]
@@ -93,13 +106,11 @@ optimizations =
 
 cmds :: Parser (IO ())
 cmds = hsubparser $ mconcat
-  [ command "check"    (info (check    <$> options <*>                   pukekoFile) idm)
-  , command "core"     (info (core     <$> options <*> optimizations <*> pukekoFile) idm)
-  , command "bytecode" (info (bytecode <$> options <*> optimizations <*> pukekoFile) idm)
-  , command "compile"  (info (compile  <$> options <*> optimizations <*> pukekoFile) idm)
+  [ command "check"    (info (check    <$> options                  ) idm)
+  , command "core"     (info (core     <$> options <*> optimizations) idm)
+  , command "bytecode" (info (bytecode <$> options <*> optimizations) idm)
+  , command "compile"  (info (compile  <$> options <*> optimizations) idm)
   ]
-  where
-    pukekoFile = argument str (metavar "PUKEKO-FILE")
 
 main :: IO ()
 main = join $ execParser (info (cmds <**> helper) idm)
