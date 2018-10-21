@@ -349,20 +349,18 @@ getChar :: IO (Option Char) =
     Unit
 count_down :: Int -> IO Unit =
   \(k :: Int) ->
-    when
-      @IO
-      monadIO
-      (ge @Int ordInt k 0)
-      (semi
-         @Unit @IO monadIO (print k) (count_down (sub @Int ringInt k 1)))
+    case ge @Int ordInt k 0 of
+    | False -> pure @IO monadIO @Unit Unit
+    | True ->
+      semi
+        @Unit @IO monadIO (print k) (count_down (sub @Int ringInt k 1))
 repeat :: forall m. Monad m -> Int -> m Unit -> m Unit =
   \@m (monad.m :: Monad m) (k :: Int) (m :: m Unit) ->
-    when
-      @m
-      monad.m
-      (gt @Int ordInt k 0)
-      (semi
-         @Unit @m monad.m m (repeat @m monad.m (sub @Int ringInt k 1) m))
+    case gt @Int ordInt k 0 of
+    | False -> pure @m monad.m @Unit Unit
+    | True ->
+      semi
+        @Unit @m monad.m m (repeat @m monad.m (sub @Int ringInt k 1) m)
 main :: IO Unit =
   bind
     @IO

@@ -1,0 +1,10 @@
+benchmarking ruceki qsort.pub < sort20.in > /dev/null
+time                 3.889 s    (2.782 s .. 4.480 s)
+                     0.991 R²   (0.973 R² .. 1.000 R²)
+mean                 4.282 s    (4.016 s .. 4.419 s)
+std dev              230.5 ms   (0.0 s .. 237.6 ms)
+variance introduced by outliers: 19% (moderately inflated)
+
+Loaded!
+==========
+Steps: 35763877

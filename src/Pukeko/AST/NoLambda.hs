@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Pukeko.AST.NoLambda
   ( Name (..)
   , Module
@@ -12,8 +13,9 @@ module Pukeko.AST.NoLambda
 where
 
 import Pukeko.Prelude
-
 import Pukeko.Pretty
+
+import Data.Aeson.TH
 
 newtype Name = MkName{unName :: String}
   deriving (Eq, Ord)
@@ -112,5 +114,14 @@ instance Pretty TopLevel where
       (pretty _body)
     Asm{_name} -> "asm" <+> pretty _name
 
+instance Pretty Module where
+  pretty = vcatMap pretty
+
 instance Show Name where
   show (MkName x) = x
+
+$(deriveJSON serdeJsonOptions ''Name)
+$(deriveJSON serdeJsonOptions ''Expr)
+$(deriveJSON serdeJsonOptions ''Defn)
+$(deriveJSON serdeJsonOptions ''Altn)
+$(deriveJSON serdeJsonOptions ''TopLevel)
