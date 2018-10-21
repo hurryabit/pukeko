@@ -40,7 +40,8 @@ infoExpr expr = case expr of
   Pack{_tag, _arity}   -> constructor _tag _arity
   Num{}                -> mempty
   Ap{_fun, _args}      -> foldMap infoExpr (_fun : _args)
-  Let{_defns, _body}   -> foldMap infoDefn _defns <> infoExpr _body
+  Let{_defn, _body} -> infoDefn _defn <> infoExpr _body
+  LetRec{_defns, _body} -> foldMap infoDefn _defns <> infoExpr _body
   Match{_expr, _altns} -> infoExpr _expr <> foldMap infoAltn _altns
 
 infoDefn :: Defn -> Info
