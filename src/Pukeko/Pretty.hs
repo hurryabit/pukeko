@@ -20,6 +20,7 @@ module Pukeko.Pretty
   , ($$)
   , ($+$)
   , braces
+  , brackets
   , doubleQuotes
   , hang
   , isEmpty

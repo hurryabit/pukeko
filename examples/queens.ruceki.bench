@@ -1,8 +1,8 @@
 benchmarking echo 10 | ruceki queens.pub > /dev/null
-time                 2.886 s    (2.795 s .. 2.975 s)
-                     1.000 R²   (1.000 R² .. NaN R²)
-mean                 2.898 s    (2.887 s .. 2.908 s)
-std dev              17.10 ms   (0.0 s .. 17.70 ms)
+time                 1.626 s    (1.542 s .. 1.673 s)
+                     1.000 R²   (0.999 R² .. 1.000 R²)
+mean                 1.644 s    (1.628 s .. 1.654 s)
+std dev              14.84 ms   (0.0 s .. 16.62 ms)
 variance introduced by outliers: 19% (moderately inflated)
 
 Loaded!

@@ -21,7 +21,7 @@ newtype Name = MkName{unName :: String}
   deriving (Eq, Ord)
 
 data Expr
-  = Local   {_name :: Name}
+  = Local   {_name :: Name, _idx :: Int}
   | Global  {_name :: Name}
   | External{_name :: Name}
   | Pack    {_tag, _arity :: Int}
@@ -72,7 +72,7 @@ instance Pretty Expr
 instance PrettyPrec Expr where
   prettyPrec prec expr =
     case expr of
-      Local{_name} -> pretty _name
+      Local{_name, _idx} -> pretty _name <> brackets (pretty _idx)
       Global{_name} -> "@" <> pretty _name
       External{_name} -> "$" <> pretty _name
       Pack{ _tag, _arity } -> "Pack" <> braces (pretty _tag <> "," <> pretty _arity)
