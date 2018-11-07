@@ -114,3 +114,65 @@ sols.L2 :: List Int -> Int -> List Int =
   \(xs :: List Int) (x :: Int) -> Cons @Int x xs
 main.L1 :: Int -> IO Unit =
   \(n :: Int) -> print (nth_exn.L1 @Int sols n)
+================================================================================
+asm abort
+asm le
+asm add
+asm sub
+asm mul
+asm mod
+asm seq
+asm puti
+asm geti
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let p = 100000007
+let sum_p = @foldableList.foldl.L1 @add_p.L1 0
+let sols =
+  Pack{1,2} 1 (@functorList.map.L1 @sols.L1 let rec scanl_f =
+                                                      @scanl.L1 @sols.L2 scanl_f[1]
+                                            in
+                                            scanl_f[1] Pack{0,0} @sols)
+let main = @monadIO.bind.L1 @input @main.L1
+let functorList.map.L1 f xs =
+  match xs[1] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    Pack{1,2} (f[4] x[2]) (@functorList.map.L1 f[4] xs[1])
+let foldableList.foldl.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> @foldableList.foldl.L1 f[5] (f[5] y0[4] x[2]) xs[1]
+let nth_exn.L1 xs n =
+  match xs[2] with
+  | {0} -> $abort
+  | {1} x xs ->
+    match $le n[3] 0 with
+    | {0} -> @nth_exn.L1 xs[1] ($sub n[3] 1)
+    | {1} -> x[2]
+let zip_with.L1 f xs ys =
+  match xs[2] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    match ys[3] with
+    | {0} -> Pack{0,0}
+    | {1} y ys ->
+      Pack{1,2} (f[7] x[4] y[2]) (@zip_with.L1 f[7] xs[3] ys[1])
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let mul_p.L1 x y = $mod ($mul x[2] y[1]) @p
+let add_p.L1 x y = $mod ($add x[2] y[1]) @p
+let scanl.L1 f scanl_f y0 xs =
+  match xs[1] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    let y0 = f[6] y0[4] x[2] in
+    Pack{1,2} y0[1] (scanl_f[6] y0[1] xs[2])
+let sols.L1 xs = @sum_p (@zip_with.L1 @mul_p.L1 @sols xs[1])
+let sols.L2 xs x = Pack{1,2} x[1] xs[2]
+let main.L1 n = @print (@nth_exn.L1 @sols n[1])

@@ -2,3 +2,8 @@ external add :: Int -> Int -> Int = "add"
 main :: Int =
   let d :: Int = add 2 2 in
   1
+================================================================================
+asm add
+let main =
+  let d = $add 2 2 in
+  1

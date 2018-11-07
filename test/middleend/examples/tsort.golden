@@ -169,3 +169,94 @@ main.L2 :: Int -> IO Unit =
           sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
     in
     coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx main.L1)
+================================================================================
+asm eq
+asm lt
+asm le
+asm ge
+asm gt
+asm sub
+asm seq
+asm puti
+asm geti
+let eqInt = Pack{0,1} $eq
+let ordInt = Pack{0,5} @eqInt $ge $gt $le $lt
+let functorIO = Pack{0,1} @functorIO.map.L2
+let monadIO =
+  Pack{0,3} @functorIO @monadIO.pure.L2 @monadIO.bind.L2
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let main = @monadIO.bind.L1 @input @main.L2
+let foldableList.foldr.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> f[5] x[2] (@foldableList.foldr.L1 f[5] y0[4] xs[1])
+let foldableList.foldl.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> @foldableList.foldl.L1 f[5] (f[5] y0[4] x[2]) xs[1]
+let replicate.L1 n x =
+  match $le n[2] 0 with
+  | {0} -> Pack{1,2} x[1] (@replicate.L1 ($sub n[2] 1) x[1])
+  | {1} -> Pack{0,0}
+let semi.L1 m2 x = m2[2]
+let semi.L2 monad.m m1 m2 =
+  (match monad.m[3] with
+   | {0} _ _ bind -> bind[1]) m1[2] (@semi.L1 m2[1])
+let sequence.L1 monad.m x xs =
+  (match monad.m[3] with
+   | {0} _ pure _ -> pure[2]) (Pack{1,2} x[2] xs[1])
+let sequence.L2 monad.m ms x =
+  (match monad.m[3] with
+   | {0} _ _ bind ->
+     bind[1]) (@sequence.L3 monad.m[3] ms[2]) (@sequence.L1 monad.m[3] x[1])
+let sequence.L3 monad.m ms =
+  match ms[1] with
+  | {0} ->
+    (match monad.m[2] with
+     | {0} _ pure _ -> pure[2]) Pack{0,0}
+  | {1} m ms ->
+    (match monad.m[4] with
+     | {0} _ _ bind -> bind[1]) m[2] (@sequence.L2 monad.m[4] ms[1])
+let traverse_.L1 monad.m f x = @semi.L2 monad.m[3] (f[2] x[1])
+let functorIO.map.L1 f mx world0 =
+  match mx[2] world0[1] with
+  | {0} x world1 -> Pack{0,2} (f[5] x[2]) world1[1]
+let functorIO.map.L2 f mx = @functorIO.map.L1 f[2] mx[1]
+let monadIO.pure.L2 x = Pack{0,2} x[1]
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let monadIO.bind.L2 mx f = @monadIO.bind.L1 mx[2] f[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let foldableBinTree.foldr.L1 f y0 t =
+  match t[1] with
+  | {0} -> y0[2]
+  | {1} l x r ->
+    @foldableBinTree.foldr.L1 f[6] (f[6] x[2] (@foldableBinTree.foldr.L1 f[6] y0[5] r[1])) l[3]
+let bag_insert.L1 insert ord._14 x t =
+  match t[1] with
+  | {0} -> Pack{1,3} Pack{0,0} x[2] Pack{0,0}
+  | {1} l y r ->
+    match (match ord._14[6] with
+           | {0} _ _ _ _ lt -> lt[1]) x[5] y[2] with
+    | {0} -> Pack{1,3} l[3] y[2] (insert[7] ord._14[6] x[5] r[1])
+    | {1} -> Pack{1,3} (insert[7] ord._14[6] x[5] l[3]) y[2] r[1]
+let tsort.L1 s x =
+  let rec insert = @bag_insert.L1 insert[1] in
+  insert[1] @ordInt x[2] s[3]
+let main.L1 xs =
+  @foldableList.foldr.L1 (@traverse_.L1 @monadIO @print) (Pack{0,2} Pack{0,0}) let f =
+                                                                                     Pack{1,2}
+                                                                               in
+                                                                               let y0 = Pack{0,0} in
+                                                                               let bag =
+                                                                                     @foldableList.foldl.L1 @tsort.L1 Pack{0,0} xs[3]
+                                                                               in
+                                                                               @foldableBinTree.foldr.L1 f[3] y0[2] bag[1]
+let main.L2 n =
+  let mx = @sequence.L3 @monadIO (@replicate.L1 n[1] @input) in
+  @monadIO.bind.L1 mx[1] @main.L1

@@ -145,3 +145,86 @@ sieve.L1 :: Int -> Int -> Bool =
     | True -> False
 main.L1 :: Int -> IO Unit =
   \(n :: Int) -> print (nth_exn.L1 @Int primes n)
+================================================================================
+asm abort
+asm eq
+asm le
+asm neg
+asm add
+asm sub
+asm mul
+asm mod
+asm seq
+asm puti
+asm geti
+let ringInt = Pack{0,4} $neg $add $sub $mul
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let psums =
+  let rec psums0 = @psums.L1 psums0[1] in
+  psums0[1] @ringInt 0
+let sieve ks =
+  match ks[1] with
+  | {0} -> $abort
+  | {1} p ks ->
+    Pack{1,2} p[2] (@sieve let p = @sieve.L1 p[2] in
+                           let rec filter_p = @filter.L1 p[2] filter_p[1] in
+                           filter_p[1] ks[3])
+let primes =
+  Pack{1,2} 2 (Pack{1,2} 3 (@sieve (@psums (Pack{1,2} 5 let xs =
+                                                              Pack{1,2} 2 (Pack{1,2} 4 Pack{0,0})
+                                                        in
+                                                        let rec ys =
+                                                                  let dict =
+                                                                        Pack{0,2} @monoidList.empty @monoidList.append.L1
+                                                                  in
+                                                                  (match dict[1] with
+                                                                   | {0} _ append ->
+                                                                     append[1]) xs[3] ys[2]
+                                                        in
+                                                        ys[1]))))
+let main = @monadIO.bind.L1 @input @main.L1
+let monoidList.empty = Pack{0,0}
+let monoidList.append.L1 xs ys =
+  @foldableList.foldr.L1 Pack{1,2} ys[1] xs[2]
+let foldableList.foldr.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> f[5] x[2] (@foldableList.foldr.L1 f[5] y0[4] xs[1])
+let nth_exn.L1 xs n =
+  match xs[2] with
+  | {0} -> $abort
+  | {1} x xs ->
+    match $le n[3] 0 with
+    | {0} -> @nth_exn.L1 xs[1] ($sub n[3] 1)
+    | {1} -> x[2]
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let psums.L1 psums0 ring._10 n xs =
+  match xs[1] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    let y =
+          (match ring._10[5] with
+           | {0} _ add _ _ -> add[3]) x[2] n[4]
+    in
+    Pack{1,2} y[1] (psums0[7] ring._10[6] y[1] xs[2])
+let filter.L1 p filter_p xs =
+  match xs[1] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    let ys = filter_p[4] xs[1] in
+    match p[6] x[3] with
+    | {0} -> ys[1]
+    | {1} -> Pack{1,2} x[3] ys[1]
+let sieve.L1 p k =
+  let x = $mod k[1] p[2] in
+  match $eq x[1] 0 with
+  | {0} -> Pack{1,0}
+  | {1} -> Pack{0,0}
+let main.L1 n = @print (@nth_exn.L1 @primes n[1])
