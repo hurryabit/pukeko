@@ -156,3 +156,87 @@ main.L1 :: Int -> IO Unit =
          monoidInt.empty
          (let ints :: List Int = range.L1 1 n in
           solve_aux.L3 ints (replicate.L1 @(List Int) n ints)))
+================================================================================
+asm eq
+asm lt
+asm le
+asm add
+asm sub
+asm seq
+asm puti
+asm geti
+let monoidInt = Pack{0,2} @monoidInt.empty $add
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let main = @monadIO.bind.L1 @input @main.L1
+let monoidInt.empty = 0
+let monoidList.empty = Pack{0,0}
+let foldMap.L1 monoid.m f x =
+  (match monoid.m[3] with
+   | {0} _ append -> append[1]) (f[2] x[1])
+let length.L1 x = 1
+let monoidList.append.L1 xs ys =
+  @foldableList.foldr.L1 Pack{1,2} ys[1] xs[2]
+let functorList.map.L1 f xs =
+  match xs[1] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    Pack{1,2} (f[4] x[2]) (@functorList.map.L1 f[4] xs[1])
+let foldableList.foldr.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> f[5] x[2] (@foldableList.foldr.L1 f[5] y0[4] xs[1])
+let replicate.L1 n x =
+  match $le n[2] 0 with
+  | {0} -> Pack{1,2} x[1] (@replicate.L1 ($sub n[2] 1) x[1])
+  | {1} -> Pack{0,0}
+let zip_with.L1 f xs ys =
+  match xs[2] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    match ys[3] with
+    | {0} -> Pack{0,0}
+    | {1} y ys ->
+      Pack{1,2} (f[7] x[4] y[2]) (@zip_with.L1 f[7] xs[3] ys[1])
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let diff.L1 xs ys =
+  match xs[2] with
+  | {0} -> Pack{0,0}
+  | {1} x xs' ->
+    match ys[3] with
+    | {0} -> xs[4]
+    | {1} y ys' ->
+      match $lt x[4] y[2] with
+      | {0} ->
+        match $eq x[4] y[2] with
+        | {0} -> @diff.L1 xs[6] ys'[1]
+        | {1} -> @diff.L1 xs'[3] ys'[1]
+      | {1} -> Pack{1,2} x[4] (@diff.L1 xs'[3] ys[5])
+let range.L1 m n =
+  match $le m[2] n[1] with
+  | {0} -> Pack{0,0}
+  | {1} -> Pack{1,2} m[2] (@range.L1 ($add m[2] 1) n[1])
+let solve_aux.L1 k ls i =
+  @diff.L1 ls[2] (Pack{1,2} ($sub k[3] i[1]) (Pack{1,2} k[3] (Pack{1,2} ($add k[3] i[1]) Pack{0,0})))
+let solve_aux.L2 ints kss k =
+  @functorList.map.L1 (Pack{1,2} k[1]) (@solve_aux.L3 ints[3] (@zip_with.L1 (@solve_aux.L1 k[1]) kss[2] ints[3]))
+let solve_aux.L3 ints kss =
+  match kss[1] with
+  | {0} -> Pack{1,2} Pack{0,0} Pack{0,0}
+  | {1} ks kss ->
+    let monoid.m = Pack{0,2} @monoidList.empty @monoidList.append.L1 in
+    let f = @solve_aux.L2 ints[5] kss[2] in
+    @foldableList.foldr.L1 (@foldMap.L1 monoid.m[2] f[1]) (match monoid.m[2] with
+                                                           | {0} empty _ -> empty[2]) ks[4]
+let main.L1 n =
+  @print let f = @length.L1 in
+         @foldableList.foldr.L1 (@foldMap.L1 @monoidInt f[1]) @monoidInt.empty let ints =
+                                                                                     @range.L1 1 n[2]
+                                                                               in
+                                                                               @solve_aux.L3 ints[1] (@replicate.L1 n[3] ints[1])

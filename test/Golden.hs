@@ -39,7 +39,8 @@ middleEndTest golden file = goldenVsStringDiff file diffCmd (golden file) $ do
     >>= MiddleEnd.run MiddleEnd.defaultConfig
   let text = case module0 of
         Left err           -> renderFailure err
-        Right (module1, _) -> render False (pretty module1)
+        Right (module1, module2) ->
+          render False (pretty module1 $$ pretty (replicate 80 '=') $$ pretty module2)
   pure (BSL.pack text <> "\n")
 
 backEndTest :: (FilePath -> FilePath) -> FilePath -> TestTree

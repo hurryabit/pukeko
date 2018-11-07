@@ -188,3 +188,121 @@ main.L1 :: Int -> Int -> Int -> IO Unit =
       coerce @(_ -> IO) (monadIO.bind.L1 @Unit @Unit m1 f)
 main.L2 :: List Unit -> IO Unit =
   \(x :: List Unit) -> coerce @(_ -> IO) (Pair @Unit @World Unit)
+================================================================================
+asm lt
+asm le
+asm sub
+asm mul
+asm mod
+asm seq
+asm puti
+let functorIO = Pack{0,1} @functorIO.map.L2
+let monadIO =
+  Pack{0,3} @functorIO @monadIO.pure.L2 @monadIO.bind.L2
+let print = @io.L2 $puti
+let random = @gen.L1 @random.L1 1
+let main =
+  let m1 = @print 400000 in
+  let m2 =
+        let m1 = @print 100000 in
+        let m2 =
+              match @split_at.L1 400000 @random with
+              | {0} xs random ->
+                let m1 =
+                      @foldableList.foldr.L1 (@traverse_.L1 @monadIO @print) (Pack{0,2} Pack{0,0}) xs[2]
+                in
+                let m2 =
+                      match @split_at.L1 100000 random[2] with
+                      | {0} ys random ->
+                        let zs = @take.L1 100000 random[1] in
+                        let mx =
+                              @sequence.L3 @monadIO (@zip_with.L1 (@main.L1 400000) ys[3] zs[1])
+                        in
+                        @monadIO.bind.L1 mx[1] @main.L2
+                in
+                let f = @semi.L1 m2[1] in
+                @monadIO.bind.L1 m1[3] f[1]
+        in
+        let f = @semi.L1 m2[1] in
+        @monadIO.bind.L1 m1[3] f[1]
+  in
+  let f = @semi.L1 m2[1] in
+  @monadIO.bind.L1 m1[3] f[1]
+let foldableList.foldr.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> f[5] x[2] (@foldableList.foldr.L1 f[5] y0[4] xs[1])
+let take.L1 n xs =
+  match $le n[2] 0 with
+  | {0} ->
+    match xs[1] with
+    | {0} -> Pack{0,0}
+    | {1} x xs -> Pack{1,2} x[2] (@take.L1 ($sub n[4] 1) xs[1])
+  | {1} -> Pack{0,0}
+let zip_with.L1 f xs ys =
+  match xs[2] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    match ys[3] with
+    | {0} -> Pack{0,0}
+    | {1} y ys ->
+      Pack{1,2} (f[7] x[4] y[2]) (@zip_with.L1 f[7] xs[3] ys[1])
+let semi.L1 m2 x = m2[2]
+let semi.L2 monad.m m1 m2 =
+  (match monad.m[3] with
+   | {0} _ _ bind -> bind[1]) m1[2] (@semi.L1 m2[1])
+let sequence.L1 monad.m x xs =
+  (match monad.m[3] with
+   | {0} _ pure _ -> pure[2]) (Pack{1,2} x[2] xs[1])
+let sequence.L2 monad.m ms x =
+  (match monad.m[3] with
+   | {0} _ _ bind ->
+     bind[1]) (@sequence.L3 monad.m[3] ms[2]) (@sequence.L1 monad.m[3] x[1])
+let sequence.L3 monad.m ms =
+  match ms[1] with
+  | {0} ->
+    (match monad.m[2] with
+     | {0} _ pure _ -> pure[2]) Pack{0,0}
+  | {1} m ms ->
+    (match monad.m[4] with
+     | {0} _ _ bind -> bind[1]) m[2] (@sequence.L2 monad.m[4] ms[1])
+let traverse_.L1 monad.m f x = @semi.L2 monad.m[3] (f[2] x[1])
+let functorIO.map.L1 f mx world0 =
+  match mx[2] world0[1] with
+  | {0} x world1 -> Pack{0,2} (f[5] x[2]) world1[1]
+let functorIO.map.L2 f mx = @functorIO.map.L1 f[2] mx[1]
+let monadIO.pure.L2 x = Pack{0,2} x[1]
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let monadIO.bind.L2 mx f = @monadIO.bind.L1 mx[2] f[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let gen.L1 f x = Pack{1,2} x[1] (@gen.L1 f[2] (f[2] x[1]))
+let split_at.L1 n xs =
+  match $le n[2] 0 with
+  | {0} ->
+    match xs[1] with
+    | {0} -> Pack{0,2} Pack{0,0} Pack{0,0}
+    | {1} x xs ->
+      match @split_at.L1 ($sub n[4] 1) xs[1] with
+      | {0} ys zs -> Pack{0,2} (Pack{1,2} x[4] ys[2]) zs[1]
+  | {1} -> Pack{0,2} Pack{0,0} xs[1]
+let random.L1 x = $mod ($mul 91 x[1]) 1000000007
+let main.L1 n y z =
+  let y = $mod y[2] n[3] in
+  let z = $mod z[2] n[4] in
+  match $lt y[2] z[1] with
+  | {0} ->
+    let m1 = @print z[1] in
+    let m2 = @print y[3] in
+    let f = @semi.L1 m2[1] in
+    @monadIO.bind.L1 m1[3] f[1]
+  | {1} ->
+    let m1 = @print y[2] in
+    let m2 = @print z[2] in
+    let f = @semi.L1 m2[1] in
+    @monadIO.bind.L1 m1[3] f[1]
+let main.L2 x = Pack{0,2} Pack{0,0}

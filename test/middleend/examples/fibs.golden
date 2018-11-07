@@ -84,3 +84,48 @@ add_mod_prime.L1 :: Int -> Int -> Int =
     | True -> z
 main.L1 :: Int -> IO Unit =
   \(n :: Int) -> print (nth_exn.L1 @Int fibs0 n)
+================================================================================
+asm abort
+asm lt
+asm le
+asm add
+asm sub
+asm mul
+asm seq
+asm puti
+asm geti
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let prime = $add ($mul 1000000 1000000) 39
+let fibs0 = Pack{1,2} 0 @fibs1
+let fibs1 =
+  Pack{1,2} 1 (@zip_with.L1 @add_mod_prime.L1 @fibs0 @fibs1)
+let main = @monadIO.bind.L1 @input @main.L1
+let nth_exn.L1 xs n =
+  match xs[2] with
+  | {0} -> $abort
+  | {1} x xs ->
+    match $le n[3] 0 with
+    | {0} -> @nth_exn.L1 xs[1] ($sub n[3] 1)
+    | {1} -> x[2]
+let zip_with.L1 f xs ys =
+  match xs[2] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    match ys[3] with
+    | {0} -> Pack{0,0}
+    | {1} y ys ->
+      Pack{1,2} (f[7] x[4] y[2]) (@zip_with.L1 f[7] xs[3] ys[1])
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let add_mod_prime.L1 x y =
+  let z = $add x[2] y[1] in
+  match $lt z[1] @prime with
+  | {0} -> $sub z[1] @prime
+  | {1} -> z[1]
+let main.L1 n = @print (@nth_exn.L1 @fibs0 n[1])
