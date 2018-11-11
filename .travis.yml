@@ -15,7 +15,9 @@ branches:
   only:
   - master
 
-os: osx
+os:
+- linux
+- osx
 
 # Do not choose a language; we provide our own build tools.
 language: generic
@@ -24,6 +26,7 @@ language: generic
 cache:
   directories:
   - $HOME/.stack
+  - $HOME/.local
 
 # Ensure necessary system libraries are present
 addons:
@@ -33,11 +36,11 @@ addons:
   homebrew:
     packages:
     - gmp
-    - haskell-stack
-    - nasm
-    update: true
 
 before_install:
+# Set up stack and nasm
+- ./.travis/setup.sh
+- export PATH=$HOME/.local/bin:$PATH
 # Install hlint
 - stack -j1 --no-terminal --install-ghc build hlint
 

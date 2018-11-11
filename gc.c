@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -59,7 +60,7 @@ void gc_init(gc_info* info) {
 
 void gc_print_cell(heap_cell* ptr) {
   uint64_t* raw_ptr = (uint64_t*) ptr;
-  printf("<0x%016llx(%u) 0x%016llx %016llx> @ 0x%016llx",
+  printf("<0x%016"PRIx64"(%u) 0x%016"PRIx64" %016"PRIx64"> @ 0x%016"PRIx64"",
          *raw_ptr, ptr->tag, *(raw_ptr+1), *(raw_ptr+2), (uint64_t) raw_ptr);
 }
 
@@ -189,8 +190,8 @@ void gc_collect(gc_info* info, uint64_t heap_claim) {
 void gc_stats(gc_info* info, uint64_t steps, uint64_t checks) {
   info->alloc_bytes += (uint64_t) info->heap_ptr;
 
-  fprintf(stderr, "Steps      : %12llu\n", steps);
-  fprintf(stderr, "Alloc bytes: %12llu          (Checks: %12llu)\n",
+  fprintf(stderr, "Steps      : %12"PRIu64"\n", steps);
+  fprintf(stderr, "Alloc bytes: %12"PRIu64"          (Checks: %12"PRIu64")\n",
          info->alloc_bytes, checks);
-  fprintf(stderr, "GC runs    : %12llu\n", info->num_gc_runs);
+  fprintf(stderr, "GC runs    : %12"PRIu64"\n", info->num_gc_runs);
 }
