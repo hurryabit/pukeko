@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 module Pukeko.MiddleEnd
   ( Module
   , Optimization (..)
