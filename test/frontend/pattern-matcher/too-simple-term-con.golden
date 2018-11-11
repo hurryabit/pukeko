@@ -1,4 +1,7 @@
 test/frontend/pattern-matcher/too-simple-term-con.pu:5:3:
+  |
+5 |   y -> y
+  |   ^
 unexpected 'y'
 expecting data constructor
 
