@@ -1,3 +1,4 @@
+%include "runtime.inc"
 g_declare_globals C.0.0, 0, C.0.1, 1, C.0.2, 2, C.0.3, 3, C.1.2, 2, B.ord, 1, B.chr, 1, B.seq, 2, B.putc, 1, functorIO, 0, monadIO, 0, putChar, 0, hello, 0, main, 0, foldableList.foldr.L1, 3, semi.L1, 2, semi.L2, 3, traverse_.L1, 3, functorIO.map.L1, 3, functorIO.map.L2, 2, monadIO.pure.L2, 1, monadIO.bind.L1, 3, monadIO.bind.L2, 2, io.L1, 3, io.L2, 2, putChar.L1, 1, main.L1, 1
 g_declare_main main
 

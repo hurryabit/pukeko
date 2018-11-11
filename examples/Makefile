@@ -9,10 +9,21 @@ HEAP_SIZE  = 0x10000000 # 256 MB
 STACK_SIZE = 0x04000000 #  64 MB
 
 ROOT = ..
-RUNTIME = $(ROOT)/runtime.inc
+RUNTIME_DIR := $(ROOT)
+RUNTIME_INC := $(RUNTIME_DIR)/runtime.inc
 LIBS = -lc
 
-NASM_FLAGS = -DHEAP_SIZE=$(HEAP_SIZE) -p $(RUNTIME) -f macho64
+NASM_FLAGS := -DHEAP_SIZE=$(HEAP_SIZE) -I$(RUNTIME_DIR)/
+LINK_FLAGS :=
+
+OS := $(shell uname -s)
+ifeq ($(OS), Darwin)
+  NASM_FLAGS += -f macho64
+  LINK_FLAGS += -Wl,-stack_size,$(STACK_SIZE)
+else
+  NASM_FLAGS += -f elf64
+endif
+
 
 SOURCES     = monad_io.pu \
 							hello.pu \
@@ -55,14 +66,14 @@ asm: $(ASSEMBLES)
 %.pub: %.pu std2/*.pu $(COMP)
 	$(COMP) bytecode $(OPTS) -o $@ $<
 
-%.o: %.asm $(RUNTIME)
+%.o: %.asm $(RUNTIME_INC)
 	$(NASM) -DDEBUG $(NASM_FLAGS) -o $@ $<
 
 gc.o: ../gc.c
 	clang -o $@ -c $<
 
 %: %.o gc.o
-	$(LINK) -Wl,-stack_size,$(STACK_SIZE) -o $@ gc.o $< $(LIBS)
+	$(LINK) $(LINK_FLAGS) -o $@ gc.o $< $(LIBS)
 
 clean:
 	rm -f $(ASSEMBLES) $(BYTECODES) $(OBJECTS) $(EXECUTABLES) *.in
