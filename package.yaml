@@ -1,10 +1,10 @@
 name: pukeko
-version: 0.0.1
+version: 0.0.2
 synopsis: "A toy compiler based on SPJ's book \"The Implementation of Functional Programming Languages\""
 description: Please see README.md
 category: Compilers/Interpreters
 author: Martin Huschenbett <martin.huschenbett@posteo.me>
-copyright: 2017 Martin Huschenbett
+copyright: 2017-2018 Martin Huschenbett
 license: BSD3
 github: hurryabit/pukeko
 

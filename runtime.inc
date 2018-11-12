@@ -1,14 +1,16 @@
 ;; -*-NASM-*-
 ;; G-Machine runtime
-global _main
-extern _exit
-extern _getchar
-extern _printf
-extern _putchar
-extern _scanf
-extern _gc_init
-extern _gc_collect
-extern _gc_stats
+%pragma macho64 prefix _
+
+global main
+extern exit
+extern getchar
+extern printf
+extern putchar
+extern scanf
+extern gc_init
+extern gc_collect
+extern gc_stats
 default rel
 
 %define NULL 0
@@ -161,15 +163,17 @@ default rel
 %endrep
 %endmacro
 
-;; Static allocation of globals
-%define GLOBAL(label) __global__ %+ label
+;; Static allocation of globals: Every global gets a data object which contains
+;; a pointer to the code of the global and will be treated like a heap object.
+%define GLOBAL_DATA(label) __data__ %+ label
+%define GLOBAL_CODE(label) __code__ %+ label
 
 %macro g_declare_globals 0-*
 section .data
   align 8
 __globals__start__:
 %rep %0 / 2
-  GLOBAL(%1):
+  GLOBAL_DATA(%1):
 %if %2 = 0
 %assign size GLOBAL_SIZE
 %else
@@ -184,8 +188,8 @@ __globals__end__:
 section .text
 __install__globals__:
 %rep %0 / 2
-  lea  rax, [GLOBAL(%1)+8]
-  lea  rbx, [%1]
+  lea  rax, [GLOBAL_DATA(%1)+8]
+  lea  rbx, [GLOBAL_CODE(%1)]
   mov  [rax], rbx
 %rotate 2
 %endrep
@@ -198,7 +202,7 @@ __install__globals__:
 
 %macro g_pushglobal 1
   @@(4)
-  lea  rax, [GLOBAL(%1)]
+  lea  rax, [GLOBAL_DATA(%1)]
   push rax
 %endmacro
 
@@ -217,7 +221,7 @@ __install__main__:
 
 ;; Stack control
 %macro g_globstart 2            ; %1 = name, % = arity
-%1:
+GLOBAL_CODE(%1):
 %ifdef DEBUG
   mov  rax, rbp
   sub  rax, rsp
@@ -497,7 +501,7 @@ __install__main__:
   lea  rdi, [FORMAT_PRINT]
   mov  rsi, [rax+8]
   mov  rax, 0
-  call _printf
+  call printf
   g_post_call_c
 %endmacro
 
@@ -508,7 +512,7 @@ __install__main__:
   lea  rdi, [FORMAT_INPUT]
   lea  rsi, [rhp+8]
   mov  rax, 0
-  call _scanf
+  call scanf
   g_post_call_c
   cmp  rax, 1
   je   %%ok
@@ -527,14 +531,14 @@ __install__main__:
   g_assert_int rax
   g_pre_call_c
   mov  rdi, [rax+8]
-  call _putchar
+  call putchar
   g_post_call_c
 %endmacro
 
 %macro g_getc 0
   g_claim 2
   g_pre_call_c
-  call _getchar
+  call getchar
   g_post_call_c
   movsx rax, eax                 ; getchar returns an int32 and we care about the sign
   push rhp
@@ -601,7 +605,7 @@ section .text
 section .text
 
 ;; "Main loop" of the evaluation
-_main:
+main:
   ; set up the stack
   push rbx
   push rbp
@@ -620,7 +624,7 @@ _main:
   mov  qword [rdi+88], 0
   mov  qword [rdi+96], 0
   g_pre_call_c
-  call _gc_init
+  call gc_init
   g_post_call_c
 
   ; set up the heap ptr
@@ -646,7 +650,7 @@ _main:
   mov  [rdi+72], rhp
   mov  rsi, step_ctr
   mov  rdx, claim_ctr
-  call _gc_stats
+  call gc_stats
   g_post_call_c
 
   ; exit
@@ -741,9 +745,9 @@ _return:
 _fail:
   g_pre_call_c
   mov  rax, 0
-  call _printf
+  call printf
   mov  rdi, 1
-  call _exit
+  call exit
 
 _gc:
   ; set up gc info
@@ -753,7 +757,7 @@ _gc:
   mov  [rdi+16], rax
   mov  [rdi+72], rhp
   g_pre_call_c
-  call _gc_collect
+  call gc_collect
   g_post_call_c
 
   ; set new heap ptr and limit
@@ -762,35 +766,46 @@ _gc:
   mov  rhl, [rdi+80]
   ret
 
+%ifndef __OUTPUT_FORMAT__
+  %error 'Output format not defined'
+%elifidn __OUTPUT_FORMAT__, elf64
+  %define PRId64 "ld"
+  %define PRIx64 "lx"
+%elifidn __OUTPUT_FORMAT__, macho64
+  %define PRId64 "lld"
+  %define PRIx64 "llx"
+%else
+  %error Unsupported output format: __OUTPUT_FORMAT__
+%endif
 
 section .data
 align 8
 FORMAT_PRINT:
-  db "%lld", 10, 0
+  db "%", PRId64, 10, 0
 FORMAT_INPUT:
-  db "%lld", 0
+  db "%", PRId64, 0
 FORMAT_DEBUG:
-  db "TAG : 0x%016llx", 10, "ARG1: 0x%016llx", 10, "ARG2: 0x%016llx", 10, 0
+  db "TAG : 0x%016", PRIx64, 10, "ARG1: 0x%016", PRIx64, 10, "ARG2: 0x%016", PRIx64, 10, 0
 MISSING_ARGUMENTS:
   db "MISSING ARGUMENTS", 10, 0
 MSG_BAD_INPUT:
   db "INVALID INPUT", 10, 0
 MSG_BAD_TAG_UNCONS:
-  db "BAD TAG IN UNCONS: #%016llx", 10, 0
+  db "BAD TAG IN UNCONS: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_PROJ:
-  db "BAD TAG IN PROJ: #%016llx", 10, 0
+  db "BAD TAG IN PROJ: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_JUMPCASE:
-  db "BAD TAG IN JUMPCASE: #%016llx", 10, 0
+  db "BAD TAG IN JUMPCASE: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_EXIT:
-  db "BAD TAG AT EXIT: #%016llx", 10, 0
+  db "BAD TAG AT EXIT: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_UPDATE:
-  db "BAD TAG IN UPDATE: #%016llx", 10, 0
+  db "BAD TAG IN UPDATE: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_EVAL:
-  db "BAD TAG IN EVAL: #%016llx", 10, 0
+  db "BAD TAG IN EVAL: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_UNWIND:
-  db "BAD TAG IN UNWIND: #%016llx", 10, 0
+  db "BAD TAG IN UNWIND: #%016", PRIx64, 10, 0
 MSG_BAD_TAG_RETURN:
-  db "BAD TAG IN RETURN: #%016llx", 10, 0
+  db "BAD TAG IN RETURN: #%016", PRIx64, 10, 0
 MSG_EXPECTED_INT:
   db "EXPECTED INT TAG", 10, 0
 ABORT_CALLED:

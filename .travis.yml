@@ -11,6 +11,14 @@
 # Use new container infrastructure to enable caching
 sudo: false
 
+branches:
+  only:
+  - master
+
+os:
+- linux
+- osx
+
 # Do not choose a language; we provide our own build tools.
 language: generic
 
@@ -18,20 +26,23 @@ language: generic
 cache:
   directories:
   - $HOME/.stack
+  - $HOME/.local
 
 # Ensure necessary system libraries are present
 addons:
   apt:
     packages:
-      - libgmp-dev
+    - libgmp-dev
+  homebrew:
+    packages:
+    - gmp
 
 before_install:
-# Download and unpack the stack executable
-- mkdir -p ~/.local/bin
+# Set up stack and nasm
+- ./.travis/setup.sh
 - export PATH=$HOME/.local/bin:$PATH
-- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
 # Install hlint
-- stack -j1 --no-terminal --install-ghc build # hlint
+- stack -j1 --no-terminal --install-ghc build hlint
 
 install:
 # Build dependencies
@@ -39,6 +50,6 @@ install:
 
 script:
 # Run hlint
-# - stack exec hlint -- --git
+- stack exec hlint -- --git
 # Build the package, its tests, and its docs and run the tests
-- stack -j1 --no-terminal test --pedantic :golden
+- stack -j1 --no-terminal test --pedantic

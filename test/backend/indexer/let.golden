@@ -1,3 +1,4 @@
+%include "runtime.inc"
 g_declare_globals B.add, 2, main, 1
 g_declare_main main
 

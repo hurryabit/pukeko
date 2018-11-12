@@ -13,25 +13,26 @@ module Pukeko.FrontEnd.Parser
 import Pukeko.Prelude hiding (lctd, many, some)
 
 import qualified Control.Applicative.Combinators.NonEmpty as NE
-import qualified Control.Monad.RWS as RWS
-import qualified Data.List.NE as NE
-import qualified Data.Set as Set
-import           System.FilePath as Sys
-import           Text.Megaparsec hiding (parse, parseTest)
-import qualified Text.Megaparsec as MP
-import           Text.Megaparsec.Char hiding (space)
-import qualified Text.Megaparsec.Char.Lexer as L
-import           Text.Megaparsec.Expr
+import           Control.Monad.Combinators.Expr
+import qualified Control.Monad.RWS                        as RWS
+import qualified Data.List.NE                             as NE
+import qualified Data.Set                                 as Set
+import           System.FilePath                          as Sys
+import           Text.Megaparsec                          hiding (parse,
+                                                           parseTest)
+import qualified Text.Megaparsec                          as MP
+import           Text.Megaparsec.Char                     hiding (space)
+import qualified Text.Megaparsec.Char.Lexer               as L
 
-import           Pukeko.AST.Name hiding (Name)
-import           Pukeko.AST.Operator (Spec (..))
-import qualified Pukeko.AST.Operator as Op
+import           Pukeko.AST.Name              hiding (Name)
+import           Pukeko.AST.Operator          (Spec (..))
+import qualified Pukeko.AST.Operator          as Op
 import           Pukeko.AST.Surface
 import           Pukeko.FrontEnd.Parser.Build (build)
 
 parseInput :: (Member (Error Failure) effs) => FilePath -> String -> Eff effs Module
 parseInput file =
-  either (throwFailure . pretty . parseErrorPretty) pure .
+  either (throwFailure . pretty . errorBundlePretty) pure .
   parse (module_ file <* eof) file
 
 parseModule ::
@@ -46,11 +47,21 @@ parsePackage = build parseModule
 
 type Parser = RWS.RWST (Pos, Ordering) () SourcePos (Parsec Void String)
 
-parse :: Parser a -> FilePath -> String -> Either (ParseError Char Void) a
+parse :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
 parse p file = MP.parse (fst <$> RWS.evalRWST p (pos1, EQ) (initialPos file)) file
 
 parseTest :: (Show a) => Parser a -> String -> IO ()
-parseTest p = either (putStrLn . parseErrorPretty) print . parse p ""
+parseTest p = either (putStrLn . errorBundlePretty) print . parse p ""
+
+getPosition :: MonadParsec e s m => m SourcePos
+getPosition = do
+  st <- getParserState
+  -- We're not interested in the line at which the offset is located in
+  -- this case, but the same 'reachOffset' function is used in
+  -- 'errorBundlePretty'.
+  let (pos, _, pst) = reachOffset (stateOffset st) (statePosState st)
+  setParserState st { statePosState = pst }
+  return pos
 
 space :: Parser ()
 space = do
