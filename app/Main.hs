@@ -21,6 +21,7 @@ data Options = Options
   { optInfile :: FilePath
   , optOutfile :: Maybe FilePath
   , optUnsafe :: Bool
+  , optDirty :: Bool
   , optDetailed :: Bool
   }
 
@@ -53,7 +54,7 @@ frontEnd opts = do
 middleEnd :: Options -> [MiddleEnd.Optimization] -> CompilerM MiddleEnd.Module
 middleEnd opts optims = do
   module_sf <- frontEnd opts
-  let cfg = MiddleEnd.Config optims (not (optUnsafe opts))
+  let cfg = MiddleEnd.Config optims (not (optUnsafe opts)) (not (optDirty opts))
   MiddleEnd.run cfg module_sf
 
 
@@ -89,6 +90,7 @@ options = Options
       <> metavar "OUTFILE"
       <> help "Write output to OUTFILE" ))
   <*> switch (long "unsafe" <> help "Don't run the type checker")
+  <*> switch (long "dirty" <> help "Don't eliminate dead code")
   <*> switch (long "detailed" <> help "Render output in detailed mode")
 
 optimizations :: Parser [MiddleEnd.Optimization]
@@ -100,7 +102,6 @@ optimizations =
       'E' -> Just MiddleEnd.EtaReduction
       'A' -> Just MiddleEnd.AliasInlining
       'I' -> Just MiddleEnd.Inlining
-      'D' -> Just MiddleEnd.DeadCodeElimination
       _   -> Nothing
 
 cmds :: Parser (IO ())
