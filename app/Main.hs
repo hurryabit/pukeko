@@ -101,7 +101,6 @@ optimizations =
       'A' -> Just MiddleEnd.AliasInlining
       'I' -> Just MiddleEnd.Inlining
       'D' -> Just MiddleEnd.DeadCodeElimination
-      'P' -> Just MiddleEnd.Prettification
       _   -> Nothing
 
 cmds :: Parser (IO ())

@@ -20,7 +20,6 @@ import qualified Pukeko.MiddleEnd.DeadCode as DeadCode
 import qualified Pukeko.MiddleEnd.EtaReducer as EtaReducer
 import qualified Pukeko.MiddleEnd.Inliner as Inliner
 import qualified Pukeko.MiddleEnd.LambdaLifter as LambdaLifter
-import qualified Pukeko.MiddleEnd.Prettifier as Prettifier
 import qualified Pukeko.MiddleEnd.TypeEraser as TypeEraser
 
 type Module = (Core.Module, NoLambda.Module)
@@ -30,7 +29,6 @@ data Optimization
   | AliasInlining
   | Inlining
   | DeadCodeElimination
-  | Prettification
 
 data Config = Config
   { optimizations :: [Optimization]
@@ -39,7 +37,7 @@ data Config = Config
 
 defaultConfig :: Config
 defaultConfig = Config
-  { optimizations = [EtaReduction, Inlining, Inlining, Inlining, DeadCodeElimination, Prettification]
+  { optimizations = [EtaReduction, Inlining, Inlining, Inlining, DeadCodeElimination]
   , typeChecking  = True
   }
 
@@ -49,7 +47,6 @@ runOptimization = \case
   AliasInlining       -> pure . AliasInliner.inlineModule
   Inlining            -> Inliner.inlineModule
   DeadCodeElimination -> pure . DeadCode.cleanModule
-  Prettification      -> pure . Prettifier.prettifyModule
 
 run :: forall effs. Members [NameSource, Error Failure] effs =>
   Config -> SysF.Module SystemF -> Eff effs Module
