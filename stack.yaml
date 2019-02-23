@@ -1,4 +1,4 @@
-resolver: nightly-2018-11-11
+resolver: lts-13.8
 
 packages:
 - '.'
