@@ -26,7 +26,6 @@ language: generic
 cache:
   directories:
   - $HOME/.stack
-  - $HOME/.local
 
 # Ensure necessary system libraries are present
 addons:
@@ -36,9 +35,11 @@ addons:
   homebrew:
     packages:
     - gmp
+    - haskell-stack
+    - nasm
 
 before_install:
-# Set up stack and nasm
+# Set up stack and nasm on Linux
 - ./.travis/setup.sh
 - export PATH=$HOME/.local/bin:$PATH
 # Install hlint
