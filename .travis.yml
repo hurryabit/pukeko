@@ -19,14 +19,14 @@ os:
 - linux
 - osx
 
-# Do not choose a language; we provide our own build tools.
-language: generic
+# We use nix as our package manager on Linux.
+language: nix
+nix: 2.2.1
 
 # Caching so the next build will be fast too.
 cache:
   directories:
   - $HOME/.stack
-  - $HOME/.local
 
 # Ensure necessary system libraries are present
 addons:
@@ -36,11 +36,12 @@ addons:
   homebrew:
     packages:
     - gmp
+    - haskell-stack
+    - nasm
 
 before_install:
-# Set up stack and nasm
-- ./.travis/setup.sh
-- export PATH=$HOME/.local/bin:$PATH
+# Set up stack and nasm on Linux
+- if [ $TRAVIS_OS_NAME = "linux" ]; then nix-env --install nasm stack; fi
 # Install hlint
 - stack -j1 --no-terminal --install-ghc build hlint
 
