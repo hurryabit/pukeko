@@ -26,7 +26,6 @@ language: generic
 cache:
   directories:
   - $HOME/.stack
-  - $HOME/.local
 
 # Ensure necessary system libraries are present
 addons:
