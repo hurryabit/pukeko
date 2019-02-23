@@ -13,8 +13,7 @@ assemble :: Member (Error Failure) effs => Program -> Eff effs String
 assemble MkProgram { _globals, _main } = do
   let funs = [ (_name, _arity) | MkGlobal{_name, _arity} <- _globals ]
       prolog = unlines
-        [ "%include \"runtime.inc\""
-        , "g_declare_globals " ++ intercalate ", " (map (\(f, k) -> unName f ++ ", " ++ show k) funs)
+        [ "g_declare_globals " ++ intercalate ", " (map (\(f, k) -> unName f ++ ", " ++ show k) funs)
         , "g_declare_main " ++ unName _main
         ]
   globals <- traverse assembleGlobal _globals
