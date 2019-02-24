@@ -17,7 +17,8 @@ if [[ ! -x $BINDIR/stack ]]; then
 fi
 
 # Get NASM if we don't have it already
-readonly NASMVER=2.14
+# To upgrade, we need to remove the cache first
+readonly NASMVER=2.14.02
 
 if [[ ! -x $BINDIR/nasm ]]; then
   readonly SRCDIR=$HOME/src
@@ -46,3 +47,6 @@ if [[ ! -x $BINDIR/nasm ]]; then
 
   popd
 fi
+
+stack --version
+nasm -v
