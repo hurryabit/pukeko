@@ -40,7 +40,6 @@ import Data.Char (toLower)
 import Data.Function
 import Data.Kind
 import Data.Tagged
-import Text.Megaparsec.Pos (SourcePos)
 
 import Pukeko.AST.Pos
 import Pukeko.Orphans ()

@@ -10,7 +10,6 @@ where
 import Pukeko.Prelude
 
 import           Control.Monad.Freer.Supply
-import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.Sized as LS
 import qualified Data.Map.Extended as Map
 
