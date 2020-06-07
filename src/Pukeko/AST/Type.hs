@@ -43,7 +43,7 @@ import Pukeko.Pretty
 import qualified Bound as B
 import qualified Bound.Name as B
 import qualified Bound.Var as B
-import           Control.Lens (Iso', iso)
+import           Control.Lens (Iso')
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Deriving

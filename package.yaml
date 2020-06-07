@@ -4,7 +4,7 @@ synopsis: "A toy compiler based on SPJ's book \"The Implementation of Functional
 description: Please see README.md
 category: Compilers/Interpreters
 author: Martin Huschenbett <martin.huschenbett@posteo.me>
-copyright: 2017-2018 Martin Huschenbett
+copyright: 2017-2020 Martin Huschenbett
 license: BSD3
 github: hurryabit/pukeko
 
@@ -21,7 +21,6 @@ default-extensions:
 - FlexibleInstances
 - GeneralizedNewtypeDeriving
 - LambdaCase
-- MonadFailDesugaring
 - NamedFieldPuns
 - NoImplicitPrelude
 - OverloadedStrings
@@ -36,6 +35,7 @@ default-extensions:
 - ViewPatterns
 ghc-options:
 - -Wall
+- -Werror
 - -O0
 
 library:

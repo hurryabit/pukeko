@@ -7,7 +7,7 @@ module Control.Lens.Freer
   , locally
   ) where
 
-import Control.Lens hiding (modifying, use, uses, view, views)
+import Control.Lens hiding (locally, modifying, use, uses, view, views)
 import Control.Monad.Freer
 import Control.Monad.Freer.Reader
 import Control.Monad.Freer.State

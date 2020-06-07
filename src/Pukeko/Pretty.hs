@@ -35,7 +35,6 @@ module Pukeko.Pretty
 import Prelude
 
 import           Data.Foldable
-import           Data.Semigroup (Semigroup (..))
 import           Data.Tagged
 import           Data.Void
 import           Text.Megaparsec.Pos (SourcePos, sourcePosPretty)

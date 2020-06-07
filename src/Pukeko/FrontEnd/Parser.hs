@@ -59,9 +59,9 @@ getPosition = do
   -- We're not interested in the line at which the offset is located in
   -- this case, but the same 'reachOffset' function is used in
   -- 'errorBundlePretty'.
-  let (pos, _, pst) = reachOffset (stateOffset st) (statePosState st)
+  let (_, pst) = reachOffset (stateOffset st) (statePosState st)
   setParserState st { statePosState = pst }
-  return pos
+  return (pstateSourcePos pst)
 
 space :: Parser ()
 space = do
