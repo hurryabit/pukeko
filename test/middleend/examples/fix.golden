@@ -281,3 +281,127 @@ main.L3 :: Int -> IO Unit =
           sequence.L3 @Int @IO monadIO (replicate.L1 @(IO Int) n input)
     in
     coerce @(_ -> IO) (monadIO.bind.L1 @(List Int) @Unit mx main.L2)
+================================================================================
+asm le
+asm sub
+asm mul
+asm seq
+asm puti
+asm geti
+let functorIO = Pack{0,1} @functorIO.map.L2
+let monadIO =
+  Pack{0,3} @functorIO @monadIO.pure.L2 @monadIO.bind.L2
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let functorFox2 bifunctor.p =
+  Pack{0,1} (@functorFox2.map.L1 bifunctor.p[1])
+let poly bifunctor.p =
+  @compose.L1 @fix2.L1 (@compose.L1 ((match bifunctor.p[1] with
+                                      | {0} bimap ->
+                                        bimap[1]) @id.L1 (@poly bifunctor.p[1])) @unFix.L1)
+let mono bifunctor.p =
+  @compose.L1 @fix.L1 (@compose.L1 ((match bifunctor.p[1] with
+                                     | {0} bimap ->
+                                       bimap[1]) @id.L1 (@mono bifunctor.p[1])) @unFix2.L1)
+let bifunctorListF = Pack{0,1} @bifunctorListF.bimap.L1
+let main = @monadIO.bind.L1 @input @main.L3
+let id.L1 x = x[1]
+let compose.L1 f g x = f[3] (g[2] x[1])
+let foldableList.foldr.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> f[5] x[2] (@foldableList.foldr.L1 f[5] y0[4] xs[1])
+let replicate.L1 n x =
+  match $le n[2] 0 with
+  | {0} -> Pack{1,2} x[1] (@replicate.L1 ($sub n[2] 1) x[1])
+  | {1} -> Pack{0,0}
+let semi.L1 m2 x = m2[2]
+let semi.L2 monad.m m1 m2 =
+  (match monad.m[3] with
+   | {0} _ _ bind -> bind[1]) m1[2] (@semi.L1 m2[1])
+let sequence.L1 monad.m x xs =
+  (match monad.m[3] with
+   | {0} _ pure _ -> pure[2]) (Pack{1,2} x[2] xs[1])
+let sequence.L2 monad.m ms x =
+  (match monad.m[3] with
+   | {0} _ _ bind ->
+     bind[1]) (@sequence.L3 monad.m[3] ms[2]) (@sequence.L1 monad.m[3] x[1])
+let sequence.L3 monad.m ms =
+  match ms[1] with
+  | {0} ->
+    (match monad.m[2] with
+     | {0} _ pure _ -> pure[2]) Pack{0,0}
+  | {1} m ms ->
+    (match monad.m[4] with
+     | {0} _ _ bind -> bind[1]) m[2] (@sequence.L2 monad.m[4] ms[1])
+let traverse_.L1 monad.m f x = @semi.L2 monad.m[3] (f[2] x[1])
+let functorIO.map.L1 f mx world0 =
+  match mx[2] world0[1] with
+  | {0} x world1 -> Pack{0,2} (f[5] x[2]) world1[1]
+let functorIO.map.L2 f mx = @functorIO.map.L1 f[2] mx[1]
+let monadIO.pure.L2 x = Pack{0,2} x[1]
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let monadIO.bind.L2 mx f = @monadIO.bind.L1 mx[2] f[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let fix.L1 x = x[1]
+let unFix.L1 x = x[1]
+let cata.L1 functor.f f =
+  @compose.L1 f[1] (@compose.L1 ((match functor.f[2] with
+                                  | {0} map -> map[1]) (@cata.L1 functor.f[2] f[1])) @unFix.L1)
+let ana.L1 functor.f f =
+  @compose.L1 @fix.L1 (@compose.L1 ((match functor.f[2] with
+                                     | {0} map -> map[1]) (@ana.L1 functor.f[2] f[1])) f[1])
+let fix2.L1 x = x[1]
+let unFix2.L1 x = x[1]
+let functorFox2.map.L1 bifunctor.p f =
+  @compose.L1 @fix2.L1 (@compose.L1 ((match bifunctor.p[2] with
+                                      | {0} bimap -> bimap[1]) f[1] let dict =
+                                                                          @functorFox2 bifunctor.p[2]
+                                                                    in
+                                                                    (match dict[1] with
+                                                                     | {0} map ->
+                                                                       map[1]) f[2]) @unFix2.L1)
+let functorListF.map.L1 = @bifunctorListF.bimap.L1 @id.L1
+let bifunctorListF.bimap.L1 f g x =
+  match x[1] with
+  | {0} -> Pack{0,0}
+  | {1} y z -> Pack{1,2} (f[5] y[2]) (g[4] z[1])
+let toList.L1 x =
+  match x[1] with
+  | {0} -> Pack{0,0}
+  | {1} y ys -> Pack{1,2} y[2] ys[1]
+let fromList.L1 x =
+  match x[1] with
+  | {0} -> Pack{0,0}
+  | {1} y ys -> Pack{1,2} y[2] ys[1]
+let main.L1 = $mul 2
+let main.L2 xs =
+  @foldableList.foldr.L1 (@traverse_.L1 @monadIO @print) (Pack{0,2} Pack{0,0}) let f =
+                                                                                     @cata.L1 (Pack{0,1} @functorListF.map.L1) @toList.L1
+                                                                               in
+                                                                               let g =
+                                                                                     @mono @bifunctorListF
+                                                                               in
+                                                                               let x =
+                                                                                     let dict =
+                                                                                           @functorFox2 @bifunctorListF
+                                                                                     in
+                                                                                     (match dict[1] with
+                                                                                      | {0} map ->
+                                                                                        map[1]) @main.L1 let f =
+                                                                                                               @poly @bifunctorListF
+                                                                                                         in
+                                                                                                         let g =
+                                                                                                               @ana.L1 (Pack{0,1} @functorListF.map.L1) @fromList.L1
+                                                                                                         in
+                                                                                                         f[2] (g[1] xs[6])
+                                                                               in
+                                                                               f[3] (g[2] x[1])
+let main.L3 n =
+  let mx = @sequence.L3 @monadIO (@replicate.L1 n[1] @input) in
+  @monadIO.bind.L1 mx[1] @main.L2

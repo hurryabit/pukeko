@@ -210,3 +210,141 @@ main.L6 :: Int -> IO Unit =
   \(n :: Int) ->
     let f :: Int -> IO Unit = main.L5 n in
     coerce @(_ -> IO) (monadIO.bind.L1 @Int @Unit input f)
+================================================================================
+asm abort
+asm lt
+asm le
+asm gt
+asm add
+asm sub
+asm seq
+asm puti
+asm geti
+let functorIO = Pack{0,1} @functorIO.map.L2
+let monadIO =
+  Pack{0,3} @functorIO @monadIO.pure.L2 @monadIO.bind.L2
+let print = @io.L2 $puti
+let input = @io.L1 $geti Pack{0,0}
+let nats =
+  let rec nats_from = @nats.L1 nats_from[1] in
+  nats_from[1] 0
+let infinity = 1000000000
+let main = @monadIO.bind.L1 @input @main.L6
+let replicate.L1 n x =
+  match $le n[2] 0 with
+  | {0} -> Pack{1,2} x[1] (@replicate.L1 ($sub n[2] 1) x[1])
+  | {1} -> Pack{0,0}
+let zip_with.L1 f xs ys =
+  match xs[2] with
+  | {0} -> Pack{0,0}
+  | {1} x xs ->
+    match ys[3] with
+    | {0} -> Pack{0,0}
+    | {1} y ys ->
+      Pack{1,2} (f[7] x[4] y[2]) (@zip_with.L1 f[7] xs[3] ys[1])
+let sequence.L1 monad.m x xs =
+  (match monad.m[3] with
+   | {0} _ pure _ -> pure[2]) (Pack{1,2} x[2] xs[1])
+let sequence.L2 monad.m ms x =
+  (match monad.m[3] with
+   | {0} _ _ bind ->
+     bind[1]) (@sequence.L3 monad.m[3] ms[2]) (@sequence.L1 monad.m[3] x[1])
+let sequence.L3 monad.m ms =
+  match ms[1] with
+  | {0} ->
+    (match monad.m[2] with
+     | {0} _ pure _ -> pure[2]) Pack{0,0}
+  | {1} m ms ->
+    (match monad.m[4] with
+     | {0} _ _ bind -> bind[1]) m[2] (@sequence.L2 monad.m[4] ms[1])
+let functorIO.map.L1 f mx world0 =
+  match mx[2] world0[1] with
+  | {0} x world1 -> Pack{0,2} (f[5] x[2]) world1[1]
+let functorIO.map.L2 f mx = @functorIO.map.L1 f[2] mx[1]
+let monadIO.pure.L2 x = Pack{0,2} x[1]
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let monadIO.bind.L2 mx f = @monadIO.bind.L1 mx[2] f[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let nats.L1 nats_from n =
+  Pack{1,2} n[1] (nats_from[2] ($add n[1] 1))
+let pair.L1 op xs1 =
+  match xs1[1] with
+  | {0} -> Pack{0,0}
+  | {1} pm$1 pm$2 ->
+    match pm$2[1] with
+    | {0} -> xs1[3]
+    | {1} x2 xs3 ->
+      Pack{1,2} (op[6] pm$1[4] x2[2]) (@pair.L1 op[6] xs3[1])
+let single.L1 i x = Pack{1,5} i[2] i[2] x[1] Pack{0,0} Pack{0,0}
+let combine.L1 op t1 t2 =
+  match t1[2] with
+  | {0} -> $abort
+  | {1} s1 _ v1 _ _ ->
+    match t2[6] with
+    | {0} -> $abort
+    | {1} _ e2 v2 _ _ ->
+      Pack{1,5} s1[10] e2[4] (op[13] v1[8] v2[3]) t1[12] t2[11]
+let build.L1 op run ts =
+  match ts[1] with
+  | {0} -> $abort
+  | {1} pm$1 pm$2 ->
+    match pm$2[1] with
+    | {0} -> pm$1[2]
+    | {1} _ _ -> run[6] (@pair.L1 (@combine.L1 op[7]) ts[5])
+let query.L1 one op q_lo q_hi aux t =
+  match t[1] with
+  | {0} -> one[6]
+  | {1} t_lo t_hi value left right ->
+    match let x = $lt q_hi[8] t_lo[5] in
+          let y = $gt q_lo[10] t_hi[5] in
+          match x[2] with
+          | {0} -> y[1]
+          | {1} -> Pack{1,0} with
+    | {0} ->
+      match let x = $le q_lo[9] t_lo[5] in
+            let y = $le t_hi[5] q_hi[9] in
+            match x[2] with
+            | {0} -> Pack{0,0}
+            | {1} -> y[1] with
+      | {0} -> op[10] (aux[7] left[2]) (aux[7] right[1])
+      | {1} -> value[3]
+    | {1} -> one[11]
+let min.L1 x y =
+  match $le x[2] y[1] with
+  | {0} -> y[1]
+  | {1} -> x[2]
+let main.L1 t lo hi =
+  let res =
+        let rec aux = @query.L1 @infinity @min.L1 lo[3] hi[2] aux[1] in
+        aux[1] t[4]
+  in
+  @print res[1]
+let main.L2 t lo =
+  let f = @main.L1 t[2] lo[1] in
+  @monadIO.bind.L1 @input f[1]
+let main.L3 x = Pack{0,2} Pack{0,0}
+let main.L4 m xs =
+  let t =
+        let rec run = @build.L1 @min.L1 run[1] in
+        run[1] (@zip_with.L1 @single.L1 @nats xs[2])
+  in
+  let mx =
+        let act =
+              let f = @main.L2 t[1] in
+              @monadIO.bind.L1 @input f[1]
+        in
+        @sequence.L3 @monadIO (@replicate.L1 m[4] act[1])
+  in
+  @monadIO.bind.L1 mx[1] @main.L3
+let main.L5 n m =
+  let mx = @sequence.L3 @monadIO (@replicate.L1 n[2] @input) in
+  let f = @main.L4 m[2] in
+  @monadIO.bind.L1 mx[2] f[1]
+let main.L6 n =
+  let f = @main.L5 n[1] in
+  @monadIO.bind.L1 @input f[1]

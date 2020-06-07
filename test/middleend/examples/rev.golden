@@ -108,3 +108,56 @@ read.L1 :: List Char -> Option Char -> IO (List Char) =
     case c_opt of
     | None -> coerce @(_ -> IO) (Pair @(List Char) @World cs)
     | Some c -> read (Cons @Char c cs)
+================================================================================
+asm lt
+asm ord
+asm chr
+asm seq
+asm putc
+asm getc
+let functorIO = Pack{0,1} @functorIO.map.L2
+let monadIO =
+  Pack{0,3} @functorIO @monadIO.pure.L2 @monadIO.bind.L2
+let putChar = @io.L2 @putChar.L1
+let getChar = @io.L1 @getChar.L1 Pack{0,0}
+let read cs =
+  let f = @read.L1 cs[1] in
+  @monadIO.bind.L1 @getChar f[1]
+let main =
+  let mx = @read Pack{0,0} in
+  let f =
+        @foldableList.foldr.L1 (@traverse_.L1 @monadIO @putChar) (Pack{0,2} Pack{0,0})
+  in
+  @monadIO.bind.L1 mx[2] f[1]
+let foldableList.foldr.L1 f y0 xs =
+  match xs[1] with
+  | {0} -> y0[2]
+  | {1} x xs -> f[5] x[2] (@foldableList.foldr.L1 f[5] y0[4] xs[1])
+let semi.L1 m2 x = m2[2]
+let semi.L2 monad.m m1 m2 =
+  (match monad.m[3] with
+   | {0} _ _ bind -> bind[1]) m1[2] (@semi.L1 m2[1])
+let traverse_.L1 monad.m f x = @semi.L2 monad.m[3] (f[2] x[1])
+let functorIO.map.L1 f mx world0 =
+  match mx[2] world0[1] with
+  | {0} x world1 -> Pack{0,2} (f[5] x[2]) world1[1]
+let functorIO.map.L2 f mx = @functorIO.map.L1 f[2] mx[1]
+let monadIO.pure.L2 x = Pack{0,2} x[1]
+let monadIO.bind.L1 mx f world0 =
+  match mx[3] world0[1] with
+  | {0} x world1 -> (f[4] x[2]) world1[1]
+let monadIO.bind.L2 mx f = @monadIO.bind.L1 mx[2] f[1]
+let io.L1 f x world =
+  let y = f[3] x[2] in
+  $seq y[1] (Pack{0,2} y[1] world[2])
+let io.L2 f x = @io.L1 f[2] x[1]
+let putChar.L1 c = $putc ($ord c[1])
+let getChar.L1 u =
+  let n = $getc u[1] in
+  match $lt n[1] 0 with
+  | {0} -> Pack{1,1} ($chr n[1])
+  | {1} -> Pack{0,0}
+let read.L1 cs c_opt =
+  match c_opt[1] with
+  | {0} -> Pack{0,2} cs[2]
+  | {1} c -> @read (Pack{1,2} c[1] cs[3])
