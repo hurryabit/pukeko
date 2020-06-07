@@ -23,7 +23,7 @@ module Pukeko.FrontEnd.Info
 
 import Pukeko.Prelude
 
-import           Control.Lens (foldMapOf, _Right)
+import           Control.Lens (foldMapOf)
 import qualified Data.Map.Extended as Map
 import           Pukeko.AST.ConDecl
 import           Pukeko.AST.Expr

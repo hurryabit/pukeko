@@ -4,7 +4,7 @@ module Pukeko.MiddleEnd.Inliner where
 
 import Pukeko.Prelude
 
-import           Control.Lens (matching, _1)
+import           Control.Lens (matching)
 import           Control.Lens.Extras (is)
 import           Data.Either.Extra (fromRight')
 import qualified Data.Map.Extended as Map

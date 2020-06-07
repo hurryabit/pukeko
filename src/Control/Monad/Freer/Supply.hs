@@ -9,7 +9,6 @@ module Control.Monad.Freer.Supply
 import Control.Monad
 import Control.Monad.Freer
 import Control.Monad.Freer.State
-import Control.Natural (type (~>))
 import Data.Function ((.))
 
 data Supply s a where

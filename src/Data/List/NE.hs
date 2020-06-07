@@ -10,7 +10,6 @@ module Data.List.NE
 
 import Prelude hiding (unzip3, zipWith, (++))
 
-import           Data.Foldable (sequence_)
 import qualified Data.List as L
 import           Data.List.NonEmpty
 import qualified Data.Vector as V
