@@ -18,7 +18,7 @@ fi
 
 # Get NASM if we don't have it already
 # To upgrade, we need to remove the cache first
-readonly NASMVER=2.14.02
+readonly NASMVER=2.15.05
 
 if [[ ! -x $BINDIR/nasm ]]; then
   readonly SRCDIR=$HOME/src
