@@ -53,7 +53,7 @@ parse p file = MP.parse (fst <$> RWS.evalRWST p (pos1, EQ) (initialPos file)) fi
 parseTest :: (Show a) => Parser a -> String -> IO ()
 parseTest p = either (putStrLn . errorBundlePretty) print . parse p ""
 
-getPosition :: MonadParsec e s m => m SourcePos
+getPosition :: (MonadParsec e s m, TraversableStream s) => m SourcePos
 getPosition = do
   st <- getParserState
   -- We're not interested in the line at which the offset is located in

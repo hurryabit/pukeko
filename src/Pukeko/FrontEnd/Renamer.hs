@@ -285,7 +285,7 @@ rnExtnDecl :: GlobalEffs effs => Ps.ExtnDecl -> Eff effs (ExtnDecl Out)
 rnExtnDecl (Ps.MkExtnDecl binder extn) = do
   name0 <- lookupGlobalName evarTab _DSign "undeclared function" binder
   let name1 = set namePos (getPos binder) name0
-  MkExtnDecl name1 NoType <$> pure extn
+  pure (MkExtnDecl name1 NoType extn)
 
 -- | Rename a class declaration. Due to the FIXME for 'rnConstraints', all
 -- constraints which methods put on the class type variables are silently
